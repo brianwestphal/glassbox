@@ -11,6 +11,9 @@ export default defineConfig({
   sourcemap: true,
   // Bundle everything except node_modules dependencies
   noExternal: [/^(?!@electric-sql|hono|@hono)/],
+  define: {
+    'process.env.BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
+  },
   esbuildOptions(options) {
     options.jsx = 'automatic';
     options.jsxImportSource = '#jsx';

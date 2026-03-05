@@ -504,6 +504,77 @@ body {
   flex-shrink: 0;
 }
 
+/* Stale annotations */
+.annotation-stale {
+  opacity: 0.7;
+}
+
+.annotation-row:has(.annotation-stale) {
+  border-left-color: var(--orange);
+  background: rgba(250,179,135,0.05);
+}
+
+.btn-keep { color: var(--orange); }
+.btn-keep:hover { background: rgba(250,179,135,0.15); }
+
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; padding: 3px 4px; }
+.btn-icon svg { display: block; }
+
+.annotation-category[data-action="reclassify"] { cursor: pointer; }
+.annotation-category[data-action="reclassify"]:hover { filter: brightness(1.3); }
+
+.reclassify-popup {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  min-width: 140px;
+}
+
+.reclassify-option {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.reclassify-option:hover {
+  background: var(--bg-hover);
+}
+
+.reclassify-option.active {
+  background: rgba(137,180,250,0.1);
+}
+
+/* Stale indicator dot */
+.stale-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  flex-shrink: 0;
+}
+
+/* Drag handle */
+.annotation-drag-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+  padding: 0 2px;
+}
+
+.annotation-drag-handle:hover {
+  color: var(--text);
+}
+
+/* Drop target highlight */
+.diff-line.drag-over {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* Annotation form */
 .annotation-form-container {
   padding: 12px 16px 12px 76px;
@@ -517,14 +588,13 @@ body {
   gap: 8px;
 }
 
-.annotation-form select {
-  width: auto;
-  padding: 4px 8px;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 12px;
+.form-category-badge {
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.form-category-badge:hover {
+  filter: brightness(1.3);
 }
 
 .annotation-form textarea {
@@ -540,8 +610,7 @@ body {
   resize: vertical;
 }
 
-.annotation-form textarea:focus,
-.annotation-form select:focus {
+.annotation-form textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -730,6 +799,42 @@ body:has(.history-page) {
 .modal h3 { margin-bottom: 12px; }
 .modal p { margin-bottom: 16px; color: var(--text-dim); font-size: 14px; }
 
+.modal-label { margin-bottom: 4px !important; font-size: 13px !important; color: var(--text-dim) !important; }
+
+.modal-copyable {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  cursor: pointer;
+  position: relative;
+  word-break: break-all;
+  transition: border-color 0.15s;
+}
+
+.modal-copyable:hover { border-color: var(--accent); }
+
+.modal-copyable.copied::after {
+  content: 'Copied!';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--green);
+  font-family: var(--font-sans);
+}
+
+.modal-gitignore {
+  margin-bottom: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
@@ -770,7 +875,9 @@ function getClientScript(): string {
     files: [],
     fileOrder: [],
     annotationCounts: {},
+    staleCounts: {},
     filterText: '',
+    _dragAnnotation: null,
   };
 
   const CATEGORIES = [
@@ -807,12 +914,17 @@ function getClientScript(): string {
     bindReopenButton();
     initScrollSync();
     updateProgress();
+    document.addEventListener('dragend', () => {
+      state._dragAnnotation = null;
+      document.querySelectorAll('.diff-line.drag-over').forEach(d => d.classList.remove('drag-over'));
+    });
   }
 
   async function loadFiles() {
     const data = await api('/files');
     state.files = data.files;
     state.annotationCounts = data.annotationCounts;
+    state.staleCounts = data.staleCounts || {};
     renderFileList();
   }
 
@@ -869,6 +981,16 @@ function getClientScript(): string {
     return count;
   }
 
+  function hasStaleInTree(node) {
+    for (var i = 0; i < node.files.length; i++) {
+      if (state.staleCounts[node.files[i].id]) return true;
+    }
+    for (var i = 0; i < node.children.length; i++) {
+      if (hasStaleInTree(node.children[i])) return true;
+    }
+    return false;
+  }
+
   function renderTreeNode(container, node, depth) {
     var sortedChildren = node.children.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
 
@@ -882,9 +1004,11 @@ function getClientScript(): string {
       var header = document.createElement('div');
       header.className = 'folder-header' + (isCollapsible ? ' collapsible' : '');
       header.style.paddingLeft = (16 + depth * 12) + 'px';
+      var stale = hasStaleInTree(child);
       header.innerHTML =
         (isCollapsible ? '<span class="folder-arrow">\u25BE</span>' : '<span class="folder-arrow-spacer"></span>') +
-        '<span class="folder-name">' + esc(child.name) + '/</span>';
+        '<span class="folder-name">' + esc(child.name) + '/</span>' +
+        (stale ? '<span class="stale-dot"></span>' : '');
 
       var content = document.createElement('div');
       content.className = 'folder-content';
@@ -909,11 +1033,13 @@ function getClientScript(): string {
       el.dataset.fileId = f.id;
       el.style.paddingLeft = (16 + depth * 12) + 'px';
       var count = state.annotationCounts[f.id] || 0;
+      var staleCount = state.staleCounts[f.id] || 0;
       var fileName = f.file_path.split('/').pop();
       el.innerHTML =
         '<span class="status-dot ' + f.status + '"></span>' +
         '<span class="file-name" title="' + esc(f.file_path) + '">' + esc(fileName) + '</span>' +
         '<span class="file-status ' + (diff.status || '') + '">' + (diff.status || '') + '</span>' +
+        (staleCount ? '<span class="stale-dot"></span>' : '') +
         (count ? '<span class="annotation-count">' + count + '</span>' : '');
       el.addEventListener('click', function() { selectFile(f.id); });
       container.appendChild(el);
@@ -956,6 +1082,8 @@ function getClientScript(): string {
 
     bindDiffLineClicks();
     bindHunkExpanders();
+    bindDragDrop();
+    bindServerAnnotations();
   }
 
   // --- Context Expansion ---
@@ -1031,20 +1159,73 @@ function getClientScript(): string {
     });
   }
 
+  function buildCategoryBadge(value) {
+    var cat = CATEGORIES.find(function(c) { return c.value === value; });
+    return '<span class="annotation-category category-' + esc(value) + ' form-category-badge" data-category="' + esc(value) + '">' + esc(cat ? cat.label : value) + '</span>';
+  }
+
+  function bindCategoryBadgeClick(container) {
+    var badge = container.querySelector('.form-category-badge');
+    if (!badge) return;
+    badge.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showCategoryPicker(badge);
+    });
+  }
+
+  function showCategoryPicker(badge) {
+    document.querySelectorAll('.reclassify-popup').forEach(function(el) { el.remove(); });
+
+    var current = badge.dataset.category;
+    var popup = document.createElement('div');
+    popup.className = 'reclassify-popup';
+    popup.innerHTML = CATEGORIES.map(function(c) {
+      return '<div class="reclassify-option' + (c.value === current ? ' active' : '') + '" data-value="' + c.value + '">' +
+        '<span class="annotation-category category-' + c.value + '">' + c.label + '</span>' +
+      '</div>';
+    }).join('');
+
+    var rect = badge.getBoundingClientRect();
+    popup.style.position = 'fixed';
+    popup.style.left = rect.left + 'px';
+    popup.style.top = (rect.bottom + 4) + 'px';
+    popup.style.zIndex = '1000';
+
+    popup.addEventListener('click', function(e) {
+      var opt = e.target.closest('.reclassify-option');
+      if (!opt) return;
+      e.stopPropagation();
+      var val = opt.dataset.value;
+      var cat = CATEGORIES.find(function(c) { return c.value === val; });
+      badge.className = 'annotation-category category-' + val + ' form-category-badge';
+      badge.dataset.category = val;
+      badge.textContent = cat ? cat.label : val;
+      popup.remove();
+    });
+
+    document.body.appendChild(popup);
+    var closePopup = function(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closePopup, true);
+      }
+    };
+    setTimeout(function() { document.addEventListener('click', closePopup, true); }, 0);
+  }
+
   function showAnnotationForm(afterEl, lineNumber, side) {
     // Remove any existing form
     document.querySelectorAll('.annotation-form-container').forEach(el => el.remove());
 
+    var defaultCategory = CATEGORIES[0].value;
     const container = document.createElement('div');
     container.className = 'annotation-form-container';
     container.innerHTML =
       '<div class="annotation-form">' +
-        '<select class="annotation-category-select">' +
-          CATEGORIES.map(c => '<option value="' + c.value + '">' + c.label + '</option>').join('') +
-        '</select>' +
+        buildCategoryBadge(defaultCategory) +
         '<textarea placeholder="Enter your annotation..." autofocus></textarea>' +
         '<div class="annotation-form-actions">' +
-          '<button class="btn btn-sm" onclick="this.closest(\\'.annotation-form-container\\').remove()">Cancel</button>' +
+          '<button class="btn btn-sm cancel-btn">Cancel</button>' +
           '<button class="btn btn-sm btn-primary annotation-save-btn">Save</button>' +
         '</div>' +
       '</div>';
@@ -1057,6 +1238,12 @@ function getClientScript(): string {
       next = next.nextElementSibling;
     }
     insertAfter.parentNode.insertBefore(container, insertAfter.nextSibling);
+
+    bindCategoryBadgeClick(container);
+
+    container.querySelector('.cancel-btn').addEventListener('click', () => {
+      container.remove();
+    });
 
     const textarea = container.querySelector('textarea');
     textarea.focus();
@@ -1078,7 +1265,7 @@ function getClientScript(): string {
 
   async function saveAnnotation(container, lineNumber, side) {
     const content = container.querySelector('textarea').value.trim();
-    const category = container.querySelector('select').value;
+    const category = container.querySelector('.form-category-badge').dataset.category;
     if (!content) return;
 
     const annotation = await api('/annotations', {
@@ -1116,97 +1303,247 @@ function getClientScript(): string {
     }
 
     const item = document.createElement('div');
-    item.className = 'annotation-item';
+    item.className = 'annotation-item' + (annotation.is_stale ? ' annotation-stale' : '');
     item.dataset.annotationId = annotation.id;
-    item.innerHTML =
-      '<span class="annotation-category category-' + esc(annotation.category) + '">' + esc(annotation.category) + '</span>' +
+    if (annotation.is_stale) item.dataset.isStale = 'true';
+    item.innerHTML = buildAnnotationItemHtml(annotation);
+
+    bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
+    annotationRow.appendChild(item);
+  }
+
+  var ICON_TRASH = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+  var ICON_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+
+  function buildAnnotationItemHtml(annotation) {
+    return '<span class="annotation-drag-handle" draggable="true" title="Drag to move">\u2807</span>' +
+      '<span class="annotation-category category-' + esc(annotation.category) + '" data-action="reclassify">' + esc(annotation.category) + '</span>' +
       '<span class="annotation-text">' + esc(annotation.content) + '</span>' +
       '<div class="annotation-actions">' +
-        '<button class="btn btn-xs" data-action="edit">Edit</button>' +
-        '<button class="btn btn-xs btn-danger" data-action="delete">Del</button>' +
+        (annotation.is_stale ? '<button class="btn btn-xs btn-keep" data-action="keep">Keep</button>' : '') +
+        '<button class="btn btn-xs btn-icon" data-action="edit" title="Edit">' + ICON_EDIT + '</button>' +
+        '<button class="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete">' + ICON_TRASH + '</button>' +
       '</div>';
+  }
 
-    item.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
+  function bindAnnotationItemEvents(item, annotation, lineEl, annotationRow) {
+    item.querySelector('[data-action="delete"]')?.addEventListener('click', async (e) => {
       e.stopPropagation();
       await api('/annotations/' + annotation.id, { method: 'DELETE' });
       item.remove();
-      if (!annotationRow.querySelector('.annotation-item')) {
+      if (annotationRow && !annotationRow.querySelector('.annotation-item')) {
         annotationRow.remove();
-        lineEl.classList.remove('has-annotation');
+        if (lineEl) lineEl.classList.remove('has-annotation');
       }
       state.annotationCounts[state.currentFileId] = Math.max(0, (state.annotationCounts[state.currentFileId] || 1) - 1);
+      if (annotation.is_stale) {
+        state.staleCounts[state.currentFileId] = Math.max(0, (state.staleCounts[state.currentFileId] || 1) - 1);
+      }
       renderFileList();
     });
 
-    item.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+    item.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       editAnnotation(item, annotation);
     });
 
-    annotationRow.appendChild(item);
+    // Double-click to edit
+    item.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      if (item.querySelector('.annotation-form')) return;
+      editAnnotation(item, annotation);
+    });
+
+    // Click category to reclassify
+    item.querySelector('[data-action="reclassify"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showReclassifyPopup(e.target.closest('[data-action="reclassify"]'), item, annotation);
+    });
+
+    item.querySelector('[data-action="keep"]')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await api('/annotations/' + annotation.id + '/keep', { method: 'POST' });
+      annotation.is_stale = false;
+      item.classList.remove('annotation-stale');
+      delete item.dataset.isStale;
+      item.innerHTML = buildAnnotationItemHtml(annotation);
+      bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
+      state.staleCounts[state.currentFileId] = Math.max(0, (state.staleCounts[state.currentFileId] || 1) - 1);
+      renderFileList();
+    });
+
+    // Drag handle
+    var handle = item.querySelector('.annotation-drag-handle');
+    if (handle) {
+      handle.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        state._dragAnnotation = { id: annotation.id, item: item, annotation: annotation };
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', annotation.id);
+      });
+    }
+  }
+
+  function showReclassifyPopup(badge, item, annotation) {
+    // Remove any existing popup
+    document.querySelectorAll('.reclassify-popup').forEach(el => el.remove());
+
+    var popup = document.createElement('div');
+    popup.className = 'reclassify-popup';
+    popup.innerHTML = CATEGORIES.map(function(c) {
+      return '<div class="reclassify-option' + (c.value === annotation.category ? ' active' : '') + '" data-value="' + c.value + '">' +
+        '<span class="annotation-category category-' + c.value + '">' + c.label + '</span>' +
+      '</div>';
+    }).join('');
+
+    // Position near the badge
+    var rect = badge.getBoundingClientRect();
+    popup.style.position = 'fixed';
+    popup.style.left = rect.left + 'px';
+    popup.style.top = (rect.bottom + 4) + 'px';
+    popup.style.zIndex = '1000';
+
+    popup.addEventListener('click', async (e) => {
+      var opt = e.target.closest('.reclassify-option');
+      if (!opt) return;
+      e.stopPropagation();
+      var newCategory = opt.dataset.value;
+      if (newCategory === annotation.category) { popup.remove(); return; }
+      annotation.category = newCategory;
+      await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content: annotation.content, category: newCategory } });
+      item.innerHTML = buildAnnotationItemHtml(annotation);
+      var row = item.closest('.annotation-row');
+      var lineElRef = row ? row.previousElementSibling : null;
+      bindAnnotationItemEvents(item, annotation, lineElRef, row);
+      popup.remove();
+    });
+
+    document.body.appendChild(popup);
+
+    // Close on outside click
+    var closePopup = function(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closePopup, true);
+      }
+    };
+    setTimeout(function() {
+      document.addEventListener('click', closePopup, true);
+    }, 0);
   }
 
   function editAnnotation(item, annotation) {
-    const origHtml = item.innerHTML;
-    item.innerHTML =
-      '<select class="annotation-category-select">' +
-        CATEGORIES.map(c => '<option value="' + c.value + '"' + (c.value === annotation.category ? ' selected' : '') + '>' + c.label + '</option>').join('') +
-      '</select>' +
-      '<textarea>' + esc(annotation.content) + '</textarea>' +
-      '<div class="annotation-form-actions">' +
-        '<button class="btn btn-xs cancel-edit">Cancel</button>' +
-        '<button class="btn btn-xs btn-primary save-edit">Save</button>' +
+    var annotationRow = item.closest('.annotation-row');
+    var formContainer = document.createElement('div');
+    formContainer.className = 'annotation-form-container';
+    formContainer.innerHTML =
+      '<div class="annotation-form">' +
+        buildCategoryBadge(annotation.category) +
+        '<textarea>' + esc(annotation.content) + '</textarea>' +
+        '<div class="annotation-form-actions">' +
+          '<button class="btn btn-sm cancel-edit">Cancel</button>' +
+          '<button class="btn btn-sm btn-primary save-edit">Save</button>' +
+        '</div>' +
       '</div>';
 
-    item.querySelector('.cancel-edit').addEventListener('click', (e) => {
+    item.style.display = 'none';
+    annotationRow.parentNode.insertBefore(formContainer, annotationRow.nextSibling);
+
+    bindCategoryBadgeClick(formContainer);
+
+    function cancelEdit() {
+      item.style.display = '';
+      formContainer.remove();
+    }
+
+    formContainer.querySelector('.cancel-edit').addEventListener('click', (e) => {
       e.stopPropagation();
-      item.innerHTML = origHtml;
-      rebindAnnotationActions(item, annotation);
+      cancelEdit();
     });
 
-    item.querySelector('.save-edit').addEventListener('click', async (e) => {
+    formContainer.querySelector('.save-edit').addEventListener('click', async (e) => {
       e.stopPropagation();
-      const content = item.querySelector('textarea').value.trim();
-      const category = item.querySelector('select').value;
+      const content = formContainer.querySelector('textarea').value.trim();
+      const category = formContainer.querySelector('.form-category-badge').dataset.category;
       if (!content) return;
       annotation.content = content;
       annotation.category = category;
       await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content, category } });
-      item.innerHTML =
-        '<span class="annotation-category category-' + esc(category) + '">' + esc(category) + '</span>' +
-        '<span class="annotation-text">' + esc(content) + '</span>' +
-        '<div class="annotation-actions">' +
-          '<button class="btn btn-xs" data-action="edit">Edit</button>' +
-          '<button class="btn btn-xs btn-danger" data-action="delete">Del</button>' +
-        '</div>';
+      item.innerHTML = buildAnnotationItemHtml(annotation);
       rebindAnnotationActions(item, annotation);
+      item.style.display = '';
+      formContainer.remove();
     });
 
-    const textarea = item.querySelector('textarea');
+    const textarea = formContainer.querySelector('textarea');
     textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     textarea.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        item.querySelector('.save-edit').click();
+        formContainer.querySelector('.save-edit').click();
       }
       if (e.key === 'Escape') {
-        item.querySelector('.cancel-edit').click();
+        cancelEdit();
       }
     });
   }
 
   function rebindAnnotationActions(item, annotation) {
-    item.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      editAnnotation(item, annotation);
+    var row = item.closest('.annotation-row');
+    var lineEl = row ? row.previousElementSibling : null;
+    bindAnnotationItemEvents(item, annotation, lineEl, row);
+  }
+
+  // --- Drag & Drop for Annotations ---
+  function bindDragDrop() {
+    document.querySelectorAll('.diff-line').forEach(el => {
+      el.addEventListener('dragover', (e) => {
+        if (!state._dragAnnotation) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.diff-line.drag-over').forEach(d => d.classList.remove('drag-over'));
+        el.classList.add('drag-over');
+      });
+
+      el.addEventListener('dragleave', () => {
+        el.classList.remove('drag-over');
+      });
+
+      el.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        document.querySelectorAll('.diff-line.drag-over').forEach(d => d.classList.remove('drag-over'));
+        if (!state._dragAnnotation) return;
+
+        const lineNum = parseInt(el.dataset.line, 10);
+        const side = el.dataset.side || 'new';
+        if (isNaN(lineNum)) return;
+
+        const drag = state._dragAnnotation;
+        state._dragAnnotation = null;
+
+        await api('/annotations/' + drag.id + '/move', {
+          method: 'PATCH',
+          body: { lineNumber: lineNum, side: side },
+        });
+
+        // Refresh the file view
+        if (state.currentFileId) selectFile(state.currentFileId);
+      });
     });
-    item.querySelector('[data-action="delete"]')?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await api('/annotations/' + annotation.id, { method: 'DELETE' });
-      const row = item.closest('.annotation-row');
-      item.remove();
-      if (row && !row.querySelector('.annotation-item')) row.remove();
-      state.annotationCounts[state.currentFileId] = Math.max(0, (state.annotationCounts[state.currentFileId] || 1) - 1);
-      renderFileList();
+  }
+
+  function bindServerAnnotations() {
+    document.querySelectorAll('.annotation-item').forEach(item => {
+      const id = item.dataset.annotationId;
+      if (!id) return;
+      const isStale = item.dataset.isStale === 'true';
+      const category = item.querySelector('.annotation-category')?.textContent || '';
+      const content = item.querySelector('.annotation-text')?.textContent || '';
+      const annotation = { id: id, category: category, content: content, is_stale: isStale };
+      var row = item.closest('.annotation-row');
+      var lineEl = row ? row.previousElementSibling : null;
+      bindAnnotationItemEvents(item, annotation, lineEl, row);
     });
   }
 
@@ -1347,8 +1684,46 @@ function getClientScript(): string {
   }
 
   function showCompleteModal() {
+    var totalStale = 0;
+    Object.keys(state.staleCounts).forEach(function(k) { totalStale += (state.staleCounts[k] || 0); });
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+
+    if (totalStale > 0) {
+      overlay.innerHTML =
+        '<div class="modal">' +
+          '<h3>Stale Annotations</h3>' +
+          '<p>There ' + (totalStale === 1 ? 'is 1 stale annotation' : 'are ' + totalStale + ' stale annotations') +
+          ' that could not be matched to the current diff. What would you like to do?</p>' +
+          '<div class="modal-actions">' +
+            '<button class="btn btn-sm modal-cancel">Cancel</button>' +
+            '<button class="btn btn-sm btn-danger" data-stale-action="discard">Discard All Stale</button>' +
+            '<button class="btn btn-sm btn-primary" data-stale-action="keep">Keep All &amp; Complete</button>' +
+          '</div>' +
+        '</div>';
+
+      overlay.querySelector('.modal-cancel').addEventListener('click', () => overlay.remove());
+      overlay.querySelector('[data-stale-action="discard"]').addEventListener('click', async () => {
+        await api('/annotations/stale/delete-all', { method: 'POST' });
+        state.staleCounts = {};
+        renderFileList();
+        overlay.remove();
+        showCompleteModal();
+      });
+      overlay.querySelector('[data-stale-action="keep"]').addEventListener('click', async () => {
+        await api('/annotations/stale/keep-all', { method: 'POST' });
+        state.staleCounts = {};
+        renderFileList();
+        overlay.remove();
+        showCompleteModal();
+      });
+
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+      return;
+    }
+
     overlay.innerHTML =
       '<div class="modal">' +
         '<h3>Complete Review</h3>' +
@@ -1362,17 +1737,56 @@ function getClientScript(): string {
     overlay.querySelector('.modal-cancel').addEventListener('click', () => overlay.remove());
     overlay.querySelector('.modal-confirm').addEventListener('click', async () => {
       const result = await api('/review/complete', { method: 'POST' });
-      let instructions;
-      if (result.isCurrent) {
-        instructions = '<p style="margin-top:8px;font-size:13px">Tell your AI tool:<br><code style="color:var(--accent);font-size:12px">Read .glassbox/latest-review.md and apply the feedback.</code></p>';
-      } else {
-        instructions = '<p style="margin-top:8px;font-size:13px">Tell your AI tool:<br><code style="color:var(--accent);font-size:12px">Read .glassbox/review-' + esc(result.reviewId) + '.md and apply the feedback.</code></p>';
+      var aiCommand = result.isCurrent
+        ? 'Read .glassbox/latest-review.md and apply the feedback.'
+        : 'Read .glassbox/review-' + result.reviewId + '.md and apply the feedback.';
+
+      var gitignoreHtml = '';
+      if (result.gitignorePrompt) {
+        gitignoreHtml =
+          '<div class="modal-gitignore">' +
+            '<p class="modal-label">.glassbox/ is not in your .gitignore</p>' +
+            '<div class="modal-actions" style="justify-content:flex-start;margin-top:4px">' +
+              '<button class="btn btn-sm btn-primary" id="gitignore-add">Add to .gitignore</button>' +
+              '<button class="btn btn-sm" id="gitignore-dismiss">Don\\'t ask for 30 days</button>' +
+            '</div>' +
+          '</div>';
       }
+
       overlay.querySelector('.modal').innerHTML =
         '<h3>Review Completed</h3>' +
-        '<p>Review exported to:<br><code style="color:var(--accent)">' + esc(result.exportPath) + '</code></p>' +
-        instructions +
+        '<p class="modal-label">Review exported to:</p>' +
+        '<div class="modal-copyable" data-copy="' + esc(result.exportPath) + '" title="Click to copy">' + esc(result.exportPath) + '</div>' +
+        '<p class="modal-label">Tell your AI tool:</p>' +
+        '<div class="modal-copyable" data-copy="' + esc(aiCommand) + '" title="Click to copy">' + esc(aiCommand) + '</div>' +
+        gitignoreHtml +
         '<div class="modal-actions"><button class="btn btn-sm btn-primary" onclick="this.closest(\\'.modal-overlay\\').remove()">Done</button></div>';
+
+      // Bind copy-to-clipboard
+      overlay.querySelectorAll('.modal-copyable').forEach(function(el) {
+        el.addEventListener('click', function() {
+          navigator.clipboard.writeText(el.dataset.copy);
+          el.classList.add('copied');
+          setTimeout(function() { el.classList.remove('copied'); }, 1500);
+        });
+      });
+
+      // Bind gitignore buttons
+      var addBtn = overlay.querySelector('#gitignore-add');
+      if (addBtn) {
+        addBtn.addEventListener('click', async function() {
+          await api('/gitignore/add', { method: 'POST' });
+          var container = addBtn.closest('.modal-gitignore');
+          container.innerHTML = '<p class="modal-label" style="color:var(--green)">Added .glassbox/ to .gitignore</p>';
+        });
+      }
+      var dismissBtn = overlay.querySelector('#gitignore-dismiss');
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', async function() {
+          await api('/gitignore/dismiss', { method: 'POST' });
+          dismissBtn.closest('.modal-gitignore').remove();
+        });
+      }
 
       // Swap complete button to reopen
       const completeBtn = document.getElementById('complete-review');

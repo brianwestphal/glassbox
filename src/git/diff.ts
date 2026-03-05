@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 export interface DiffHunk {
@@ -124,14 +125,17 @@ function getAllFiles(repoRoot: string): FileDiff[] {
 function createNewFileDiff(filePath: string, repoRoot: string): FileDiff {
   let content: string;
   try {
-    content = execSync(`cat "${resolve(repoRoot, filePath)}"`, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+    const buf = readFileSync(resolve(repoRoot, filePath));
+    // Check first 8KB of raw bytes for null bytes
+    const checkLen = Math.min(buf.length, 8192);
+    for (let i = 0; i < checkLen; i++) {
+      if (buf[i] === 0) {
+        return { filePath, oldPath: null, status: 'added', hunks: [], isBinary: true };
+      }
+    }
+    content = buf.toString('utf-8');
   } catch {
     content = '';
-  }
-
-  const isBinary = content.includes('\0');
-  if (isBinary) {
-    return { filePath, oldPath: null, status: 'added', hunks: [], isBinary: true };
   }
 
   const lines = content.split('\n');
@@ -163,15 +167,18 @@ export function parseDiff(raw: string): FileDiff[] {
 
   for (const chunk of fileChunks) {
     const headerEnd = chunk.indexOf('@@');
-    if (headerEnd === -1 && !chunk.includes('Binary')) {
+    // Only check the header portion for binary indicators (not diff content which may contain "Binary file" as text)
+    const header = headerEnd === -1 ? chunk : chunk.slice(0, headerEnd);
+
+    if (headerEnd === -1 && !header.includes('Binary')) {
       // Possibly a file with no changes or binary
       const pathMatch = chunk.match(/^a\/(.+?) b\/(.+)/m);
       if (pathMatch) {
-        const isBinary = chunk.includes('Binary');
+        const isBinary = header.includes('Binary');
         files.push({
           filePath: pathMatch[2],
           oldPath: pathMatch[1] !== pathMatch[2] ? pathMatch[1] : null,
-          status: chunk.includes('new file') ? 'added' : chunk.includes('deleted file') ? 'deleted' : 'modified',
+          status: header.includes('new file') ? 'added' : header.includes('deleted file') ? 'deleted' : 'modified',
           hunks: [],
           isBinary,
         });
@@ -186,11 +193,11 @@ export function parseDiff(raw: string): FileDiff[] {
     const oldPath = pathMatch[1] !== pathMatch[2] ? pathMatch[1] : null;
 
     let status: FileDiff['status'] = 'modified';
-    if (chunk.includes('new file mode')) status = 'added';
-    else if (chunk.includes('deleted file mode')) status = 'deleted';
+    if (header.includes('new file mode')) status = 'added';
+    else if (header.includes('deleted file mode')) status = 'deleted';
     else if (oldPath) status = 'renamed';
 
-    const isBinary = chunk.includes('Binary file');
+    const isBinary = header.includes('Binary file');
     if (isBinary) {
       files.push({ filePath, oldPath, status, hunks: [], isBinary: true });
       continue;
@@ -265,6 +272,10 @@ export function getFileContent(filePath: string, ref: string, cwd: string): stri
   } catch {
     return '';
   }
+}
+
+export function getHeadCommit(cwd: string): string {
+  return execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8' }).trim();
 }
 
 export function getModeString(mode: ReviewMode): string {

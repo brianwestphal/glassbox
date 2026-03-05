@@ -26,10 +26,10 @@ export function DiffView({ file, diff, annotations, mode }: {
       </div>
       {diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
-      ) : mode === 'split' ? (
-        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} />
-      ) : (
+      ) : (diff.status === 'added' || diff.status === 'deleted' || mode === 'unified') ? (
         <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} />
+      ) : (
+        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} />
       )}
     </div>
   );
@@ -162,12 +162,15 @@ function AnnotationRows({ annotations }: { annotations: Annotation[] }) {
   return (
     <div className="annotation-row">
       {annotations.map(a => (
-        <div className="annotation-item" data-annotation-id={a.id}>
-          <span className={`annotation-category category-${a.category}`}>{a.category}</span>
+        <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
+          data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
+          <span className="annotation-drag-handle" draggable="true" title="Drag to move">⠿</span>
+          <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
           <span className="annotation-text">{a.content}</span>
           <div className="annotation-actions">
-            <button className="btn btn-xs" data-action="edit">Edit</button>
-            <button className="btn btn-xs btn-danger" data-action="delete">Del</button>
+            {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}
+            <button className="btn btn-xs btn-icon" data-action="edit" title="Edit">{raw('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>')}</button>
+            <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete">{raw('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>')}</button>
           </div>
         </div>
       ))}

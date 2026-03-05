@@ -3,10 +3,12 @@ import type { AppEnv } from '../types.js';
 import {
   getReview, getReviewFiles, getReviewFile,
   getAnnotationsForFile, getAnnotationsForReview,
-  addAnnotation, updateAnnotation, deleteAnnotation,
+  addAnnotation, updateAnnotation, deleteAnnotation, moveAnnotation,
+  markAnnotationCurrent, deleteStaleAnnotations, keepAllStaleAnnotations,
   updateFileStatus, updateReviewStatus, listReviews, deleteReview,
+  getStaleCountsForReview,
 } from '../db/queries.js';
-import { generateReviewExport, deleteReviewExport } from '../export/generate.js';
+import { generateReviewExport, deleteReviewExport, shouldPromptGitignore, addGlassboxToGitignore, dismissGitignorePrompt } from '../export/generate.js';
 import { getFileContent } from '../git/diff.js';
 
 export const apiRoutes = new Hono<AppEnv>();
@@ -37,7 +39,20 @@ apiRoutes.post('/review/complete', async (c) => {
   await updateReviewStatus(reviewId, 'completed');
   const isCurrent = reviewId === currentReviewId;
   const exportPath = await generateReviewExport(reviewId, repoRoot, isCurrent);
-  return c.json({ status: 'completed', exportPath, isCurrent, reviewId });
+  const gitignorePrompt = shouldPromptGitignore(repoRoot);
+  return c.json({ status: 'completed', exportPath, isCurrent, reviewId, gitignorePrompt });
+});
+
+apiRoutes.post('/gitignore/add', async (c) => {
+  const repoRoot = c.get('repoRoot') as string;
+  addGlassboxToGitignore(repoRoot);
+  return c.json({ ok: true });
+});
+
+apiRoutes.post('/gitignore/dismiss', async (c) => {
+  const repoRoot = c.get('repoRoot') as string;
+  dismissGitignorePrompt(repoRoot);
+  return c.json({ ok: true });
 });
 
 apiRoutes.post('/review/reopen', async (c) => {
@@ -92,7 +107,8 @@ apiRoutes.get('/files', async (c) => {
     const annotations = await getAnnotationsForFile(file.id);
     annotationCounts[file.id] = annotations.length;
   }
-  return c.json({ files, annotationCounts });
+  const staleCounts = await getStaleCountsForReview(reviewId);
+  return c.json({ files, annotationCounts, staleCounts });
 });
 
 apiRoutes.get('/files/:fileId', async (c) => {
@@ -132,6 +148,29 @@ apiRoutes.patch('/annotations/:id', async (c) => {
 
 apiRoutes.delete('/annotations/:id', async (c) => {
   await deleteAnnotation(c.req.param('id'));
+  return c.json({ ok: true });
+});
+
+apiRoutes.patch('/annotations/:id/move', async (c) => {
+  const { lineNumber, side } = await c.req.json<{ lineNumber: number; side: string }>();
+  await moveAnnotation(c.req.param('id'), lineNumber, side);
+  return c.json({ ok: true });
+});
+
+apiRoutes.post('/annotations/:id/keep', async (c) => {
+  await markAnnotationCurrent(c.req.param('id'));
+  return c.json({ ok: true });
+});
+
+apiRoutes.post('/annotations/stale/delete-all', async (c) => {
+  const reviewId = resolveReviewId(c);
+  await deleteStaleAnnotations(reviewId);
+  return c.json({ ok: true });
+});
+
+apiRoutes.post('/annotations/stale/keep-all', async (c) => {
+  const reviewId = resolveReviewId(c);
+  await keepAllStaleAnnotations(reviewId);
   return c.json({ ok: true });
 });
 

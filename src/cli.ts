@@ -1,8 +1,9 @@
 import { startServer } from './server.js';
-import { isGitRepo, getRepoRoot, getRepoName, getFileDiffs, getModeString, getModeArgs } from './git/diff.js';
+import { isGitRepo, getRepoRoot, getRepoName, getFileDiffs, getModeString, getModeArgs, getHeadCommit } from './git/diff.js';
 import type { ReviewMode } from './git/diff.js';
 import { createReview, getLatestInProgressReview, addReviewFile } from './db/queries.js';
 import { checkForUpdates } from './update-check.js';
+import { updateReviewDiffs } from './review-update.js';
 
 function printUsage() {
   console.log(`
@@ -36,12 +37,13 @@ Examples:
 `);
 }
 
-function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean } | null {
+function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean; debug: boolean } | null {
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
   let port = 4173;
   let resume = false;
   let forceUpdateCheck = false;
+  let debug = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -85,6 +87,9 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
       case '--check-for-updates':
         forceUpdateCheck = true;
         break;
+      case '--debug':
+        debug = true;
+        break;
       default:
         console.error(`Unknown option: ${arg}`);
         printUsage();
@@ -93,10 +98,10 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
   }
 
   if (!mode) {
-    return null;
+    mode = { type: 'uncommitted' };
   }
 
-  return { mode, port, resume, forceUpdateCheck };
+  return { mode, port, resume, forceUpdateCheck, debug };
 }
 
 async function main() {
@@ -106,7 +111,11 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck } = parsed;
+  const { mode, port, resume, forceUpdateCheck, debug } = parsed;
+
+  if (debug) {
+    console.log(`Build timestamp: ${process.env.BUILD_TIMESTAMP}`);
+  }
 
   // Check for updates (once per day, or if --check-for-updates is passed)
   await checkForUpdates(forceUpdateCheck);
@@ -122,15 +131,29 @@ async function main() {
   const repoName = getRepoName(cwd);
   const modeStr = getModeString(mode);
   const modeArgs = getModeArgs(mode);
+  const headCommit = getHeadCommit(cwd);
 
   // Check for existing in-progress review
-  if (resume) {
-    const existing = await getLatestInProgressReview(repoRoot, modeStr, modeArgs);
-    if (existing) {
+  const existing = await getLatestInProgressReview(repoRoot, modeStr, modeArgs);
+
+  if (existing) {
+    // Same HEAD — reuse review and update diffs
+    if (existing.head_commit === headCommit) {
+      console.log(`Updating existing review ${existing.id}...`);
+      const diffs = getFileDiffs(mode, cwd);
+      const result = await updateReviewDiffs(existing.id, diffs, headCommit);
+      console.log(`Updated ${result.updated} file(s), ${result.added} added, ${result.stale} stale annotation(s)`);
+      await startServer(port, existing.id, repoRoot);
+      return;
+    }
+
+    // Different HEAD but --resume: reopen as-is
+    if (resume) {
       console.log(`Resuming review ${existing.id} (started ${existing.created_at})`);
       await startServer(port, existing.id, repoRoot);
       return;
     }
+  } else if (resume) {
     console.log('No in-progress review found, starting a new one.');
   }
 
@@ -146,7 +169,7 @@ async function main() {
   console.log(`Found ${diffs.length} file(s) to review.`);
 
   // Create review
-  const review = await createReview(repoRoot, repoName, modeStr, modeArgs);
+  const review = await createReview(repoRoot, repoName, modeStr, modeArgs, headCommit);
 
   // Add files
   for (const diff of diffs) {

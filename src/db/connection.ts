@@ -24,6 +24,7 @@ async function initSchema(db: PGlite): Promise<void> {
       repo_name TEXT NOT NULL,
       mode TEXT NOT NULL,
       mode_args TEXT,
+      head_commit TEXT,
       status TEXT NOT NULL DEFAULT 'in_progress',
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -47,10 +48,17 @@ async function initSchema(db: PGlite): Promise<void> {
       side TEXT NOT NULL DEFAULT 'new',
       category TEXT NOT NULL DEFAULT 'note',
       content TEXT NOT NULL,
+      is_stale BOOLEAN NOT NULL DEFAULT FALSE,
+      original_content TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
 
     CREATE INDEX IF NOT EXISTS idx_annotations_file ON annotations(review_file_id);
   `);
+
+  // Migrations for existing databases
+  try { await db.exec('ALTER TABLE reviews ADD COLUMN head_commit TEXT'); } catch {}
+  try { await db.exec('ALTER TABLE annotations ADD COLUMN is_stale BOOLEAN NOT NULL DEFAULT FALSE'); } catch {}
+  try { await db.exec('ALTER TABLE annotations ADD COLUMN original_content TEXT'); } catch {}
 }

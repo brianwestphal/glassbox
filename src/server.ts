@@ -5,6 +5,20 @@ import type { AppEnv } from './types.js';
 import { apiRoutes } from './routes/api.js';
 import { pageRoutes } from './routes/pages.js';
 
+function tryServe(fetch: Hono['fetch'], port: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = serve({ fetch, port });
+    server.on('listening', () => resolve(port));
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        reject(err);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
 export async function startServer(port: number, reviewId: string, repoRoot: string) {
   const app = new Hono<AppEnv>();
 
@@ -22,10 +36,25 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   // Page routes
   app.route('/', pageRoutes);
 
-  const url = `http://localhost:${port}`;
-  console.log(`\n  Glassbox running at ${url}\n`);
+  let actualPort = port;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      actualPort = await tryServe(app.fetch, port + attempt);
+      break;
+    } catch (err: any) {
+      if (err.code === 'EADDRINUSE' && attempt < 19) {
+        continue;
+      }
+      throw err;
+    }
+  }
 
-  serve({ fetch: app.fetch, port });
+  if (actualPort !== port) {
+    console.log(`  Port ${port} in use, using ${actualPort} instead.`);
+  }
+
+  const url = `http://localhost:${actualPort}`;
+  console.log(`\n  Glassbox running at ${url}\n`);
 
   // Open browser
   const openCmd = process.platform === 'darwin' ? 'open'

@@ -43,7 +43,21 @@ function countFiles(node: TreeNode): number {
   return count;
 }
 
-function TreeView({ node, depth, annotationCounts }: { node: TreeNode; depth: number; annotationCounts: Record<string, number> }) {
+function hasStale(node: TreeNode, staleCounts: Record<string, number>): boolean {
+  for (const f of node.files) {
+    if (staleCounts[f.id]) return true;
+  }
+  for (const child of node.children) {
+    if (hasStale(child, staleCounts)) return true;
+  }
+  return false;
+}
+
+function TreeView({ node, depth, annotationCounts, staleCounts }: {
+  node: TreeNode; depth: number;
+  annotationCounts: Record<string, number>;
+  staleCounts: Record<string, number>;
+}) {
   const sortedChildren = [...node.children].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -51,14 +65,16 @@ function TreeView({ node, depth, annotationCounts }: { node: TreeNode; depth: nu
       {sortedChildren.map(child => {
         const total = countFiles(child);
         const isCollapsible = total > 1;
+        const stale = hasStale(child, staleCounts);
         return (
           <div className="folder-group">
             <div className={`folder-header${isCollapsible ? ' collapsible' : ''}`} style={`padding-left:${16 + depth * 12}px`}>
               {isCollapsible ? <span className="folder-arrow">▾</span> : <span className="folder-arrow-spacer"></span>}
               <span className="folder-name">{child.name}/</span>
+              {stale ? <span className="stale-dot"></span> : null}
             </div>
             <div className="folder-content">
-              <TreeView node={child} depth={depth + 1} annotationCounts={annotationCounts} />
+              <TreeView node={child} depth={depth + 1} annotationCounts={annotationCounts} staleCounts={staleCounts} />
             </div>
           </div>
         );
@@ -66,12 +82,14 @@ function TreeView({ node, depth, annotationCounts }: { node: TreeNode; depth: nu
       {node.files.map(f => {
         const diff = JSON.parse(f.diff_data || '{}');
         const count = annotationCounts[f.id] || 0;
+        const stale = staleCounts[f.id] || 0;
         const fileName = f.file_path.split('/').pop()!;
         return (
           <div className="file-item" data-file-id={f.id} style={`padding-left:${16 + depth * 12}px`}>
             <span className={`status-dot ${f.status}`}></span>
             <span className="file-name" title={f.file_path}>{fileName}</span>
             <span className={`file-status ${diff.status || ''}`}>{diff.status || ''}</span>
+            {stale > 0 ? <span className="stale-dot"></span> : null}
             {count > 0 ? <span className="annotation-count">{count}</span> : null}
           </div>
         );
@@ -80,13 +98,17 @@ function TreeView({ node, depth, annotationCounts }: { node: TreeNode; depth: nu
   );
 }
 
-export function FileList({ files, annotationCounts }: { files: ReviewFile[]; annotationCounts: Record<string, number> }) {
+export function FileList({ files, annotationCounts, staleCounts }: {
+  files: ReviewFile[];
+  annotationCounts: Record<string, number>;
+  staleCounts: Record<string, number>;
+}) {
   const tree = buildFileTree(files);
 
   return (
     <div className="file-list">
       <div className="file-list-items">
-        <TreeView node={tree} depth={0} annotationCounts={annotationCounts} />
+        <TreeView node={tree} depth={0} annotationCounts={annotationCounts} staleCounts={staleCounts} />
       </div>
     </div>
   );

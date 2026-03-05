@@ -1,6 +1,66 @@
-import { mkdirSync, writeFileSync, unlinkSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync, appendFileSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
+import { execSync } from 'child_process';
 import { getReview, getReviewFiles, getAnnotationsForReview } from '../db/queries.js';
+
+const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
+const DISMISS_DAYS = 30;
+
+function loadDismissals(): Record<string, number> {
+  try {
+    return JSON.parse(readFileSync(DISMISS_FILE, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveDismissals(data: Record<string, number>): void {
+  const dir = join(homedir(), '.glassbox');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(DISMISS_FILE, JSON.stringify(data), 'utf-8');
+}
+
+export function isGlassboxGitignored(repoRoot: string): boolean {
+  // Use git check-ignore to see if .glassbox is ignored
+  try {
+    execSync('git check-ignore -q .glassbox', { cwd: repoRoot, stdio: 'pipe' });
+    return true; // exit code 0 = ignored
+  } catch {
+    return false; // exit code 1 = not ignored
+  }
+}
+
+export function shouldPromptGitignore(repoRoot: string): boolean {
+  if (isGlassboxGitignored(repoRoot)) return false;
+  const dismissals = loadDismissals();
+  const dismissed = dismissals[repoRoot];
+  if (dismissed) {
+    const daysSince = (Date.now() - dismissed) / (1000 * 60 * 60 * 24);
+    if (daysSince < DISMISS_DAYS) return false;
+  }
+  return true;
+}
+
+export function addGlassboxToGitignore(repoRoot: string): void {
+  const gitignorePath = join(repoRoot, '.gitignore');
+  if (existsSync(gitignorePath)) {
+    const content = readFileSync(gitignorePath, 'utf-8');
+    if (!content.endsWith('\n')) {
+      appendFileSync(gitignorePath, '\n.glassbox/\n', 'utf-8');
+    } else {
+      appendFileSync(gitignorePath, '.glassbox/\n', 'utf-8');
+    }
+  } else {
+    writeFileSync(gitignorePath, '.glassbox/\n', 'utf-8');
+  }
+}
+
+export function dismissGitignorePrompt(repoRoot: string): void {
+  const dismissals = loadDismissals();
+  dismissals[repoRoot] = Date.now();
+  saveDismissals(dismissals);
+}
 
 export function deleteReviewExport(reviewId: string, repoRoot: string): void {
   const exportDir = join(repoRoot, '.glassbox');
