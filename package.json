@@ -1,0 +1,32 @@
+{
+  "name": "glassbox",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "glassbox": "./dist/cli.js"
+  },
+  "imports": {
+    "#jsx/jsx-runtime": "./src/jsx-runtime.ts"
+  },
+  "scripts": {
+    "dev": "tsx --tsconfig tsconfig.json src/cli.ts",
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.15",
+    "@hono/node-server": "^1.19.9",
+    "hono": "^4.12.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
