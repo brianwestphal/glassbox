@@ -1,6 +1,111 @@
+<div align="center">
+
 # Glassbox
 
-A local code review tool for AI-generated code. Run it from any git repository to get a browser-based diff viewer where you can annotate lines with categorized feedback. When you're done, export your review as structured markdown that AI tools can read and act on.
+### Stop hoping your AI got it right. Review the diff, leave precise feedback, and let AI fix it — in one loop.
+
+<br>
+
+**Glassbox** is a local, browser-based code review tool built for the AI coding workflow. You review the changes your AI made, annotate what's wrong (or right), and export structured feedback that AI tools can read and act on instantly.
+
+No accounts. No pull requests. No waiting. Just you, the diff, and a tight feedback loop.
+
+<br>
+
+```bash
+npm install -g glassbox
+```
+
+```bash
+glassbox
+```
+
+That's it. Opens in your browser. Works in any git repo.
+
+<br>
+
+<img src="assets/screenshot.png" alt="Glassbox reviewing a diff" width="720">
+
+</div>
+
+---
+
+## Why Glassbox?
+
+AI coding tools generate a lot of code fast. But "fast" doesn't mean "correct." The bottleneck isn't generation — it's **review**.
+
+Most developers review AI output by skimming files in their editor, mentally diffing what changed, and then either accepting it or rewriting it by hand. That's slow, error-prone, and throws away the most valuable signal: your expert judgment about *what specifically* was wrong and why.
+
+Glassbox gives you a proper diff viewer with annotation categories designed for AI feedback:
+
+| Category | What it tells the AI |
+|----------|---------------------|
+| **Bug** | "This is broken. Fix it." |
+| **Fix needed** | "This needs a specific change." |
+| **Style** | "I prefer it done this way." |
+| **Pattern to follow** | "This is good. Keep doing this." |
+| **Pattern to avoid** | "This is an anti-pattern. Stop." |
+| **Note** | Context for the AI to consider. |
+| **Remember** | A rule to persist to the AI's long-term config. |
+
+When you're done, click **Complete Review** and tell your AI tool:
+
+```
+Read .glassbox/latest-review.md and apply the feedback.
+```
+
+The AI gets a structured file with every annotation, organized by file and line number, with clear instructions on how to interpret each category. It fixes the bugs, applies your style preferences, avoids the anti-patterns, and updates its own config with your "remember" items.
+
+Then you run `glassbox` again. Your previous annotations carry forward — matched to the updated diff. Stale comments that no longer apply are flagged so you can keep or discard them. The loop continues until you're satisfied.
+
+---
+
+## How it works
+
+```
+  You                     AI
+   |                       |
+   |   generate code       |
+   |<----------------------|
+   |                       |
+   |   glassbox            |
+   |   review + annotate   |
+   |                       |
+   |   "Read .glassbox/    |
+   |    latest-review.md"  |
+   |---------------------->|
+   |                       |
+   |   updated code        |
+   |<----------------------|
+   |                       |
+   |   glassbox            |
+   |   (annotations carry  |
+   |    forward)           |
+   |                       |
+   :   repeat until done   :
+```
+
+---
+
+## Features
+
+- **Split and unified diffs** with syntax-colored add/remove/context lines
+- **Line-level annotations** — click any line to add feedback with a category
+- **Drag and drop** annotations to different lines
+- **Double-click** to edit, click the category badge to reclassify
+- **Collapsible folder tree** in the sidebar with file filter
+- **Resizable sidebar** and word wrap toggle
+- **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
+- **Session persistence** — reviews survive restarts, pick up where you left off
+- **Smart review reuse** — re-running `glassbox` on the same commit updates diffs in place and migrates annotations to their new line positions
+- **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
+- **Review history** — browse, reopen, or delete past reviews
+- **Structured export** — markdown output with file paths, line numbers, categories, and instructions for AI consumption
+- **Automatic .gitignore prompt** — reminds you to exclude `.glassbox/` from version control
+- **Auto port selection** — if the default port is busy, it finds an open one
+- **Fully local** — no network calls, no accounts, no telemetry. Your code stays on your machine.
+
+---
 
 ## Install
 
@@ -8,50 +113,45 @@ A local code review tool for AI-generated code. Run it from any git repository t
 npm install -g glassbox
 ```
 
-Or for development:
+Requires **Node.js 20+** and **git**.
 
-```bash
-git clone <repo-url>
-cd glassbox
-npm install
-npm run build
-npm link
-```
+---
 
 ## Usage
 
 Run from inside any git repository:
 
 ```bash
-# Review uncommitted changes (staged + unstaged + untracked)
-glassbox --uncommitted
+# Review uncommitted changes (default, same as no arguments)
+glassbox
 
 # Review only staged changes
 glassbox --staged
 
-# Review only unstaged changes
-glassbox --unstaged
-
 # Review a specific commit
 glassbox --commit abc123
 
+# Review current branch vs main
+glassbox --branch main
+
 # Review a range of commits
 glassbox --range main..feature-branch
-
-# Review current branch vs another branch
-glassbox --branch main
 
 # Review specific files
 glassbox --files "src/**/*.ts,lib/*.js"
 
 # Review entire codebase
 glassbox --all
+
+# Resume a previous review
+glassbox --resume
 ```
 
-### Options
+### All options
 
 | Flag | Description |
 |------|-------------|
+| *(no flag)* | Same as `--uncommitted` |
 | `--uncommitted` | Staged + unstaged + untracked changes |
 | `--staged` | Only staged changes |
 | `--unstaged` | Only unstaged changes |
@@ -63,116 +163,62 @@ glassbox --all
 | `--port <number>` | Port to run on (default: 4173) |
 | `--resume` | Resume the latest in-progress review for this mode |
 | `--check-for-updates` | Check for a newer version on npm |
+| `--debug` | Show build timestamp and debug info |
 | `--help` | Show help |
 
-## Features
+---
 
-### Diff Viewer
+## AI integration
 
-The web UI shows diffs with syntax-highlighted add/remove/context lines and old+new line numbers. Toggle between split and unified diff modes. Long lines can be wrapped or scrolled horizontally (with synchronized scrolling in split mode).
+The exported review file is plain markdown. Any AI tool that can read files can use it.
 
-### Annotations
-
-Click any line in the diff to add an annotation. Each annotation has a **category** and **content**:
-
-| Category | Purpose |
-|----------|---------|
-| **Bug** | Code defect that needs fixing |
-| **Fix needed** | Specific change required |
-| **Style** | Stylistic preference |
-| **Pattern to follow** | Good pattern — keep using it |
-| **Pattern to avoid** | Anti-pattern — stop using it |
-| **Note** | General observation |
-| **Remember (for AI)** | Rule/preference that should be persisted to AI config files |
-
-You can add multiple annotations to the same line, each with a different category. Edit or delete annotations at any time.
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `j` / `Down` | Next file |
-| `k` / `Up` | Previous file |
-| `Cmd+Enter` | Save annotation |
-| `Escape` | Cancel annotation |
-
-### Session Persistence
-
-Reviews are saved to a local PGLite database at `~/.glassbox/data/`. Use `--resume` to pick up where you left off:
-
-```bash
-glassbox --uncommitted --resume
-```
-
-### Review History
-
-Visit `/history` in the web UI to see all previous reviews for the current repository. You can reopen completed reviews, delete individual reviews, or bulk-delete completed/all reviews.
-
-### Completing a Review
-
-Click **Complete Review** to finish. This:
-
-1. Marks the review as completed
-2. Exports all annotations to `.glassbox/latest-review.md` in the repository
-3. Archives a copy as `.glassbox/review-<id>.md`
-
-## AI Integration
-
-The exported review file (`.glassbox/latest-review.md`) is structured so AI coding tools can parse and act on it.
-
-### With Claude Code
-
-After completing a review, tell Claude Code:
+### Claude Code
 
 ```
 Read .glassbox/latest-review.md and apply the review feedback.
 ```
 
-Claude Code will:
-- Fix bugs and apply changes marked as **bug** or **fix**
-- Apply **style** preferences to indicated lines and similar patterns
-- Continue using **pattern-follow** patterns in new code
-- Refactor **pattern-avoid** anti-patterns
-- Update CLAUDE.md with **remember** items for long-term retention
+### Cursor / Copilot / other
 
-### With Other AI Tools
+Point the tool at the file. The export includes an "Instructions for AI Tools" section that explains how to interpret each annotation category.
 
-The export format is plain markdown with clear structure. Any AI tool that can read files can consume it. The "Instructions for AI Tools" section at the bottom of each export explains how to interpret each annotation category.
+### What the AI does with it
 
-### Adding `.glassbox/` to `.gitignore`
+- Fixes lines marked **bug** or **fix needed**
+- Applies **style** preferences to the indicated lines and similar patterns
+- Continues using **pattern-to-follow** patterns
+- Refactors **pattern-to-avoid** anti-patterns
+- Persists **remember** items to its configuration (CLAUDE.md, .cursorrules, etc.)
+- Reads **notes** as context
 
-Review exports are meant to be ephemeral working files. Add this to your `.gitignore`:
+---
 
-```
-.glassbox/
-```
+## Architecture
 
-Or commit them if you want review history in version control.
+| Layer | Technology |
+|-------|-----------|
+| CLI | TypeScript, Node.js |
+| Server | Hono |
+| Database | PGLite (embedded PostgreSQL) |
+| UI | Custom server-side JSX (no React), vanilla client JS |
+| Build | tsup (single-file bundle) |
+| Storage | `~/.glassbox/data/` |
 
-## How It Works
-
-1. **CLI** parses arguments and determines which git diff to generate
-2. **Git integration** runs `git diff` (or `git ls-files` for `--all` mode) and parses the unified diff output into structured data
-3. **PGLite database** stores reviews, files, and annotations locally
-4. **Hono web server** serves a single-page review UI with server-rendered HTML
-5. **Client-side JS** (vanilla, no framework) handles interactivity: file selection, annotation forms, keyboard navigation
-6. **Export** generates structured markdown grouped by file with category labels and AI-readable instructions
+Data stays local. The only network call is an optional once-per-day npm update check.
 
 ## Development
 
 ```bash
-npm run dev -- --uncommitted    # Run with tsx (hot reload)
+git clone <repo-url>
+cd glassbox
+npm install
+
+npm run dev -- --uncommitted    # Run with tsx (no build step)
 npm run build                   # Build to dist/cli.js
+npm run clean                   # Remove dist and caches
+npm link                        # Symlink for global 'glassbox' command
 ```
 
-### Tech Stack
+## License
 
-- **TypeScript** with a custom server-side JSX runtime (no React)
-- **Hono** for the HTTP server
-- **PGLite** (embedded PostgreSQL) for persistence
-- **tsup** for building a single-file CLI bundle
-
-## Requirements
-
-- Node.js 20+
-- Git
+MIT
