@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { exec } from 'child_process';
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import type { AppEnv } from './types.js';
 import { apiRoutes } from './routes/api.js';
 import { pageRoutes } from './routes/pages.js';
@@ -28,6 +31,23 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
     c.set('currentReviewId', reviewId);
     c.set('repoRoot', repoRoot);
     await next();
+  });
+
+  // Static client assets — resolve from dist/client/ relative to the entry point
+  // In production: import.meta.url is dist/cli.js -> dirname is dist/ -> client/ is correct
+  // In dev: import.meta.url is src/server.ts -> dirname is src/ -> client/ won't have built files
+  // So we check both locations
+  const selfDir = dirname(fileURLToPath(import.meta.url));
+  const distDir = existsSync(join(selfDir, 'client', 'styles.css'))
+    ? join(selfDir, 'client')
+    : join(selfDir, '..', 'dist', 'client');
+  app.get('/static/styles.css', (c) => {
+    const css = readFileSync(join(distDir, 'styles.css'), 'utf-8');
+    return c.text(css, 200, { 'Content-Type': 'text/css', 'Cache-Control': 'no-cache' });
+  });
+  app.get('/static/app.js', (c) => {
+    const js = readFileSync(join(distDir, 'app.global.js'), 'utf-8');
+    return c.text(js, 200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
   });
 
   // API routes

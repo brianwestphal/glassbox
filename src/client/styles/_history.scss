@@ -1,0 +1,77 @@
+body:has(.history-page) { overflow: auto; }
+
+.history-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+
+  h1 { margin-bottom: 24px; }
+}
+
+.history-item {
+  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  position: relative;
+
+  h3 { font-size: 15px; margin-bottom: 4px; padding-right: 32px; }
+  .meta { font-size: 12px; color: var(--text-dim); }
+
+  .delete-review-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius);
+    font-size: 16px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+
+    &:hover { color: var(--red); background: rgba(243,139,168,0.15); }
+  }
+
+  &:hover .delete-review-btn { opacity: 1; }
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 4px 0;
+  align-items: center;
+
+  span {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-right: auto;
+  }
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+
+  &.in_progress, &.in-progress { color: var(--yellow); background: rgba(249,226,175,0.15); }
+  &.completed { color: var(--green); background: rgba(166,227,161,0.15); }
+}
+
+.history-item-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+
+  &:hover .history-item {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+  }
+}

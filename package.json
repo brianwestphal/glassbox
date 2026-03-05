@@ -28,8 +28,9 @@
     "glassbox": "./dist/cli.js"
   },
   "scripts": {
-    "dev": "tsx --tsconfig tsconfig.json src/cli.ts",
+    "dev": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts",
     "build": "tsup",
+    "build:client": "mkdir -p dist/client && npx esbuild src/client/app.ts --bundle --format=iife --outfile=dist/client/app.global.js --target=es2020 --jsx=automatic --jsx-import-source=#jsx --alias:#jsx/jsx-runtime=./src/jsx-runtime.ts && npx sass src/client/styles.scss dist/client/styles.css --style compressed --no-source-map",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
     "prepublishOnly": "npm run build"
@@ -46,6 +47,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.3",
+    "sass": "^1.97.3",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
