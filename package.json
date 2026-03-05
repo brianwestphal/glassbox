@@ -31,6 +31,7 @@
     "dev": "tsx --tsconfig tsconfig.json src/cli.ts",
     "build": "tsup",
     "clean": "rm -rf dist node_modules/.cache",
+    "release": "bash scripts/release.sh",
     "prepublishOnly": "npm run build"
   },
   "files": [
