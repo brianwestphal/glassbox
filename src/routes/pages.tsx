@@ -39,12 +39,16 @@ pageRoutes.get('/', async (c) => {
               <button className="btn btn-sm" id="wrap-toggle">Wrap</button>
             </div>
           </div>
+          <div className="file-filter">
+            <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
+          </div>
           <FileList files={files} annotationCounts={annotationCounts} />
           <div className="sidebar-footer">
             <button className="btn btn-primary btn-complete" id="complete-review">Complete Review</button>
             <a href="/history" className="btn btn-sm btn-link">Review History</a>
           </div>
         </aside>
+        <div className="sidebar-resize" id="sidebar-resize"></div>
         <main className="main-content">
           <div className="welcome-message">
             <h3>Select a file to begin reviewing</h3>
@@ -110,6 +114,9 @@ pageRoutes.get('/review/:reviewId', async (c) => {
               <button className="btn btn-sm" id="wrap-toggle">Wrap</button>
             </div>
           </div>
+          <div className="file-filter">
+            <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
+          </div>
           <FileList files={files} annotationCounts={annotationCounts} />
           <div className="sidebar-footer">
             {review.status === 'completed' ? (
@@ -121,6 +128,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             <a href="/" className="btn btn-sm btn-link">Back to current review</a>
           </div>
         </aside>
+        <div className="sidebar-resize" id="sidebar-resize"></div>
         <main className="main-content">
           <div className="welcome-message">
             <h3>Select a file to begin reviewing</h3>

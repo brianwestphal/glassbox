@@ -68,12 +68,27 @@ body {
 /* Sidebar */
 .sidebar {
   width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
+  min-width: 200px;
+  max-width: 60vw;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-resize {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.sidebar-resize:hover,
+.sidebar-resize.dragging {
+  background: var(--accent);
 }
 
 .sidebar-header {
@@ -104,6 +119,31 @@ body {
   gap: 4px;
 }
 
+.file-filter {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-filter-input {
+  width: 100%;
+  padding: 5px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+}
+
+.file-filter-input:focus {
+  border-color: var(--accent);
+}
+
+.file-filter-input::placeholder {
+  color: var(--text-dim);
+}
+
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid var(--border);
@@ -122,7 +162,7 @@ body {
 .file-item {
   display: flex;
   align-items: center;
-  padding: 6px 16px;
+  padding: 6px 16px 6px 16px;
   cursor: pointer;
   font-size: 13px;
   gap: 8px;
@@ -173,6 +213,51 @@ body {
   border-radius: 8px;
   min-width: 18px;
   text-align: center;
+}
+
+/* Folder tree */
+.folder-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  gap: 4px;
+  user-select: none;
+}
+
+.folder-header.collapsible {
+  cursor: pointer;
+}
+
+.folder-header.collapsible:hover {
+  color: var(--text);
+}
+
+.folder-header.collapsed + .folder-content {
+  display: none;
+}
+
+.folder-arrow {
+  width: 12px;
+  font-size: 10px;
+  flex-shrink: 0;
+  text-align: center;
+  transition: transform 0.1s;
+}
+
+.folder-header.collapsed .folder-arrow {
+  transform: rotate(-90deg);
+}
+
+.folder-arrow-spacer {
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.folder-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 /* Main content */
@@ -683,7 +768,9 @@ function getClientScript(): string {
     diffMode: 'split',
     wrapLines: false,
     files: [],
+    fileOrder: [],
     annotationCounts: {},
+    filterText: '',
   };
 
   const CATEGORIES = [
@@ -714,6 +801,8 @@ function getClientScript(): string {
     bindSidebarEvents();
     bindDiffModeToggle();
     bindWrapToggle();
+    bindFileFilter();
+    bindSidebarResize();
     bindCompleteButton();
     bindReopenButton();
     initScrollSync();
@@ -728,29 +817,108 @@ function getClientScript(): string {
   }
 
   function renderFileList() {
-    const list = document.querySelector('.file-list-items');
+    var list = document.querySelector('.file-list-items');
     if (!list) return;
     list.innerHTML = '';
-    state.files.forEach(f => {
-      const diff = JSON.parse(f.diff_data || '{}');
-      const el = document.createElement('div');
-      el.className = 'file-item' + (f.id === state.currentFileId ? ' active' : '');
-      el.dataset.fileId = f.id;
-      const count = state.annotationCounts[f.id] || 0;
-      el.innerHTML =
-        '<span class="status-dot ' + f.status + '"></span>' +
-        '<span class="file-name" title="' + esc(f.file_path) + '">' + esc(shortPath(f.file_path)) + '</span>' +
-        '<span class="file-status ' + (diff.status || '') + '">' + (diff.status || '') + '</span>' +
-        (count ? '<span class="annotation-count">' + count + '</span>' : '');
-      el.addEventListener('click', () => selectFile(f.id));
-      list.appendChild(el);
-    });
+    state.fileOrder = [];
+    var filtered = state.files;
+    if (state.filterText) {
+      var q = state.filterText.toLowerCase();
+      filtered = state.files.filter(function(f) {
+        return f.file_path.toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    var tree = buildFileTree(filtered);
+    renderTreeNode(list, tree, 0);
   }
 
-  function shortPath(p) {
-    const parts = p.split('/');
-    if (parts.length <= 3) return p;
-    return '.../' + parts.slice(-2).join('/');
+  function buildFileTree(files) {
+    var root = { name: '', children: [], files: [] };
+    files.forEach(function(f) {
+      var parts = f.file_path.split('/');
+      var node = root;
+      for (var i = 0; i < parts.length - 1; i++) {
+        var child = node.children.find(function(c) { return c.name === parts[i]; });
+        if (!child) {
+          child = { name: parts[i], children: [], files: [] };
+          node.children.push(child);
+        }
+        node = child;
+      }
+      node.files.push(f);
+    });
+    compressTree(root);
+    return root;
+  }
+
+  function compressTree(node) {
+    for (var i = 0; i < node.children.length; i++) {
+      var child = node.children[i];
+      while (child.children.length === 1 && child.files.length === 0) {
+        var gc = child.children[0];
+        child = { name: child.name + '/' + gc.name, children: gc.children, files: gc.files };
+        node.children[i] = child;
+      }
+      compressTree(child);
+    }
+  }
+
+  function countTreeFiles(node) {
+    var count = node.files.length;
+    node.children.forEach(function(c) { count += countTreeFiles(c); });
+    return count;
+  }
+
+  function renderTreeNode(container, node, depth) {
+    var sortedChildren = node.children.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+    sortedChildren.forEach(function(child) {
+      var total = countTreeFiles(child);
+      var isCollapsible = total > 1;
+
+      var group = document.createElement('div');
+      group.className = 'folder-group';
+
+      var header = document.createElement('div');
+      header.className = 'folder-header' + (isCollapsible ? ' collapsible' : '');
+      header.style.paddingLeft = (16 + depth * 12) + 'px';
+      header.innerHTML =
+        (isCollapsible ? '<span class="folder-arrow">\u25BE</span>' : '<span class="folder-arrow-spacer"></span>') +
+        '<span class="folder-name">' + esc(child.name) + '/</span>';
+
+      var content = document.createElement('div');
+      content.className = 'folder-content';
+
+      if (isCollapsible) {
+        header.addEventListener('click', function() {
+          header.classList.toggle('collapsed');
+        });
+      }
+
+      renderTreeNode(content, child, depth + 1);
+
+      group.appendChild(header);
+      group.appendChild(content);
+      container.appendChild(group);
+    });
+
+    node.files.forEach(function(f) {
+      var diff = JSON.parse(f.diff_data || '{}');
+      var el = document.createElement('div');
+      el.className = 'file-item' + (f.id === state.currentFileId ? ' active' : '');
+      el.dataset.fileId = f.id;
+      el.style.paddingLeft = (16 + depth * 12) + 'px';
+      var count = state.annotationCounts[f.id] || 0;
+      var fileName = f.file_path.split('/').pop();
+      el.innerHTML =
+        '<span class="status-dot ' + f.status + '"></span>' +
+        '<span class="file-name" title="' + esc(f.file_path) + '">' + esc(fileName) + '</span>' +
+        '<span class="file-status ' + (diff.status || '') + '">' + (diff.status || '') + '</span>' +
+        (count ? '<span class="annotation-count">' + count + '</span>' : '');
+      el.addEventListener('click', function() { selectFile(f.id); });
+      container.appendChild(el);
+      state.fileOrder.push(f.id);
+    });
   }
 
   function esc(s) {
@@ -1053,6 +1221,64 @@ function getClientScript(): string {
     });
   }
 
+  // --- File Filter ---
+  function bindFileFilter() {
+    var input = document.getElementById('file-filter');
+    if (!input) return;
+    var timer = null;
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() {
+        state.filterText = input.value;
+        renderFileList();
+      }, 150);
+    });
+    // Also handle Escape to clear
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        input.value = '';
+        state.filterText = '';
+        renderFileList();
+        input.blur();
+      }
+    });
+  }
+
+  // --- Sidebar Resize ---
+  function bindSidebarResize() {
+    var handle = document.getElementById('sidebar-resize');
+    var sidebar = document.querySelector('.sidebar');
+    if (!handle || !sidebar) return;
+
+    var dragging = false;
+    var startX, startWidth;
+
+    handle.addEventListener('mousedown', function(e) {
+      dragging = true;
+      startX = e.clientX;
+      startWidth = sidebar.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var newWidth = startWidth + (e.clientX - startX);
+      newWidth = Math.max(200, Math.min(newWidth, window.innerWidth * 0.6));
+      sidebar.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+  }
+
   // --- Wrap Toggle ---
   function bindWrapToggle() {
     const btn = document.getElementById('wrap-toggle');
@@ -1215,10 +1441,11 @@ function getClientScript(): string {
   }
 
   function navigateFile(delta) {
-    const idx = state.files.findIndex(f => f.id === state.currentFileId);
-    const next = idx + delta;
-    if (next >= 0 && next < state.files.length) {
-      selectFile(state.files[next].id);
+    var order = state.fileOrder;
+    var idx = order.indexOf(state.currentFileId);
+    var next = idx + delta;
+    if (next >= 0 && next < order.length) {
+      selectFile(order[next]);
     }
   }
 
