@@ -1,13 +1,31 @@
 {
   "name": "glassbox",
   "version": "0.1.0",
+  "description": "A local code review tool for AI-generated code. Review diffs, annotate lines, and export structured feedback that AI tools can act on.",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "westphal",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/westphal/glassbox"
+  },
+  "keywords": [
+    "code-review",
+    "ai",
+    "diff",
+    "annotations",
+    "cli",
+    "developer-tools",
+    "llm",
+    "claude",
+    "cursor",
+    "copilot"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "glassbox": "./dist/cli.js"
-  },
-  "imports": {
-    "#jsx/jsx-runtime": "./src/jsx-runtime.ts"
   },
   "scripts": {
     "dev": "tsx --tsconfig tsconfig.json src/cli.ts",
@@ -16,7 +34,8 @@
     "prepublishOnly": "npm run build"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/*.map"
   ],
   "dependencies": {
     "@electric-sql/pglite": "^0.3.15",
