@@ -1,0 +1,60 @@
+// Syntax highlighting theme (based on highlight.js with Catppuccin-inspired colors)
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name { color: var(--purple); }
+
+.hljs-string,
+.hljs-attr,
+.hljs-template-variable,
+.hljs-addition { color: var(--green); }
+
+.hljs-comment,
+.hljs-quote { color: var(--text-dim); font-style: italic; }
+
+.hljs-number,
+.hljs-literal,
+.hljs-selector-id { color: var(--orange); }
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_,
+.hljs-title.function_ { color: var(--yellow); }
+
+.hljs-variable,
+.hljs-template-variable { color: var(--red); }
+
+.hljs-regexp,
+.hljs-link { color: var(--teal); }
+
+.hljs-symbol,
+.hljs-bullet { color: var(--orange); }
+
+.hljs-meta,
+.hljs-meta .hljs-keyword { color: var(--blue); }
+
+.hljs-deletion { color: var(--red); }
+
+.hljs-section,
+.hljs-title { color: var(--blue); font-weight: 600; }
+
+.hljs-attribute { color: var(--yellow); }
+
+.hljs-tag { color: var(--red); }
+
+.hljs-tag .hljs-name { color: var(--red); }
+.hljs-tag .hljs-attr { color: var(--yellow); }
+
+.hljs-params { color: var(--text); }
+
+.hljs-property { color: var(--blue); }
+
+.hljs-punctuation { color: var(--text-dim); }
+
+.hljs-operator { color: var(--teal); }
+
+.hljs-subst { color: var(--text); }
+
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }

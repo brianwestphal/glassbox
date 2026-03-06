@@ -40,28 +40,6 @@
   display: block;
 }
 
-.sidebar-controls {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.sidebar-controls-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.controls-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-}
-
-.diff-mode-toggle {
-  display: flex;
-  gap: 4px;
-}
-
 // --- File Filter ---
 
 .file-filter {

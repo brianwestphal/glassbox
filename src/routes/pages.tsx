@@ -29,16 +29,6 @@ pageRoutes.get('/', async (c) => {
             <h2>{review.repo_name}</h2>
             <span className="review-mode">{review.mode}{review.mode_args ? `: ${review.mode_args}` : ''}</span>
           </div>
-          <div className="sidebar-controls">
-            <div className="sidebar-controls-row">
-              <div className="diff-mode-toggle">
-                <button className="btn btn-sm active" data-diff-mode="split">Split</button>
-                <button className="btn btn-sm" data-diff-mode="unified">Unified</button>
-              </div>
-              <span className="controls-divider"></span>
-              <button className="btn btn-sm" id="wrap-toggle">Wrap</button>
-            </div>
-          </div>
           <div className="file-filter">
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
           </div>
@@ -56,6 +46,18 @@ pageRoutes.get('/', async (c) => {
             <p className="progress-summary" id="progress-summary"></p>
           </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
+          <div className="diff-toolbar" id="diff-toolbar" style="display:none">
+            <div className="diff-toolbar-left">
+              <div className="segmented-control">
+                <button className="segment active" data-diff-mode="split">Split</button>
+                <button className="segment" data-diff-mode="unified">Unified</button>
+              </div>
+              <button className="toolbar-btn" id="wrap-toggle">Wrap</button>
+            </div>
+            <div className="diff-toolbar-right">
+              <button className="toolbar-btn" id="language-btn">Plain Text</button>
+            </div>
+          </div>
         </main>
       </div>
     </Layout>
@@ -104,16 +106,6 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             <h2>{review.repo_name}</h2>
             <span className="review-mode">{review.mode}{review.mode_args ? `: ${review.mode_args}` : ''}</span>
           </div>
-          <div className="sidebar-controls">
-            <div className="sidebar-controls-row">
-              <div className="diff-mode-toggle">
-                <button className="btn btn-sm active" data-diff-mode="split">Split</button>
-                <button className="btn btn-sm" data-diff-mode="unified">Unified</button>
-              </div>
-              <span className="controls-divider"></span>
-              <button className="btn btn-sm" id="wrap-toggle">Wrap</button>
-            </div>
-          </div>
           <div className="file-filter">
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
           </div>
@@ -136,6 +128,18 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             <p className="progress-summary" id="progress-summary"></p>
           </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
+          <div className="diff-toolbar" id="diff-toolbar" style="display:none">
+            <div className="diff-toolbar-left">
+              <div className="segmented-control">
+                <button className="segment active" data-diff-mode="split">Split</button>
+                <button className="segment" data-diff-mode="unified">Unified</button>
+              </div>
+              <button className="toolbar-btn" id="wrap-toggle">Wrap</button>
+            </div>
+            <div className="diff-toolbar-right">
+              <button className="toolbar-btn" id="language-btn">Plain Text</button>
+            </div>
+          </div>
         </main>
       </div>
     </Layout>

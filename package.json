@@ -47,6 +47,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.3",
+    "highlight.js": "^11.11.1",
     "sass": "^1.97.3",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",

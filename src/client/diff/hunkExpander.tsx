@@ -2,6 +2,7 @@ import { state } from '../state.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { bindDiffLineClicks } from './lineClicks.js';
+import { applyHighlighting } from './highlight.js';
 
 export function bindHunkExpanders() {
   document.querySelectorAll('.hunk-separator').forEach(el => {
@@ -58,6 +59,7 @@ export function bindHunkExpanders() {
       });
 
       el.replaceWith(fragment);
+      applyHighlighting();
       bindDiffLineClicks();
     });
   });

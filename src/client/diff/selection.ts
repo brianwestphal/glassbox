@@ -6,6 +6,7 @@ import { bindDiffLineClicks } from './lineClicks.js';
 import { bindHunkExpanders } from './hunkExpander.js';
 import { bindDragDrop } from './dragDrop.js';
 import { bindServerAnnotations } from '../annotations/events.js';
+import { detectLanguage, applyHighlighting } from './highlight.js';
 
 export async function selectFile(fileId: string) {
   state.currentFileId = fileId;
@@ -17,6 +18,8 @@ export async function selectFile(fileId: string) {
   const welcome = document.querySelector('.welcome-message') as HTMLElement | null;
   if (welcome) welcome.style.display = 'none';
   container.style.display = 'block';
+  const toolbar = document.getElementById('diff-toolbar');
+  if (toolbar) toolbar.style.display = '';
 
   const res = await fetch('/file/' + fileId + '?mode=' + state.diffMode);
   container.innerHTML = await res.text();
@@ -31,8 +34,28 @@ export async function selectFile(fileId: string) {
     updateProgress();
   }
 
+  // Auto-detect language and apply syntax highlighting
+  const filePath = (container.querySelector('.diff-view') as HTMLElement | null)?.dataset?.filePath || '';
+  state._detectedLang = detectLanguage(filePath);
+  if (state.highlightAuto) {
+    state.highlightLang = state._detectedLang;
+  }
+  applyHighlighting();
+  updateToolbarLanguage();
+
   bindDiffLineClicks();
   bindHunkExpanders();
   bindDragDrop();
   bindServerAnnotations();
+}
+
+export function updateToolbarLanguage() {
+  const btn = document.getElementById('language-btn');
+  if (!btn) return;
+  if (state.highlightAuto) {
+    const detected = state._detectedLang === 'plaintext' ? 'Plain Text' : state._detectedLang;
+    btn.textContent = 'Auto (' + detected + ')';
+  } else {
+    btn.textContent = state.highlightLang === 'plaintext' ? 'Plain Text' : state.highlightLang;
+  }
 }

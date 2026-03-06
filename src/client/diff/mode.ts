@@ -1,31 +1,4 @@
 import { state } from '../state.js';
-import { selectFile } from './selection.js';
-
-export function bindDiffModeToggle() {
-  document.querySelectorAll('[data-diff-mode]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.diffMode = (btn as HTMLElement).dataset.diffMode as 'split' | 'unified';
-      document.querySelectorAll('[data-diff-mode]').forEach(b => b.classList.toggle('active', b === btn));
-      if (state.currentFileId) selectFile(state.currentFileId);
-    });
-  });
-}
-
-export function bindWrapToggle() {
-  const btn = document.getElementById('wrap-toggle');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    state.wrapLines = !state.wrapLines;
-    btn.classList.toggle('active', state.wrapLines);
-    const container = document.getElementById('diff-container');
-    if (container) {
-      container.classList.toggle('wrap-lines', state.wrapLines);
-    }
-    if (!state.wrapLines) {
-      resetScrollSync();
-    }
-  });
-}
 
 export function initScrollSync() {
   const container = document.getElementById('diff-container');
@@ -56,12 +29,4 @@ export function initScrollSync() {
       syncing = false;
     });
   }, true);
-}
-
-function resetScrollSync() {
-  const container = document.getElementById('diff-container');
-  if (!container) return;
-  container.querySelectorAll('.split-row .code').forEach(el => {
-    (el as HTMLElement).scrollLeft = 0;
-  });
 }

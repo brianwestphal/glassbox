@@ -1,15 +1,15 @@
 import { state } from './state.js';
 import { loadFiles } from './sidebar/fileTree.js';
 import { bindSidebarEvents, bindFileFilter, bindSidebarResize } from './sidebar/controls.js';
-import { bindDiffModeToggle, bindWrapToggle, initScrollSync } from './diff/mode.js';
+import { initScrollSync } from './diff/mode.js';
+import { bindToolbar } from './diff/toolbar.js';
 import { bindCompleteButton, bindReopenButton } from './review/modal.js';
 import { updateProgress } from './review/progress.js';
 
 async function init() {
   await loadFiles();
   bindSidebarEvents();
-  bindDiffModeToggle();
-  bindWrapToggle();
+  bindToolbar();
   bindFileFilter();
   bindSidebarResize();
   bindCompleteButton();

@@ -41,6 +41,9 @@ export interface AppState {
   annotationCounts: Record<string, number>;
   staleCounts: Record<string, number>;
   filterText: string;
+  highlightLang: string;
+  highlightAuto: boolean;
+  _detectedLang: string;
   _dragAnnotation: DragAnnotation | null;
 }
 
@@ -54,6 +57,9 @@ export const state: AppState = {
   annotationCounts: {},
   staleCounts: {},
   filterText: '',
+  highlightLang: 'plaintext',
+  highlightAuto: true,
+  _detectedLang: 'plaintext',
   _dragAnnotation: null,
 };
 
