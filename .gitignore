@@ -2,3 +2,4 @@ node_modules
 dist
 .glassbox
 .release-state.json
+.DS_Store

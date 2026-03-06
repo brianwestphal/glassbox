@@ -62,28 +62,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 
 ## How it works
 
-```
-  You                     AI
-   |                       |
-   |   generate code       |
-   |<----------------------|
-   |                       |
-   |   glassbox            |
-   |   review + annotate   |
-   |                       |
-   |   "Read .glassbox/    |
-   |    latest-review.md"  |
-   |---------------------->|
-   |                       |
-   |   updated code        |
-   |<----------------------|
-   |                       |
-   |   glassbox            |
-   |   (annotations carry  |
-   |    forward)           |
-   |                       |
-   :   repeat until done   :
-```
+<img src="assets/sequence-diagram.svg" alt="Sequence diagram: You and AI in a review loop" width="520">
 
 ---
 

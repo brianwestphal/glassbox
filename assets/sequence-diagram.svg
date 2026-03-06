@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="520px" height="520px" viewBox="0 0 520 520" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>sequence-diagram</title>
+    <g id="sequence-diagram" stroke="none" fill="none">
+        <rect id="Rectangle" fill="#1E1E2E" fill-rule="nonzero" x="0" y="0" width="520" height="520" rx="12"></rect>
+        <rect id="Rectangle" fill="#89B4FA" fill-rule="nonzero" x="80" y="24" width="60" height="28" rx="6"></rect>
+        <text id="You" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="99" y="43">You</tspan>
+        </text>
+        <rect id="Rectangle" fill="#A6E3A1" fill-rule="nonzero" x="370" y="24" width="60" height="28" rx="6"></rect>
+        <text id="AI" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="393.5" y="43">AI</tspan>
+        </text>
+        <line x1="110" y1="60" x2="110" y2="480" id="Path" stroke="#45475A" stroke-width="1.5" fill="#000000" fill-rule="nonzero" stroke-dasharray="6,4"></line>
+        <line x1="400" y1="60" x2="400" y2="480" id="Path" stroke="#45475A" stroke-width="1.5" fill="#000000" fill-rule="nonzero" stroke-dasharray="6,4"></line>
+        <path id="Path" d="M126.333333,84.25 L126.333,89.25 L395,89.25 L395,90.75 L126.333,90.75 L126.333333,95.75 L114.333333,90 L126.333333,84.25 Z" fill="#A6E3A1" fill-rule="nonzero"></path>
+        <text id="generate-code" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="213" y="82">generate code</tspan>
+        </text>
+        <rect id="Rectangle" fill="#313244" fill-rule="nonzero" x="42" y="116" width="136" height="44" rx="6"></rect>
+        <text id="glassbox" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="84" y="135">glassbox</tspan>
+        </text>
+        <text id="review-+-annotate" fill="#CDD6F4" fill-rule="nonzero" font-family="Helvetica" font-size="10" font-weight="normal">
+            <tspan x="70.390625" y="151">review + annotate</tspan>
+        </text>
+        <path id="Path" d="M383.666667,180.25 L395.666667,186 L383.666667,191.75 L383.666,186.75 L115,186.75 L115,185.25 L383.666,185.25 L383.666667,180.25 Z" fill="#89B4FA" fill-rule="nonzero"></path>
+        <text id="&quot;Read-.glassbox/latest-review.md&quot;" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="156.5" y="178">"Read .glassbox/latest-review.md"</tspan>
+        </text>
+        <path id="Path" d="M126.333333,224.25 L126.333,229.25 L395,229.25 L395,230.75 L126.333,230.75 L126.333333,235.75 L114.333333,230 L126.333333,224.25 Z" fill="#A6E3A1" fill-rule="nonzero"></path>
+        <text id="updated-code" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="215.5" y="222">updated code</tspan>
+        </text>
+        <rect id="Rectangle" fill="#313244" fill-rule="nonzero" x="42" y="256" width="136" height="44" rx="6"></rect>
+        <text id="glassbox" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="84" y="275">glassbox</tspan>
+        </text>
+        <text id="(annotations-carry-f" fill="#CDD6F4" fill-rule="nonzero" font-family="Helvetica" font-size="10" font-weight="normal">
+            <tspan x="50.2539062" y="291">(annotations carry forward)</tspan>
+        </text>
+        <path id="Path" d="M383.666667,320.25 L395.666667,326 L383.666667,331.75 L383.666,326.75 L115,326.75 L115,325.25 L383.666,325.25 L383.666667,320.25 Z" fill="#89B4FA" fill-rule="nonzero"></path>
+        <text id="&quot;Read-.glassbox/latest-review.md&quot;" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="156.5" y="318">"Read .glassbox/latest-review.md"</tspan>
+        </text>
+        <path id="Path" d="M126.333333,364.25 L126.333,369.25 L395,369.25 L395,370.75 L126.333,370.75 L126.333333,375.75 L114.333333,370 L126.333333,364.25 Z" fill="#A6E3A1" fill-rule="nonzero"></path>
+        <text id="updated-code" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="215.5" y="362">updated code</tspan>
+        </text>
+        <path d="M176,408 L334,408 C342.836556,408 350,415.163444 350,424 C350,432.836556 342.836556,440 334,440 L176,440 C167.163444,440 160,432.836556 160,424 C160,415.163444 167.163444,408 176,408 Z" id="Rectangle" stroke="#6C7086" stroke-width="1" stroke-dasharray="4,3"></path>
+        <text id="repeat-until-satisfied" fill="#FFFFFF" fill-rule="nonzero" font-family="Helvetica" font-size="13" font-weight="normal">
+            <tspan x="197" y="429">repeat until satisfied</tspan>
+        </text>
+        <circle id="Oval" fill="#45475A" fill-rule="nonzero" cx="110" cy="400" r="2"></circle>
+        <circle id="Oval" fill="#45475A" fill-rule="nonzero" cx="110" cy="412" r="2"></circle>
+        <circle id="Oval" fill="#45475A" fill-rule="nonzero" cx="110" cy="424" r="2"></circle>
+        <circle id="Oval" fill="#45475A" fill-rule="nonzero" cx="400" cy="400" r="2"></circle>
+        <circle id="Oval" fill="#45475A" fill-rule="nonzero" cx="400" cy="412" r="2"></circle>
+        <circle id="Oval" fill="#45475A" fill-rule="nonzero" cx="400" cy="424" r="2"></circle>
+    </g>
+</svg>
