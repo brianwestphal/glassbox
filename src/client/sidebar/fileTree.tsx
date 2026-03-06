@@ -9,6 +9,7 @@ export async function loadFiles() {
   state.files = data.files;
   state.annotationCounts = data.annotationCounts;
   state.staleCounts = data.staleCounts || {};
+  restoreCollapsedFolders();
   renderFileList();
 }
 
@@ -23,7 +24,7 @@ export function renderFileList() {
     filtered = state.files.filter(f => f.file_path.toLowerCase().indexOf(q) !== -1);
   }
   const tree = buildFileTree(filtered);
-  renderTreeNode(list, tree, 0);
+  renderTreeNode(list, tree, 0, '');
 }
 
 function buildFileTree(files: ReviewFile[]): TreeNode {
@@ -73,18 +74,20 @@ function hasStaleInTree(node: TreeNode): boolean {
   return false;
 }
 
-function renderTreeNode(container: Element, node: TreeNode, depth: number) {
+function renderTreeNode(container: Element, node: TreeNode, depth: number, pathPrefix: string) {
   const sortedChildren = node.children.slice().sort((a, b) => a.name.localeCompare(b.name));
   const pad = (d: number) => `padding-left: ${16 + d * 12}px`;
 
   sortedChildren.forEach(child => {
+    const folderPath = pathPrefix ? pathPrefix + '/' + child.name : child.name;
     const total = countTreeFiles(child);
     const isCollapsible = total > 1;
+    const isCollapsed = isCollapsible && state.collapsedFolders.has(folderPath);
     const stale = hasStaleInTree(child);
 
     const group = toElement(
       <div className="folder-group">
-        <div className={`folder-header${isCollapsible ? ' collapsible' : ''}`} style={pad(depth)}>
+        <div className={`folder-header${isCollapsible ? ' collapsible' : ''}${isCollapsed ? ' collapsed' : ''}`} style={pad(depth)}>
           {isCollapsible
             ? <span className="folder-arrow">{'\u25BE'}</span>
             : <span className="folder-arrow-spacer"></span>}
@@ -97,10 +100,18 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number) {
 
     if (isCollapsible) {
       const header = group.querySelector('.folder-header')!;
-      header.addEventListener('click', () => header.classList.toggle('collapsed'));
+      header.addEventListener('click', () => {
+        header.classList.toggle('collapsed');
+        if (header.classList.contains('collapsed')) {
+          state.collapsedFolders.add(folderPath);
+        } else {
+          state.collapsedFolders.delete(folderPath);
+        }
+        saveCollapsedFolders();
+      });
     }
 
-    renderTreeNode(group.querySelector('.folder-content')!, child, depth + 1);
+    renderTreeNode(group.querySelector('.folder-content')!, child, depth + 1, folderPath);
     container.appendChild(group);
   });
 
@@ -123,4 +134,23 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number) {
     container.appendChild(el);
     state.fileOrder.push(f.id);
   });
+}
+
+function storageKey(): string {
+  return 'glassbox-collapsed-' + state.reviewId;
+}
+
+function saveCollapsedFolders() {
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify([...state.collapsedFolders]));
+  } catch { /* localStorage unavailable */ }
+}
+
+function restoreCollapsedFolders() {
+  try {
+    const stored = localStorage.getItem(storageKey());
+    if (stored) {
+      state.collapsedFolders = new Set(JSON.parse(stored));
+    }
+  } catch { /* localStorage unavailable */ }
 }

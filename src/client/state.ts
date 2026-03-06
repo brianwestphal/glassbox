@@ -45,6 +45,7 @@ export interface AppState {
   highlightAuto: boolean;
   _detectedLang: string;
   _dragAnnotation: DragAnnotation | null;
+  collapsedFolders: Set<string>;
 }
 
 export const state: AppState = {
@@ -61,6 +62,7 @@ export const state: AppState = {
   highlightAuto: true,
   _detectedLang: 'plaintext',
   _dragAnnotation: null,
+  collapsedFolders: new Set(),
 };
 
 export const CATEGORIES: Category[] = [
