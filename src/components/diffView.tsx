@@ -36,6 +36,9 @@ export function DiffView({ file, diff, annotations, mode }: {
 }
 
 function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]> }) {
+  const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
+  const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
+
   return (
     <div className="diff-table-split">
       {hunks.map((hunk, hunkIdx) => {
@@ -60,7 +63,8 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                 <div>
                   <div className="split-row">
                     <div className={`diff-line split-left ${pair.left?.type || 'empty'}`}
-                      data-line={pair.left?.oldNum ?? ''} data-side="old">
+                      data-line={pair.left?.oldNum ?? ''} data-side="old"
+                      data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
                       <span className="gutter">{pair.left?.oldNum ?? ''}</span>
                       <span className="code">{pair.left ? raw(escapeHtml(pair.left.content)) : ''}</span>
                     </div>
@@ -77,6 +81,9 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
           </div>
         );
       })}
+      <div className="hunk-separator hunk-expander-tail" data-start={tailStart}>
+        ↕ Show remaining lines
+      </div>
     </div>
   );
 }
@@ -122,6 +129,9 @@ function pairLines(lines: DiffLine[]): LinePair[] {
 }
 
 function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]> }) {
+  const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
+  const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
+
   return (
     <div className="diff-table-unified">
       {hunks.map((hunk, hunkIdx) => (
@@ -152,6 +162,9 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
           })}
         </div>
       ))}
+      <div className="hunk-separator hunk-expander-tail" data-start={tailStart}>
+        ↕ Show remaining lines
+      </div>
     </div>
   );
 }

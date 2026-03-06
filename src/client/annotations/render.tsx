@@ -27,10 +27,14 @@ export function renderAnnotationInline(annotation: Annotation, lineNumber: numbe
 
   lineEl.classList.add('has-annotation');
 
-  let annotationRow = lineEl.nextElementSibling;
+  // In split mode, insert after the split-row (not inside it) so annotations span both columns
+  const splitRow = lineEl.closest('.split-row');
+  const insertTarget = splitRow ?? lineEl;
+
+  let annotationRow = insertTarget.nextElementSibling;
   if (!annotationRow || !annotationRow.classList.contains('annotation-row')) {
     annotationRow = toElement(<div className="annotation-row"></div>);
-    lineEl.parentNode?.insertBefore(annotationRow, lineEl.nextSibling);
+    insertTarget.parentNode?.insertBefore(annotationRow, insertTarget.nextSibling);
   }
 
   const item = toElement(

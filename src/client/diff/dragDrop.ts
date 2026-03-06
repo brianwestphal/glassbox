@@ -25,9 +25,19 @@ export function bindDragDrop() {
       document.querySelectorAll('.diff-line.drag-over').forEach(d => { d.classList.remove('drag-over'); });
       if (state._dragAnnotation === null) return;
 
-      const lineNum = parseInt((el as HTMLElement).dataset.line ?? '0', 10);
-      const side = (el as HTMLElement).dataset.side ?? 'new';
+      const htmlEl = el as HTMLElement;
+      let lineNum = parseInt(htmlEl.dataset.line ?? '0', 10);
+      let side = htmlEl.dataset.side ?? 'new';
       if (isNaN(lineNum)) return;
+
+      // For old-side drops, prefer the new-side line number
+      if (side === 'old' && htmlEl.dataset.newLine !== undefined && htmlEl.dataset.newLine !== '') {
+        const newLine = parseInt(htmlEl.dataset.newLine, 10);
+        if (!isNaN(newLine)) {
+          lineNum = newLine;
+          side = 'new';
+        }
+      }
 
       const drag = state._dragAnnotation;
       state._dragAnnotation = null;

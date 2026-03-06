@@ -24,8 +24,10 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
     </div>
   );
 
-  let insertAfter: Element = afterEl;
-  let next = afterEl.nextElementSibling;
+  // In split mode, insert after the split-row (not inside it) so the form spans both columns
+  const splitRow = afterEl.closest('.split-row');
+  let insertAfter: Element = splitRow ?? afterEl;
+  let next = insertAfter.nextElementSibling;
   while (next !== null && next.classList.contains('annotation-row')) {
     insertAfter = next;
     next = next.nextElementSibling;
