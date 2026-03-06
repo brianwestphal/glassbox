@@ -1,15 +1,16 @@
-import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync, appendFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
 import { execSync } from 'child_process';
-import { getReview, getReviewFiles, getAnnotationsForReview } from '../db/queries.js';
+import { appendFileSync,existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
+
+import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
 
 const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
 const DISMISS_DAYS = 30;
 
 function loadDismissals(): Record<string, number> {
   try {
-    return JSON.parse(readFileSync(DISMISS_FILE, 'utf-8'));
+    return JSON.parse(readFileSync(DISMISS_FILE, 'utf-8')) as Record<string, number>;
   } catch {
     return {};
   }
@@ -81,7 +82,7 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
   // Group annotations by file
   const byFile: Record<string, typeof annotations> = {};
   for (const a of annotations) {
-    if (!byFile[a.file_path]) byFile[a.file_path] = [];
+    if (!(a.file_path in byFile)) byFile[a.file_path] = [];
     byFile[a.file_path].push(a);
   }
 
@@ -90,7 +91,7 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
   lines.push('# Code Review');
   lines.push('');
   lines.push(`- **Repository**: ${review.repo_name}`);
-  lines.push(`- **Review mode**: ${review.mode}${review.mode_args ? ` (${review.mode_args})` : ''}`);
+  lines.push(`- **Review mode**: ${review.mode}${review.mode_args !== null && review.mode_args !== '' ? ` (${review.mode_args})` : ''}`);
   lines.push(`- **Review ID**: ${review.id}`);
   lines.push(`- **Date**: ${new Date().toISOString()}`);
   lines.push(`- **Files reviewed**: ${files.filter(f => f.status === 'reviewed').length}/${files.length}`);

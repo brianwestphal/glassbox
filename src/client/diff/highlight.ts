@@ -1,4 +1,5 @@
 import hljs from 'highlight.js';
+
 import { state } from '../state.js';
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -69,8 +70,8 @@ const FILENAME_TO_LANG: Record<string, string> = {
 };
 
 export function detectLanguage(filePath: string): string {
-  const fileName = filePath.split('/').pop() || '';
-  if (FILENAME_TO_LANG[fileName]) return FILENAME_TO_LANG[fileName];
+  const fileName = filePath.split('/').pop() ?? '';
+  if (fileName in FILENAME_TO_LANG) return FILENAME_TO_LANG[fileName];
   const dotIdx = fileName.lastIndexOf('.');
   if (dotIdx >= 0) {
     const ext = fileName.substring(dotIdx).toLowerCase();

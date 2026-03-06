@@ -1,14 +1,14 @@
-import type { FileDiff } from './git/diff.js';
 import type { Annotation, ReviewFile } from './db/queries.js';
 import {
-  getReviewFiles, getAnnotationsForFile,
-  updateFileDiff, deleteReviewFile, addReviewFile,
-  markAnnotationStale, markAnnotationCurrent, moveAnnotation,
-  updateReviewHead,
+addReviewFile,
+deleteReviewFile, getAnnotationsForFile,
+  getReviewFiles, markAnnotationCurrent,   markAnnotationStale, moveAnnotation,
+  updateFileDiff,   updateReviewHead,
 } from './db/queries.js';
+import type { FileDiff } from './git/diff.js';
 
 function findLineContent(diff: FileDiff, lineNumber: number, side: string): string | null {
-  for (const hunk of diff.hunks || []) {
+  for (const hunk of diff.hunks) {
     for (const line of hunk.lines) {
       if (side === 'old' && line.oldNum === lineNumber) return line.content;
       if (side === 'new' && line.newNum === lineNumber) return line.content;
@@ -21,7 +21,7 @@ function findMatchingLine(diff: FileDiff, content: string, origLineNum: number, 
   let bestMatch: { lineNumber: number; side: string } | null = null;
   let bestDistance = Infinity;
 
-  for (const hunk of diff.hunks || []) {
+  for (const hunk of diff.hunks) {
     for (const line of hunk.lines) {
       if (line.content !== content) continue;
       const lineNum = side === 'old' ? line.oldNum : line.newNum;
@@ -42,7 +42,7 @@ async function migrateAnnotations(annotations: Annotation[], oldDiff: FileDiff, 
 
   for (const annotation of annotations) {
     const oldContent = findLineContent(oldDiff, annotation.line_number, annotation.side);
-    if (!oldContent) {
+    if (oldContent === null) {
       if (!annotation.is_stale) {
         await markAnnotationStale(annotation.id, null);
         staleCount++;
@@ -92,7 +92,7 @@ export async function updateReviewDiffs(
   for (const [path, existingFile] of existingByPath) {
     const newDiff = newDiffsByPath.get(path);
     if (newDiff) {
-      const oldDiff: FileDiff = JSON.parse(existingFile.diff_data || '{}');
+      const oldDiff: FileDiff = JSON.parse(existingFile.diff_data ?? '{}') as FileDiff;
       const annotations = await getAnnotationsForFile(existingFile.id);
       if (annotations.length > 0) {
         stale += await migrateAnnotations(annotations, oldDiff, newDiff);
@@ -106,7 +106,7 @@ export async function updateReviewDiffs(
         await deleteReviewFile(existingFile.id);
       } else {
         // Mark all non-stale annotations as stale
-        const oldDiff: FileDiff = JSON.parse(existingFile.diff_data || '{}');
+        const oldDiff: FileDiff = JSON.parse(existingFile.diff_data ?? '{}') as FileDiff;
         for (const a of annotations) {
           if (!a.is_stale) {
             const content = findLineContent(oldDiff, a.line_number, a.side);

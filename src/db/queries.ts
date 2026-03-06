@@ -37,7 +37,7 @@ export async function getReview(id: string): Promise<Review | undefined> {
 
 export async function listReviews(repoPath?: string): Promise<Review[]> {
   const db = await getDb();
-  if (repoPath) {
+  if (repoPath !== undefined && repoPath !== '') {
     const result = await db.query<Review>(
       'SELECT * FROM reviews WHERE repo_path = $1 ORDER BY created_at DESC', [repoPath]
     );

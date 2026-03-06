@@ -30,7 +30,7 @@ function git(args: string, cwd: string): string {
     return execSync(`git ${args}`, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string };
-    if (err.stdout) return err.stdout;
+    if (err.stdout !== undefined && err.stdout !== '') return err.stdout;
     throw e;
   }
 }
@@ -41,7 +41,7 @@ export function getRepoRoot(cwd: string): string {
 
 export function getRepoName(cwd: string): string {
   const root = getRepoRoot(cwd);
-  return root.split('/').pop() || 'unknown';
+  return root.split('/').pop() ?? 'unknown';
 }
 
 export function isGitRepo(cwd: string): boolean {
@@ -195,7 +195,7 @@ export function parseDiff(raw: string): FileDiff[] {
     let status: FileDiff['status'] = 'modified';
     if (header.includes('new file mode')) status = 'added';
     else if (header.includes('deleted file mode')) status = 'deleted';
-    else if (oldPath) status = 'renamed';
+    else if (oldPath !== null) status = 'renamed';
 
     const isBinary = header.includes('Binary file');
     if (isBinary) {
@@ -217,12 +217,13 @@ function parseHunks(raw: string): DiffHunk[] {
   const hunkStarts: { index: number; oldStart: number; oldCount: number; newStart: number; newCount: number }[] = [];
 
   while ((match = hunkRegex.exec(raw)) !== null) {
+    const groups = match as unknown as (string | undefined)[];
     hunkStarts.push({
       index: match.index + match[0].length,
       oldStart: parseInt(match[1], 10),
-      oldCount: match[2] != null ? parseInt(match[2], 10) : 1,
+      oldCount: groups[2] !== undefined ? parseInt(groups[2], 10) : 1,
       newStart: parseInt(match[3], 10),
-      newCount: match[4] != null ? parseInt(match[4], 10) : 1,
+      newCount: groups[4] !== undefined ? parseInt(groups[4], 10) : 1,
     });
   }
 
@@ -297,6 +298,10 @@ export function getModeArgs(mode: ReviewMode): string | undefined {
     case 'range': return `${mode.from}..${mode.to}`;
     case 'branch': return mode.name;
     case 'files': return mode.patterns.join(',');
-    default: return undefined;
+    case 'uncommitted':
+    case 'staged':
+    case 'unstaged':
+    case 'all':
+      return undefined;
   }
 }

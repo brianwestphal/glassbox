@@ -11,14 +11,14 @@ export function initScrollSync() {
   container.addEventListener('scroll', (e) => {
     if (syncing || state.wrapLines || state.diffMode !== 'split') return;
     const target = e.target as HTMLElement;
-    if (!target.classList || !target.classList.contains('code')) return;
+    if (!target.classList.contains('code')) return;
     if (!target.closest('.split-row')) return;
 
     const scrollLeft = target.scrollLeft;
     if (scrollLeft === lastScrollLeft) return;
     lastScrollLeft = scrollLeft;
 
-    if (rafId) cancelAnimationFrame(rafId);
+    if (rafId !== null) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
       syncing = true;
       container.querySelectorAll('.split-row .code').forEach(el => {

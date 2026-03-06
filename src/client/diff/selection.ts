@@ -1,12 +1,12 @@
-import { state } from '../state.js';
-import { api } from '../api.js';
-import { renderFileList } from '../sidebar/fileTree.js';
-import { updateProgress } from '../review/progress.js';
-import { bindDiffLineClicks } from './lineClicks.js';
-import { bindHunkExpanders } from './hunkExpander.js';
-import { bindDragDrop } from './dragDrop.js';
 import { bindServerAnnotations } from '../annotations/events.js';
-import { detectLanguage, applyHighlighting } from './highlight.js';
+import { api } from '../api.js';
+import { updateProgress } from '../review/progress.js';
+import { renderFileList } from '../sidebar/fileTree.js';
+import { state } from '../state.js';
+import { bindDragDrop } from './dragDrop.js';
+import { applyHighlighting,detectLanguage } from './highlight.js';
+import { bindHunkExpanders } from './hunkExpander.js';
+import { bindDiffLineClicks } from './lineClicks.js';
 import { loadOutline } from './outline.js';
 
 export async function selectFile(fileId: string) {
@@ -15,12 +15,13 @@ export async function selectFile(fileId: string) {
     (el as HTMLElement).classList.toggle('active', (el as HTMLElement).dataset.fileId === fileId);
   });
 
-  const container = document.getElementById('diff-container')!;
-  const welcome = document.querySelector('.welcome-message') as HTMLElement | null;
-  if (welcome) welcome.style.display = 'none';
+  const container = document.getElementById('diff-container');
+  if (container === null) return;
+  const welcome = document.querySelector<HTMLElement>('.welcome-message');
+  if (welcome !== null) welcome.style.display = 'none';
   container.style.display = 'block';
   const toolbar = document.getElementById('diff-toolbar');
-  if (toolbar) toolbar.style.display = '';
+  if (toolbar !== null) toolbar.style.display = '';
 
   const res = await fetch('/file/' + fileId + '?mode=' + state.diffMode);
   container.innerHTML = await res.text();
@@ -28,7 +29,7 @@ export async function selectFile(fileId: string) {
   container.classList.toggle('wrap-lines', state.wrapLines);
 
   const file = state.files.find(f => f.id === fileId);
-  if (file && file.status === 'pending') {
+  if (file !== undefined && file.status === 'pending') {
     await api('/files/' + fileId + '/status', { method: 'PATCH', body: { status: 'reviewed' } });
     file.status = 'reviewed';
     renderFileList();
@@ -36,7 +37,8 @@ export async function selectFile(fileId: string) {
   }
 
   // Auto-detect language and apply syntax highlighting
-  const filePath = (container.querySelector('.diff-view') as HTMLElement | null)?.dataset?.filePath || '';
+  const diffView = container.querySelector<HTMLElement>('.diff-view');
+  const filePath = diffView?.dataset.filePath ?? '';
   state._detectedLang = detectLanguage(filePath);
   if (state.highlightAuto) {
     state.highlightLang = state._detectedLang;
@@ -44,7 +46,7 @@ export async function selectFile(fileId: string) {
   applyHighlighting();
   updateToolbarLanguage();
 
-  loadOutline(fileId);
+  void loadOutline(fileId);
   bindDiffLineClicks();
   bindHunkExpanders();
   bindDragDrop();
@@ -53,7 +55,7 @@ export async function selectFile(fileId: string) {
 
 export function updateToolbarLanguage() {
   const btn = document.getElementById('language-btn');
-  if (!btn) return;
+  if (btn === null) return;
   if (state.highlightAuto) {
     const detected = state._detectedLang === 'plaintext' ? 'Plain Text' : state._detectedLang;
     btn.textContent = 'Auto (' + detected + ')';

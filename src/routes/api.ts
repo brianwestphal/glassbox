@@ -1,28 +1,29 @@
 import { Hono } from 'hono';
-import type { AppEnv } from '../types.js';
+
 import {
-  getReview, getReviewFiles, getReviewFile,
-  getAnnotationsForFile, getAnnotationsForReview,
-  addAnnotation, updateAnnotation, deleteAnnotation, moveAnnotation,
-  markAnnotationCurrent, deleteStaleAnnotations, keepAllStaleAnnotations,
-  updateFileStatus, updateReviewStatus, listReviews, deleteReview,
-  getStaleCountsForReview,
-} from '../db/queries.js';
-import { generateReviewExport, deleteReviewExport, shouldPromptGitignore, addGlassboxToGitignore, dismissGitignorePrompt } from '../export/generate.js';
+  addAnnotation, deleteAnnotation, deleteReview,
+deleteStaleAnnotations,   getAnnotationsForFile, getAnnotationsForReview,
+  getReview, getReviewFile,
+getReviewFiles,   getStaleCountsForReview,
+keepAllStaleAnnotations,
+listReviews,   markAnnotationCurrent, moveAnnotation,
+updateAnnotation,   updateFileStatus, updateReviewStatus, } from '../db/queries.js';
+import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt,generateReviewExport, shouldPromptGitignore } from '../export/generate.js';
 import { getFileContent } from '../git/diff.js';
 import { parseOutline } from '../outline/parser.js';
+import type { AppEnv } from '../types.js';
 
 export const apiRoutes = new Hono<AppEnv>();
 
 // Helper: resolve reviewId from query param or middleware
 function resolveReviewId(c: { req: { query: (k: string) => string | undefined }; get: (k: string) => string }): string {
-  return c.req.query('reviewId') || c.get('reviewId') as string;
+  return c.req.query('reviewId') ?? c.get('reviewId');
 }
 
 // --- Reviews ---
 
 apiRoutes.get('/reviews', async (c) => {
-  const repoRoot = c.get('repoRoot') as string;
+  const repoRoot = c.get('repoRoot');
   const reviews = await listReviews(repoRoot);
   return c.json(reviews);
 });
@@ -35,8 +36,8 @@ apiRoutes.get('/review', async (c) => {
 
 apiRoutes.post('/review/complete', async (c) => {
   const reviewId = resolveReviewId(c);
-  const currentReviewId = c.get('currentReviewId') as string;
-  const repoRoot = c.get('repoRoot') as string;
+  const currentReviewId = c.get('currentReviewId');
+  const repoRoot = c.get('repoRoot');
   await updateReviewStatus(reviewId, 'completed');
   const isCurrent = reviewId === currentReviewId;
   const exportPath = await generateReviewExport(reviewId, repoRoot, isCurrent);
@@ -44,14 +45,14 @@ apiRoutes.post('/review/complete', async (c) => {
   return c.json({ status: 'completed', exportPath, isCurrent, reviewId, gitignorePrompt });
 });
 
-apiRoutes.post('/gitignore/add', async (c) => {
-  const repoRoot = c.get('repoRoot') as string;
+apiRoutes.post('/gitignore/add', (c) => {
+  const repoRoot = c.get('repoRoot');
   addGlassboxToGitignore(repoRoot);
   return c.json({ ok: true });
 });
 
-apiRoutes.post('/gitignore/dismiss', async (c) => {
-  const repoRoot = c.get('repoRoot') as string;
+apiRoutes.post('/gitignore/dismiss', (c) => {
+  const repoRoot = c.get('repoRoot');
   dismissGitignorePrompt(repoRoot);
   return c.json({ ok: true });
 });
@@ -64,19 +65,19 @@ apiRoutes.post('/review/reopen', async (c) => {
 
 apiRoutes.delete('/review/:id', async (c) => {
   const reviewId = c.req.param('id');
-  const currentReviewId = c.get('currentReviewId') as string;
+  const currentReviewId = c.get('currentReviewId');
   if (reviewId === currentReviewId) {
     return c.json({ error: 'Cannot delete the current review' }, 400);
   }
-  const repoRoot = c.get('repoRoot') as string;
+  const repoRoot = c.get('repoRoot');
   deleteReviewExport(reviewId, repoRoot);
   await deleteReview(reviewId);
   return c.json({ ok: true });
 });
 
 apiRoutes.post('/reviews/delete-completed', async (c) => {
-  const currentReviewId = c.get('currentReviewId') as string;
-  const repoRoot = c.get('repoRoot') as string;
+  const currentReviewId = c.get('currentReviewId');
+  const repoRoot = c.get('repoRoot');
   const reviews = await listReviews(repoRoot);
   const toDelete = reviews.filter(r => r.status === 'completed' && r.id !== currentReviewId);
   for (const r of toDelete) {
@@ -87,8 +88,8 @@ apiRoutes.post('/reviews/delete-completed', async (c) => {
 });
 
 apiRoutes.post('/reviews/delete-all', async (c) => {
-  const currentReviewId = c.get('currentReviewId') as string;
-  const repoRoot = c.get('repoRoot') as string;
+  const currentReviewId = c.get('currentReviewId');
+  const repoRoot = c.get('repoRoot');
   const reviews = await listReviews(repoRoot);
   const toDelete = reviews.filter(r => r.id !== currentReviewId);
   for (const r of toDelete) {
@@ -184,11 +185,11 @@ apiRoutes.get('/annotations/all', async (c) => {
 // --- Outline ---
 
 apiRoutes.get('/outline/:fileId', async (c) => {
-  const repoRoot = c.get('repoRoot') as string;
+  const repoRoot = c.get('repoRoot');
   const file = await getReviewFile(c.req.param('fileId'));
   if (!file) return c.json({ error: 'Not found' }, 404);
 
-  const diff = JSON.parse(file.diff_data || '{}');
+  const diff = JSON.parse(file.diff_data ?? '{}') as { status?: string };
   const isDeleted = diff.status === 'deleted';
 
   let content = '';
@@ -211,12 +212,12 @@ apiRoutes.get('/outline/:fileId', async (c) => {
 // --- Context expansion ---
 
 apiRoutes.get('/context/:fileId', async (c) => {
-  const repoRoot = c.get('repoRoot') as string;
+  const repoRoot = c.get('repoRoot');
   const file = await getReviewFile(c.req.param('fileId'));
   if (!file) return c.json({ error: 'Not found' }, 404);
 
-  const startLine = parseInt(c.req.query('start') || '1', 10);
-  const endLine = parseInt(c.req.query('end') || '20', 10);
+  const startLine = parseInt(c.req.query('start') ?? '1', 10);
+  const endLine = parseInt(c.req.query('end') ?? '20', 10);
 
   const content = getFileContent(file.file_path, 'working', repoRoot);
   const allLines = content.split('\n');

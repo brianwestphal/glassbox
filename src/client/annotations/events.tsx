@@ -1,26 +1,29 @@
 import { raw } from '../../jsx-runtime.js';
-import { state, CATEGORIES } from '../state.js';
-import type { Annotation } from '../state.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
+import type { Annotation } from '../state.js';
+import { CATEGORIES,state } from '../state.js';
+import { bindCategoryBadgeClick,buildCategoryBadge } from './categories.js';
 import { buildAnnotationItemHtml } from './render.js';
-import { buildCategoryBadge, bindCategoryBadgeClick } from './categories.js';
 
 export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotation, lineEl: HTMLElement, annotationRow: HTMLElement) {
-  item.querySelector('[data-action="delete"]')?.addEventListener('click', async (e) => {
+  item.querySelector('[data-action="delete"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    await api('/annotations/' + annotation.id, { method: 'DELETE' });
-    item.remove();
-    if (annotationRow && !annotationRow.querySelector('.annotation-item')) {
-      annotationRow.remove();
-      if (lineEl) lineEl.classList.remove('has-annotation');
-    }
-    state.annotationCounts[state.currentFileId!] = Math.max(0, (state.annotationCounts[state.currentFileId!] || 1) - 1);
-    if (annotation.is_stale) {
-      state.staleCounts[state.currentFileId!] = Math.max(0, (state.staleCounts[state.currentFileId!] || 1) - 1);
-    }
-    renderFileList();
+    void (async () => {
+      await api('/annotations/' + annotation.id, { method: 'DELETE' });
+      item.remove();
+      if (!annotationRow.querySelector('.annotation-item')) {
+        annotationRow.remove();
+        lineEl.classList.remove('has-annotation');
+      }
+      const fileId = state.currentFileId ?? '';
+      state.annotationCounts[fileId] = Math.max(0, (state.annotationCounts[fileId] ?? 1) - 1);
+      if (annotation.is_stale) {
+        state.staleCounts[fileId] = Math.max(0, (state.staleCounts[fileId] ?? 1) - 1);
+      }
+      renderFileList();
+    })();
   });
 
   item.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
@@ -30,7 +33,7 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
 
   item.addEventListener('dblclick', (e) => {
     e.stopPropagation();
-    if (item.querySelector('.annotation-form')) return;
+    if (item.querySelector('.annotation-form') !== null) return;
     editAnnotation(item, annotation);
   });
 
@@ -39,25 +42,31 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
     showReclassifyPopup((e.target as HTMLElement).closest('[data-action="reclassify"]') as HTMLElement, item, annotation);
   });
 
-  item.querySelector('[data-action="keep"]')?.addEventListener('click', async (e) => {
+  item.querySelector('[data-action="keep"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    await api('/annotations/' + annotation.id + '/keep', { method: 'POST' });
-    annotation.is_stale = false;
-    item.classList.remove('annotation-stale');
-    delete item.dataset.isStale;
-    item.innerHTML = buildAnnotationItemHtml(annotation);
-    bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
-    state.staleCounts[state.currentFileId!] = Math.max(0, (state.staleCounts[state.currentFileId!] || 1) - 1);
-    renderFileList();
+    void (async () => {
+      await api('/annotations/' + annotation.id + '/keep', { method: 'POST' });
+      annotation.is_stale = false;
+      item.classList.remove('annotation-stale');
+      delete item.dataset.isStale;
+      item.innerHTML = buildAnnotationItemHtml(annotation);
+      bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
+      const fileId = state.currentFileId ?? '';
+      state.staleCounts[fileId] = Math.max(0, (state.staleCounts[fileId] ?? 1) - 1);
+      renderFileList();
+    })();
   });
 
   const handle = item.querySelector('.annotation-drag-handle');
-  if (handle) {
+  if (handle !== null) {
     handle.addEventListener('dragstart', (e) => {
       e.stopPropagation();
       state._dragAnnotation = { id: annotation.id, item: item, annotation: annotation };
-      (e as DragEvent).dataTransfer!.effectAllowed = 'move';
-      (e as DragEvent).dataTransfer!.setData('text/plain', annotation.id);
+      const dragEvent = e as DragEvent;
+      if (dragEvent.dataTransfer !== null) {
+        dragEvent.dataTransfer.effectAllowed = 'move';
+        dragEvent.dataTransfer.setData('text/plain', annotation.id);
+      }
     });
   }
 }
@@ -66,19 +75,19 @@ export function bindServerAnnotations() {
   document.querySelectorAll('.annotation-item').forEach(el => {
     const item = el as HTMLElement;
     const id = item.dataset.annotationId;
-    if (!id) return;
+    if (id === undefined || id === '') return;
     const isStale = item.dataset.isStale === 'true';
-    const category = item.querySelector('.annotation-category')?.textContent || '';
-    const content = item.querySelector('.annotation-text')?.textContent || '';
+    const category = item.querySelector('.annotation-category')?.textContent ?? '';
+    const content = item.querySelector('.annotation-text')?.textContent ?? '';
     const annotation: Annotation = { id, category, content, is_stale: isStale };
     const row = item.closest('.annotation-row') as HTMLElement;
-    const lineEl = row ? row.previousElementSibling as HTMLElement : null;
-    bindAnnotationItemEvents(item, annotation, lineEl!, row);
+    const lineEl = row.previousElementSibling as HTMLElement;
+    bindAnnotationItemEvents(item, annotation, lineEl, row);
   });
 }
 
 function showReclassifyPopup(badge: HTMLElement, item: HTMLElement, annotation: Annotation) {
-  document.querySelectorAll('.reclassify-popup').forEach(el => el.remove());
+  document.querySelectorAll('.reclassify-popup').forEach(el => { el.remove(); });
 
   const rect = badge.getBoundingClientRect();
   const optionsHtml = CATEGORIES.map(c => (
@@ -92,19 +101,21 @@ function showReclassifyPopup(badge: HTMLElement, item: HTMLElement, annotation: 
     </div>
   );
 
-  popup.addEventListener('click', async (e) => {
-    const opt = (e.target as HTMLElement).closest('.reclassify-option') as HTMLElement | null;
+  popup.addEventListener('click', (e) => {
+    const opt = (e.target as HTMLElement).closest<HTMLElement>('.reclassify-option');
     if (!opt) return;
     e.stopPropagation();
-    const newCategory = opt.dataset.value!;
+    const newCategory = opt.dataset.value ?? '';
     if (newCategory === annotation.category) { popup.remove(); return; }
     annotation.category = newCategory;
-    await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content: annotation.content, category: newCategory } });
-    item.innerHTML = buildAnnotationItemHtml(annotation);
-    const row = item.closest('.annotation-row') as HTMLElement;
-    const lineElRef = row ? row.previousElementSibling as HTMLElement : null;
-    bindAnnotationItemEvents(item, annotation, lineElRef!, row);
-    popup.remove();
+    void (async () => {
+      await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content: annotation.content, category: newCategory } });
+      item.innerHTML = buildAnnotationItemHtml(annotation);
+      const row = item.closest('.annotation-row') as HTMLElement;
+      const lineElRef = row.previousElementSibling as HTMLElement;
+      bindAnnotationItemEvents(item, annotation, lineElRef, row);
+      popup.remove();
+    })();
   });
 
   document.body.appendChild(popup);
@@ -114,7 +125,7 @@ function showReclassifyPopup(badge: HTMLElement, item: HTMLElement, annotation: 
       document.removeEventListener('click', closePopup, true);
     }
   };
-  setTimeout(() => document.addEventListener('click', closePopup, true), 0);
+  setTimeout(() => { document.addEventListener('click', closePopup, true); }, 0);
 }
 
 function editAnnotation(item: HTMLElement, annotation: Annotation) {
@@ -133,7 +144,7 @@ function editAnnotation(item: HTMLElement, annotation: Annotation) {
   );
 
   item.style.display = 'none';
-  annotationRow.parentNode!.insertBefore(formContainer, annotationRow.nextSibling);
+  annotationRow.parentNode?.insertBefore(formContainer, annotationRow.nextSibling);
 
   bindCategoryBadgeClick(formContainer);
 
@@ -142,36 +153,40 @@ function editAnnotation(item: HTMLElement, annotation: Annotation) {
     formContainer.remove();
   }
 
-  formContainer.querySelector('.cancel-edit')!.addEventListener('click', (e) => {
+  formContainer.querySelector('.cancel-edit')?.addEventListener('click', (e) => {
     e.stopPropagation();
     cancelEdit();
   });
 
-  formContainer.querySelector('.save-edit')!.addEventListener('click', async (e) => {
+  formContainer.querySelector('.save-edit')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    const content = (formContainer.querySelector('textarea') as HTMLTextAreaElement).value.trim();
-    const category = (formContainer.querySelector('.form-category-badge') as HTMLElement).dataset.category!;
-    if (!content) return;
-    annotation.content = content;
-    annotation.category = category;
-    await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content, category } });
-    item.innerHTML = buildAnnotationItemHtml(annotation);
-    const row = item.closest('.annotation-row') as HTMLElement;
-    const lineEl = row ? row.previousElementSibling as HTMLElement : null;
-    bindAnnotationItemEvents(item, annotation, lineEl!, row);
-    item.style.display = '';
-    formContainer.remove();
+    void (async () => {
+      const content = (formContainer.querySelector('textarea') as HTMLTextAreaElement).value.trim();
+      const category = (formContainer.querySelector('.form-category-badge') as HTMLElement).dataset.category ?? '';
+      if (content === '') return;
+      annotation.content = content;
+      annotation.category = category;
+      await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content, category } });
+      item.innerHTML = buildAnnotationItemHtml(annotation);
+      const row = item.closest('.annotation-row') as HTMLElement;
+      const lineEl = row.previousElementSibling as HTMLElement;
+      bindAnnotationItemEvents(item, annotation, lineEl, row);
+      item.style.display = '';
+      formContainer.remove();
+    })();
   });
 
-  const textarea = formContainer.querySelector('textarea')!;
-  textarea.focus();
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-  textarea.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      (formContainer.querySelector('.save-edit') as HTMLElement).click();
-    }
-    if (e.key === 'Escape') {
-      cancelEdit();
-    }
-  });
+  const textarea = formContainer.querySelector('textarea');
+  if (textarea !== null) {
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        (formContainer.querySelector('.save-edit') as HTMLElement).click();
+      }
+      if (e.key === 'Escape') {
+        cancelEdit();
+      }
+    });
+  }
 }

@@ -1,5 +1,5 @@
-import { toElement } from '../dom.js';
 import { api } from '../api.js';
+import { toElement } from '../dom.js';
 
 interface OutlineSymbol {
   name: string;
@@ -9,6 +9,10 @@ interface OutlineSymbol {
   children: OutlineSymbol[];
 }
 
+interface OutlineContainer extends HTMLElement {
+  _outlineScrollHandler?: () => void;
+}
+
 let currentSymbols: OutlineSymbol[] = [];
 let scrollRafId = 0;
 
@@ -16,11 +20,11 @@ export async function loadOutline(fileId: string) {
   currentSymbols = [];
 
   // Remove any existing outline bar
-  document.querySelectorAll('.outline-bar').forEach(el => el.remove());
+  document.querySelectorAll('.outline-bar').forEach(el => { el.remove(); });
 
   try {
-    const data = await api('/outline/' + fileId);
-    if (!data.symbols || !data.symbols.length) return;
+    const data = await api<{ symbols: OutlineSymbol[] }>('/outline/' + fileId);
+    if (data.symbols.length === 0) return;
     currentSymbols = data.symbols;
   } catch {
     return;
@@ -29,7 +33,7 @@ export async function loadOutline(fileId: string) {
   // Inject outline bar after the diff-header inside diff-container
   const container = document.getElementById('diff-container');
   const header = container?.querySelector('.diff-header');
-  if (!header) return;
+  if (header === undefined || header === null) return;
 
   const bar = toElement(<div className="outline-bar" id="outline-bar"></div>);
   header.after(bar);
@@ -50,19 +54,20 @@ function findSymbolPath(symbols: OutlineSymbol[], line: number): OutlineSymbol[]
 
 function getTopVisibleLine(): number | null {
   const container = document.getElementById('diff-container');
-  if (!container) return null;
+  if (container === null) return null;
 
   const lines = container.querySelectorAll('.diff-line[data-line]');
   const containerRect = container.getBoundingClientRect();
-  const headerHeight = (container.querySelector('.diff-header') as HTMLElement)?.offsetHeight || 0;
-  const outlineBar = container.querySelector('.outline-bar') as HTMLElement | null;
-  const outlineHeight = outlineBar?.offsetHeight || 0;
+  const headerEl = container.querySelector<HTMLElement>('.diff-header');
+  const headerHeight = headerEl?.offsetHeight ?? 0;
+  const outlineBar = container.querySelector('.outline-bar');
+  const outlineHeight = (outlineBar as HTMLElement | null)?.offsetHeight ?? 0;
   const topOffset = containerRect.top + headerHeight + outlineHeight;
 
   for (const el of lines) {
     const rect = el.getBoundingClientRect();
     if (rect.bottom > topOffset && rect.top < containerRect.bottom) {
-      const lineNum = parseInt((el as HTMLElement).dataset.line || '0', 10);
+      const lineNum = parseInt((el as HTMLElement).dataset.line ?? '0', 10);
       if (lineNum > 0) return lineNum;
     }
   }
@@ -71,10 +76,10 @@ function getTopVisibleLine(): number | null {
 
 function updateBreadcrumb() {
   const bar = document.getElementById('outline-bar');
-  if (!bar || !currentSymbols.length) return;
+  if (bar === null || currentSymbols.length === 0) return;
 
   const line = getTopVisibleLine();
-  const path = line ? findSymbolPath(currentSymbols, line) : [];
+  const path = line !== null ? findSymbolPath(currentSymbols, line) : [];
 
   bar.innerHTML = '';
 
@@ -104,7 +109,7 @@ function updateBreadcrumb() {
 
 function toggleDropdown() {
   const existing = document.querySelector('.outline-dropdown');
-  if (existing) {
+  if (existing !== null) {
     existing.remove();
     return;
   }
@@ -112,10 +117,10 @@ function toggleDropdown() {
 }
 
 function showDropdown() {
-  document.querySelectorAll('.outline-dropdown').forEach(el => el.remove());
+  document.querySelectorAll('.outline-dropdown').forEach(el => { el.remove(); });
 
   const bar = document.getElementById('outline-bar');
-  if (!bar || !currentSymbols.length) return;
+  if (bar === null || currentSymbols.length === 0) return;
 
   const dropdown = toElement(
     <div className="outline-dropdown">
@@ -124,9 +129,9 @@ function showDropdown() {
   );
 
   dropdown.addEventListener('click', (e) => {
-    const item = (e.target as HTMLElement).closest('.outline-item') as HTMLElement | null;
-    if (!item) return;
-    const line = parseInt(item.dataset.line || '0', 10);
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.outline-item');
+    if (item === null) return;
+    const line = parseInt(item.dataset.line ?? '0', 10);
     if (line > 0) {
       scrollToLine(line);
       dropdown.remove();
@@ -136,12 +141,12 @@ function showDropdown() {
   bar.appendChild(dropdown);
 
   const close = (e: Event) => {
-    if (!dropdown.contains(e.target as Node) && !(bar.querySelector('.outline-breadcrumb')?.contains(e.target as Node))) {
+    if (!dropdown.contains(e.target as Node) && (bar.querySelector('.outline-breadcrumb')?.contains(e.target as Node) !== true)) {
       dropdown.remove();
       document.removeEventListener('click', close, true);
     }
   };
-  setTimeout(() => document.addEventListener('click', close, true), 0);
+  setTimeout(() => { document.addEventListener('click', close, true); }, 0);
 }
 
 function renderSymbolList(symbols: OutlineSymbol[], depth: number): JSX.Element {
@@ -149,7 +154,7 @@ function renderSymbolList(symbols: OutlineSymbol[], depth: number): JSX.Element 
     <div>
       {symbols.map(s => (
         <div>
-          <div className={`outline-item outline-kind-${s.kind}`} data-line={String(s.line)} style={`padding-left: ${12 + depth * 16}px`}>
+          <div className={`outline-item outline-kind-${s.kind}`} data-line={String(s.line)} style={`padding-left: ${String(12 + depth * 16)}px`}>
             <span className="outline-item-icon">{s.kind === 'class' ? 'C' : 'f'}</span>
             {s.name}
             <span className="outline-item-line">:{s.line}</span>
@@ -163,16 +168,17 @@ function renderSymbolList(symbols: OutlineSymbol[], depth: number): JSX.Element 
 
 function scrollToLine(lineNum: number) {
   const container = document.getElementById('diff-container');
-  if (!container) return;
+  if (container === null) return;
 
   const target =
-    container.querySelector(`.diff-line[data-line="${lineNum}"][data-side="new"]`) ||
-    container.querySelector(`.diff-line[data-line="${lineNum}"]`);
-  if (!target) return;
+    container.querySelector(`.diff-line[data-line="${String(lineNum)}"][data-side="new"]`) ??
+    container.querySelector(`.diff-line[data-line="${String(lineNum)}"]`);
+  if (target === null) return;
 
-  const headerHeight = (container.querySelector('.diff-header') as HTMLElement)?.offsetHeight || 0;
-  const outlineBar = container.querySelector('.outline-bar') as HTMLElement | null;
-  const outlineHeight = outlineBar?.offsetHeight || 0;
+  const headerEl = container.querySelector<HTMLElement>('.diff-header');
+  const headerHeight = headerEl?.offsetHeight ?? 0;
+  const outlineBar = container.querySelector('.outline-bar');
+  const outlineHeight = (outlineBar as HTMLElement | null)?.offsetHeight ?? 0;
 
   const targetRect = target.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
@@ -182,20 +188,20 @@ function scrollToLine(lineNum: number) {
 }
 
 function bindScrollTracking() {
-  const container = document.getElementById('diff-container');
-  if (!container) return;
+  const container = document.getElementById('diff-container') as OutlineContainer | null;
+  if (container === null) return;
 
-  const prev = (container as any)._outlineScrollHandler;
-  if (prev) container.removeEventListener('scroll', prev);
+  const prev = container._outlineScrollHandler;
+  if (prev !== undefined) container.removeEventListener('scroll', prev);
 
   const handler = () => {
-    if (scrollRafId) return;
+    if (scrollRafId !== 0) return;
     scrollRafId = requestAnimationFrame(() => {
       scrollRafId = 0;
       updateBreadcrumb();
     });
   };
 
-  (container as any)._outlineScrollHandler = handler;
+  container._outlineScrollHandler = handler;
   container.addEventListener('scroll', handler, { passive: true });
 }

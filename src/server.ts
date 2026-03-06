@@ -1,17 +1,18 @@
-import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { exec } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { existsSync,readFileSync } from 'fs';
+import { Hono } from 'hono';
+import { dirname,join } from 'path';
 import { fileURLToPath } from 'url';
-import type { AppEnv } from './types.js';
+
 import { apiRoutes } from './routes/api.js';
 import { pageRoutes } from './routes/pages.js';
+import type { AppEnv } from './types.js';
 
 function tryServe(fetch: Hono['fetch'], port: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = serve({ fetch, port });
-    server.on('listening', () => resolve(port));
+    server.on('listening', () => { resolve(port); });
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         reject(err);
@@ -61,8 +62,8 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
     try {
       actualPort = await tryServe(app.fetch, port + attempt);
       break;
-    } catch (err: any) {
-      if (err.code === 'EADDRINUSE' && attempt < 19) {
+    } catch (err: unknown) {
+      if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'EADDRINUSE' && attempt < 19) {
         continue;
       }
       throw err;

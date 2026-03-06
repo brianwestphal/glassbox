@@ -36,7 +36,7 @@ function langFromPath(filePath: string): string | null {
 
 export function parseOutline(content: string, filePath: string): OutlineSymbol[] {
   const lang = langFromPath(filePath);
-  if (!lang) return [];
+  if (lang === null) return [];
   if (BRACE_LANGS.has(lang)) return parseBraces(content, lang);
   if (INDENT_LANGS.has(lang)) return parseIndent(content, lang);
   return [];
@@ -124,7 +124,6 @@ function parseBraces(content: string, lang: string): OutlineSymbol[] {
   let braceDepth = 0;
   let inString = false;
   let stringChar = '';
-  let inLineComment = false;
   let inBlockComment = false;
   let inTemplateLiteral = false;
 
@@ -178,8 +177,6 @@ function parseBraces(content: string, lang: string): OutlineSymbol[] {
       const ch = line[j];
       const next = line[j + 1];
 
-      if (inLineComment) break;
-
       if (inBlockComment) {
         if (ch === '*' && next === '/') { inBlockComment = false; j++; }
         continue;
@@ -197,7 +194,7 @@ function parseBraces(content: string, lang: string): OutlineSymbol[] {
         continue;
       }
 
-      if (ch === '/' && next === '/') { inLineComment = true; break; }
+      if (ch === '/' && next === '/') { break; }
       if (ch === '/' && next === '*') { inBlockComment = true; j++; continue; }
       if (ch === '"' || ch === "'") { inString = true; stringChar = ch; continue; }
       if (ch === '`' && (lang === 'javascript' || lang === 'typescript')) { inTemplateLiteral = true; continue; }
@@ -207,13 +204,14 @@ function parseBraces(content: string, lang: string): OutlineSymbol[] {
         braceDepth--;
         // Close symbols that end at this depth
         while (stack.length > 0 && stack[stack.length - 1].depth >= braceDepth) {
-          const closed = stack.pop()!;
-          closed.symbol.endLine = lineNum;
+          const closed = stack.pop();
+          if (closed !== undefined) {
+            closed.symbol.endLine = lineNum;
+          }
         }
       }
     }
 
-    inLineComment = false;
   }
 
   // Close any remaining open symbols
@@ -288,8 +286,10 @@ function pushIndentSymbol(
 ) {
   // Close stack items at same or deeper indent
   while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
-    const closed = stack.pop()!;
-    closed.symbol.endLine = lineIdx; // previous line
+    const closed = stack.pop();
+    if (closed !== undefined) {
+      closed.symbol.endLine = lineIdx; // previous line
+    }
   }
 
   // Calculate endLine by scanning forward for the next line at same or lesser indent

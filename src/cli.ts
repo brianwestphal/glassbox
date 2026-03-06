@@ -1,9 +1,9 @@
-import { startServer } from './server.js';
-import { isGitRepo, getRepoRoot, getRepoName, getFileDiffs, getModeString, getModeArgs, getHeadCommit } from './git/diff.js';
+import { addReviewFile,createReview, getLatestInProgressReview } from './db/queries.js';
 import type { ReviewMode } from './git/diff.js';
-import { createReview, getLatestInProgressReview, addReviewFile } from './db/queries.js';
-import { checkForUpdates } from './update-check.js';
+import { getFileDiffs, getHeadCommit,getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from './git/diff.js';
 import { updateReviewDiffs } from './review-update.js';
+import { startServer } from './server.js';
+import { checkForUpdates } from './update-check.js';
 
 function printUsage() {
   console.log(`
@@ -52,6 +52,7 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
       case '-h':
         printUsage();
         process.exit(0);
+      // falls through
       case '--uncommitted':
         mode = { type: 'uncommitted' };
         break;
@@ -181,7 +182,7 @@ async function main() {
   await startServer(port, review.id, repoRoot);
 }
 
-main().catch(err => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

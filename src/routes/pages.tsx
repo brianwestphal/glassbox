@@ -1,16 +1,17 @@
 import { Hono } from 'hono';
-import type { AppEnv } from '../types.js';
-import { getReview, getReviewFiles, getReviewFile, getAnnotationsForFile, getAnnotationsForReview, listReviews } from '../db/queries.js';
-import type { FileDiff } from '../git/diff.js';
-import { Layout } from '../components/layout.js';
-import { FileList } from '../components/fileList.js';
+
 import { DiffView } from '../components/diffView.js';
+import { FileList } from '../components/fileList.js';
+import { Layout } from '../components/layout.js';
 import { ReviewHistory } from '../components/reviewHistory.js';
+import { getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../db/queries.js';
+import type { FileDiff } from '../git/diff.js';
+import type { AppEnv } from '../types.js';
 
 export const pageRoutes = new Hono<AppEnv>();
 
 pageRoutes.get('/', async (c) => {
-  const reviewId = c.get('reviewId') as string;
+  const reviewId = c.get('reviewId');
   const review = await getReview(reviewId);
   if (!review) return c.text('Review not found', 404);
 
@@ -27,7 +28,7 @@ pageRoutes.get('/', async (c) => {
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>
-            <span className="review-mode">{review.mode}{review.mode_args ? `: ${review.mode_args}` : ''}</span>
+            <span className="review-mode">{review.mode}{review.mode_args !== null && review.mode_args !== '' ? `: ${review.mode_args}` : ''}</span>
           </div>
           <div className="file-filter">
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
@@ -68,12 +69,12 @@ pageRoutes.get('/', async (c) => {
 
 pageRoutes.get('/file/:fileId', async (c) => {
   const fileId = c.req.param('fileId');
-  const mode = (c.req.query('mode') === 'unified' ? 'unified' : 'split') as 'split' | 'unified';
+  const mode = (c.req.query('mode') === 'unified' ? 'unified' : 'split');
   const file = await getReviewFile(fileId);
   if (!file) return c.text('File not found', 404);
 
   const annotations = await getAnnotationsForFile(fileId);
-  const diff: FileDiff = JSON.parse(file.diff_data || '{}');
+  const diff: FileDiff = JSON.parse(file.diff_data ?? '{}') as FileDiff;
 
   const html = <DiffView file={file} diff={diff} annotations={annotations} mode={mode} />;
   return c.html(html.toString());
@@ -81,7 +82,7 @@ pageRoutes.get('/file/:fileId', async (c) => {
 
 pageRoutes.get('/review/:reviewId', async (c) => {
   const reviewId = c.req.param('reviewId');
-  const currentReviewId = c.get('reviewId') as string;
+  const currentReviewId = c.get('reviewId');
 
   // If viewing the current review, redirect to /
   if (reviewId === currentReviewId) {
@@ -104,7 +105,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>
-            <span className="review-mode">{review.mode}{review.mode_args ? `: ${review.mode_args}` : ''}</span>
+            <span className="review-mode">{review.mode}{review.mode_args !== null && review.mode_args !== '' ? `: ${review.mode_args}` : ''}</span>
           </div>
           <div className="file-filter">
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
@@ -149,8 +150,8 @@ pageRoutes.get('/review/:reviewId', async (c) => {
 });
 
 pageRoutes.get('/history', async (c) => {
-  const repoRoot = c.get('repoRoot') as string;
-  const currentReviewId = c.get('reviewId') as string;
+  const repoRoot = c.get('repoRoot');
+  const currentReviewId = c.get('reviewId');
   const reviews = await listReviews(repoRoot);
 
   const html = (

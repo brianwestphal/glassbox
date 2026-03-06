@@ -80,15 +80,15 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
         );
       })}
       {node.files.map(f => {
-        const diff = JSON.parse(f.diff_data || '{}');
+        const diff = JSON.parse(f.diff_data ?? '{}') as { status?: string };
         const count = annotationCounts[f.id] || 0;
         const stale = staleCounts[f.id] || 0;
-        const fileName = f.file_path.split('/').pop()!;
+        const fileName = f.file_path.split('/').pop() ?? '';
         return (
           <div className="file-item" data-file-id={f.id} style={`padding-left:${16 + depth * 12}px`}>
             <span className={`status-dot ${f.status}`}></span>
             <span className="file-name" title={f.file_path}>{fileName}</span>
-            <span className={`file-status ${diff.status || ''}`}>{diff.status || ''}</span>
+            <span className={`file-status ${diff.status ?? ''}`}>{diff.status ?? ''}</span>
             {stale > 0 ? <span className="stale-dot"></span> : null}
             {count > 0 ? <span className="annotation-count">{count}</span> : null}
           </div>

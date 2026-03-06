@@ -1,25 +1,35 @@
-import { state } from '../state.js';
-import type { ReviewFile, TreeNode } from '../state.js';
 import { api } from '../api.js';
-import { toElement } from '../dom.js';
 import { selectFile } from '../diff/selection.js';
+import { toElement } from '../dom.js';
+import type { ReviewFile, TreeNode } from '../state.js';
+import { state } from '../state.js';
+
+interface FilesResponse {
+  files: ReviewFile[];
+  annotationCounts: Record<string, number>;
+  staleCounts?: Record<string, number>;
+}
+
+interface DiffData {
+  status?: string;
+}
 
 export async function loadFiles() {
-  const data = await api('/files');
+  const data = await api<FilesResponse>('/files');
   state.files = data.files;
   state.annotationCounts = data.annotationCounts;
-  state.staleCounts = data.staleCounts || {};
+  state.staleCounts = data.staleCounts ?? {};
   restoreCollapsedFolders();
   renderFileList();
 }
 
 export function renderFileList() {
   const list = document.querySelector('.file-list-items');
-  if (!list) return;
+  if (list === null) return;
   list.innerHTML = '';
   state.fileOrder = [];
   let filtered = state.files;
-  if (state.filterText) {
+  if (state.filterText !== '') {
     const q = state.filterText.toLowerCase();
     filtered = state.files.filter(f => f.file_path.toLowerCase().indexOf(q) !== -1);
   }
@@ -34,7 +44,7 @@ function buildFileTree(files: ReviewFile[]): TreeNode {
     let node = root;
     for (let i = 0; i < parts.length - 1; i++) {
       let child = node.children.find(c => c.name === parts[i]);
-      if (!child) {
+      if (child === undefined) {
         child = { name: parts[i], children: [], files: [] };
         node.children.push(child);
       }
@@ -66,7 +76,7 @@ function countTreeFiles(node: TreeNode): number {
 
 function hasStaleInTree(node: TreeNode): boolean {
   for (let i = 0; i < node.files.length; i++) {
-    if (state.staleCounts[node.files[i].id]) return true;
+    if ((state.staleCounts[node.files[i].id] ?? 0) > 0) return true;
   }
   for (let i = 0; i < node.children.length; i++) {
     if (hasStaleInTree(node.children[i])) return true;
@@ -76,10 +86,10 @@ function hasStaleInTree(node: TreeNode): boolean {
 
 function renderTreeNode(container: Element, node: TreeNode, depth: number, pathPrefix: string) {
   const sortedChildren = node.children.slice().sort((a, b) => a.name.localeCompare(b.name));
-  const pad = (d: number) => `padding-left: ${16 + d * 12}px`;
+  const pad = (d: number) => `padding-left: ${String(16 + d * 12)}px`;
 
   sortedChildren.forEach(child => {
-    const folderPath = pathPrefix ? pathPrefix + '/' + child.name : child.name;
+    const folderPath = pathPrefix !== '' ? pathPrefix + '/' + child.name : child.name;
     const total = countTreeFiles(child);
     const isCollapsible = total > 1;
     const isCollapsed = isCollapsible && state.collapsedFolders.has(folderPath);
@@ -99,38 +109,43 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
     );
 
     if (isCollapsible) {
-      const header = group.querySelector('.folder-header')!;
-      header.addEventListener('click', () => {
-        header.classList.toggle('collapsed');
-        if (header.classList.contains('collapsed')) {
-          state.collapsedFolders.add(folderPath);
-        } else {
-          state.collapsedFolders.delete(folderPath);
-        }
-        saveCollapsedFolders();
-      });
+      const header = group.querySelector('.folder-header');
+      if (header !== null) {
+        header.addEventListener('click', () => {
+          header.classList.toggle('collapsed');
+          if (header.classList.contains('collapsed')) {
+            state.collapsedFolders.add(folderPath);
+          } else {
+            state.collapsedFolders.delete(folderPath);
+          }
+          saveCollapsedFolders();
+        });
+      }
     }
 
-    renderTreeNode(group.querySelector('.folder-content')!, child, depth + 1, folderPath);
+    const folderContent = group.querySelector('.folder-content');
+    if (folderContent !== null) {
+      renderTreeNode(folderContent, child, depth + 1, folderPath);
+    }
     container.appendChild(group);
   });
 
   node.files.forEach(f => {
-    const diff = JSON.parse(f.diff_data || '{}');
-    const count = state.annotationCounts[f.id] || 0;
-    const staleCount = state.staleCounts[f.id] || 0;
-    const fileName = f.file_path.split('/').pop()!;
+    const diff: DiffData = JSON.parse(f.diff_data !== '' ? f.diff_data : '{}') as DiffData;
+    const count = state.annotationCounts[f.id] ?? 0;
+    const staleCount = state.staleCounts[f.id] ?? 0;
+    const fileName = f.file_path.split('/').pop() ?? '';
 
     const el = toElement(
       <div className={`file-item${f.id === state.currentFileId ? ' active' : ''}`} data-file-id={f.id} style={pad(depth)}>
         <span className={`status-dot ${f.status}`}></span>
         <span className="file-name" title={f.file_path}>{fileName}</span>
-        <span className={`file-status ${diff.status || ''}`}>{diff.status || ''}</span>
-        {staleCount ? <span className="stale-dot"></span> : null}
-        {count ? <span className="annotation-count">{count}</span> : null}
+        <span className={`file-status ${diff.status ?? ''}`}>{diff.status ?? ''}</span>
+        {staleCount > 0 ? <span className="stale-dot"></span> : null}
+        {count > 0 ? <span className="annotation-count">{count}</span> : null}
       </div>
     );
-    el.addEventListener('click', () => selectFile(f.id));
+    el.addEventListener('click', () => { void selectFile(f.id); });
     container.appendChild(el);
     state.fileOrder.push(f.id);
   });
@@ -149,8 +164,8 @@ function saveCollapsedFolders() {
 function restoreCollapsedFolders() {
   try {
     const stored = localStorage.getItem(storageKey());
-    if (stored) {
-      state.collapsedFolders = new Set(JSON.parse(stored));
+    if (stored !== null) {
+      state.collapsedFolders = new Set(JSON.parse(stored) as string[]);
     }
   } catch { /* localStorage unavailable */ }
 }

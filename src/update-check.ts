@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { homedir } from 'os';
+import { existsSync,mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { get } from 'https';
+import { homedir } from 'os';
+import { dirname,join } from 'path';
 import { fileURLToPath } from 'url';
 
 const DATA_DIR = join(homedir(), '.glassbox');
@@ -12,7 +12,7 @@ function getCurrentVersion(): string {
   try {
     // Works both in dev (src/) and built (dist/) — package.json is always one dir up
     const dir = dirname(fileURLToPath(import.meta.url));
-    const pkg = JSON.parse(readFileSync(join(dir, '..', 'package.json'), 'utf-8'));
+    const pkg = JSON.parse(readFileSync(join(dir, '..', 'package.json'), 'utf-8')) as { version: string };
     return pkg.version;
   } catch {
     return '0.0.0';
@@ -24,7 +24,7 @@ function getLastCheckDate(): string | null {
     if (existsSync(CHECK_FILE)) {
       return readFileSync(CHECK_FILE, 'utf-8').trim();
     }
-  } catch {}
+  } catch { /* ignore */ }
   return null;
 }
 
@@ -35,7 +35,7 @@ function saveCheckDate(): void {
 
 function isFirstUseToday(): boolean {
   const last = getLastCheckDate();
-  if (!last) return true;
+  if (last === null) return true;
   const today = new Date().toISOString().slice(0, 10);
   return last !== today;
 }
@@ -48,16 +48,16 @@ function fetchLatestVersion(): Promise<string | null> {
         return;
       }
       let data = '';
-      res.on('data', (chunk: Buffer) => { data += chunk; });
+      res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
       res.on('end', () => {
         try {
-          resolve(JSON.parse(data).version);
+          resolve((JSON.parse(data) as { version: string }).version);
         } catch {
           resolve(null);
         }
       });
     });
-    req.on('error', () => resolve(null));
+    req.on('error', () => { resolve(null); });
     req.on('timeout', () => { req.destroy(); resolve(null); });
   });
 }
@@ -97,7 +97,7 @@ export async function checkForUpdates(force: boolean): Promise<void> {
 
   saveCheckDate();
 
-  if (!latest || compareVersions(current, latest) >= 0) return;
+  if (latest === null || compareVersions(current, latest) >= 0) return;
 
   const cmd = detectUpgradeCommand();
   const updateLine = `Update available: ${current} → ${latest}`;

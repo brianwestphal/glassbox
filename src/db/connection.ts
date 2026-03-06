@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
-import { join } from 'path';
-import { homedir } from 'os';
 import { mkdirSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 const dataDir = join(homedir(), '.glassbox', 'data');
 mkdirSync(dataDir, { recursive: true });
@@ -58,7 +58,7 @@ async function initSchema(db: PGlite): Promise<void> {
   `);
 
   // Migrations for existing databases
-  try { await db.exec('ALTER TABLE reviews ADD COLUMN head_commit TEXT'); } catch {}
-  try { await db.exec('ALTER TABLE annotations ADD COLUMN is_stale BOOLEAN NOT NULL DEFAULT FALSE'); } catch {}
-  try { await db.exec('ALTER TABLE annotations ADD COLUMN original_content TEXT'); } catch {}
+  try { await db.exec('ALTER TABLE reviews ADD COLUMN head_commit TEXT'); } catch { /* column already exists */ }
+  try { await db.exec('ALTER TABLE annotations ADD COLUMN is_stale BOOLEAN NOT NULL DEFAULT FALSE'); } catch { /* column already exists */ }
+  try { await db.exec('ALTER TABLE annotations ADD COLUMN original_content TEXT'); } catch { /* column already exists */ }
 }

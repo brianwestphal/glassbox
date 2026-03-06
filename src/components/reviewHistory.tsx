@@ -10,15 +10,15 @@ const trashIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16
 // Shorten hex strings that look like commit SHAs (7+ hex chars)
 function shortenArgs(args: string): { short: string; full: string } {
   const shaPattern = /\b([0-9a-f]{7,40})\b/gi;
-  let hasLong = false;
+  const result: { hasLong: boolean } = { hasLong: false };
   const short = args.replace(shaPattern, (match) => {
     if (match.length > 8) {
-      hasLong = true;
+      result.hasLong = true;
       return match.slice(0, 7);
     }
     return match;
   });
-  return { short, full: hasLong ? args : '' };
+  return { short, full: result.hasLong ? args : '' };
 }
 
 export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[]; currentReviewId: string }) {
@@ -36,9 +36,9 @@ export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[];
             const isCurrent = r.id === currentReviewId;
             const href = isCurrent ? '/' : `/review/${r.id}`;
             let argsDisplay = null;
-            if (r.mode_args) {
+            if (r.mode_args !== null && r.mode_args !== '') {
               const { short, full } = shortenArgs(r.mode_args);
-              argsDisplay = full
+              argsDisplay = full !== ''
                 ? <span title={full}>: {short}</span>
                 : <span>: {short}</span>;
             }

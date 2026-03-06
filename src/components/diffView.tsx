@@ -1,7 +1,7 @@
-import type { ReviewFile, Annotation } from '../db/queries.js';
-import type { FileDiff, DiffHunk, DiffLine } from '../git/diff.js';
-import { escapeHtml } from '../utils/escapeHtml.js';
+import type { Annotation,ReviewFile } from '../db/queries.js';
+import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { raw } from '../jsx-runtime.js';
+import { escapeHtml } from '../utils/escapeHtml.js';
 
 export function DiffView({ file, diff, annotations, mode }: {
   file: ReviewFile;
@@ -12,7 +12,7 @@ export function DiffView({ file, diff, annotations, mode }: {
   const annotationsByLine: Record<string, Annotation[]> = {};
   for (const a of annotations) {
     const key = `${a.line_number}:${a.side}`;
-    if (!annotationsByLine[key]) annotationsByLine[key] = [];
+    if (!(key in annotationsByLine)) annotationsByLine[key] = [];
     annotationsByLine[key].push(a);
   }
 
@@ -50,10 +50,10 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
             </div>
             {pairs.map(pair => {
               const leftAnns = pair.left
-                ? annotationsByLine[`${pair.left.oldNum}:old`] || []
+                ? annotationsByLine[`${pair.left.oldNum}:old`] ?? []
                 : [];
               const rightAnns = pair.right
-                ? annotationsByLine[`${pair.right.newNum}:new`] || []
+                ? annotationsByLine[`${pair.right.newNum}:new`] ?? []
                 : [];
               const allAnns = [...leftAnns, ...rightAnns];
               return (
@@ -113,10 +113,8 @@ function pairLines(lines: DiffLine[]): LinePair[] {
           right: j < adds.length ? adds[j] : null,
         });
       }
-    } else if (line.type === 'add') {
-      pairs.push({ left: null, right: line });
-      i++;
     } else {
+      pairs.push({ left: null, right: line });
       i++;
     }
   }
@@ -136,7 +134,7 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
           {hunk.lines.map(line => {
             const lineNum = line.type === 'remove' ? line.oldNum : line.newNum;
             const side = line.type === 'remove' ? 'old' : 'new';
-            const anns = annotationsByLine[`${lineNum}:${side}`] || [];
+            const anns = annotationsByLine[`${lineNum}:${side}`] ?? [];
             return (
               <div>
                 <div

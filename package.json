@@ -31,6 +31,7 @@
     "dev": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts",
     "build": "tsup",
     "build:client": "mkdir -p dist/client && npx esbuild src/client/app.ts --bundle --format=iife --outfile=dist/client/app.global.js --target=es2020 --jsx=automatic --jsx-import-source=#jsx --alias:#jsx/jsx-runtime=./src/jsx-runtime.ts && npx sass src/client/styles.scss dist/client/styles.css --style compressed --no-source-map",
+    "lint": "eslint src/",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
     "prepublishOnly": "npm run build"
@@ -45,12 +46,18 @@
     "hono": "^4.12.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
+    "eslint-plugin-import-x": "^4.16.1",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-tsdoc": "^0.5.2",
     "highlight.js": "^11.11.1",
     "sass": "^1.97.3",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
   }
 }

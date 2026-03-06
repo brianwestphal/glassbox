@@ -1,8 +1,7 @@
-import { state } from '../state.js';
 import { toElement } from '../dom.js';
-import { selectFile } from './selection.js';
-import { updateToolbarLanguage } from './selection.js';
-import { getLanguageList, applyHighlighting } from './highlight.js';
+import { state } from '../state.js';
+import { applyHighlighting,getLanguageList } from './highlight.js';
+import { selectFile, updateToolbarLanguage  } from './selection.js';
 
 // Languages most developers encounter regularly, shown first in the picker
 const POPULAR_LANGS = new Set([
@@ -24,20 +23,22 @@ function bindDiffModeSegments() {
   document.querySelectorAll('[data-diff-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
       state.diffMode = (btn as HTMLElement).dataset.diffMode as 'split' | 'unified';
-      document.querySelectorAll('[data-diff-mode]').forEach(b => b.classList.toggle('active', b === btn));
-      if (state.currentFileId) selectFile(state.currentFileId);
+      document.querySelectorAll('[data-diff-mode]').forEach(b => { b.classList.toggle('active', b === btn); });
+      if (state.currentFileId !== null) {
+        void selectFile(state.currentFileId);
+      }
     });
   });
 }
 
 function bindWrapToggle() {
   const btn = document.getElementById('wrap-toggle');
-  if (!btn) return;
+  if (btn === null) return;
   btn.addEventListener('click', () => {
     state.wrapLines = !state.wrapLines;
     btn.classList.toggle('active', state.wrapLines);
     const container = document.getElementById('diff-container');
-    if (container) container.classList.toggle('wrap-lines', state.wrapLines);
+    if (container !== null) container.classList.toggle('wrap-lines', state.wrapLines);
     if (!state.wrapLines) {
       document.getElementById('diff-container')?.querySelectorAll('.split-row .code').forEach(el => {
         (el as HTMLElement).scrollLeft = 0;
@@ -48,16 +49,16 @@ function bindWrapToggle() {
 
 function bindLanguageSelector() {
   const btn = document.getElementById('language-btn');
-  if (!btn) return;
+  if (btn === null) return;
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    showLanguagePicker(btn as HTMLElement);
+    showLanguagePicker(btn);
   });
 }
 
 function showLanguagePicker(btn: HTMLElement) {
-  document.querySelectorAll('.language-popup').forEach(el => el.remove());
+  document.querySelectorAll('.language-popup').forEach(el => { el.remove(); });
 
   const allLangs = getLanguageList();
   const popular = allLangs.filter(l => POPULAR_LANGS.has(l)).sort();
@@ -73,9 +74,10 @@ function showLanguagePicker(btn: HTMLElement) {
 
   // Position above the button, clamped to viewport
   popup.style.position = 'fixed';
-  popup.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+  popup.style.bottom = String(window.innerHeight - rect.top + 4) + 'px';
 
-  const listEl = popup.querySelector('.language-list')!;
+  const listEl = popup.querySelector('.language-list');
+  if (listEl === null) return;
   const filterInput = popup.querySelector('.language-filter') as HTMLInputElement;
 
   function selectLang(lang: string, auto: boolean) {
@@ -94,7 +96,7 @@ function showLanguagePicker(btn: HTMLElement) {
     const q = filter.toLowerCase();
     listEl.innerHTML = '';
 
-    if (!q) {
+    if (q === '') {
       // No filter: show Auto, then popular, then separator, then rest
       const autoLabel = state._detectedLang === 'plaintext' ? 'Plain Text' : state._detectedLang;
       const autoItem = toElement(
@@ -120,7 +122,7 @@ function showLanguagePicker(btn: HTMLElement) {
     } else {
       // Filtered: search all languages
       const filtered = allLangs.filter(l => l.toLowerCase().includes(q));
-      if (!filtered.length) {
+      if (filtered.length === 0) {
         listEl.appendChild(toElement(<div className="language-option disabled">No matches</div>));
         return;
       }
@@ -141,12 +143,12 @@ function showLanguagePicker(btn: HTMLElement) {
 
   renderList('');
 
-  filterInput.addEventListener('input', () => renderList(filterInput.value));
+  filterInput.addEventListener('input', () => { renderList(filterInput.value); });
 
   listEl.addEventListener('click', (e) => {
-    const opt = (e.target as HTMLElement).closest('.language-option:not(.disabled)') as HTMLElement | null;
-    if (!opt) return;
-    const lang = opt.dataset.lang!;
+    const opt = (e.target as HTMLElement).closest<HTMLElement>('.language-option:not(.disabled)');
+    if (opt === null) return;
+    const lang = opt.dataset.lang ?? '';
     if (lang === '__auto__') {
       selectLang('', true);
     } else {
@@ -161,7 +163,7 @@ function showLanguagePicker(btn: HTMLElement) {
   let left = rect.right - popupWidth; // right-align to button
   if (left < 4) left = 4;
   if (left + popupWidth > window.innerWidth - 4) left = window.innerWidth - popupWidth - 4;
-  popup.style.left = left + 'px';
+  popup.style.left = String(left) + 'px';
 
   filterInput.focus();
 
@@ -171,5 +173,5 @@ function showLanguagePicker(btn: HTMLElement) {
       document.removeEventListener('click', closePopup, true);
     }
   };
-  setTimeout(() => document.addEventListener('click', closePopup, true), 0);
+  setTimeout(() => { document.addEventListener('click', closePopup, true); }, 0);
 }

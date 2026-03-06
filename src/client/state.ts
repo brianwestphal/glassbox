@@ -49,7 +49,7 @@ export interface AppState {
 }
 
 export const state: AppState = {
-  reviewId: document.body.dataset.reviewId!,
+  reviewId: document.body.dataset.reviewId ?? '',
   currentFileId: null,
   diffMode: 'split',
   wrapLines: false,
