@@ -10,6 +10,7 @@ import {
 } from '../db/queries.js';
 import { generateReviewExport, deleteReviewExport, shouldPromptGitignore, addGlassboxToGitignore, dismissGitignorePrompt } from '../export/generate.js';
 import { getFileContent } from '../git/diff.js';
+import { parseOutline } from '../outline/parser.js';
 
 export const apiRoutes = new Hono<AppEnv>();
 
@@ -178,6 +179,33 @@ apiRoutes.get('/annotations/all', async (c) => {
   const reviewId = resolveReviewId(c);
   const annotations = await getAnnotationsForReview(reviewId);
   return c.json(annotations);
+});
+
+// --- Outline ---
+
+apiRoutes.get('/outline/:fileId', async (c) => {
+  const repoRoot = c.get('repoRoot') as string;
+  const file = await getReviewFile(c.req.param('fileId'));
+  if (!file) return c.json({ error: 'Not found' }, 404);
+
+  const diff = JSON.parse(file.diff_data || '{}');
+  const isDeleted = diff.status === 'deleted';
+
+  let content = '';
+  try {
+    if (isDeleted) {
+      content = getFileContent(file.file_path, 'HEAD', repoRoot);
+    } else {
+      content = getFileContent(file.file_path, 'working', repoRoot);
+    }
+  } catch {
+    // File not accessible
+  }
+
+  if (!content) return c.json({ symbols: [] });
+
+  const symbols = parseOutline(content, file.file_path);
+  return c.json({ symbols });
 });
 
 // --- Context expansion ---

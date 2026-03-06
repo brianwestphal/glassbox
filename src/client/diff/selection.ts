@@ -7,6 +7,7 @@ import { bindHunkExpanders } from './hunkExpander.js';
 import { bindDragDrop } from './dragDrop.js';
 import { bindServerAnnotations } from '../annotations/events.js';
 import { detectLanguage, applyHighlighting } from './highlight.js';
+import { loadOutline } from './outline.js';
 
 export async function selectFile(fileId: string) {
   state.currentFileId = fileId;
@@ -43,6 +44,7 @@ export async function selectFile(fileId: string) {
   applyHighlighting();
   updateToolbarLanguage();
 
+  loadOutline(fileId);
   bindDiffLineClicks();
   bindHunkExpanders();
   bindDragDrop();
