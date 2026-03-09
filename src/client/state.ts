@@ -31,6 +31,46 @@ interface TreeNode {
 
 export type { TreeNode };
 
+export type SortMode = 'folder' | 'risk' | 'narrative';
+
+export type AnalysisStatusValue = 'idle' | 'running' | 'completed' | 'failed';
+
+export interface AnalysisModeState {
+  status: AnalysisStatusValue;
+  error: string | null;
+  progressCompleted: number;
+  progressTotal: number;
+}
+
+export function defaultAnalysisModeState(): AnalysisModeState {
+  return { status: 'idle', error: null, progressCompleted: 0, progressTotal: 0 };
+}
+
+export function getAnalysisState(mode: 'risk' | 'narrative'): AnalysisModeState {
+  return mode === 'risk' ? state.riskAnalysis : state.narrativeAnalysis;
+}
+
+export interface FileNotes {
+  overview: string;
+  lines: Array<{ line: number; content: string }>;
+}
+
+export interface RiskFileScore {
+  reviewFileId: string;
+  filePath: string;
+  aggregateScore: number;
+  dimensionScores: Record<string, number>;
+  rationale: string;
+  sortOrder: number;
+}
+
+export interface NarrativeFileOrder {
+  reviewFileId: string;
+  filePath: string;
+  position: number;
+  rationale: string;
+}
+
 export interface AppState {
   reviewId: string;
   currentFileId: string | null;
@@ -46,6 +86,17 @@ export interface AppState {
   _detectedLang: string;
   _dragAnnotation: DragAnnotation | null;
   collapsedFolders: Set<string>;
+  // AI sorting
+  sortMode: SortMode;
+  riskScores: RiskFileScore[] | null;
+  narrativeOrder: NarrativeFileOrder[] | null;
+  riskAnalysis: AnalysisModeState;
+  narrativeAnalysis: AnalysisModeState;
+  aiConfigured: boolean;
+  riskSortDimension: string;
+  showRiskScores: boolean;
+  // AI notes keyed by reviewFileId
+  fileNotes: Record<string, FileNotes>;
 }
 
 export const state: AppState = {
@@ -63,6 +114,16 @@ export const state: AppState = {
   _detectedLang: 'plaintext',
   _dragAnnotation: null,
   collapsedFolders: new Set(),
+  // AI sorting
+  sortMode: 'folder',
+  riskScores: null,
+  narrativeOrder: null,
+  riskAnalysis: defaultAnalysisModeState(),
+  narrativeAnalysis: defaultAnalysisModeState(),
+  aiConfigured: false,
+  riskSortDimension: 'aggregate',
+  showRiskScores: false,
+  fileNotes: {},
 };
 
 export const CATEGORIES: Category[] = [

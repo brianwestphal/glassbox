@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import { dirname,join } from 'path';
 import { fileURLToPath } from 'url';
 
+import { aiApiRoutes } from './routes/ai-api.js';
 import { apiRoutes } from './routes/api.js';
 import { pageRoutes } from './routes/pages.js';
 import type { AppEnv } from './types.js';
@@ -53,6 +54,7 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
 
   // API routes
   app.route('/api', apiRoutes);
+  app.route('/api/ai', aiApiRoutes);
 
   // Page routes
   app.route('/', pageRoutes);

@@ -1,4 +1,5 @@
 import { addReviewFile,createReview, getLatestInProgressReview } from './db/queries.js';
+import { setAIServiceTest, setDebug } from './debug.js';
 import type { ReviewMode } from './git/diff.js';
 import { getFileDiffs, getHeadCommit,getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from './git/diff.js';
 import { updateReviewDiffs } from './review-update.js';
@@ -26,6 +27,7 @@ Options:
   --port <number>     Port to run on (default: 4173)
   --resume            Resume the latest in-progress review for this mode
   --check-for-updates Check for a newer version on npm
+  --ai-service-test   Use mock AI responses (no API calls, no tokens used)
   --help              Show this help message
 
 Examples:
@@ -37,13 +39,14 @@ Examples:
 `);
 }
 
-function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean; debug: boolean } | null {
+function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean; debug: boolean; aiServiceTest: boolean } | null {
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
   let port = 4173;
   let resume = false;
   let forceUpdateCheck = false;
   let debug = false;
+  let aiServiceTest = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -91,6 +94,9 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
       case '--debug':
         debug = true;
         break;
+      case '--ai-service-test':
+        aiServiceTest = true;
+        break;
       default:
         console.error(`Unknown option: ${arg}`);
         printUsage();
@@ -102,7 +108,7 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
     mode = { type: 'uncommitted' };
   }
 
-  return { mode, port, resume, forceUpdateCheck, debug };
+  return { mode, port, resume, forceUpdateCheck, debug, aiServiceTest };
 }
 
 async function main() {
@@ -112,10 +118,15 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck, debug } = parsed;
+  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest } = parsed;
 
+  setDebug(debug);
+  setAIServiceTest(aiServiceTest);
+  if (aiServiceTest) {
+    console.log('AI service test mode enabled — using mock AI responses');
+  }
   if (debug) {
-    console.log(`Build timestamp: ${process.env.BUILD_TIMESTAMP}`);
+    console.log(`[debug] Build timestamp: ${process.env.BUILD_TIMESTAMP}`);
   }
 
   // Check for updates (once per day, or if --check-for-updates is passed)

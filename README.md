@@ -82,7 +82,50 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Structured export** — markdown output with file paths, line numbers, categories, and instructions for AI consumption
 - **Automatic .gitignore prompt** — reminds you to exclude `.glassbox/` from version control
 - **Auto port selection** — if the default port is busy, it finds an open one
-- **Fully local** — no network calls, no accounts, no telemetry. Your code stays on your machine.
+- **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
+- **AI-powered analysis** *(optional)* — risk scoring and narrative reading order to help you focus your review where it matters most
+
+---
+
+## AI-Powered Review Intelligence
+
+> Entirely optional. Glassbox is fully functional without it.
+
+When reviewing a large diff, knowing *where to look first* is half the battle. Glassbox can optionally connect to an AI provider to analyze your changes and surface what matters:
+
+### Risk Analysis
+
+Every file is scored across six dimensions — security, correctness, error handling, maintainability, architecture, and performance — on a 0.0 to 1.0 scale. Files are ranked by their highest-risk dimension, so a single critical issue won't hide behind low averages.
+
+When you open a file, inline risk notes highlight the specific lines and concerns the AI flagged, giving you a heads-up before you even start reading.
+
+### Narrative Reading Order
+
+For large, multi-file changes, the AI determines the optimal reading order: types and interfaces first, then utilities, then business logic, then integration code. Each file gets walkthrough notes that explain what changed and how it connects to the rest of the diff — like having a colleague walk you through their PR.
+
+### How to use it
+
+Click the shield or book icon in the sidebar to switch from the default folder view to risk or narrative mode. If you haven't configured an API key yet, a settings dialog will prompt you. Analysis runs once and results are cached for the session.
+
+### Supported providers
+
+| Provider | Models | Env variable |
+|----------|--------|-------------|
+| **Anthropic** | Claude Sonnet 4, Claude Haiku 4 | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-4o, GPT-4o Mini | `OPENAI_API_KEY` |
+| **Google** | Gemini 2.5 Flash, Gemini 2.5 Pro | `GEMINI_API_KEY` |
+
+You can switch providers and models in the settings dialog (gear icon in the sidebar).
+
+### API key storage
+
+Your API key never leaves your machine. Glassbox resolves keys in this order:
+
+1. **Environment variables** — if `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY` is set, it's used automatically. Nothing is stored.
+2. **OS keychain** — on macOS (Keychain), Linux (GNOME Keyring / KDE Wallet via `secret-tool`), or Windows (Credential Manager). Keys are encrypted by your operating system and tied to your user account.
+3. **Config file** — stored in `~/.glassbox/config.json` with `0600` permissions, base64-encoded. Use this as a fallback if your OS keychain isn't available.
+
+Keys entered through the settings dialog are stored in the OS keychain by default when available, and never sent anywhere except directly to the AI provider's API.
 
 ---
 
@@ -183,7 +226,7 @@ Point the tool at the file. The export includes an "Instructions for AI Tools" s
 | Build | tsup (single-file bundle) |
 | Storage | `~/.glassbox/data/` |
 
-Data stays local. The only network call is an optional once-per-day npm update check.
+Data stays local. The only network calls are an optional once-per-day npm update check and AI analysis requests if you opt in.
 
 ## Development
 

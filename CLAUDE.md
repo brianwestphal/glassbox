@@ -27,10 +27,18 @@ The app is a single-entry CLI (`src/cli.ts`) that:
 - `src/cli.ts` — CLI entry point, arg parsing
 - `src/server.ts` — Hono app setup, middleware injection
 - `src/routes/api.ts` — JSON API (annotations CRUD, file status, review management)
+- `src/routes/ai-api.ts` — AI analysis, configuration, and preferences API
 - `src/routes/pages.tsx` — Server-rendered HTML pages
 - `src/components/` — TSX components (layout, diffView, fileList, reviewHistory)
 - `src/db/connection.ts` — PGLite setup and schema initialization (raw SQL, no ORM)
 - `src/db/queries.ts` — All database operations
+- `src/db/ai-queries.ts` — AI analysis and preferences database operations
+- `src/ai/models.ts` — Curated AI model lists per platform (CHECK DAILY: keep model IDs and names up to date with latest releases from Anthropic, OpenAI, and Google)
+- `src/ai/config.ts` — API key resolution (env → keychain → config file) and config management
+- `src/ai/client.ts` — Unified HTTP client for Anthropic, OpenAI, and Google AI APIs
+- `src/ai/context-builder.ts` — Builds diff context payloads for AI analysis
+- `src/ai/analyze-risk.ts` — Risk analysis orchestration with multi-turn context loop
+- `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
 - `src/git/diff.ts` — Git operations: diff generation, parsing, file listing
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
 - `src/jsx-runtime.ts` — Custom JSX runtime (server-side HTML string generation)
@@ -59,13 +67,18 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `_history.scss` — Review history page
 - `_modal.scss` — Modal dialogs
 - `_scrollbar.scss` — Custom scrollbar
+- `_ai-sort.scss` — Sort mode control, risk badges, score bars, analysis loading
+- `_settings.scss` — AI settings dialog styles
 - `styles.scss` — Entry point, imports all partials
 
 **TypeScript** (`src/client/`): Modular files using TSX and SafeHtml for HTML building:
 - `app.ts` — Entry point, init
 - `state.ts` — Shared state, types, category constants
 - `api.ts` — API helper, HTML escaping utility
-- `sidebar/fileTree.tsx` — File tree rendering
+- `sidebar/fileTree.tsx` — File tree rendering, sort mode dispatch
+- `sidebar/sortMode.tsx` — Sort mode segmented control (folder/risk/narrative)
+- `sidebar/riskView.tsx` — Risk-sorted file list with score badges and popovers
+- `sidebar/narrativeView.tsx` — Narrative-ordered file list with position numbers
 - `sidebar/controls.ts` — File filter, sidebar resize, keyboard navigation
 - `diff/selection.ts` — File selection
 - `diff/hunkExpander.tsx` — Context expansion
@@ -78,16 +91,20 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `annotations/categories.tsx` — Category badge and picker UI
 - `review/modal.tsx` — Completion modal, gitignore prompts
 - `review/progress.tsx` — Progress bar
+- `settings/dialog.tsx` — AI settings modal (platform, model, API key configuration)
 - `dom.ts` — `toElement()` helper for converting JSX to DOM elements
 
 Both are served as static files via `/static/styles.css` and `/static/app.js` routes in `src/server.ts`. The JSX runtime is shared between server and client builds.
 
 ### Database
 
-Raw PGLite queries (no ORM). Three tables:
+Raw PGLite queries (no ORM). Six tables:
 - `reviews` — review sessions (repo, mode, status)
 - `review_files` — files in each review (with serialized diff JSON)
 - `annotations` — line-level annotations with categories
+- `ai_analyses` — AI analysis runs (per review, risk or narrative)
+- `ai_file_scores` — per-file AI scores and ordering
+- `user_preferences` — sort mode, risk dimension, score visibility
 
 ### Annotation Categories
 

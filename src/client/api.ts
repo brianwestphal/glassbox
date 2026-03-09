@@ -17,3 +17,27 @@ export function esc(s: string): string {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// --- Client-side debug logging (sends to server console when --debug is active) ---
+
+let debugEnabled: boolean | null = null; // null = not yet checked
+
+/** Initialize debug state by checking the server. Call once at startup. */
+export async function initDebug(): Promise<void> {
+  try {
+    const result = await api<{ enabled: boolean }>('/ai/debug-status');
+    debugEnabled = result.enabled;
+  } catch {
+    debugEnabled = false;
+  }
+}
+
+/** Fire-and-forget debug log to server console. No-op if debug is off. */
+export function clientLog(message: string): void {
+  if (debugEnabled !== true) return;
+  void fetch('/api/ai/debug-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+}

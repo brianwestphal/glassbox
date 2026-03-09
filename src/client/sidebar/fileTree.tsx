@@ -1,8 +1,11 @@
-import { api } from '../api.js';
+import type { SafeHtml } from '../../jsx-runtime.js';
+import { api, clientLog } from '../api.js';
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
-import type { ReviewFile, TreeNode } from '../state.js';
+import type { AnalysisModeState, ReviewFile, TreeNode } from '../state.js';
 import { state } from '../state.js';
+import { renderNarrativeFileList } from './narrativeView.js';
+import { renderRiskFileList } from './riskView.js';
 
 interface FilesResponse {
   files: ReviewFile[];
@@ -23,11 +26,97 @@ export async function loadFiles() {
   renderFileList();
 }
 
+function renderProgressBar(modeState: AnalysisModeState): SafeHtml {
+  const completed = modeState.progressCompleted;
+  const total = modeState.progressTotal;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const label = total > 0
+    ? `Analyzing files... ${String(completed)}/${String(total)}`
+    : `Analyzing ${String(state.files.length)} files...`;
+
+  return (
+    <div className="analysis-loading-inline">
+      <div className="analysis-spinner analysis-spinner-sm"></div>
+      <div className="analysis-progress-info">
+        <span>{label}</span>
+        {total > 0 && (
+          <div className="analysis-progress-bar">
+            <div className="analysis-progress-fill" style={`width: ${String(pct)}%`}></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function renderFileList() {
   const list = document.querySelector('.file-list-items');
   if (list === null) return;
   list.innerHTML = '';
   state.fileOrder = [];
+
+  // Dispatch based on sort mode
+  if (state.sortMode === 'risk') {
+    const rs = state.riskAnalysis;
+    if (rs.status === 'running') {
+      list.appendChild(toElement(renderProgressBar(rs)));
+      if (state.riskScores !== null && state.riskScores.length > 0) {
+        clientLog(`renderFileList: risk (running) — rendering ${String(state.riskScores.length)} files`);
+        renderRiskFileList(list);
+        return;
+      }
+    } else if (rs.status === 'failed') {
+      list.appendChild(toElement(
+        <div className="analysis-error">
+          <span>{'Analysis failed: ' + (rs.error ?? 'Unknown error')}</span>
+          <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
+        </div>
+      ));
+      const retryBtn = list.querySelector('#retry-analysis');
+      if (retryBtn !== null) {
+        retryBtn.addEventListener('click', () => {
+          void import('./sortMode.js').then(m => { m.triggerAnalysis('risk'); });
+        });
+      }
+      return;
+    } else if (state.riskScores !== null) {
+      clientLog(`renderFileList: risk (completed) — rendering ${String(state.riskScores.length)} files`);
+      renderRiskFileList(list);
+      return;
+    }
+  }
+
+  if (state.sortMode === 'narrative') {
+    const ns = state.narrativeAnalysis;
+    if (ns.status === 'running') {
+      list.appendChild(toElement(renderProgressBar(ns)));
+      if (state.narrativeOrder !== null && state.narrativeOrder.length > 0) {
+        clientLog(`renderFileList: narrative (running) — rendering ${String(state.narrativeOrder.length)} files`);
+        renderNarrativeFileList(list);
+        return;
+      }
+    } else if (ns.status === 'failed') {
+      list.appendChild(toElement(
+        <div className="analysis-error">
+          <span>{'Analysis failed: ' + (ns.error ?? 'Unknown error')}</span>
+          <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
+        </div>
+      ));
+      const retryBtn = list.querySelector('#retry-analysis');
+      if (retryBtn !== null) {
+        retryBtn.addEventListener('click', () => {
+          void import('./sortMode.js').then(m => { m.triggerAnalysis('narrative'); });
+        });
+      }
+      return;
+    } else if (state.narrativeOrder !== null) {
+      clientLog(`renderFileList: narrative (completed) — rendering ${String(state.narrativeOrder.length)} files`);
+      renderNarrativeFileList(list);
+      return;
+    }
+  }
+
+  // Default: folder view (also shown during AI loading)
   let filtered = state.files;
   if (state.filterText !== '') {
     const q = state.filterText.toLowerCase();

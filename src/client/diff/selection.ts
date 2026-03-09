@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { updateProgress } from '../review/progress.js';
 import { renderFileList } from '../sidebar/fileTree.js';
 import { state } from '../state.js';
+import { renderAINotes } from './aiNotes.js';
 import { bindDragDrop } from './dragDrop.js';
 import { applyHighlighting,detectLanguage } from './highlight.js';
 import { bindHunkExpanders } from './hunkExpander.js';
@@ -51,6 +52,11 @@ export async function selectFile(fileId: string) {
   bindHunkExpanders();
   bindDragDrop();
   bindServerAnnotations();
+
+  // Show AI notes if available for this file
+  if (state.sortMode !== 'folder' && fileId in state.fileNotes) {
+    renderAINotes(container, fileId);
+  }
 }
 
 export function updateToolbarLanguage() {

@@ -1,0 +1,128 @@
+// --- Settings Dialog ---
+
+.settings-dialog {
+  max-width: 440px;
+}
+
+.settings-section {
+  margin-bottom: 16px;
+}
+
+.settings-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.settings-platform-control {
+  width: 100%;
+
+  .segment {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+.settings-select {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:focus { outline: none; border-color: var(--accent); }
+}
+
+.settings-input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 8px;
+
+  &:focus { outline: none; border-color: var(--accent); }
+  &::placeholder { color: var(--text-dim); }
+}
+
+.settings-key-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+
+  svg { flex-shrink: 0; }
+
+  &.settings-key-configured {
+    color: var(--green);
+  }
+}
+
+.settings-key-missing {
+  color: var(--orange);
+}
+
+.settings-key-input-group {
+  margin-top: 4px;
+}
+
+.settings-storage-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.settings-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+
+  input[type="radio"] {
+    accent-color: var(--accent);
+  }
+}
+
+.settings-warning {
+  font-size: 11px;
+  color: var(--orange);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+// --- Settings Gear ---
+
+.settings-gear {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+
+  svg { display: block; }
+}
