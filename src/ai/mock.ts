@@ -1,5 +1,6 @@
 import type { ReviewFile } from '../db/queries.js';
 import { debugLog } from '../debug.js';
+import type { GuidedFileResult } from './analyze-guided.js';
 import type { NarrativeFileResult } from './analyze-narrative.js';
 import type { RiskFileResult } from './analyze-risk.js';
 
@@ -99,6 +100,34 @@ export async function mockNarrativeAnalysisBatch(
     notes: {
       overview: pick(LOREM),
       lines: randomLines(50),
+    },
+  }));
+}
+
+const GUIDED_NOTES = [
+  'This is a closure — it captures variables from the surrounding scope so they can be used later.',
+  'The async/await pattern makes asynchronous code read like synchronous code.',
+  'This uses destructuring to extract specific properties from an object.',
+  'A Set is used here because it automatically prevents duplicate entries.',
+  'Template literals (backtick strings) allow embedding expressions with ${...} syntax.',
+  'The optional chaining operator (?.) safely accesses nested properties that might be null.',
+  'This arrow function uses an implicit return — no braces means the expression is returned directly.',
+  'The spread operator (...) creates a shallow copy of the array to avoid mutating the original.',
+];
+
+/** Mock guided analysis — returns educational notes after a delay. */
+export async function mockGuidedAnalysisBatch(
+  files: ReviewFile[],
+): Promise<GuidedFileResult[]> {
+  const delay = 2000 + Math.random() * 2000; // 2-4 seconds
+  debugLog(`[mock] Guided batch: ${String(files.length)} files, waiting ${String(Math.round(delay / 1000))}s`);
+  await sleep(delay);
+
+  return files.map(f => ({
+    filePath: f.file_path,
+    notes: {
+      overview: pick(LOREM),
+      lines: randomLines(50).map(l => ({ ...l, content: pick(GUIDED_NOTES) })),
     },
   }));
 }

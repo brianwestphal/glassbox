@@ -93,10 +93,14 @@ export interface AppState {
   riskAnalysis: AnalysisModeState;
   narrativeAnalysis: AnalysisModeState;
   aiConfigured: boolean;
+  guidedReviewEnabled: boolean;
   riskSortDimension: string;
   showRiskScores: boolean;
   // AI notes keyed by reviewFileId
   fileNotes: Record<string, FileNotes>;
+  // Guided review (separate from risk/narrative)
+  guidedAnalysis: AnalysisModeState;
+  guidedNotes: Record<string, FileNotes>;
 }
 
 export const state: AppState = {
@@ -121,9 +125,12 @@ export const state: AppState = {
   riskAnalysis: defaultAnalysisModeState(),
   narrativeAnalysis: defaultAnalysisModeState(),
   aiConfigured: false,
+  guidedReviewEnabled: false,
   riskSortDimension: 'aggregate',
   showRiskScores: false,
   fileNotes: {},
+  guidedAnalysis: defaultAnalysisModeState(),
+  guidedNotes: {},
 };
 
 export const CATEGORIES: Category[] = [

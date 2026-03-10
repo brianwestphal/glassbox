@@ -24,23 +24,32 @@ function getScoreForDimension(score: RiskFileScore, dimension: string): number {
 
 export function renderRiskFileList(container: Element) {
   const scores = state.riskScores;
-  if (scores === null) return;
-
   const dimension = state.riskSortDimension;
+  const filterQ = state.filterText.toLowerCase();
 
-  // Sort by selected dimension
-  const sorted = scores.slice().sort((a, b) => {
-    return getScoreForDimension(b, dimension) - getScoreForDimension(a, dimension);
-  });
+  // Build set of scored file IDs
+  const scoredFileIds = new Set(scores?.map(s => s.reviewFileId) ?? []);
+
+  // Sort scored files by selected dimension
+  const sorted = scores !== null
+    ? scores.slice().sort((a, b) => getScoreForDimension(b, dimension) - getScoreForDimension(a, dimension))
+    : [];
+
+  // Unscored files in original flat order
+  const unscored = state.files.filter(f => !scoredFileIds.has(f.id));
 
   // Apply filter
-  const filtered = state.filterText !== ''
-    ? sorted.filter(s => s.filePath.toLowerCase().includes(state.filterText.toLowerCase()))
+  const filteredScored = filterQ !== ''
+    ? sorted.filter(s => s.filePath.toLowerCase().includes(filterQ))
     : sorted;
+  const filteredUnscored = filterQ !== ''
+    ? unscored.filter(f => f.file_path.toLowerCase().includes(filterQ))
+    : unscored;
 
   state.fileOrder = [];
 
-  for (const score of filtered) {
+  // Render scored files first
+  for (const score of filteredScored) {
     const file = state.files.find(f => f.id === score.reviewFileId);
     if (file === undefined) continue;
 
@@ -81,6 +90,29 @@ export function renderRiskFileList(container: Element) {
 
     container.appendChild(el);
     state.fileOrder.push(score.reviewFileId);
+  }
+
+  // Render unscored files in flat original order
+  for (const file of filteredUnscored) {
+    const fileName = file.file_path.split('/').pop() ?? '';
+    const count = state.annotationCounts[file.id] ?? 0;
+    const staleCount = state.staleCounts[file.id] ?? 0;
+
+    const el = toElement(
+      <div className={`file-item${file.id === state.currentFileId ? ' active' : ''}`}
+        data-file-id={file.id} style="padding-left: 16px">
+        <span className="file-name" title={file.file_path}>{fileName}</span>
+        <span className="file-path-dim" title={file.file_path}>
+          {file.file_path.includes('/') ? file.file_path.slice(0, file.file_path.lastIndexOf('/')) : ''}
+        </span>
+        {staleCount > 0 ? <span className="stale-dot"></span> : null}
+        {count > 0 ? <span className="annotation-count">{count}</span> : null}
+      </div>
+    );
+
+    el.addEventListener('click', () => { void selectFile(file.id); });
+    container.appendChild(el);
+    state.fileOrder.push(file.id);
   }
 }
 

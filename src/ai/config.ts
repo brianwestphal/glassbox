@@ -13,6 +13,11 @@ export interface AIConfig {
   keySource: 'env' | 'keychain' | 'config' | null;
 }
 
+export interface GuidedReviewConfig {
+  enabled: boolean;
+  topics: string[];
+}
+
 const CONFIG_DIR = join(homedir(), '.glassbox');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 
@@ -21,6 +26,10 @@ interface ConfigFile {
     platform?: string;
     model?: string;
     keys?: Record<string, string>;
+  };
+  guidedReview?: {
+    enabled?: boolean;
+    topics?: string[];
   };
 }
 
@@ -264,4 +273,18 @@ export function getKeychainLabel(): string {
   if (os === 'linux') return 'System Keyring';
   if (os === 'win32') return 'Credential Manager';
   return 'System Keychain';
+}
+
+export function loadGuidedReviewConfig(): GuidedReviewConfig {
+  const config = readConfigFile();
+  return {
+    enabled: config.guidedReview?.enabled ?? false,
+    topics: config.guidedReview?.topics ?? [],
+  };
+}
+
+export function saveGuidedReviewConfig(settings: GuidedReviewConfig): void {
+  const config = readConfigFile();
+  config.guidedReview = { enabled: settings.enabled, topics: settings.topics };
+  writeConfigFile(config);
 }

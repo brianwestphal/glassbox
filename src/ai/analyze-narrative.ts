@@ -2,8 +2,9 @@ import type { ReviewFile } from '../db/queries.js';
 import { getFileContent } from '../git/diff.js';
 import type { AIMessage } from './client.js';
 import { sendAIRequest } from './client.js';
-import type { AIConfig } from './config.js';
+import type { AIConfig, GuidedReviewConfig } from './config.js';
 import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
+import { buildGuidedReviewSuffix } from './guided-review.js';
 import { getModelContextWindow } from './models.js';
 import { extractJSON, isNeedContext } from './shared.js';
 
@@ -50,9 +51,13 @@ export async function runNarrativeAnalysisBatch(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,
+  guidedReview?: GuidedReviewConfig,
 ): Promise<NarrativeFileResult[]> {
   const contextWindow = getModelContextWindow(config.platform, config.model);
   const charBudget = Math.floor(contextWindow * 0.7 * 3);
+
+  const systemPrompt = SYSTEM_PROMPT + (guidedReview !== undefined
+    ? buildGuidedReviewSuffix(guidedReview, 'narrative') : '');
 
   const contexts = buildFileContexts(files, charBudget);
   const validPaths = new Set(files.map(f => f.file_path));
@@ -66,7 +71,7 @@ export async function runNarrativeAnalysisBatch(
   const messages: AIMessage[] = [{ role: 'user', content: initialPrompt }];
 
   for (let round = 0; round < 3; round++) {
-    const response = await sendAIRequest(config, SYSTEM_PROMPT, messages);
+    const response = await sendAIRequest(config, systemPrompt, messages);
     const parsed = extractJSON(response.content);
 
     if (isNeedContext(parsed)) {
@@ -164,6 +169,7 @@ export async function runNarrativeAnalysis(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,
+  guidedReview?: GuidedReviewConfig,
 ): Promise<NarrativeFileResult[]> {
-  return runNarrativeAnalysisBatch(files, config, repoRoot);
+  return runNarrativeAnalysisBatch(files, config, repoRoot, guidedReview);
 }

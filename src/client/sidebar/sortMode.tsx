@@ -181,7 +181,7 @@ function friendlyError(raw: string): string {
   return raw.length > 120 ? raw.slice(0, 120) + '...' : raw;
 }
 
-export function triggerAnalysis(mode: 'risk' | 'narrative') {
+export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boolean = false) {
   const modeState = getAnalysisState(mode);
 
   // Skip if already running for this mode
@@ -190,7 +190,7 @@ export function triggerAnalysis(mode: 'risk' | 'narrative') {
     return;
   }
 
-  clientLog(`triggerAnalysis(${mode}): starting`);
+  clientLog(`triggerAnalysis(${mode}): starting${invalidateCache ? ' (cache invalidated)' : ''}`);
   modeState.status = 'running';
   modeState.error = null;
   modeState.progressCompleted = 0;
@@ -201,7 +201,7 @@ export function triggerAnalysis(mode: 'risk' | 'narrative') {
 
   void (async () => {
     try {
-      await api('/ai/analyze', { method: 'POST', body: { type: mode } });
+      await api('/ai/analyze', { method: 'POST', body: { type: mode, invalidateCache } });
       if (gen !== pollGenerations[mode]) return; // Stale
       clientLog(`triggerAnalysis(${mode}): server accepted, starting poll (gen=${String(gen)})`);
       pollAnalysisStatus(mode, gen);
@@ -289,6 +289,37 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
   };
 
   setTimeout(poll, 3000);
+}
+
+export function invalidateAnalysisCache() {
+  // Clear all cached results
+  state.riskScores = null;
+  state.narrativeOrder = null;
+  state.fileNotes = {};
+
+  // Reset analysis states
+  state.riskAnalysis.status = 'idle';
+  state.riskAnalysis.error = null;
+  state.riskAnalysis.progressCompleted = 0;
+  state.riskAnalysis.progressTotal = 0;
+  state.narrativeAnalysis.status = 'idle';
+  state.narrativeAnalysis.error = null;
+  state.narrativeAnalysis.progressCompleted = 0;
+  state.narrativeAnalysis.progressTotal = 0;
+
+  // Invalidate all running polls
+  pollGenerations.risk++;
+  pollGenerations.narrative++;
+
+  clientLog('invalidateAnalysisCache: cleared all cached results and stopped polls');
+
+  // If on an AI sort mode, trigger fresh analysis (skip cache since settings changed)
+  if (state.sortMode === 'risk' || state.sortMode === 'narrative') {
+    triggerAnalysis(state.sortMode, true);
+  } else {
+    // Folder mode — re-render to update spinner if guided review is enabled
+    renderFileList();
+  }
 }
 
 export async function loadAnalysisResults(mode: 'risk' | 'narrative', partial: boolean = false) {

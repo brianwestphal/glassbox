@@ -1,11 +1,51 @@
 // --- Settings Dialog ---
 
 .settings-dialog {
-  max-width: 440px;
+  max-width: 460px;
 }
 
 .settings-section {
   margin-bottom: 16px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.settings-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-beta-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+
+.settings-disclaimer {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
 }
 
 .settings-label {
@@ -14,6 +54,10 @@
   font-weight: 600;
   color: var(--text-dim);
   margin-bottom: 6px;
+
+  &.settings-label-spaced {
+    margin-top: 12px;
+  }
 }
 
 .settings-platform-control {
@@ -101,6 +145,73 @@
   color: var(--orange);
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+}
+
+// --- Guided Review ---
+
+.settings-guided-topics {
+  margin-bottom: 16px;
+}
+
+.settings-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-sans);
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 500;
+  }
+}
+
+.settings-more-toggle {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+
+  &:hover { text-decoration: underline; }
+}
+
+.settings-tags-more {
+  margin-top: 8px;
 }
 
 // --- Settings Gear ---

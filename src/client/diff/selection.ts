@@ -54,7 +54,9 @@ export async function selectFile(fileId: string) {
   bindServerAnnotations();
 
   // Show AI notes if available for this file
-  if (state.sortMode !== 'folder' && fileId in state.fileNotes) {
+  const hasNotes = (state.sortMode !== 'folder' && fileId in state.fileNotes) ||
+    (state.guidedReviewEnabled && fileId in state.guidedNotes);
+  if (hasNotes) {
     renderAINotes(container, fileId);
   }
 }

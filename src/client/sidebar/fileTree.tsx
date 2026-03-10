@@ -26,13 +26,13 @@ export async function loadFiles() {
   renderFileList();
 }
 
-function renderProgressBar(modeState: AnalysisModeState): SafeHtml {
+function renderProgressBar(modeState: AnalysisModeState, analysisLabel: string): SafeHtml {
   const completed = modeState.progressCompleted;
   const total = modeState.progressTotal;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const label = total > 0
-    ? `Analyzing files... ${String(completed)}/${String(total)}`
-    : `Analyzing ${String(state.files.length)} files...`;
+    ? `${analysisLabel}... ${String(completed)}/${String(total)}`
+    : `${analysisLabel}...`;
 
   return (
     <div className="analysis-loading-inline">
@@ -55,68 +55,60 @@ export function renderFileList() {
   list.innerHTML = '';
   state.fileOrder = [];
 
-  // Dispatch based on sort mode
-  if (state.sortMode === 'risk') {
-    const rs = state.riskAnalysis;
-    if (rs.status === 'running') {
-      list.appendChild(toElement(renderProgressBar(rs)));
-      if (state.riskScores !== null && state.riskScores.length > 0) {
-        clientLog(`renderFileList: risk (running) — rendering ${String(state.riskScores.length)} files`);
-        renderRiskFileList(list);
-        return;
-      }
-    } else if (rs.status === 'failed') {
-      list.appendChild(toElement(
-        <div className="analysis-error">
-          <span>{'Analysis failed: ' + (rs.error ?? 'Unknown error')}</span>
-          <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
-        </div>
-      ));
-      const retryBtn = list.querySelector('#retry-analysis');
-      if (retryBtn !== null) {
-        retryBtn.addEventListener('click', () => {
-          void import('./sortMode.js').then(m => { m.triggerAnalysis('risk'); });
-        });
-      }
-      return;
-    } else if (state.riskScores !== null) {
-      clientLog(`renderFileList: risk (completed) — rendering ${String(state.riskScores.length)} files`);
-      renderRiskFileList(list);
-      return;
+  // Show analysis spinner if running
+  if (state.sortMode === 'risk' && state.riskAnalysis.status === 'running') {
+    list.appendChild(toElement(renderProgressBar(state.riskAnalysis, 'Analyzing risk')));
+  } else if (state.sortMode === 'narrative' && state.narrativeAnalysis.status === 'running') {
+    list.appendChild(toElement(renderProgressBar(state.narrativeAnalysis, 'Analyzing reading order')));
+  }
+  // Show guided analysis spinner (independent of sort mode)
+  if (state.guidedReviewEnabled && state.guidedAnalysis.status === 'running') {
+    list.appendChild(toElement(renderProgressBar(state.guidedAnalysis, 'Guided review')));
+  }
+
+  // Show error for AI modes
+  if (state.sortMode === 'risk' && state.riskAnalysis.status === 'failed') {
+    list.appendChild(toElement(
+      <div className="analysis-error">
+        <span>{'Analysis failed: ' + (state.riskAnalysis.error ?? 'Unknown error')}</span>
+        <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
+      </div>
+    ));
+    const retryBtn = list.querySelector('#retry-analysis');
+    if (retryBtn !== null) {
+      retryBtn.addEventListener('click', () => {
+        void import('./sortMode.js').then(m => { m.triggerAnalysis('risk'); });
+      });
     }
+  } else if (state.sortMode === 'narrative' && state.narrativeAnalysis.status === 'failed') {
+    list.appendChild(toElement(
+      <div className="analysis-error">
+        <span>{'Analysis failed: ' + (state.narrativeAnalysis.error ?? 'Unknown error')}</span>
+        <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
+      </div>
+    ));
+    const retryBtn = list.querySelector('#retry-analysis');
+    if (retryBtn !== null) {
+      retryBtn.addEventListener('click', () => {
+        void import('./sortMode.js').then(m => { m.triggerAnalysis('narrative'); });
+      });
+    }
+  }
+
+  // Dispatch file rendering based on sort mode
+  if (state.sortMode === 'risk') {
+    clientLog(`renderFileList: risk — rendering files (scores: ${String(state.riskScores?.length ?? 0)})`);
+    renderRiskFileList(list);
+    return;
   }
 
   if (state.sortMode === 'narrative') {
-    const ns = state.narrativeAnalysis;
-    if (ns.status === 'running') {
-      list.appendChild(toElement(renderProgressBar(ns)));
-      if (state.narrativeOrder !== null && state.narrativeOrder.length > 0) {
-        clientLog(`renderFileList: narrative (running) — rendering ${String(state.narrativeOrder.length)} files`);
-        renderNarrativeFileList(list);
-        return;
-      }
-    } else if (ns.status === 'failed') {
-      list.appendChild(toElement(
-        <div className="analysis-error">
-          <span>{'Analysis failed: ' + (ns.error ?? 'Unknown error')}</span>
-          <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
-        </div>
-      ));
-      const retryBtn = list.querySelector('#retry-analysis');
-      if (retryBtn !== null) {
-        retryBtn.addEventListener('click', () => {
-          void import('./sortMode.js').then(m => { m.triggerAnalysis('narrative'); });
-        });
-      }
-      return;
-    } else if (state.narrativeOrder !== null) {
-      clientLog(`renderFileList: narrative (completed) — rendering ${String(state.narrativeOrder.length)} files`);
-      renderNarrativeFileList(list);
-      return;
-    }
+    clientLog(`renderFileList: narrative — rendering files (order: ${String(state.narrativeOrder?.length ?? 0)})`);
+    renderNarrativeFileList(list);
+    return;
   }
 
-  // Default: folder view (also shown during AI loading)
+  // Default: folder view
   let filtered = state.files;
   if (state.filterText !== '') {
     const q = state.filterText.toLowerCase();

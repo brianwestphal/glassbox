@@ -292,6 +292,16 @@
   background: rgba(137, 180, 250, 0.15);
 }
 
+.ai-note-guided {
+  &.ai-note-overview { background: rgba(166, 227, 161, 0.06); }
+  &.ai-note-row { background: rgba(166, 227, 161, 0.06); }
+}
+
+.ai-note-label-guided {
+  color: var(--green, #a6e3a1);
+  background: rgba(166, 227, 161, 0.15);
+}
+
 .ai-note-text {
   color: var(--text-dim);
 }

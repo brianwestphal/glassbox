@@ -1,23 +1,27 @@
 import { Hono } from 'hono';
 
+import type { GuidedFileResult } from '../ai/analyze-guided.js';
+import { runGuidedAnalysisBatch } from '../ai/analyze-guided.js';
 import type { NarrativeFileResult } from '../ai/analyze-narrative.js';
 import { mergeNarrativeOrders, runNarrativeAnalysisBatch } from '../ai/analyze-narrative.js';
 import type { RiskFileResult } from '../ai/analyze-risk.js';
 import { runRiskAnalysisBatch } from '../ai/analyze-risk.js';
 import { planBatches } from '../ai/batch-planner.js';
 import { runBatches } from '../ai/batch-runner.js';
-import type { AIConfig } from '../ai/config.js';
+import type { AIConfig, GuidedReviewConfig } from '../ai/config.js';
 import {
   deleteAPIKey,
   detectAvailablePlatforms,
   getKeychainLabel,
   isKeychainAvailable,
   loadAIConfig,
+  loadGuidedReviewConfig,
   resolveAPIKey,
   saveAIConfigPreferences,
   saveAPIKey,
+  saveGuidedReviewConfig,
 } from '../ai/config.js';
-import { mockNarrativeAnalysisBatch, mockRiskAnalysisBatch } from '../ai/mock.js';
+import { mockGuidedAnalysisBatch, mockNarrativeAnalysisBatch, mockRiskAnalysisBatch } from '../ai/mock.js';
 import type { AIPlatform } from '../ai/models.js';
 import { getModelContextWindow, MODELS, PLATFORMS } from '../ai/models.js';
 import {
@@ -52,12 +56,20 @@ aiApiRoutes.get('/config', (c) => {
     model: config.model,
     keyConfigured: config.apiKey !== null || isAIServiceTest(),
     keySource: config.keySource,
+    guidedReview: loadGuidedReviewConfig(),
   });
 });
 
 aiApiRoutes.post('/config', async (c) => {
-  const body = await c.req.json<{ platform: string; model: string }>();
+  const body = await c.req.json<{
+    platform: string;
+    model: string;
+    guidedReview?: { enabled: boolean; topics: string[] };
+  }>();
   saveAIConfigPreferences(body.platform as AIPlatform, body.model);
+  if (body.guidedReview !== undefined) {
+    saveGuidedReviewConfig(body.guidedReview);
+  }
   return c.json({ ok: true });
 });
 
@@ -104,12 +116,13 @@ aiApiRoutes.delete('/key', (c) => {
 aiApiRoutes.post('/analyze', async (c) => {
   const reviewId = c.req.query('reviewId') ?? '';
   const repoRoot = c.get('repoRoot');
-  const body = await c.req.json<{ type: string }>();
+  const body = await c.req.json<{ type: string; invalidateCache?: boolean }>();
   const analysisType = body.type;
+  const invalidateCache = body.invalidateCache === true;
 
   debugLog(`POST /analyze: type=${analysisType}, reviewId=${reviewId}`);
 
-  if (analysisType !== 'risk' && analysisType !== 'narrative') {
+  if (analysisType !== 'risk' && analysisType !== 'narrative' && analysisType !== 'guided') {
     return c.json({ error: 'Invalid analysis type' }, 400);
   }
 
@@ -128,35 +141,51 @@ aiApiRoutes.post('/analyze', async (c) => {
     return c.json({ error: 'No files in review' }, 400);
   }
 
-  // Cancel the OTHER type's running analysis (risk↔narrative), if any.
-  // Switching to folder mode never calls this endpoint, so folder doesn't cancel.
-  const otherType = analysisType === 'risk' ? 'narrative' : 'risk';
-  const otherRunning = await getLatestAnalysis(reviewId, otherType);
-  if (otherRunning !== undefined && otherRunning.status === 'running') {
-    debugLog(`POST /analyze: cancelling ${otherType} analysis id=${otherRunning.id} (switching to ${analysisType})`);
-    cancelledAnalyses.add(otherRunning.id);
+  // When invalidating cache, cancel running analyses of all types
+  if (invalidateCache) {
+    debugLog('POST /analyze: invalidateCache=true, cancelling all running analyses');
+    for (const type of ['risk', 'narrative', 'guided'] as const) {
+      const running = await getLatestAnalysis(reviewId, type);
+      if (running !== undefined && running.status === 'running') {
+        debugLog(`POST /analyze: cancelling ${type} analysis id=${running.id}`);
+        cancelledAnalyses.add(running.id);
+        await updateAnalysisStatus(running.id, 'failed', 'Cancelled');
+      }
+    }
+  } else if (analysisType === 'risk' || analysisType === 'narrative') {
+    // Risk↔narrative cancel each other; guided runs independently
+    const otherType = analysisType === 'risk' ? 'narrative' : 'risk';
+    const otherRunning = await getLatestAnalysis(reviewId, otherType);
+    if (otherRunning !== undefined && otherRunning.status === 'running') {
+      debugLog(`POST /analyze: cancelling ${otherType} analysis id=${otherRunning.id} (switching to ${analysisType})`);
+      cancelledAnalyses.add(otherRunning.id);
+    }
   }
 
-  // Deduplicate: if there's already a running analysis of this type, return it
-  const existing = await getLatestAnalysis(reviewId, analysisType);
-  if (existing !== undefined) {
-    debugLog(`POST /analyze: found existing ${analysisType} analysis id=${existing.id}, status=${existing.status}, created=${existing.created_at}, updated=${existing.updated_at}`);
-  }
-  if (existing !== undefined && existing.status === 'running') {
-    const ageMs = Date.now() - new Date(existing.updated_at + 'Z').getTime();
-    debugLog(`POST /analyze: existing analysis age=${String(Math.round(ageMs / 1000))}s`);
-    if (ageMs < 15 * 60 * 1000) {
-      // Still recent, reuse it
-      debugLog('POST /analyze: reusing existing running analysis');
-      return c.json({ analysisId: existing.id, status: 'running' });
+  if (!invalidateCache) {
+    // Deduplicate: if there's already a running analysis of this type, return it
+    const existing = await getLatestAnalysis(reviewId, analysisType);
+    if (existing !== undefined) {
+      debugLog(`POST /analyze: found existing ${analysisType} analysis id=${existing.id}, status=${existing.status}, created=${existing.created_at}, updated=${existing.updated_at}`);
     }
-    // Stale — mark it as failed so we can start fresh
-    debugLog('POST /analyze: marking stale analysis as timed out');
-    await updateAnalysisStatus(existing.id, 'failed', 'Analysis timed out');
+    if (existing !== undefined && existing.status === 'running') {
+      const ageMs = Date.now() - new Date(existing.updated_at + 'Z').getTime();
+      debugLog(`POST /analyze: existing analysis age=${String(Math.round(ageMs / 1000))}s`);
+      if (ageMs < 15 * 60 * 1000) {
+        // Still recent, reuse it
+        debugLog('POST /analyze: reusing existing running analysis');
+        return c.json({ analysisId: existing.id, status: 'running' });
+      }
+      // Stale — mark it as failed so we can start fresh
+      debugLog('POST /analyze: marking stale analysis as timed out');
+      await updateAnalysisStatus(existing.id, 'failed', 'Analysis timed out');
+    }
   }
 
   const analysis = await createAnalysis(reviewId, analysisType);
   debugLog(`POST /analyze: created new analysis id=${analysis.id}`);
+
+  const guidedReview = loadGuidedReviewConfig();
 
   // Run batched analysis in background
   void (async () => {
@@ -171,8 +200,8 @@ aiApiRoutes.post('/analyze', async (c) => {
       debugLog(`Analysis plan: ${String(totalAnalyzable)} analyzable + ${String(binaryFiles.length)} binary = ${String(totalAnalyzable + binaryFiles.length)} total files in ${String(batches.length)} batch(es)`);
 
       // --- Cache: carry forward scores from a previous analysis (same review) ---
-      // Within the same reviewId, diffs don't change, so all previous scores are valid.
-      const prevScores = await getPreviousScores(reviewId, analysisType, analysis.id);
+      // Skip cache when invalidateCache is true (e.g. guided review settings changed)
+      const prevScores = invalidateCache ? [] : await getPreviousScores(reviewId, analysisType, analysis.id);
       const binaryPathSet = new Set(binaryFiles.map(f => f.file_path));
       const unchangedPaths = new Set<string>();
       const cachedScores = prevScores.filter(s => {
@@ -246,9 +275,11 @@ aiApiRoutes.post('/analyze', async (c) => {
       const progressOffset = cachedScores.length + binaryFiles.length;
 
       if (analysisType === 'risk') {
-        await runBatchedRiskAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel);
+        await runBatchedRiskAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel, guidedReview);
+      } else if (analysisType === 'narrative') {
+        await runBatchedNarrativeAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel, guidedReview);
       } else {
-        await runBatchedNarrativeAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel);
+        await runBatchedGuidedAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel, guidedReview);
       }
 
       // Check if this analysis was cancelled while running (user switched modes)
@@ -283,13 +314,14 @@ async function runBatchedRiskAnalysis(
   progressTotal: number,
   progressOffset: number,
   shouldCancel?: () => boolean,
+  guidedReview?: GuidedReviewConfig,
 ): Promise<void> {
   const allResults = await runBatches<RiskFileResult>(
     batches,
     allFiles.length,
     async (batch) => isAIServiceTest()
       ? mockRiskAnalysisBatch(batch.files)
-      : runRiskAnalysisBatch(batch.files, config, repoRoot),
+      : runRiskAnalysisBatch(batch.files, config, repoRoot, guidedReview),
     async (_batchIndex, results) => {
       // Post-process: aggregate = max of individual dimension scores
       for (const r of results) {
@@ -342,13 +374,14 @@ async function runBatchedNarrativeAnalysis(
   progressTotal: number,
   progressOffset: number,
   shouldCancel?: () => boolean,
+  guidedReview?: GuidedReviewConfig,
 ): Promise<void> {
   const allResults = await runBatches<NarrativeFileResult>(
     batches,
     allFiles.length,
     async (batch) => isAIServiceTest()
       ? mockNarrativeAnalysisBatch(batch.files)
-      : runNarrativeAnalysisBatch(batch.files, config, repoRoot),
+      : runNarrativeAnalysisBatch(batch.files, config, repoRoot, guidedReview),
     async (_batchIndex, results) => {
       // Save this batch's results incrementally
       const scores = results.map(r => ({
@@ -383,6 +416,47 @@ async function runBatchedNarrativeAnalysis(
       );
     }
   }
+}
+
+async function runBatchedGuidedAnalysis(
+  analysisId: string,
+  batches: Array<{ files: ReviewFile[]; estimatedTokens: number }>,
+  allFiles: ReviewFile[],
+  config: AIConfig,
+  repoRoot: string,
+  fileIdMap: Map<string, string>,
+  progressTotal: number,
+  progressOffset: number,
+  shouldCancel?: () => boolean,
+  guidedReview?: GuidedReviewConfig,
+): Promise<void> {
+  await runBatches<GuidedFileResult>(
+    batches,
+    allFiles.length,
+    async (batch) => {
+      if (isAIServiceTest()) return mockGuidedAnalysisBatch(batch.files);
+      if (guidedReview === undefined) throw new Error('Guided review config required');
+      return runGuidedAnalysisBatch(batch.files, config, repoRoot, guidedReview);
+    },
+    async (_batchIndex, results) => {
+      const scores = results.map((r, idx) => ({
+        reviewFileId: fileIdMap.get(r.filePath) ?? '',
+        filePath: r.filePath,
+        sortOrder: idx,
+        aggregateScore: null,
+        rationale: null,
+        dimensionScores: null,
+        notes: r.notes,
+      }));
+      await appendFileScores(analysisId, scores);
+    },
+    async (progress) => {
+      await updateAnalysisProgress(analysisId, progressOffset + progress.completedFiles, progressTotal);
+    },
+    1,
+    shouldCancel,
+    'guided',
+  );
 }
 
 aiApiRoutes.get('/analysis/:type', async (c) => {

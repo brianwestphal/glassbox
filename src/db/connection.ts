@@ -122,6 +122,12 @@ async function initSchema(db: PGlite): Promise<void> {
   await addColumnIfMissing(db, 'ai_file_scores', 'notes', 'TEXT');
   await addColumnIfMissing(db, 'ai_analyses', 'progress_completed', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing(db, 'ai_analyses', 'progress_total', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Mark any 'running' analyses as failed — if the server is starting up,
+  // no background workers exist to complete them (e.g. server was killed mid-analysis)
+  await db.exec(
+    `UPDATE ai_analyses SET status = 'failed', error_message = 'Interrupted (server restarted)' WHERE status = 'running'`
+  );
 }
 
 async function addColumnIfMissing(db: PGlite, table: string, column: string, definition: string): Promise<void> {

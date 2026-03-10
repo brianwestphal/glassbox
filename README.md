@@ -83,7 +83,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Automatic .gitignore prompt** — reminds you to exclude `.glassbox/` from version control
 - **Auto port selection** — if the default port is busy, it finds an open one
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
-- **AI-powered analysis** *(optional)* — risk scoring and narrative reading order to help you focus your review where it matters most
+- **AI-powered analysis** *(optional)* — risk scoring, narrative reading order, and guided review to help you focus and learn as you review
 
 ---
 
@@ -103,9 +103,15 @@ When you open a file, inline risk notes highlight the specific lines and concern
 
 For large, multi-file changes, the AI determines the optimal reading order: types and interfaces first, then utilities, then business logic, then integration code. Each file gets walkthrough notes that explain what changed and how it connects to the rest of the diff — like having a colleague walk you through their PR.
 
+### Guided Review
+
+If you're learning a new language, onboarding to an unfamiliar codebase, or new to programming, Guided Review generates educational annotations inline with the diff. Enable it in Settings and select the topics that apply to you — "Programming," "This codebase," or specific languages. Glassbox runs a separate analysis pass and inserts green "Learn" notes that explain concepts, idioms, and design decisions relevant to your experience level.
+
+Guided Review works in all three sidebar modes (folder, risk, and narrative) and runs independently of risk or narrative analysis. When enabled, risk and narrative analysis also adjust their output to be more detailed and educational.
+
 ### How to use it
 
-Click the shield or book icon in the sidebar to switch from the default folder view to risk or narrative mode. If you haven't configured an API key yet, a settings dialog will prompt you. Analysis runs once and results are cached for the session.
+Click the shield or book icon in the sidebar to switch from the default folder view to risk or narrative mode. If you haven't configured an API key yet, a settings dialog will prompt you. Analysis runs once and results are cached for the session. To enable Guided Review, open the Settings dialog (gear icon) and check "Enable guided review."
 
 ### Supported providers
 
