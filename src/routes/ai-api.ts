@@ -37,7 +37,7 @@ import {
 } from '../db/ai-queries.js';
 import type { ReviewFile } from '../db/queries.js';
 import { getReviewFiles } from '../db/queries.js';
-import { debugLog, isAIServiceTest, isDebug } from '../debug.js';
+import { debugLog, getDemoMode, isAIServiceTest, isDebug } from '../debug.js';
 import type { AppEnv } from '../types.js';
 
 export const aiApiRoutes = new Hono<AppEnv>();
@@ -54,7 +54,7 @@ aiApiRoutes.get('/config', (c) => {
   return c.json({
     platform: config.platform,
     model: config.model,
-    keyConfigured: config.apiKey !== null || isAIServiceTest(),
+    keyConfigured: config.apiKey !== null || isAIServiceTest() || getDemoMode() !== null,
     keySource: config.keySource,
     guidedReview: loadGuidedReviewConfig(),
   });

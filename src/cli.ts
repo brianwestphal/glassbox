@@ -1,5 +1,6 @@
 import { addReviewFile,createReview, getLatestInProgressReview } from './db/queries.js';
-import { setAIServiceTest, setDebug } from './debug.js';
+import { setAIServiceTest, setDebug, setDemoMode } from './debug.js';
+import { DEMO_SCENARIOS, setupDemoReview } from './demo.js';
 import type { ReviewMode } from './git/diff.js';
 import { getFileDiffs, getHeadCommit,getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from './git/diff.js';
 import { updateReviewDiffs } from './review-update.js';
@@ -39,7 +40,7 @@ Examples:
 `);
 }
 
-function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean; debug: boolean; aiServiceTest: boolean } | null {
+function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean; debug: boolean; aiServiceTest: boolean; demo: number | null } | null {
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
   let port = 4173;
@@ -47,6 +48,7 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
   let forceUpdateCheck = false;
   let debug = false;
   let aiServiceTest = false;
+  let demo: number | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -98,6 +100,14 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
         aiServiceTest = true;
         break;
       default:
+        if (arg.startsWith('--demo:')) {
+          demo = parseInt(arg.slice(7), 10);
+          if (isNaN(demo) || demo < 1) {
+            console.error(`Invalid demo scenario: ${arg}`);
+            process.exit(1);
+          }
+          break;
+        }
         console.error(`Unknown option: ${arg}`);
         printUsage();
         process.exit(1);
@@ -108,7 +118,7 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
     mode = { type: 'uncommitted' };
   }
 
-  return { mode, port, resume, forceUpdateCheck, debug, aiServiceTest };
+  return { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo };
 }
 
 async function main() {
@@ -118,7 +128,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest } = parsed;
+  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo } = parsed;
 
   setDebug(debug);
   setAIServiceTest(aiServiceTest);
@@ -127,6 +137,26 @@ async function main() {
   }
   if (debug) {
     console.log(`[debug] Build timestamp: ${process.env.BUILD_TIMESTAMP}`);
+  }
+
+  // Demo mode — bypass git operations and set up pre-configured data
+  if (demo !== null) {
+    const scenario = DEMO_SCENARIOS.find(s => s.id === demo);
+    if (scenario === undefined) {
+      console.error(`Unknown demo scenario: ${String(demo)}`);
+      console.error('Available scenarios:');
+      for (const s of DEMO_SCENARIOS) {
+        console.error(`  --demo:${String(s.id)}  ${s.label}`);
+      }
+      process.exit(1);
+    }
+
+    setDemoMode(demo);
+    console.log(`\n  DEMO MODE: ${scenario.label}\n`);
+
+    const { reviewId } = await setupDemoReview(demo);
+    await startServer(port, reviewId, process.cwd());
+    return;
   }
 
   // Check for updates (once per day, or if --check-for-updates is passed)
