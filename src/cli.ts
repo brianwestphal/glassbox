@@ -1,11 +1,11 @@
-import { addReviewFile,createReview, getLatestInProgressReview } from './db/queries.js';
-import { setAIServiceTest, setDebug, setDemoMode } from './debug.js';
-import { DEMO_SCENARIOS, setupDemoReview } from './demo.js';
-import type { ReviewMode } from './git/diff.js';
-import { getFileDiffs, getHeadCommit,getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from './git/diff.js';
-import { updateReviewDiffs } from './review-update.js';
-import { startServer } from './server.js';
-import { checkForUpdates } from './update-check.js';
+import { addReviewFile, createReview, getLatestInProgressReview } from "./db/queries.js";
+import { setAIServiceTest, setDebug, setDemoMode } from "./debug.js";
+import { DEMO_SCENARIOS, setupDemoReview } from "./demo.js";
+import type { ReviewMode } from "./git/diff.js";
+import { getFileDiffs, getHeadCommit, getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from "./git/diff.js";
+import { updateReviewDiffs } from "./review-update.js";
+import { startServer } from "./server.js";
+import { checkForUpdates } from "./update-check.js";
 
 function printUsage() {
   console.log(`
@@ -25,8 +25,11 @@ Modes (pick one):
   --all               Review entire codebase
 
 Options:
-  --port <number>     Port to run on (default: 4173)
+  --port <number>     Port to run on (default: 4183)
   --resume            Resume the latest in-progress review for this mode
+  --no-open           Don't open browser automatically
+  --strict-port       Fail if the requested port is in use
+  --project-dir <dir> Run as if invoked from <dir> (used by Tauri desktop app)
   --check-for-updates Check for a newer version on npm
   --ai-service-test   Use mock AI responses (no API calls, no tokens used)
   --help              Show this help message
@@ -40,67 +43,92 @@ Examples:
 `);
 }
 
-function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: boolean; forceUpdateCheck: boolean; debug: boolean; aiServiceTest: boolean; demo: number | null } | null {
+function parseArgs(
+  argv: string[],
+): {
+  mode: ReviewMode;
+  port: number;
+  resume: boolean;
+  forceUpdateCheck: boolean;
+  debug: boolean;
+  aiServiceTest: boolean;
+  demo: number | null;
+  noOpen: boolean;
+  strictPort: boolean;
+  projectDir: string | null;
+} | null {
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
-  let port = 4173;
+  let port = 4183;
   let resume = false;
   let forceUpdateCheck = false;
   let debug = false;
   let aiServiceTest = false;
   let demo: number | null = null;
+  let noOpen = false;
+  let strictPort = false;
+  let projectDir: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     switch (arg) {
-      case '--help':
-      case '-h':
+      case "--help":
+      case "-h":
         printUsage();
         process.exit(0);
       // falls through
-      case '--uncommitted':
-        mode = { type: 'uncommitted' };
+      case "--uncommitted":
+        mode = { type: "uncommitted" };
         break;
-      case '--staged':
-        mode = { type: 'staged' };
+      case "--staged":
+        mode = { type: "staged" };
         break;
-      case '--unstaged':
-        mode = { type: 'unstaged' };
+      case "--unstaged":
+        mode = { type: "unstaged" };
         break;
-      case '--commit':
-        mode = { type: 'commit', sha: args[++i] };
+      case "--commit":
+        mode = { type: "commit", sha: args[++i] };
         break;
-      case '--range': {
-        const parts = args[++i].split('..');
-        mode = { type: 'range', from: parts[0], to: parts[1] || 'HEAD' };
+      case "--range": {
+        const parts = args[++i].split("..");
+        mode = { type: "range", from: parts[0], to: parts[1] || "HEAD" };
         break;
       }
-      case '--branch':
-        mode = { type: 'branch', name: args[++i] };
+      case "--branch":
+        mode = { type: "branch", name: args[++i] };
         break;
-      case '--files':
-        mode = { type: 'files', patterns: args[++i].split(',') };
+      case "--files":
+        mode = { type: "files", patterns: args[++i].split(",") };
         break;
-      case '--all':
-        mode = { type: 'all' };
+      case "--all":
+        mode = { type: "all" };
         break;
-      case '--port':
+      case "--port":
         port = parseInt(args[++i], 10);
         break;
-      case '--resume':
+      case "--resume":
         resume = true;
         break;
-      case '--check-for-updates':
+      case "--check-for-updates":
         forceUpdateCheck = true;
         break;
-      case '--debug':
+      case "--debug":
         debug = true;
         break;
-      case '--ai-service-test':
+      case "--ai-service-test":
         aiServiceTest = true;
         break;
+      case "--no-open":
+        noOpen = true;
+        break;
+      case "--strict-port":
+        strictPort = true;
+        break;
+      case "--project-dir":
+        projectDir = args[++i];
+        break;
       default:
-        if (arg.startsWith('--demo:')) {
+        if (arg.startsWith("--demo:")) {
           demo = parseInt(arg.slice(7), 10);
           if (isNaN(demo) || demo < 1) {
             console.error(`Invalid demo scenario: ${arg}`);
@@ -115,10 +143,10 @@ function parseArgs(argv: string[]): { mode: ReviewMode; port: number; resume: bo
   }
 
   if (!mode) {
-    mode = { type: 'uncommitted' };
+    mode = { type: "uncommitted" };
   }
 
-  return { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo };
+  return { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir };
 }
 
 async function main() {
@@ -128,23 +156,28 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo } = parsed;
+  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir } = parsed;
 
   setDebug(debug);
   setAIServiceTest(aiServiceTest);
   if (aiServiceTest) {
-    console.log('AI service test mode enabled — using mock AI responses');
+    console.log("AI service test mode enabled — using mock AI responses");
   }
   if (debug) {
     console.log(`[debug] Build timestamp: ${process.env.BUILD_TIMESTAMP}`);
   }
 
+  // Change working directory if --project-dir was passed (used by Tauri desktop app)
+  if (projectDir) {
+    process.chdir(projectDir);
+  }
+
   // Demo mode — bypass git operations and set up pre-configured data
   if (demo !== null) {
-    const scenario = DEMO_SCENARIOS.find(s => s.id === demo);
+    const scenario = DEMO_SCENARIOS.find((s) => s.id === demo);
     if (scenario === undefined) {
       console.error(`Unknown demo scenario: ${String(demo)}`);
-      console.error('Available scenarios:');
+      console.error("Available scenarios:");
       for (const s of DEMO_SCENARIOS) {
         console.error(`  --demo:${String(s.id)}  ${s.label}`);
       }
@@ -155,7 +188,7 @@ async function main() {
     console.log(`\n  DEMO MODE: ${scenario.label}\n`);
 
     const { reviewId } = await setupDemoReview(demo);
-    await startServer(port, reviewId, process.cwd());
+    await startServer(port, reviewId, process.cwd(), { noOpen, strictPort });
     return;
   }
 
@@ -165,7 +198,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!isGitRepo(cwd)) {
-    console.error('Error: Not a git repository. Run this from inside a git repo.');
+    console.error("Error: Not a git repository. Run this from inside a git repo.");
     process.exit(1);
   }
 
@@ -185,18 +218,18 @@ async function main() {
       const diffs = getFileDiffs(mode, cwd);
       const result = await updateReviewDiffs(existing.id, diffs, headCommit);
       console.log(`Updated ${result.updated} file(s), ${result.added} added, ${result.stale} stale annotation(s)`);
-      await startServer(port, existing.id, repoRoot);
+      await startServer(port, existing.id, repoRoot, { noOpen, strictPort });
       return;
     }
 
     // Different HEAD but --resume: reopen as-is
     if (resume) {
       console.log(`Resuming review ${existing.id} (started ${existing.created_at})`);
-      await startServer(port, existing.id, repoRoot);
+      await startServer(port, existing.id, repoRoot, { noOpen, strictPort });
       return;
     }
   } else if (resume) {
-    console.log('No in-progress review found, starting a new one.');
+    console.log("No in-progress review found, starting a new one.");
   }
 
   // Get diffs
@@ -204,7 +237,7 @@ async function main() {
   const diffs = getFileDiffs(mode, cwd);
 
   if (diffs.length === 0) {
-    console.log('No changes found for the specified mode.');
+    console.log("No changes found for the specified mode.");
     process.exit(0);
   }
 
@@ -220,7 +253,7 @@ async function main() {
 
   console.log(`Review ${review.id} created.`);
 
-  await startServer(port, review.id, repoRoot);
+  await startServer(port, review.id, repoRoot, { noOpen, strictPort });
 }
 
 main().catch((err: unknown) => {

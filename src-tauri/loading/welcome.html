@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glassbox</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      color: #c0c0d8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .container {
+      max-width: 520px;
+      text-align: center;
+      padding: 0 24px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #e0e0f0;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #8888a8;
+      margin-bottom: 32px;
+    }
+    .status {
+      background: #222244;
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .status-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      color: #e0e0f0;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-red { background: #ef4444; }
+    .dot-green { background: #22c55e; }
+    .instructions {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #a0a0b8;
+    }
+    .instructions p { margin-bottom: 10px; }
+    .instructions code {
+      background: #16162e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      color: #c4b5fd;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .code-block {
+      background: #16162e;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 10px 0;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      color: #c4b5fd;
+      text-align: left;
+      user-select: text;
+      -webkit-user-select: text;
+      word-break: break-all;
+    }
+    .btn {
+      display: inline-block;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #5558e6; }
+    .btn:active { background: #4f46e5; }
+    .btn:disabled {
+      background: #3a3a5c;
+      color: #8888a8;
+      cursor: default;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+    .btn-secondary {
+      background: #2a2a4a;
+      color: #c0c0d8;
+    }
+    .btn-secondary:hover { background: #333358; }
+    .error {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    .success {
+      color: #22c55e;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .hidden { display: none; }
+    .loading .btn { pointer-events: none; opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Glassbox</h1>
+    <p class="subtitle">Review AI-generated code with annotations</p>
+
+    <div id="view-loading" class="status">
+      <div class="instructions"><p>Checking CLI status...</p></div>
+    </div>
+
+    <div id="view-not-installed" class="status hidden">
+      <div class="status-header">
+        <span class="dot dot-red"></span>
+        CLI not installed
+      </div>
+      <div class="instructions">
+        <p>Glassbox needs to be launched from your project directory so it knows which git repo to review.</p>
+        <p>Click below to install the <code>glassbox</code> command, or copy the command manually:</p>
+        <div id="manual-command" class="code-block"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btn-install" onclick="installCli()">Install CLI</button>
+      </div>
+      <div id="install-error" class="error hidden"></div>
+    </div>
+
+    <div id="view-installed" class="status hidden">
+      <div class="status-header">
+        <span class="dot dot-green"></span>
+        CLI is installed
+      </div>
+      <div class="instructions">
+        <p>Open a terminal, navigate to your git repository, and run:</p>
+        <div class="code-block">cd /path/to/your/project<br>glassbox</div>
+        <p>This opens Glassbox to review your uncommitted changes. Close this window — the app will reopen from the terminal.</p>
+      </div>
+    </div>
+
+    <div id="view-just-installed" class="status hidden">
+      <div class="status-header">
+        <span class="dot dot-green"></span>
+        CLI installed successfully
+      </div>
+      <div class="instructions">
+        <p id="installed-path"></p>
+        <p>Now open a terminal, navigate to your git repository, and run:</p>
+        <div class="code-block">cd /path/to/your/project<br>glassbox</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { invoke } = window.__TAURI__.core;
+
+    function showView(id) {
+      document.querySelectorAll('.status').forEach(el => el.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    async function checkStatus() {
+      showView('view-loading');
+      try {
+        const result = await invoke('check_cli_installed');
+        if (result.installed) {
+          showView('view-installed');
+        } else {
+          document.getElementById('manual-command').textContent = result.manual_command;
+          showView('view-not-installed');
+        }
+      } catch (e) {
+        document.getElementById('manual-command').textContent = 'Error checking CLI status';
+        showView('view-not-installed');
+      }
+    }
+
+    async function installCli() {
+      const btn = document.getElementById('btn-install');
+      const errorEl = document.getElementById('install-error');
+      errorEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Installing...';
+      try {
+        const result = await invoke('install_cli');
+        document.getElementById('installed-path').textContent =
+          'Installed to ' + result.path;
+        showView('view-just-installed');
+      } catch (e) {
+        errorEl.textContent = e;
+        errorEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Install CLI';
+      }
+    }
+
+    checkStatus();
+  </script>
+</body>
+</html>

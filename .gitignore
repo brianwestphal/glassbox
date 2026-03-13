@@ -3,3 +3,12 @@ dist
 .glassbox
 .release-state.json
 .DS_Store
+.hotsheet/
+
+# Tauri
+src-tauri/target
+src-tauri/binaries
+src-tauri/server
+src-tauri/icons/*.png
+src-tauri/icons/*.ico
+src-tauri/icons/*.icns

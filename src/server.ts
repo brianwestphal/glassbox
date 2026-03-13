@@ -24,7 +24,7 @@ function tryServe(fetch: Hono['fetch'], port: number): Promise<number> {
   });
 }
 
-export async function startServer(port: number, reviewId: string, repoRoot: string) {
+export async function startServer(port: number, reviewId: string, repoRoot: string, options?: { noOpen?: boolean; strictPort?: boolean }) {
   const app = new Hono<AppEnv>();
 
   // Inject context
@@ -60,15 +60,19 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   app.route('/', pageRoutes);
 
   let actualPort = port;
-  for (let attempt = 0; attempt < 20; attempt++) {
-    try {
-      actualPort = await tryServe(app.fetch, port + attempt);
-      break;
-    } catch (err: unknown) {
-      if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'EADDRINUSE' && attempt < 19) {
-        continue;
+  if (options?.strictPort) {
+    actualPort = await tryServe(app.fetch, port);
+  } else {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      try {
+        actualPort = await tryServe(app.fetch, port + attempt);
+        break;
+      } catch (err: unknown) {
+        if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'EADDRINUSE' && attempt < 19) {
+          continue;
+        }
+        throw err;
       }
-      throw err;
     }
   }
 
@@ -79,9 +83,11 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   const url = `http://localhost:${actualPort}`;
   console.log(`\n  Glassbox running at ${url}\n`);
 
-  // Open browser
-  const openCmd = process.platform === 'darwin' ? 'open'
-    : process.platform === 'win32' ? 'start'
-    : 'xdg-open';
-  exec(`${openCmd} ${url}`);
+  // Open browser (unless --no-open was passed)
+  if (!options?.noOpen) {
+    const openCmd = process.platform === 'darwin' ? 'open'
+      : process.platform === 'win32' ? 'start'
+      : 'xdg-open';
+    exec(`${openCmd} ${url}`);
+  }
 }

@@ -1,0 +1,180 @@
+#!/bin/bash
+# CLI launcher for Glassbox desktop app.
+# Symlink this to your PATH:
+#   ln -sf "/Applications/Glassbox.app/Contents/Resources/resources/glassbox" /usr/local/bin/glassbox
+
+set -e
+
+# Resolve the app bundle from this script's location
+# Script lives at: Glassbox.app/Contents/Resources/resources/glassbox
+SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+CONTENTS_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_PATH")")")"
+NODE_BIN="$CONTENTS_DIR/MacOS/glassbox-node"
+CLI_JS="$CONTENTS_DIR/Resources/server/cli.js"
+APP_BUNDLE="$(dirname "$CONTENTS_DIR")"
+GLASSBOX_BIN="$CONTENTS_DIR/MacOS/glassbox"
+MAIN_ICON="$CONTENTS_DIR/Resources/icon.icns"
+
+PROJECT_DIR="$(pwd)"
+BROWSER_MODE=false
+PASSTHROUGH_ARGS=()
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --browser)
+      BROWSER_MODE=true
+      shift
+      ;;
+    --demo:*)
+      # Demo mode runs the server directly (needs fresh temp DB)
+      BROWSER_MODE=true
+      PASSTHROUGH_ARGS+=("$1")
+      shift
+      ;;
+    *)
+      PASSTHROUGH_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [ "$BROWSER_MODE" = true ]; then
+  # Run the Node server directly — opens in browser
+  exec "$NODE_BIN" "$CLI_JS" "${PASSTHROUGH_ARGS[@]}"
+fi
+
+# --- Resolve app name from settings.json or project folder name ---
+APP_NAME=""
+
+# Try reading appName from .glassbox/settings.json
+SETTINGS_FILE="$PROJECT_DIR/.glassbox/settings.json"
+if [[ -f "$SETTINGS_FILE" ]]; then
+  APP_NAME=$("$NODE_BIN" -e "
+    try {
+      const s = JSON.parse(require('fs').readFileSync('$SETTINGS_FILE', 'utf8'));
+      const n = s.appName || '';
+      if (n) process.stdout.write(n);
+    } catch(e) {}
+  " 2>/dev/null || true)
+fi
+
+# Fall back to folder name
+if [[ -z "$APP_NAME" ]]; then
+  FOLDER_NAME="$(basename "$PROJECT_DIR")"
+  APP_NAME="Glassbox — $FOLDER_NAME"
+fi
+
+# --- Create/update stub .app for unique Dock/Cmd+Tab identity ---
+ensure_stub_app() {
+  local glassbox_dir="$PROJECT_DIR/.glassbox"
+  local stub_path="$glassbox_dir/$APP_NAME.app"
+  local plist_path="$stub_path/Contents/Info.plist"
+
+  # Remove old stubs with different names
+  for old in "$glassbox_dir/"*.app; do
+    [[ -d "$old" ]] && [[ "$old" != "$stub_path" ]] && rm -rf "$old"
+  done
+
+  # Check if already up to date
+  local launcher_path="$stub_path/Contents/MacOS/launcher"
+  if [[ -f "$plist_path" ]] && grep -q "<string>$APP_NAME</string>" "$plist_path" 2>/dev/null \
+     && [[ -f "$launcher_path" ]] && grep -q "/tmp/glassbox-server" "$launcher_path" 2>/dev/null; then
+    return
+  fi
+
+  # Create stub structure
+  mkdir -p "$stub_path/Contents/MacOS" "$stub_path/Contents/Resources"
+
+  # Generate safe bundle identifier
+  local safe_id
+  safe_id=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+
+  # Write Info.plist
+  cat > "$plist_path" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>$APP_NAME</string>
+    <key>CFBundleDisplayName</key>
+    <string>$APP_NAME</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.brianwestphal.glassbox.$safe_id</string>
+    <key>CFBundleExecutable</key>
+    <string>launcher</string>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+</dict>
+</plist>
+PLIST
+
+  # Write launcher script — reads pre-started server info from /tmp, then execs to Tauri.
+  # The Node server is started by the CLI script (in the terminal context) because macOS
+  # restricts WASM/JIT and filesystem access for apps launched via open -a.
+  local info_hash
+  info_hash=$(echo "$PROJECT_DIR" | shasum -a 256 | cut -c1-12)
+  cat > "$stub_path/Contents/MacOS/launcher" << LAUNCHER
+#!/bin/bash
+GLASSBOX_BIN="$GLASSBOX_BIN"
+
+# Read server URL and PID from the info file written by the CLI launcher
+INFO_FILE="/tmp/glassbox-server-${info_hash}.info"
+if [ -f "\$INFO_FILE" ]; then
+  read -r SERVER_URL NODE_PID < "\$INFO_FILE"
+  rm -f "\$INFO_FILE"
+  export GLASSBOX_SERVER_URL="\$SERVER_URL"
+  export GLASSBOX_SIDECAR_PID="\$NODE_PID"
+fi
+
+exec "\$GLASSBOX_BIN" --project-dir "$PROJECT_DIR" "\$@"
+LAUNCHER
+  chmod +x "$stub_path/Contents/MacOS/launcher"
+
+  # Symlink the icon from the main app
+  ln -sf "$MAIN_ICON" "$stub_path/Contents/Resources/icon.icns"
+}
+
+# Ensure .glassbox directory exists before creating the stub
+mkdir -p "$PROJECT_DIR/.glassbox"
+ensure_stub_app
+
+# --- Start the Node server in the terminal context (WASM/JIT works here) ---
+LOGFILE="/tmp/glassbox-node-$$.log"
+"$NODE_BIN" "$CLI_JS" --no-open --project-dir "$PROJECT_DIR" "${PASSTHROUGH_ARGS[@]}" > "$LOGFILE" 2>&1 &
+NODE_PID=$!
+
+# Wait for the server to print its URL (up to 15 seconds)
+SERVER_URL=""
+for i in $(seq 1 150); do
+  if [ -f "$LOGFILE" ]; then
+    LINE=$(grep "running at " "$LOGFILE" 2>/dev/null || true)
+    if [ -n "$LINE" ]; then
+      SERVER_URL=$(echo "$LINE" | sed 's/.*running at //' | tr -d '[:space:]')
+      break
+    fi
+  fi
+  if ! kill -0 $NODE_PID 2>/dev/null; then
+    echo "Error: Server failed to start" >&2
+    cat "$LOGFILE" >&2
+    rm -f "$LOGFILE"
+    exit 1
+  fi
+  sleep 0.1
+done
+rm -f "$LOGFILE"
+
+if [ -z "$SERVER_URL" ]; then
+  echo "Error: Server did not respond within 15 seconds" >&2
+  kill $NODE_PID 2>/dev/null
+  exit 1
+fi
+
+# Write server info to /tmp (stub apps can't access ~/Documents due to macOS privacy)
+SERVER_INFO="/tmp/glassbox-server-$(echo "$PROJECT_DIR" | shasum -a 256 | cut -c1-12).info"
+echo "$SERVER_URL $NODE_PID" > "$SERVER_INFO"
+
+# Launch the stub app (gives us the custom Dock/Cmd+Tab name)
+STUB_APP="$PROJECT_DIR/.glassbox/$APP_NAME.app"
+open -a "$STUB_APP"

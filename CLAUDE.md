@@ -9,6 +9,7 @@ A locally-running web application for reviewing AI-generated code. Launched from
 - **Runtime**: Node.js 20+
 - **Language**: TypeScript (strict mode)
 - **Server**: Hono framework with `@hono/node-server`
+- **Desktop**: Tauri v2 (Rust) — wraps the Node.js server in a native window
 - **Database**: PGLite (embedded PostgreSQL) — data stored in `~/.glassbox/data/`
 - **Rendering**: Custom server-side JSX runtime (no React) — produces HTML strings via `SafeHtml` class
 - **Build**: tsup (server CLI + client JS bundles) + sass (SCSS → CSS)
@@ -17,10 +18,21 @@ A locally-running web application for reviewing AI-generated code. Launched from
 ## Architecture
 
 The app is a single-entry CLI (`src/cli.ts`) that:
+
 1. Parses CLI args to determine review mode (uncommitted, staged, commit, branch, etc.)
 2. Runs git commands to collect file diffs
 3. Creates a review record in PGLite
-4. Starts a Hono HTTP server on port 4173
+4. Starts a Hono HTTP server on port 4183
+
+### Architecture Documentation
+
+Architectural decisions and system design are documented in `docs/`. When making architectural changes, update the relevant document:
+
+- `docs/ARCHITECTURE.md` — Overall software architecture (components, data flow, build pipeline)
+- `docs/tauri-architecture.md` — Tauri desktop integration (sidecar, launch flows, CLI wrappers)
+- `docs/tauri-setup.md` — Tauri setup guide (certificates, signing keys, GitHub secrets)
+
+For more complex subsystems, create specialized documents in `docs/` rather than overloading existing ones.
 
 ### Key Directories
 
@@ -43,10 +55,12 @@ The app is a single-entry CLI (`src/cli.ts`) that:
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
 - `src/jsx-runtime.ts` — Custom JSX runtime (server-side HTML string generation)
 - `src/types.ts` — Shared Hono environment types
+- `src-tauri/` — Tauri desktop app (Rust backend, loading screens, CLI wrappers) — see `docs/tauri-architecture.md`
 
 ### JSX Runtime
 
 The project uses a custom JSX runtime (`src/jsx-runtime.ts`) instead of React. It renders JSX to HTML strings via the `SafeHtml` class. This runtime is shared by both the server-side components and client-side modules. Configured via:
+
 - `tsconfig.json`: `"jsx": "react-jsx"`, `"jsxImportSource": "#jsx"`
 - `package.json` imports map: `"#jsx/jsx-runtime": "./src/jsx-runtime.ts"`
 - `tsup.config.ts`: esbuild alias resolves `#jsx/jsx-runtime` at build time (both server and client configs)
@@ -58,6 +72,7 @@ When writing TSX components, they return `SafeHtml` (which is `JSX.Element`). Us
 Client-side CSS and JavaScript are built as separate resources, organized into modular files by concern.
 
 **SCSS** (`src/client/styles/`): Split into partials by concern:
+
 - `_variables.scss` — CSS custom properties (colors, fonts, spacing)
 - `_base.scss` — Reset and body/layout defaults
 - `_sidebar.scss` — Sidebar, file list, folder tree, filter, progress bar
@@ -72,6 +87,7 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `styles.scss` — Entry point, imports all partials
 
 **TypeScript** (`src/client/`): Modular files using TSX and SafeHtml for HTML building:
+
 - `app.ts` — Entry point, init
 - `state.ts` — Shared state, types, category constants
 - `api.ts` — API helper, HTML escaping utility
@@ -99,6 +115,7 @@ Both are served as static files via `/static/styles.css` and `/static/app.js` ro
 ### Database
 
 Raw PGLite queries (no ORM). Six tables:
+
 - `reviews` — review sessions (repo, mode, status)
 - `review_files` — files in each review (with serialized diff JSON)
 - `annotations` — line-level annotations with categories
@@ -122,9 +139,12 @@ Raw PGLite queries (no ORM). Six tables:
 npm run build          # tsup -> dist/cli.js + dist/client/app.global.js + dist/client/styles.css
 npm run build:client   # Build only client assets (JS + CSS) into dist/client/
 npm run dev            # Build client assets, then run via tsx
+npm run tauri:dev      # Build client + run Node server + Tauri window (dev mode)
+npm run tauri:build    # Build sidecar + package native desktop app
 ```
 
 The build produces:
+
 - `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`) are kept external.
 - `dist/client/app.global.js` — Client JS bundle (IIFE, minified, es2020 target)
 - `dist/client/styles.css` — Compiled and compressed CSS from SCSS

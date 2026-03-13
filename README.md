@@ -12,15 +12,30 @@ No accounts. No pull requests. No waiting. Just you, the diff, and a tight feedb
 
 <br>
 
+**Desktop app** (recommended) — download from [GitHub Releases](https://github.com/brianwestphal/glassbox/releases):
+
+| Platform | Download |
+|----------|----------|
+| macOS (Apple Silicon) | `.dmg` (arm64) |
+| macOS (Intel) | `.dmg` (x64) |
+| Linux | `.AppImage` / `.deb` |
+| Windows | `.msi` / `.exe` |
+
+After installing, open the app and click **Install CLI** to add the `glassbox` command to your PATH.
+
+**Or install via npm:**
+
 ```bash
 npm install -g glassbox
 ```
+
+Then, from any git repository:
 
 ```bash
 glassbox
 ```
 
-That's it. Opens in your browser. Works in any git repo.
+That's it. Data stays local. Works in any git repo.
 
 <br>
 
@@ -34,21 +49,21 @@ That's it. Opens in your browser. Works in any git repo.
 
 AI coding tools generate a lot of code fast. But "fast" doesn't mean "correct." The bottleneck isn't generation — it's **review**.
 
-Most developers review AI output by skimming files in their editor, mentally diffing what changed, and then either accepting it or rewriting it by hand. That's slow, error-prone, and throws away the most valuable signal: your expert judgment about *what specifically* was wrong and why.
+Most developers review AI output by skimming files in their editor, mentally diffing what changed, and then either accepting it or rewriting it by hand. That's slow, error-prone, and throws away the most valuable signal: your expert judgment about _what specifically_ was wrong and why.
 
 Glassbox gives you a proper diff viewer with annotation categories designed for AI feedback:
 
 <img src="assets/demo-annotations.png" alt="Inline annotations with category badges" width="720">
 
-| Category | What it tells the AI |
-|----------|---------------------|
-| **Bug** | "This is broken. Fix it." |
-| **Fix needed** | "This needs a specific change." |
-| **Style** | "I prefer it done this way." |
-| **Pattern to follow** | "This is good. Keep doing this." |
-| **Pattern to avoid** | "This is an anti-pattern. Stop." |
-| **Note** | Context for the AI to consider. |
-| **Remember** | A rule to persist to the AI's long-term config. |
+| Category              | What it tells the AI                            |
+| --------------------- | ----------------------------------------------- |
+| **Bug**               | "This is broken. Fix it."                       |
+| **Fix needed**        | "This needs a specific change."                 |
+| **Style**             | "I prefer it done this way."                    |
+| **Pattern to follow** | "This is good. Keep doing this."                |
+| **Pattern to avoid**  | "This is an anti-pattern. Stop."                |
+| **Note**              | Context for the AI to consider.                 |
+| **Remember**          | A rule to persist to the AI's long-term config. |
 
 When you're done, click **Complete Review** and tell your AI tool:
 
@@ -85,7 +100,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Automatic .gitignore prompt** — reminds you to exclude `.glassbox/` from version control
 - **Auto port selection** — if the default port is busy, it finds an open one
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
-- **AI-powered analysis** *(optional)* — risk scoring, narrative reading order, and guided review to help you focus and learn as you review
+- **AI-powered analysis** _(optional)_ — risk scoring, narrative reading order, and guided review to help you focus and learn as you review
 
 ---
 
@@ -93,7 +108,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 
 > Entirely optional. Glassbox is fully functional without it.
 
-When reviewing a large diff, knowing *where to look first* is half the battle. Glassbox can optionally connect to an AI provider to analyze your changes and surface what matters:
+When reviewing a large diff, knowing _where to look first_ is half the battle. Glassbox can optionally connect to an AI provider to analyze your changes and surface what matters:
 
 ### Risk Analysis
 
@@ -123,11 +138,11 @@ Click the shield or book icon in the sidebar to switch from the default folder v
 
 ### Supported providers
 
-| Provider | Models | Env variable |
-|----------|--------|-------------|
-| **Anthropic** | Claude Sonnet 4, Claude Haiku 4 | `ANTHROPIC_API_KEY` |
-| **OpenAI** | GPT-4o, GPT-4o Mini | `OPENAI_API_KEY` |
-| **Google** | Gemini 2.5 Flash, Gemini 2.5 Pro | `GEMINI_API_KEY` |
+| Provider      | Models                           | Env variable        |
+| ------------- | -------------------------------- | ------------------- |
+| **Anthropic** | Claude Sonnet 4, Claude Haiku 4  | `ANTHROPIC_API_KEY` |
+| **OpenAI**    | GPT-4o, GPT-4o Mini              | `OPENAI_API_KEY`    |
+| **Google**    | Gemini 2.5 Flash, Gemini 2.5 Pro | `GEMINI_API_KEY`    |
 
 You can switch providers and models in the settings dialog (gear icon in the sidebar).
 
@@ -144,6 +159,28 @@ Keys entered through the settings dialog are stored in the OS keychain by defaul
 ---
 
 ## Install
+
+### Desktop app (recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/brianwestphal/glassbox/releases).
+
+On first launch, the app will prompt you to install the `glassbox` CLI command. This creates a symlink so you can launch the desktop app from any project directory. You can also install it manually:
+
+**macOS:**
+```bash
+sudo ln -sf "/Applications/Glassbox.app/Contents/Resources/resources/glassbox" /usr/local/bin/glassbox
+```
+
+**Linux:**
+```bash
+ln -sf /path/to/glassbox/resources/glassbox-linux ~/.local/bin/glassbox
+```
+
+The desktop app includes automatic updates — new versions are downloaded and applied in the background.
+
+### npm
+
+Alternatively, install via npm (runs in your browser instead of a native window):
 
 ```bash
 npm install -g glassbox
@@ -185,22 +222,37 @@ glassbox --resume
 
 ### All options
 
-| Flag | Description |
-|------|-------------|
-| *(no flag)* | Same as `--uncommitted` |
-| `--uncommitted` | Staged + unstaged + untracked changes |
-| `--staged` | Only staged changes |
-| `--unstaged` | Only unstaged changes |
-| `--commit <sha>` | Changes from a specific commit |
-| `--range <from>..<to>` | Changes between two refs |
-| `--branch <name>` | Current branch vs the named branch |
-| `--files <patterns>` | Specific files (comma-separated globs) |
-| `--all` | Entire codebase (all tracked files) |
-| `--port <number>` | Port to run on (default: 4173) |
-| `--resume` | Resume the latest in-progress review for this mode |
-| `--check-for-updates` | Check for a newer version on npm |
-| `--debug` | Show build timestamp and debug info |
-| `--help` | Show help |
+| Flag                   | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| _(no flag)_            | Same as `--uncommitted`                            |
+| `--uncommitted`        | Staged + unstaged + untracked changes              |
+| `--staged`             | Only staged changes                                |
+| `--unstaged`           | Only unstaged changes                              |
+| `--commit <sha>`       | Changes from a specific commit                     |
+| `--range <from>..<to>` | Changes between two refs                           |
+| `--branch <name>`      | Current branch vs the named branch                 |
+| `--files <patterns>`   | Specific files (comma-separated globs)             |
+| `--all`                | Entire codebase (all tracked files)                |
+| `--port <number>`      | Port to run on (default: 4183)                     |
+| `--resume`             | Resume the latest in-progress review for this mode |
+| `--browser`            | Open in browser instead of desktop window          |
+| `--check-for-updates`  | Check for a newer version on npm                   |
+| `--debug`              | Show build timestamp and debug info                |
+| `--help`               | Show help                                          |
+
+### Settings file
+
+Create `.glassbox/settings.json` in your project directory to configure per-project options:
+
+```json
+{
+  "appName": "Glassbox — My Project"
+}
+```
+
+| Key | Description |
+|-----|-------------|
+| `appName` | Custom window title and Dock name (defaults to "Glassbox — _folder name_") |
 
 ---
 
@@ -231,16 +283,19 @@ Point the tool at the file. The export includes an "Instructions for AI Tools" s
 
 ## Architecture
 
-| Layer | Technology |
-|-------|-----------|
-| CLI | TypeScript, Node.js |
-| Server | Hono |
-| Database | PGLite (embedded PostgreSQL) |
-| UI | Custom server-side JSX (no React), vanilla client JS |
-| Build | tsup (single-file bundle) |
-| Storage | `~/.glassbox/data/` |
+| Layer    | Technology                                           |
+| -------- | ---------------------------------------------------- |
+| Desktop  | Tauri v2 (native window, auto-updates)               |
+| CLI      | TypeScript, Node.js                                  |
+| Server   | Hono                                                 |
+| Database | PGLite (embedded PostgreSQL)                         |
+| UI       | Custom server-side JSX (no React), vanilla client JS |
+| Build    | tsup (single-file bundle)                            |
+| Storage  | `~/.glassbox/data/`                                  |
 
 Data stays local. The only network calls are an optional once-per-day npm update check and AI analysis requests if you opt in.
+
+> **Note:** We're actively developing and testing on macOS. Linux and Windows builds are provided but less tested — if you run into issues on those platforms, please [open an issue](https://github.com/brianwestphal/glassbox/issues).
 
 ## Development
 
@@ -249,10 +304,12 @@ git clone <repo-url>
 cd glassbox
 npm install
 
-npm run dev -- --uncommitted    # Run with tsx (no build step)
-npm run build                   # Build to dist/cli.js
-npm run clean                   # Remove dist and caches
-npm link                        # Symlink for global 'glassbox' command
+npm run dev              # Build client assets, then run via tsx
+npm run build            # Build to dist/cli.js
+npm run tauri:dev        # Run desktop app in dev mode
+npm run tauri:build      # Build desktop app for distribution
+npm run clean            # Remove dist and caches
+npm link                 # Symlink for global 'glassbox' command
 ```
 
 ## License

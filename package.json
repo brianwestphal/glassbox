@@ -31,6 +31,10 @@
     "dev": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts",
     "build": "tsup",
     "build:client": "mkdir -p dist/client && npx esbuild src/client/app.ts --bundle --format=iife --outfile=dist/client/app.global.js --target=es2020 --jsx=automatic --jsx-import-source=#jsx --alias:#jsx/jsx-runtime=./src/jsx-runtime.ts && npx sass src/client/styles.scss dist/client/styles.css --style compressed --no-source-map",
+    "dev:server": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts --no-open --strict-port",
+    "tauri": "tauri",
+    "tauri:dev": "bash scripts/ensure-sidecar-stub.sh && tauri dev",
+    "tauri:build": "bash scripts/build-sidecar.sh && tauri build",
     "lint": "eslint src/",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
@@ -47,6 +51,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
+    "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",

@@ -1,0 +1,50 @@
+#!/bin/bash
+# CLI launcher for Glassbox desktop app (Linux).
+# Symlink this to your PATH:
+#   ln -sf /path/to/glassbox-linux ~/.local/bin/glassbox
+
+set -e
+
+SCRIPT_PATH="$(readlink -f "$0")"
+RESOURCES_DIR="$(dirname "$SCRIPT_PATH")"
+APP_DIR="$(dirname "$RESOURCES_DIR")"
+NODE_BIN="$APP_DIR/bin/glassbox-node"
+CLI_JS="$RESOURCES_DIR/cli.js"
+
+# Fallback: look for node binary in common locations
+if [ ! -f "$NODE_BIN" ]; then
+  NODE_BIN="$RESOURCES_DIR/../bin/glassbox-node"
+fi
+
+PROJECT_DIR="$(pwd)"
+BROWSER_MODE=false
+PASSTHROUGH_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --browser)
+      BROWSER_MODE=true
+      shift
+      ;;
+    --demo:*)
+      BROWSER_MODE=true
+      PASSTHROUGH_ARGS+=("$1")
+      shift
+      ;;
+    *)
+      PASSTHROUGH_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [ "$BROWSER_MODE" = true ]; then
+  exec "$NODE_BIN" "$CLI_JS" "${PASSTHROUGH_ARGS[@]}"
+else
+  # Find the Tauri binary
+  TAURI_BIN="$APP_DIR/bin/glassbox"
+  if [ ! -f "$TAURI_BIN" ]; then
+    TAURI_BIN="$APP_DIR/glassbox"
+  fi
+  exec "$TAURI_BIN" --project-dir "$PROJECT_DIR" "${PASSTHROUGH_ARGS[@]}"
+fi

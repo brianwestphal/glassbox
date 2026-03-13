@@ -281,11 +281,30 @@ step_build() {
 step_update_version() {
   local version
   version=$(get_state "version")
-  info "Updating package.json to ${BOLD}v${version}${RESET}..."
+  info "Updating version to ${BOLD}v${version}${RESET} in all files..."
 
-  # Use npm version to update package.json (no git tag yet)
+  # Update package.json (no git tag yet)
   npm version "$version" --no-git-tag-version --allow-same-version
-  success "package.json updated to ${version}"
+
+  # Update src-tauri/tauri.conf.json
+  if [[ -f "src-tauri/tauri.conf.json" ]]; then
+    node -e "
+      const fs = require('fs');
+      const f = 'src-tauri/tauri.conf.json';
+      const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+      c.version = process.argv[1];
+      fs.writeFileSync(f, JSON.stringify(c, null, 2) + '\n');
+    " "$version"
+    success "src-tauri/tauri.conf.json updated"
+  fi
+
+  # Update src-tauri/Cargo.toml
+  if [[ -f "src-tauri/Cargo.toml" ]]; then
+    sed -i '' "s/^version = \".*\"/version = \"${version}\"/" src-tauri/Cargo.toml
+    success "src-tauri/Cargo.toml updated"
+  fi
+
+  success "All version files updated to ${version}"
 }
 
 step_git_tag() {
@@ -297,7 +316,7 @@ step_git_tag() {
 
   info "Creating git commit and tag ${BOLD}${tag}${RESET}..."
 
-  git add package.json package-lock.json 2>/dev/null || git add package.json
+  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml 2>/dev/null || git add package.json
   git commit -m "release: v${version}" --allow-empty
 
   # Create annotated tag with release notes
