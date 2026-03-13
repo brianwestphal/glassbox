@@ -1,6 +1,6 @@
 {
   "name": "glassbox",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A local code review tool for AI-generated code. Review diffs, annotate lines, and export structured feedback that AI tools can act on.",
   "type": "module",
   "license": "MIT",
