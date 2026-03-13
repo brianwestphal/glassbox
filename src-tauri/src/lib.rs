@@ -16,6 +16,9 @@ use tauri_plugin_updater::UpdaterExt;
 /// Holds the sidecar PID so it can be killed on app exit.
 struct SidecarPid(Mutex<Option<u32>>);
 
+/// Holds the version string of a pending update, if any.
+struct PendingUpdate(Mutex<Option<String>>);
+
 /// Returns the expected symlink/install path for the CLI on this platform.
 fn cli_install_path() -> PathBuf {
     #[cfg(target_os = "macos")]
@@ -250,6 +253,32 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
     })
 }
 
+#[tauri::command]
+fn get_pending_update(app: tauri::AppHandle) -> Option<String> {
+    app.state::<PendingUpdate>().0.lock().unwrap().clone()
+}
+
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(not(debug_assertions))]
+    {
+        *app.state::<PendingUpdate>().0.lock().unwrap() = None;
+        let updater = app.updater().map_err(|e| format!("{e}"))?;
+        let update = updater
+            .check()
+            .await
+            .map_err(|e| format!("{e}"))?;
+        if let Some(update) = update {
+            update
+                .download_and_install(|_, _| {}, || {})
+                .await
+                .map_err(|e| format!("{e}"))?;
+        }
+    }
+    let _ = &app;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -257,7 +286,13 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(SidecarPid(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![check_cli_installed, install_cli])
+        .manage(PendingUpdate(Mutex::new(None)))
+        .invoke_handler(tauri::generate_handler![
+            check_cli_installed,
+            install_cli,
+            get_pending_update,
+            install_update
+        ])
         .setup(|_app| {
             #[allow(unused_variables)]
             let app = _app;
@@ -273,7 +308,7 @@ pub fn run() {
                         .expect("main window not found");
                     let _ = window.navigate("tauri://localhost/welcome.html".parse().unwrap());
 
-                    // Still check for updates
+                    // Check for updates (store version for user-initiated install)
                     let handle = app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         let Ok(updater) = handle.updater() else {
@@ -282,9 +317,8 @@ pub fn run() {
                         let Ok(Some(update)) = updater.check().await else {
                             return;
                         };
-                        let _ = update
-                            .download_and_install(|_, _| {}, || {})
-                            .await;
+                        *handle.state::<PendingUpdate>().0.lock().unwrap() =
+                            Some(update.version);
                     });
 
                     return Ok(());
@@ -368,7 +402,7 @@ pub fn run() {
                     });
                 }
 
-                // Check for updates in the background
+                // Check for updates (store version for user-initiated install)
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     let Ok(updater) = handle.updater() else {
@@ -377,9 +411,8 @@ pub fn run() {
                     let Ok(Some(update)) = updater.check().await else {
                         return;
                     };
-                    let _ = update
-                        .download_and_install(|_, _| {}, || {})
-                        .await;
+                    *handle.state::<PendingUpdate>().0.lock().unwrap() =
+                        Some(update.version);
                 });
             }
 
@@ -393,8 +426,14 @@ pub fn run() {
                 if let Some(pid) = app_handle.state::<SidecarPid>().0.lock().unwrap().take() {
                     #[cfg(unix)]
                     {
-                        // Kill the sidecar and its child processes
-                        unsafe { libc::kill(-(pid as i32), libc::SIGTERM); }
+                        // Kill the sidecar directly, then attempt group kill for children.
+                        // Direct kill is essential: when Node is started from the CLI wrapper
+                        // (backgrounded with &), it's not a process group leader, so the
+                        // negative-PID group kill silently fails and orphans the process.
+                        unsafe {
+                            libc::kill(pid as i32, libc::SIGTERM);
+                            libc::kill(-(pid as i32), libc::SIGTERM);
+                        }
                     }
                     #[cfg(windows)]
                     {

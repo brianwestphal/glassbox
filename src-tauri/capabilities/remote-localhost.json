@@ -1,0 +1,11 @@
+{
+  "identifier": "remote-localhost",
+  "description": "Allow IPC from localhost so the Node-served frontend can call Tauri commands",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://localhost:*"]
+  },
+  "permissions": [
+    "core:default"
+  ]
+}

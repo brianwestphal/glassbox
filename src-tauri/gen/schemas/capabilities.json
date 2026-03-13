@@ -1,1 +1,1 @@
-{}
+{"default":{"identifier":"default","description":"Default permissions for Glassbox","local":true,"windows":["main"],"permissions":["core:default","shell:default",{"identifier":"shell:allow-spawn","allow":[{"args":true,"name":"binaries/glassbox-node","sidecar":true}]},"updater:default","process:default"]},"remote-localhost":{"identifier":"remote-localhost","description":"Allow IPC from localhost so the Node-served frontend can call Tauri commands","remote":{"urls":["http://localhost:*"]},"local":true,"windows":["main"],"permissions":["core:default"]}}

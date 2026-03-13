@@ -1,0 +1,21 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for Glassbox",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/glassbox-node",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "updater:default",
+    "process:default"
+  ]
+}

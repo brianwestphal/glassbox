@@ -1,0 +1,41 @@
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px;
+  background: #dcfce7;
+  border-bottom: 2px solid #22c55e;
+  font-size: 13px;
+  color: #166534;
+  flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .update-banner {
+    background: #14532d;
+    border-bottom-color: #22c55e;
+    color: #86efac;
+  }
+}
+
+.update-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-accent {
+  color: white;
+  background: #22c55e;
+  border-color: #22c55e;
+
+  &:hover:not(:disabled) {
+    background: #16a34a;
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+}

@@ -25,6 +25,13 @@ pageRoutes.get('/', async (c) => {
   const html = (
     <Layout title={`Glassbox - ${review.repo_name}`} reviewId={reviewId}>
       <div className="review-app" data-review-id={reviewId}>
+        <div id="update-banner" className="update-banner" style="display:none">
+          <span id="update-banner-label">Update available</span>
+          <div className="update-banner-actions">
+            <button id="update-install-btn" className="btn btn-sm btn-accent">Install Update</button>
+            <button id="update-banner-dismiss" className="btn btn-sm">Later</button>
+          </div>
+        </div>
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>
@@ -102,6 +109,13 @@ pageRoutes.get('/review/:reviewId', async (c) => {
   const html = (
     <Layout title={`Glassbox - ${review.repo_name}`} reviewId={reviewId}>
       <div className="review-app" data-review-id={reviewId}>
+        <div id="update-banner" className="update-banner" style="display:none">
+          <span id="update-banner-label">Update available</span>
+          <div className="update-banner-actions">
+            <button id="update-install-btn" className="btn btn-sm btn-accent">Install Update</button>
+            <button id="update-banner-dismiss" className="btn btn-sm">Later</button>
+          </div>
+        </div>
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>

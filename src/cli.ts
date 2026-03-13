@@ -3,6 +3,7 @@ import { setAIServiceTest, setDebug, setDemoMode } from "./debug.js";
 import { DEMO_SCENARIOS, setupDemoReview } from "./demo.js";
 import type { ReviewMode } from "./git/diff.js";
 import { getFileDiffs, getHeadCommit, getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from "./git/diff.js";
+import { acquireLock } from "./lock.js";
 import { updateReviewDiffs } from "./review-update.js";
 import { startServer } from "./server.js";
 import { checkForUpdates } from "./update-check.js";
@@ -170,6 +171,16 @@ async function main() {
   // Change working directory if --project-dir was passed (used by Tauri desktop app)
   if (projectDir) {
     process.chdir(projectDir);
+  }
+
+  // Acquire instance lock (skip for demo mode — allow multiple demos)
+  if (demo === null) {
+    const { homedir } = await import("os");
+    const { join } = await import("path");
+    const { mkdirSync } = await import("fs");
+    const dataDir = join(homedir(), ".glassbox");
+    mkdirSync(dataDir, { recursive: true });
+    acquireLock(dataDir);
   }
 
   // Demo mode — bypass git operations and set up pre-configured data
