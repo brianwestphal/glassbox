@@ -42,15 +42,20 @@ const MORE_LANGUAGES: Array<[string, string]> = [
 
 const ALL_LANG_KEYS = new Set([...TOP_LANGUAGES, ...MORE_LANGUAGES].map(([k]) => k));
 
+interface ProjectSettingsResponse {
+  appName?: string;
+}
+
 export function showSettingsDialog(onSave?: () => void) {
   void (async () => {
-    const [keyStatus, modelsData, configData] = await Promise.all([
+    const [keyStatus, modelsData, configData, projectSettings] = await Promise.all([
       api<KeyStatusResponse>('/ai/key-status'),
       api<ModelsResponse>('/ai/models'),
       api<ConfigResponse>('/ai/config'),
+      api<ProjectSettingsResponse>('/project-settings'),
     ]);
 
-    renderSettingsModal(keyStatus, modelsData, configData, onSave);
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, onSave);
   })();
 }
 
@@ -58,6 +63,7 @@ function renderSettingsModal(
   keyStatus: KeyStatusResponse,
   modelsData: ModelsResponse,
   configData: ConfigResponse,
+  projectSettings: ProjectSettingsResponse,
   onSave?: () => void,
 ) {
   const overlay = toElement(<div className="modal-overlay"></div>);
@@ -67,6 +73,7 @@ function renderSettingsModal(
   let guidedEnabled = configData.guidedReview.enabled;
   const guidedTopics = new Set(configData.guidedReview.topics);
   let showMoreLangs = false;
+  let appName = projectSettings.appName ?? '';
 
   function getKeyInfo(platform: string): { configured: boolean; source: string | null } {
     return keyStatus.status[platform] ?? { configured: false, source: null };
@@ -117,6 +124,15 @@ function renderSettingsModal(
     modalEl.innerHTML = (
       <>
         <h3>Settings</h3>
+
+        <span className="settings-heading">Desktop App</span>
+        <div className="settings-section">
+          <label className="settings-label">App Name</label>
+          {raw(`<input type="text" class="settings-input" id="settings-app-name" value="${appName.replace(/"/g, '&quot;')}" placeholder="Glassbox — project-name" />`)}
+          <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
+        </div>
+
+        <div className="settings-divider"></div>
 
         <div className="settings-section-header">
           <span className="settings-heading">AI</span>
@@ -297,9 +313,27 @@ function renderSettingsModal(
     // Cancel
     overlay.querySelector('.modal-cancel')?.addEventListener('click', () => { overlay.remove(); });
 
+    // App name input
+    const appNameInput = overlay.querySelector<HTMLInputElement>('#settings-app-name');
+    if (appNameInput !== null) {
+      appNameInput.addEventListener('input', () => {
+        appName = appNameInput.value;
+      });
+    }
+
     // Save
     overlay.querySelector('#settings-save')?.addEventListener('click', () => {
       void (async () => {
+        // Save project settings (app name)
+        const appNameVal = appName.trim();
+        if (appNameVal !== (projectSettings.appName ?? '')) {
+          await api('/project-settings', {
+            method: 'PATCH',
+            body: { appName: appNameVal },
+          });
+          projectSettings.appName = appNameVal || undefined;
+        }
+
         // Detect if guided review settings changed
         const prevEnabled = configData.guidedReview.enabled;
         const prevTopics = new Set(configData.guidedReview.topics);
