@@ -4,6 +4,7 @@ dist
 .release-state.json
 .DS_Store
 .hotsheet/
+coverage/
 
 # Tauri
 src-tauri/target

@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { mkdirSync, rmSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from './schema.js';
 
 const dataDir = join(homedir(), '.glassbox', 'data');
 mkdirSync(dataDir, { recursive: true });
@@ -37,81 +38,8 @@ export async function getDb(): Promise<PGlite> {
 }
 
 async function initSchema(db: PGlite): Promise<void> {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS reviews (
-      id TEXT PRIMARY KEY,
-      repo_path TEXT NOT NULL,
-      repo_name TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      mode_args TEXT,
-      head_commit TEXT,
-      status TEXT NOT NULL DEFAULT 'in_progress',
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS review_files (
-      id TEXT PRIMARY KEY,
-      review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
-      file_path TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
-      diff_data TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_review_files_review ON review_files(review_id);
-
-    CREATE TABLE IF NOT EXISTS annotations (
-      id TEXT PRIMARY KEY,
-      review_file_id TEXT NOT NULL REFERENCES review_files(id) ON DELETE CASCADE,
-      line_number INTEGER NOT NULL,
-      side TEXT NOT NULL DEFAULT 'new',
-      category TEXT NOT NULL DEFAULT 'note',
-      content TEXT NOT NULL,
-      is_stale BOOLEAN NOT NULL DEFAULT FALSE,
-      original_content TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_annotations_file ON annotations(review_file_id);
-  `);
-
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS ai_analyses (
-      id TEXT PRIMARY KEY,
-      review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
-      analysis_type TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
-      error_message TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ai_analyses_review ON ai_analyses(review_id);
-
-    CREATE TABLE IF NOT EXISTS ai_file_scores (
-      id TEXT PRIMARY KEY,
-      analysis_id TEXT NOT NULL REFERENCES ai_analyses(id) ON DELETE CASCADE,
-      review_file_id TEXT NOT NULL,
-      file_path TEXT NOT NULL,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      aggregate_score REAL,
-      rationale TEXT,
-      dimension_scores TEXT,
-      notes TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ai_file_scores_analysis ON ai_file_scores(analysis_id);
-
-    CREATE TABLE IF NOT EXISTS user_preferences (
-      id TEXT PRIMARY KEY DEFAULT 'singleton',
-      sort_mode TEXT NOT NULL DEFAULT 'folder',
-      risk_sort_dimension TEXT NOT NULL DEFAULT 'aggregate',
-      show_risk_scores BOOLEAN NOT NULL DEFAULT FALSE
-    );
-  `);
+  await db.exec(SCHEMA_CORE_SQL);
+  await db.exec(SCHEMA_AI_SQL);
 
   // Migrations for existing databases — use safe column checks instead of
   // try/catch ALTER TABLE, since PGLite's WASM can abort on SQL errors

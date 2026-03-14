@@ -36,6 +36,9 @@
     "tauri:clean": "rm -rf src-tauri/target",
     "tauri:dev": "bash scripts/ensure-sidecar-stub.sh && tauri dev",
     "tauri:build": "bash scripts/build-sidecar.sh && tauri build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src/",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
@@ -54,6 +57,7 @@
     "@eslint/js": "^9.39.3",
     "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.1.0",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
     "eslint-plugin-import-x": "^4.16.1",
@@ -64,6 +68,7 @@
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.1.0"
   }
 }
