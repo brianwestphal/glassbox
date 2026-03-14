@@ -24,15 +24,37 @@ The app is a single-entry CLI (`src/cli.ts`) that:
 3. Creates a review record in PGLite
 4. Starts a Hono HTTP server on port 4183
 
-### Architecture Documentation
+### Documentation
 
-Architectural decisions and system design are documented in `docs/`. When making architectural changes, update the relevant document:
+All project documentation lives in `docs/`. There are two types:
 
-- `docs/ARCHITECTURE.md` — Overall software architecture (components, data flow, build pipeline)
-- `docs/tauri-architecture.md` — Tauri desktop integration (sidecar, launch flows, CLI wrappers)
-- `docs/tauri-setup.md` — Tauri setup guide (certificates, signing keys, GitHub secrets)
+**Requirements documents** (`docs/N-topic.md`) define what the application does. They are numbered for linear reading order and contain functional (FR-) and non-functional (NFR-) requirements:
 
-For more complex subsystems, create specialized documents in `docs/` rather than overloading existing ones.
+- `1-review-workflow.md` — Review creation, resumption, completion, history
+- `2-cli-and-server.md` — CLI options, HTTP server, API endpoints, browser launch
+- `3-git-integration.md` — Repository detection, diff generation, review modes
+- `4-diff-viewing.md` — Split/unified modes, syntax highlighting, context expansion
+- `5-annotations.md` — Categories, CRUD, drag-and-drop, stale handling
+- `6-export.md` — Markdown export format and AI tool instructions
+- `7-ai-analysis.md` — Risk scoring, narrative ordering, guided review, API keys
+- `8-user-interface.md` — Layout, navigation, settings dialog, keyboard shortcuts
+- `9-data-storage.md` — PGLite schema, config files, data locality
+- `10-desktop-app.md` — Tauri sidecar, launch flows, CLI install, updates
+- `11-build-and-distribution.md` — Build pipeline, npm/desktop packaging, CI/CD
+- `12-demo-mode.md` — Demo scenarios and isolation
+
+**Architecture documents** describe system design and setup:
+
+- `ARCHITECTURE.md` — Overall software architecture (components, data flow, build pipeline)
+- `tauri-architecture.md` — Tauri desktop integration (sidecar, launch flows, CLI wrappers)
+- `tauri-setup.md` — Tauri setup guide (certificates, signing keys, GitHub secrets)
+
+**When making changes, keep docs in sync:**
+
+- If a change affects existing requirements, update the relevant requirements document.
+- If a change introduces a new major area not covered by existing documents, create a new numbered requirements document. Insert it at the appropriate position in the reading order and renumber subsequent documents.
+- If a change affects architecture or system design, update the relevant architecture document.
+- For complex new subsystems, create a dedicated architecture document rather than overloading existing ones.
 
 ### Key Directories
 
