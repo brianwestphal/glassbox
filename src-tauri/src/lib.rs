@@ -259,6 +259,25 @@ fn get_pending_update(app: tauri::AppHandle) -> Option<String> {
 }
 
 #[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    #[cfg(not(debug_assertions))]
+    {
+        let updater = app.updater().map_err(|e| format!("{e}"))?;
+        let update = updater.check().await.map_err(|e| format!("{e}"))?;
+        if let Some(update) = update {
+            *app.state::<PendingUpdate>().0.lock().unwrap() = Some(update.version.clone());
+            return Ok(Some(update.version));
+        }
+        return Ok(None);
+    }
+    #[allow(unreachable_code)]
+    {
+        let _ = &app;
+        Ok(None)
+    }
+}
+
+#[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(not(debug_assertions))]
     {
@@ -291,6 +310,7 @@ pub fn run() {
             check_cli_installed,
             install_cli,
             get_pending_update,
+            check_for_update,
             install_update
         ])
         .setup(|_app| {

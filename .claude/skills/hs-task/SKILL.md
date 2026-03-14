@@ -3,7 +3,7 @@ name: hs-task
 description: Create a new task ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 1 port: 4176 -->
+<!-- hotsheet-skill-version: 2 -->
 
 Create a new Hot Sheet **task** ticket. General tasks to complete.
 
@@ -13,7 +13,7 @@ Create a new Hot Sheet **task** ticket. General tasks to complete.
 
 **Create the ticket** by running:
 ```bash
-curl -s -X POST http://localhost:4176/api/tickets \
+curl -s -X POST http://localhost:4175/api/tickets \
   -H "Content-Type: application/json" \
   -d '{"title": "<TITLE>", "defaults": {"category": "task", "up_next": <true|false>}}'
 ```

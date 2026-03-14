@@ -3,7 +3,7 @@ name: hs-req-change
 description: Create a new requirement change ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 1 port: 4176 -->
+<!-- hotsheet-skill-version: 2 -->
 
 Create a new Hot Sheet **requirement change** ticket. Changes to existing requirements.
 
@@ -13,7 +13,7 @@ Create a new Hot Sheet **requirement change** ticket. Changes to existing requir
 
 **Create the ticket** by running:
 ```bash
-curl -s -X POST http://localhost:4176/api/tickets \
+curl -s -X POST http://localhost:4175/api/tickets \
   -H "Content-Type: application/json" \
   -d '{"title": "<TITLE>", "defaults": {"category": "requirement_change", "up_next": <true|false>}}'
 ```

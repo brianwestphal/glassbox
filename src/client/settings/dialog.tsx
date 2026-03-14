@@ -74,6 +74,7 @@ function renderSettingsModal(
   const guidedTopics = new Set(configData.guidedReview.topics);
   let showMoreLangs = false;
   let appName = projectSettings.appName ?? '';
+  const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI__;
 
   function getKeyInfo(platform: string): { configured: boolean; source: string | null } {
     return keyStatus.status[platform] ?? { configured: false, source: null };
@@ -125,14 +126,26 @@ function renderSettingsModal(
       <>
         <h3>Settings</h3>
 
-        <span className="settings-heading">Desktop App</span>
-        <div className="settings-section">
-          <label className="settings-label">App Name</label>
-          {raw(`<input type="text" class="settings-input" id="settings-app-name" value="${appName.replace(/"/g, '&quot;')}" placeholder="Glassbox — project-name" />`)}
-          <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
-        </div>
+        {isTauri && (
+          <>
+            <span className="settings-heading">Desktop App</span>
+            <div className="settings-section">
+              <label className="settings-label">App Name</label>
+              {raw(`<input type="text" class="settings-input" id="settings-app-name" value="${appName.replace(/"/g, '&quot;')}" placeholder="Glassbox — project-name" />`)}
+              <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
+            </div>
 
-        <div className="settings-divider"></div>
+            <div className="settings-section">
+              <div className="settings-section-header">
+                <span className="settings-label">Software Updates</span>
+                <button className="btn btn-xs" id="check-updates-btn">Check for Updates</button>
+              </div>
+              <p className="settings-hint" id="check-updates-status"></p>
+            </div>
+
+            <div className="settings-divider"></div>
+          </>
+        )}
 
         <div className="settings-section-header">
           <span className="settings-heading">AI</span>
@@ -236,7 +249,39 @@ function renderSettingsModal(
     bindModalEvents();
   }
 
+  function getTauriInvoke(): ((cmd: string) => Promise<unknown>) | null {
+    const tauri = (window as unknown as Record<string, unknown>).__TAURI__ as
+      | { core?: { invoke: (cmd: string) => Promise<unknown> } }
+      | undefined;
+    return tauri?.core?.invoke ?? null;
+  }
+
   function bindModalEvents() {
+    // Check for Updates button
+    const checkUpdatesBtn = overlay.querySelector<HTMLButtonElement>('#check-updates-btn');
+    const checkUpdatesStatus = overlay.querySelector<HTMLElement>('#check-updates-status');
+    if (checkUpdatesBtn !== null && checkUpdatesStatus !== null) {
+      checkUpdatesBtn.addEventListener('click', async () => {
+        const invoke = getTauriInvoke();
+        if (!invoke) return;
+        checkUpdatesBtn.disabled = true;
+        checkUpdatesBtn.textContent = 'Checking...';
+        checkUpdatesStatus.textContent = '';
+        try {
+          const version = (await invoke('check_for_update')) as string | null;
+          if (version) {
+            checkUpdatesStatus.textContent = `Update available: v${version}`;
+          } else {
+            checkUpdatesStatus.textContent = 'Your software is up to date.';
+          }
+        } catch {
+          checkUpdatesStatus.textContent = 'Could not check for updates.';
+        }
+        checkUpdatesBtn.textContent = 'Check for Updates';
+        checkUpdatesBtn.disabled = false;
+      });
+    }
+
     // Platform switching
     overlay.querySelectorAll('.settings-platform-control .segment').forEach(btn => {
       btn.addEventListener('click', () => {
