@@ -1,5 +1,6 @@
 import { api, initDebug } from './api.js';
 import { initScrollSync } from './diff/mode.js';
+import { selectFile } from './diff/selection.js';
 import { bindToolbar } from './diff/toolbar.js';
 import { triggerGuidedAnalysis } from './guided.js';
 import { bindCompleteButton, bindReopenButton } from './review/modal.js';
@@ -63,6 +64,11 @@ async function init() {
   await initDebug();
   await initAISorting();
   await loadFiles();
+
+  // Auto-select the first file if none is selected
+  if (state.currentFileId === null && state.fileOrder.length > 0) {
+    void selectFile(state.fileOrder[0]);
+  }
 
   // Auto-start analysis if resuming in an AI mode with no cached results
   if (state.aiConfigured && (state.sortMode === 'risk' || state.sortMode === 'narrative')) {
