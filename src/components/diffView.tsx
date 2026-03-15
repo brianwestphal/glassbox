@@ -35,55 +35,153 @@ export function DiffView({ file, diff, annotations, mode }: {
   );
 }
 
+// A single item in the flattened split diff stream
+type SplitItem =
+  | { kind: 'separator'; hunkIdx: number; hunk: DiffHunk; gapStart: number; gapEnd: number }
+  | { kind: 'pair'; pair: LinePair }
+  | { kind: 'annotated'; pair: LinePair; annotations: Annotation[] }
+  | { kind: 'tail'; start: number };
+
+function getAnnotations(pair: LinePair, annotationsByLine: Record<string, Annotation[]>): Annotation[] {
+  const leftAnns = pair.left ? annotationsByLine[`${pair.left.oldNum}:old`] ?? [] : [];
+  const rightAnns = pair.right ? annotationsByLine[`${pair.right.newNum}:new`] ?? [] : [];
+  return [...leftAnns, ...rightAnns];
+}
+
 function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]> }) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
 
+  // Flatten all hunks into a single stream of items
+  const items: SplitItem[] = [];
+  for (let hunkIdx = 0; hunkIdx < hunks.length; hunkIdx++) {
+    const hunk = hunks[hunkIdx];
+    const prevHunk = hunkIdx > 0 ? hunks[hunkIdx - 1] : null;
+    const gapStart = prevHunk ? prevHunk.newStart + prevHunk.newCount : 1;
+    const gapEnd = hunk.newStart - 1;
+    items.push({ kind: 'separator', hunkIdx, hunk, gapStart, gapEnd });
+
+    for (const pair of pairLines(hunk.lines)) {
+      const anns = getAnnotations(pair, annotationsByLine);
+      if (anns.length > 0) {
+        items.push({ kind: 'annotated', pair, annotations: anns });
+      } else {
+        items.push({ kind: 'pair', pair });
+      }
+    }
+  }
+  items.push({ kind: 'tail', start: tailStart });
+
+  // Group consecutive non-annotated items into split-columns blocks.
+  // Annotated pairs break the flow so annotations render full-width.
+  type Group =
+    | { type: 'columns'; items: Exclude<SplitItem, { kind: 'annotated' }>[] }
+    | { type: 'annotated'; pair: LinePair; annotations: Annotation[] };
+
+  const groups: Group[] = [];
+  let run: Exclude<SplitItem, { kind: 'annotated' }>[] = [];
+
+  for (const item of items) {
+    if (item.kind === 'annotated') {
+      if (run.length > 0) { groups.push({ type: 'columns', items: run }); run = []; }
+      groups.push({ type: 'annotated', pair: item.pair, annotations: item.annotations });
+    } else {
+      run.push(item);
+    }
+  }
+  if (run.length > 0) groups.push({ type: 'columns', items: run });
+
   return (
     <div className="diff-table-split">
-      {hunks.map((hunk, hunkIdx) => {
-        // Pair up lines: removals on left, additions on right, context on both
-        const pairs = pairLines(hunk.lines);
-        return (
-          <div className="hunk-block">
-            <div className="hunk-separator" data-hunk-idx={hunkIdx}
-              data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
-              data-new-start={hunk.newStart} data-new-count={hunk.newCount}>
-              @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
-            </div>
-            {pairs.map(pair => {
-              const leftAnns = pair.left
-                ? annotationsByLine[`${pair.left.oldNum}:old`] ?? []
-                : [];
-              const rightAnns = pair.right
-                ? annotationsByLine[`${pair.right.newNum}:new`] ?? []
-                : [];
-              const allAnns = [...leftAnns, ...rightAnns];
-              return (
-                <div>
-                  <div className="split-row">
-                    <div className={`diff-line split-left ${pair.left?.type || 'empty'}`}
-                      data-line={pair.left?.oldNum ?? ''} data-side="old"
-                      data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
-                      <span className="gutter">{pair.left?.oldNum ?? ''}</span>
-                      <span className="code">{pair.left ? raw(escapeHtml(pair.left.content)) : ''}</span>
-                    </div>
-                    <div className={`diff-line split-right ${pair.right?.type || 'empty'}`}
-                      data-line={pair.right?.newNum ?? ''} data-side="new">
-                      <span className="gutter">{pair.right?.newNum ?? ''}</span>
-                      <span className="code">{pair.right ? raw(escapeHtml(pair.right.content)) : ''}</span>
-                    </div>
-                  </div>
-                  {allAnns.length > 0 ? <AnnotationRows annotations={allAnns} /> : null}
+      {groups.map(group => {
+        if (group.type === 'annotated') {
+          return (
+            <div>
+              <div className="split-row">
+                <div className={`diff-line split-left ${group.pair.left?.type || 'empty'}`}
+                  data-line={group.pair.left?.oldNum ?? ''} data-side="old"
+                  data-new-line={group.pair.left?.newNum ?? group.pair.right?.newNum ?? ''}>
+                  <span className="gutter" data-line-number={group.pair.left?.oldNum ?? ''}></span>
+                  <span className="code">{group.pair.left ? raw(escapeHtml(group.pair.left.content)) : ''}</span>
                 </div>
-              );
-            })}
+                <div className={`diff-line split-right ${group.pair.right?.type || 'empty'}`}
+                  data-line={group.pair.right?.newNum ?? ''} data-side="new">
+                  <span className="gutter" data-line-number={group.pair.right?.newNum ?? ''}></span>
+                  <span className="code">{group.pair.right ? raw(escapeHtml(group.pair.right.content)) : ''}</span>
+                </div>
+              </div>
+              <AnnotationRows annotations={group.annotations} />
+            </div>
+          );
+        }
+
+        // Render as two continuous independent columns
+        return (
+          <div className="split-columns">
+            <div className="split-col split-col-left">
+              {group.items.map(item => {
+                if (item.kind === 'separator') {
+                  const { hunk, hunkIdx, gapStart, gapEnd } = item;
+                  return (
+                    <div className="hunk-separator" data-hunk-idx={hunkIdx}
+                      data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
+                      data-new-start={hunk.newStart} data-new-count={hunk.newCount}
+                      data-gap-start={gapStart} data-gap-end={gapEnd}>
+                      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+                    </div>
+                  );
+                }
+                if (item.kind === 'tail') {
+                  return (
+                    <div className="hunk-separator hunk-expander-tail" data-start={item.start}>
+                      ↕ Show remaining lines
+                    </div>
+                  );
+                }
+                const { pair } = item;
+                return (
+                  <div className={`diff-line split-left ${pair.left?.type || 'empty'}`}
+                    data-line={pair.left?.oldNum ?? ''} data-side="old"
+                    data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
+                    <span className="gutter" data-line-number={pair.left?.oldNum ?? ''}></span>
+                    <span className="code">{pair.left ? raw(escapeHtml(pair.left.content)) : ''}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="split-col split-col-right">
+              {group.items.map(item => {
+                if (item.kind === 'separator') {
+                  const { hunk, hunkIdx, gapStart, gapEnd } = item;
+                  return (
+                    <div className="hunk-separator" data-hunk-idx={hunkIdx}
+                      data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
+                      data-new-start={hunk.newStart} data-new-count={hunk.newCount}
+                      data-gap-start={gapStart} data-gap-end={gapEnd}>
+                      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+                    </div>
+                  );
+                }
+                if (item.kind === 'tail') {
+                  return (
+                    <div className="hunk-separator hunk-expander-tail" data-start={item.start}>
+                      ↕ Show remaining lines
+                    </div>
+                  );
+                }
+                const { pair } = item;
+                return (
+                  <div className={`diff-line split-right ${pair.right?.type || 'empty'}`}
+                    data-line={pair.right?.newNum ?? ''} data-side="new">
+                    <span className="gutter" data-line-number={pair.right?.newNum ?? ''}></span>
+                    <span className="code">{pair.right ? raw(escapeHtml(pair.right.content)) : ''}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })}
-      <div className="hunk-separator hunk-expander-tail" data-start={tailStart}>
-        ↕ Show remaining lines
-      </div>
     </div>
   );
 }
@@ -152,8 +250,8 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
                   data-line={lineNum}
                   data-side={side}
                 >
-                  <span className="gutter-old">{line.oldNum ?? ''}</span>
-                  <span className="gutter-new">{line.newNum ?? ''}</span>
+                  <span className="gutter-old" data-line-number={line.oldNum ?? ''}></span>
+                  <span className="gutter-new" data-line-number={line.newNum ?? ''}></span>
                   <span className="code">{raw(escapeHtml(line.content))}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}

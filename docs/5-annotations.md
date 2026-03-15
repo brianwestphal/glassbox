@@ -6,7 +6,7 @@ Requirements for creating, managing, and categorizing line-level annotations.
 
 ### 5.1 Annotation Creation
 
-- **Click to annotate** — Users shall be able to click any diff line to open an annotation form.
+- **Click to annotate** — Users shall be able to click any diff line to open an annotation form. A click is defined as a mousedown followed by a mouseup without significant movement (≤5px). Dragging to select text shall not trigger annotation creation.
 - **Annotation content** — Each annotation shall consist of:
   - Free-text content (the comment)
   - A category (from a fixed set)

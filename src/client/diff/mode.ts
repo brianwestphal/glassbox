@@ -12,7 +12,7 @@ export function initScrollSync() {
     if (syncing || state.wrapLines || state.diffMode !== 'split') return;
     const target = e.target as HTMLElement;
     if (!target.classList.contains('code')) return;
-    if (!target.closest('.split-row')) return;
+    if (!target.closest('.split-row') && !target.closest('.split-columns')) return;
 
     const scrollLeft = target.scrollLeft;
     if (scrollLeft === lastScrollLeft) return;
@@ -21,7 +21,7 @@ export function initScrollSync() {
     if (rafId !== null) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
       syncing = true;
-      container.querySelectorAll('.split-row .code').forEach(el => {
+      container.querySelectorAll('.split-row .code, .split-columns .code').forEach(el => {
         if (el !== target && (el as HTMLElement).scrollLeft !== scrollLeft) {
           (el as HTMLElement).scrollLeft = scrollLeft;
         }

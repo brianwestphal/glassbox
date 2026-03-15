@@ -2,6 +2,7 @@ import { toElement } from '../dom.js';
 import { state } from '../state.js';
 import { applyHighlighting,getLanguageList } from './highlight.js';
 import { selectFile, updateToolbarLanguage  } from './selection.js';
+import { syncSplitColumnHeights } from './splitSync.js';
 
 // Languages most developers encounter regularly, shown first in the picker
 const POPULAR_LANGS = new Set([
@@ -39,8 +40,9 @@ function bindWrapToggle() {
     btn.classList.toggle('active', state.wrapLines);
     const container = document.getElementById('diff-container');
     if (container !== null) container.classList.toggle('wrap-lines', state.wrapLines);
+    syncSplitColumnHeights();
     if (!state.wrapLines) {
-      document.getElementById('diff-container')?.querySelectorAll('.split-row .code').forEach(el => {
+      document.getElementById('diff-container')?.querySelectorAll('.split-row .code, .split-columns .code').forEach(el => {
         (el as HTMLElement).scrollLeft = 0;
       });
     }

@@ -9,6 +9,7 @@ import { applyHighlighting,detectLanguage } from './highlight.js';
 import { bindHunkExpanders } from './hunkExpander.js';
 import { bindDiffLineClicks } from './lineClicks.js';
 import { loadOutline } from './outline.js';
+import { syncSplitColumnHeights } from './splitSync.js';
 
 export async function selectFile(fileId: string) {
   state.currentFileId = fileId;
@@ -46,6 +47,7 @@ export async function selectFile(fileId: string) {
   }
   applyHighlighting();
   updateToolbarLanguage();
+  syncSplitColumnHeights();
 
   void loadOutline(fileId);
   bindDiffLineClicks();
