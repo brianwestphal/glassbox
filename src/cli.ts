@@ -6,6 +6,7 @@ import { getFileDiffs, getHeadCommit, getModeArgs, getModeString, getRepoName, g
 import { acquireLock } from "./lock.js";
 import { updateReviewDiffs } from "./review-update.js";
 import { startServer } from "./server.js";
+import { ensureSkills } from "./skills.js";
 import { checkForUpdates } from "./update-check.js";
 
 function printUsage() {
@@ -207,6 +208,12 @@ async function main() {
   await checkForUpdates(forceUpdateCheck);
 
   const cwd = process.cwd();
+
+  // Generate AI tool skills (/glassbox) for supported platforms
+  const skillPlatforms = ensureSkills();
+  if (skillPlatforms.length > 0) {
+    console.log(`AI tool skills created/updated for: ${skillPlatforms.join(', ')}`);
+  }
 
   if (!isGitRepo(cwd)) {
     console.error("Error: Not a git repository. Run this from inside a git repo.");
