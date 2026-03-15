@@ -1,6 +1,6 @@
 [package]
 name = "glassbox"
-version = "0.2.5"
+version = "0.2.6"
 description = "Glassbox desktop app"
 edition = "2021"
 
