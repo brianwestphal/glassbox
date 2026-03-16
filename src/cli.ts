@@ -1,4 +1,8 @@
+import { mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join, resolve } from "path";
 import { addReviewFile, createReview, getLatestInProgressReview } from "./db/queries.js";
+import { setDataDir } from "./db/connection.js";
 import { setAIServiceTest, setDebug, setDemoMode } from "./debug.js";
 import { DEMO_SCENARIOS, setupDemoReview } from "./demo.js";
 import type { ReviewMode } from "./git/diff.js";
@@ -28,6 +32,7 @@ Modes (pick one):
 
 Options:
   --port <number>     Port to run on (default: 4183)
+  --data-dir <path>   Store data in an alternative location (default: .glassbox/)
   --resume            Resume the latest in-progress review for this mode
   --no-open           Don't open browser automatically
   --strict-port       Fail if the requested port is in use
@@ -50,6 +55,7 @@ function parseArgs(
 ): {
   mode: ReviewMode;
   port: number;
+  dataDir: string | null;
   resume: boolean;
   forceUpdateCheck: boolean;
   debug: boolean;
@@ -62,6 +68,7 @@ function parseArgs(
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
   let port = 4183;
+  let dataDir: string | null = null;
   let resume = false;
   let forceUpdateCheck = false;
   let debug = false;
@@ -108,6 +115,9 @@ function parseArgs(
       case "--port":
         port = parseInt(args[++i], 10);
         break;
+      case "--data-dir":
+        dataDir = resolve(args[++i]);
+        break;
       case "--resume":
         resume = true;
         break;
@@ -148,7 +158,7 @@ function parseArgs(
     mode = { type: "uncommitted" };
   }
 
-  return { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir };
+  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir };
 }
 
 async function main() {
@@ -159,6 +169,7 @@ async function main() {
   }
 
   const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir } = parsed;
+  let { dataDir } = parsed;
 
   setDebug(debug);
   setAIServiceTest(aiServiceTest);
@@ -174,17 +185,12 @@ async function main() {
     process.chdir(projectDir);
   }
 
-  // Acquire instance lock (skip for demo mode — allow multiple demos)
-  if (demo === null) {
-    const { homedir } = await import("os");
-    const { join } = await import("path");
-    const { mkdirSync } = await import("fs");
-    const dataDir = join(homedir(), ".glassbox");
-    mkdirSync(dataDir, { recursive: true });
-    acquireLock(dataDir);
+  // Resolve data directory default after any chdir
+  if (dataDir === null) {
+    dataDir = join(process.cwd(), '.glassbox');
   }
 
-  // Demo mode — bypass git operations and set up pre-configured data
+  // Demo mode: use a fresh temp directory
   if (demo !== null) {
     const scenario = DEMO_SCENARIOS.find((s) => s.id === demo);
     if (scenario === undefined) {
@@ -195,10 +201,23 @@ async function main() {
       }
       process.exit(1);
     }
-
+    dataDir = join(tmpdir(), `glassbox-demo-${demo}-${Date.now()}`);
     setDemoMode(demo);
     console.log(`\n  DEMO MODE: ${scenario.label}\n`);
+  }
 
+  // Ensure data directory exists
+  mkdirSync(dataDir, { recursive: true });
+
+  // Acquire instance lock (skip for demo mode — allow multiple demos)
+  if (demo === null) {
+    acquireLock(dataDir);
+  }
+
+  // Initialize database
+  setDataDir(dataDir);
+
+  if (demo !== null) {
     const { reviewId } = await setupDemoReview(demo);
     await startServer(port, reviewId, process.cwd(), { noOpen, strictPort });
     return;

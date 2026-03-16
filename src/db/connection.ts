@@ -1,20 +1,22 @@
 import { PGlite } from '@electric-sql/pglite';
 import { mkdirSync, rmSync } from 'fs';
-import { homedir } from 'os';
 import { join } from 'path';
 import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from './schema.js';
 
-const dataDir = join(homedir(), '.glassbox', 'data');
-mkdirSync(dataDir, { recursive: true });
-
-const dbPath = join(dataDir, 'reviews');
-
 let db: PGlite | null = null;
+let currentDbPath: string | null = null;
+
+export function setDataDir(dataDir: string) {
+  const dbDir = join(dataDir, 'data');
+  mkdirSync(dbDir, { recursive: true });
+  currentDbPath = join(dbDir, 'reviews');
+}
 
 export async function getDb(): Promise<PGlite> {
   if (db) return db;
+  if (currentDbPath === null) throw new Error('Data directory not set. Call setDataDir() first.');
   try {
-    db = new PGlite(dbPath);
+    db = new PGlite(currentDbPath);
     await db.waitReady;
     await initSchema(db);
     return db;
@@ -26,9 +28,9 @@ export async function getDb(): Promise<PGlite> {
       console.error('Database appears to be corrupt. Recreating...');
       console.error('(Previous review data will be lost.)');
       try {
-        rmSync(dbPath, { recursive: true, force: true });
+        rmSync(currentDbPath, { recursive: true, force: true });
       } catch { /* may not exist */ }
-      db = new PGlite(dbPath);
+      db = new PGlite(currentDbPath);
       await db.waitReady;
       await initSchema(db);
       return db;
