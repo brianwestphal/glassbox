@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.3] - 2026-03-17
+
+- Image diffing mode now remembers which tab was last used (Metadata / Difference / Slice)
+
 ## [0.3.2] - 2026-03-16
 
 - Replaced Sharp with lightweight image header parsing (no native dependencies), fixing metadata extraction in production builds
