@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.5] - 2026-03-17
+
+- Split the GitHub action into 2 separate steps to avoid race condition
+
 ## [0.3.4] - 2026-03-17
 
 - Fixed GitHub action for creating release notes
