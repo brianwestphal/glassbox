@@ -307,6 +307,52 @@ step_update_version() {
   success "All version files updated to ${version}"
 }
 
+step_changelog() {
+  local version
+  version=$(get_state "version")
+  local notes
+  notes=$(get_state "release_notes")
+  local date
+  date=$(date +%Y-%m-%d)
+
+  info "Updating CHANGELOG.md..."
+
+  # Build the new entry
+  local entry
+  entry="## [${version}] - ${date}"$'\n\n'
+  # Convert notes to markdown list items (if not already)
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    if [[ "$line" == -* ]]; then
+      entry+="${line}"$'\n'
+    else
+      entry+="- ${line}"$'\n'
+    fi
+  done <<< "$(echo -e "$notes")"
+
+  if [[ -f "CHANGELOG.md" ]]; then
+    # Insert after the header line (line starting with "# Changelog" + blank + description + blank)
+    node -e "
+      const fs = require('fs');
+      const content = fs.readFileSync('CHANGELOG.md', 'utf8');
+      const entry = process.argv[1];
+      // Find the first ## heading and insert before it
+      const idx = content.indexOf('\n## ');
+      if (idx !== -1) {
+        const updated = content.slice(0, idx) + '\n' + entry + '\n' + content.slice(idx + 1);
+        fs.writeFileSync('CHANGELOG.md', updated);
+      } else {
+        // No existing entries, append
+        fs.writeFileSync('CHANGELOG.md', content + '\n' + entry);
+      }
+    " "$entry"
+  else
+    echo -e "# Changelog\n\nAll notable changes to Glassbox are documented here.\n\n${entry}" > CHANGELOG.md
+  fi
+
+  success "CHANGELOG.md updated"
+}
+
 step_git_tag() {
   local version
   version=$(get_state "version")
@@ -316,7 +362,7 @@ step_git_tag() {
 
   info "Creating git commit and tag ${BOLD}${tag}${RESET}..."
 
-  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml 2>/dev/null || git add package.json
+  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md 2>/dev/null || git add package.json CHANGELOG.md
   git commit -m "release: v${version}" --allow-empty
 
   # Create annotated tag with release notes
@@ -350,6 +396,28 @@ step_git_push() {
   fi
 }
 
+step_github_release() {
+  local version
+  version=$(get_state "version")
+  local notes
+  notes=$(get_state "release_notes")
+  local tag="v${version}"
+
+  if ! command -v gh &>/dev/null; then
+    warn "gh CLI not found — skipping GitHub Release."
+    echo "    Install: https://cli.github.com"
+    return
+  fi
+
+  if confirm "Create GitHub Release for ${tag}?"; then
+    echo -e "$notes" | gh release create "$tag" --title "$tag" --notes-file -
+    success "GitHub Release created: ${tag}"
+  else
+    warn "Skipped GitHub Release. Create manually:"
+    echo "    gh release create ${tag} --notes-from-tag"
+  fi
+}
+
 # --- Main ---
 main() {
   echo ""
@@ -361,7 +429,7 @@ main() {
   local resume_step
   resume_step=$(get_step)
   if [[ -n "$resume_step" && "$resume_step" -gt 0 ]]; then
-    warn "Found saved progress (step ${resume_step}/8)."
+    warn "Found saved progress (step ${resume_step}/10)."
     if confirm "Resume from where you left off?"; then
       echo ""
     else
@@ -404,35 +472,44 @@ main() {
     set_step 4
   fi
 
-  # Step 5: Update version in package.json
+  # Step 5: Update version in package.json + Cargo.toml + tauri.conf.json
   if ! past_step 5; then
     echo ""
     step_update_version
     set_step 5
   fi
 
-  # Step 6: Build
+  # Step 6: Update CHANGELOG.md
   if ! past_step 6; then
     echo ""
-    step_build
+    step_changelog
     set_step 6
   fi
 
-  # Step 7: Git commit + tag
+  # Step 7: Build
   if ! past_step 7; then
-    step_git_tag
+    echo ""
+    step_build
     set_step 7
   fi
 
-  # Step 8: Publish
+  # Step 8: Git commit + tag
   if ! past_step 8; then
-    step_publish
+    step_git_tag
     set_step 8
   fi
 
-  # Step 9: Push (optional, not tracked)
+  # Step 9: Publish to npm
+  if ! past_step 9; then
+    step_publish
+    set_step 9
+  fi
+
+  # Step 10: Push + GitHub Release (optional, not tracked)
   echo ""
   step_git_push
+  echo ""
+  step_github_release
 
   # Done — clean up
   echo ""

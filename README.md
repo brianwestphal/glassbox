@@ -315,6 +315,7 @@ npm link                 # Symlink for global 'glassbox' command
 ## See Also
 
 - **[Hot Sheet](https://github.com/brianwestphal/hotsheet)** — Lightweight local project management for AI-assisted development. Pairs well with Glassbox for tracking review feedback as actionable tickets.
+- **[Changelog](CHANGELOG.md)** — Full release history
 
 ## License
 
