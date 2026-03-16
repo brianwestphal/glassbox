@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.4] - 2026-03-17
+
+- Fixed GitHub action for creating release notes
+
 ## [0.3.3] - 2026-03-17
 
 - Image diffing mode now remembers which tab was last used (Metadata / Difference / Slice)
