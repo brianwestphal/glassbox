@@ -15,7 +15,46 @@ on:
         required: true
 
 jobs:
-  release:
+  # Create the GitHub Release first so build jobs don't race
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract release notes from tag
+        id: tag_notes
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          NOTES=$(git tag -l --format='%(contents)' "$TAG" | sed '/^$/d')
+          if [ -z "$NOTES" ]; then
+            NOTES="See the assets below to download and install."
+          fi
+          echo "body<<ENDOFNOTES" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "ENDOFNOTES" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}';
+            const isDraft = ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }};
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Glassbox ${tag}`,
+              body: `${{ steps.tag_notes.outputs.body }}`.replace(/`/g, ''),
+              draft: isDraft,
+              prerelease: false,
+            });
+            return data.id;
+
+  build:
+    needs: create-release
 
     strategy:
       fail-fast: false
@@ -51,20 +90,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
 
-      - name: Extract release notes from tag
-        id: tag_notes
-        run: |
-          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-          NOTES=$(git tag -l --format='%(contents)' "$TAG" | sed '/^$/d')
-          if [ -z "$NOTES" ]; then
-            NOTES="See the assets below to download and install."
-          fi
-          # Use heredoc delimiter for multiline output
-          echo "body<<ENDOFNOTES" >> "$GITHUB_OUTPUT"
-          echo "$NOTES" >> "$GITHUB_OUTPUT"
-          echo "ENDOFNOTES" >> "$GITHUB_OUTPUT"
-        shell: bash
-
       - name: Install npm dependencies
         run: npm ci
 
@@ -72,14 +97,12 @@ jobs:
         run: bash scripts/build-sidecar.sh ${{ matrix.target }}
         shell: bash
 
-      - name: Build Tauri app and publish release
+      - name: Build Tauri app and upload to release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tauri updater signing
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS code signing & notarization
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -88,7 +111,5 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseName: 'Glassbox ${{ github.event_name == ''workflow_dispatch'' && inputs.tag || github.ref_name }}'
-          releaseBody: ${{ steps.tag_notes.outputs.body }}
-          releaseDraft: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: --target ${{ matrix.target }}
