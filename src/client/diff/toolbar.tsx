@@ -1,3 +1,4 @@
+import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { state } from '../state.js';
 import { applyHighlighting,getLanguageList } from './highlight.js';
@@ -17,6 +18,7 @@ const POPULAR_LANGS = new Set([
 export function bindToolbar() {
   bindDiffModeSegments();
   bindWrapToggle();
+  bindWhitespaceToggle();
   bindLanguageSelector();
 }
 
@@ -45,6 +47,20 @@ function bindWrapToggle() {
       document.getElementById('diff-container')?.querySelectorAll('.split-row .code, .split-columns .code').forEach(el => {
         (el as HTMLElement).scrollLeft = 0;
       });
+    }
+  });
+}
+
+function bindWhitespaceToggle() {
+  const btn = document.getElementById('whitespace-toggle');
+  if (btn === null) return;
+  btn.classList.toggle('active', state.ignoreWhitespace);
+  btn.addEventListener('click', () => {
+    state.ignoreWhitespace = !state.ignoreWhitespace;
+    btn.classList.toggle('active', state.ignoreWhitespace);
+    void api('/ai/preferences', { method: 'POST', body: { ignore_whitespace: state.ignoreWhitespace } });
+    if (state.currentFileId !== null) {
+      void selectFile(state.currentFileId);
     }
   });
 }

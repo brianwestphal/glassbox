@@ -81,6 +81,7 @@ export const SCHEMA_AI_SQL = `
     id TEXT PRIMARY KEY DEFAULT 'singleton',
     sort_mode TEXT NOT NULL DEFAULT 'folder',
     risk_sort_dimension TEXT NOT NULL DEFAULT 'aggregate',
-    show_risk_scores BOOLEAN NOT NULL DEFAULT FALSE
+    show_risk_scores BOOLEAN NOT NULL DEFAULT FALSE,
+    ignore_whitespace BOOLEAN NOT NULL DEFAULT FALSE
   );
 `;

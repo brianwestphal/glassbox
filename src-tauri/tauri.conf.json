@@ -4,8 +4,7 @@
   "version": "0.2.8",
   "identifier": "com.brianwestphal.glassbox",
   "build": {
-    "beforeDevCommand": "npm run dev:server",
-    "devUrl": "http://localhost:4183",
+    "beforeDevCommand": "npm run build:client",
     "frontendDist": "loading"
   },
   "app": {

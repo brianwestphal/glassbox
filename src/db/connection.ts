@@ -52,6 +52,7 @@ async function initSchema(db: PGlite): Promise<void> {
   await addColumnIfMissing(db, 'ai_file_scores', 'notes', 'TEXT');
   await addColumnIfMissing(db, 'ai_analyses', 'progress_completed', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing(db, 'ai_analyses', 'progress_total', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing(db, 'user_preferences', 'ignore_whitespace', 'BOOLEAN NOT NULL DEFAULT FALSE');
 
   // Mark any 'running' analyses as failed — if the server is starting up,
   // no background workers exist to complete them (e.g. server was killed mid-analysis)

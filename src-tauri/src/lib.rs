@@ -316,6 +316,53 @@ pub fn run() {
         .setup(|_app| {
             #[allow(unused_variables)]
             let app = _app;
+
+            // Dev mode: spawn the Node server via tsx and navigate once it's ready.
+            // Uses automatic port selection (no --strict-port) so dev isn't blocked
+            // when a previous instance is still running.
+            #[cfg(debug_assertions)]
+            {
+                let project_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .expect("CARGO_MANIFEST_DIR has no parent")
+                    .to_path_buf();
+
+                let child = std::process::Command::new("npx")
+                    .args(["tsx", "--tsconfig", "tsconfig.json", "src/cli.ts", "--no-open"])
+                    .current_dir(&project_root)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::inherit())
+                    .spawn()
+                    .expect("Failed to spawn dev server (npx tsx)");
+
+                let pid = child.id();
+                *app.state::<SidecarPid>().0.lock().unwrap() = Some(pid);
+
+                let window = app
+                    .get_webview_window("main")
+                    .expect("main window not found");
+
+                // Read stdout in a background thread to find the server URL,
+                // then keep draining so the pipe doesn't block the child process
+                std::thread::spawn(move || {
+                    use std::io::{BufRead, BufReader};
+                    let stdout = child.stdout.expect("stdout not captured");
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines() {
+                        let Ok(line) = line else { break };
+                        eprintln!("[dev-server] {}", line);
+                        if let Some(idx) = line.find("running at ") {
+                            let url = line[idx + "running at ".len()..].trim().to_string();
+                            if let Ok(parsed) = url.parse() {
+                                let _ = window.navigate(parsed);
+                            }
+                        }
+                    }
+                });
+
+                return Ok(());
+            }
+
             #[cfg(not(debug_assertions))]
             {
                 let app_args: Vec<String> = std::env::args().collect();
@@ -436,6 +483,7 @@ pub fn run() {
                 });
             }
 
+            #[allow(unreachable_code)]
             Ok(())
         })
         .build(tauri::generate_context!())

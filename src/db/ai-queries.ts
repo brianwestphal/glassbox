@@ -218,6 +218,7 @@ export interface UserPreferences {
   sort_mode: string;
   risk_sort_dimension: string;
   show_risk_scores: boolean;
+  ignore_whitespace: boolean;
 }
 
 export async function getUserPreferences(): Promise<UserPreferences> {
@@ -227,7 +228,7 @@ export async function getUserPreferences(): Promise<UserPreferences> {
     ['singleton']
   );
   if (result.rows.length === 0) {
-    return { sort_mode: 'folder', risk_sort_dimension: 'aggregate', show_risk_scores: false };
+    return { sort_mode: 'folder', risk_sort_dimension: 'aggregate', show_risk_scores: false, ignore_whitespace: false };
   }
   return result.rows[0];
 }
@@ -237,12 +238,13 @@ export async function saveUserPreferences(prefs: Partial<UserPreferences>): Prom
   const current = await getUserPreferences();
   const merged = { ...current, ...prefs };
   await db.query(
-    `INSERT INTO user_preferences (id, sort_mode, risk_sort_dimension, show_risk_scores)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO user_preferences (id, sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (id) DO UPDATE SET
        sort_mode = EXCLUDED.sort_mode,
        risk_sort_dimension = EXCLUDED.risk_sort_dimension,
-       show_risk_scores = EXCLUDED.show_risk_scores`,
-    ['singleton', merged.sort_mode, merged.risk_sort_dimension, merged.show_risk_scores]
+       show_risk_scores = EXCLUDED.show_risk_scores,
+       ignore_whitespace = EXCLUDED.ignore_whitespace`,
+    ['singleton', merged.sort_mode, merged.risk_sort_dimension, merged.show_risk_scores, merged.ignore_whitespace]
   );
 }

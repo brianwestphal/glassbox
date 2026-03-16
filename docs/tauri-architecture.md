@@ -119,13 +119,14 @@ The Node.js server process must be cleaned up when the Tauri window closes:
 
 |                   | Dev (`tauri:dev`)                                     | Production (`tauri:build`)                       |
 | ----------------- | ----------------------------------------------------- | ------------------------------------------------ |
-| Node server       | Runs via `npm run dev:server` (tsx, separate process) | Bundled sidecar (downloaded Node.js binary)      |
-| Frontend          | Loaded from `http://localhost:4183` (dev URL)         | Loaded from `loading/index.html`, then navigated |
+| Node server       | Spawned by Rust via `npx tsx` (auto port selection)   | Bundled sidecar (downloaded Node.js binary)      |
+| Frontend          | Loading screen, then navigated to server URL          | Loading screen, then navigated to server URL     |
 | Sidecar binary    | Stub placeholder (from `ensure-sidecar-stub.sh`)      | Real Node.js binary (from `build-sidecar.sh`)    |
 | Server code       | Source TypeScript via tsx                             | Bundled `cli.js` in `server/` resource dir       |
-| Release-only code | Skipped (`#[cfg(not(debug_assertions))]`)             | Active (sidecar spawn, welcome screen, updater)  |
+| Port selection    | Automatic (tries 4183, increments if in use)          | Automatic (same behavior)                        |
+| Release-only code | Skipped (`#[cfg(not(debug_assertions))]`)             | Active (welcome screen, updater)                 |
 
-In dev mode, Tauri's `beforeDevCommand` starts the Node server, and the webview connects to `devUrl`. The sidecar binary is never used — `ensure-sidecar-stub.sh` creates a no-op placeholder so Tauri's build system doesn't complain about a missing binary.
+In dev mode, the Rust `setup` callback (`#[cfg(debug_assertions)]`) spawns the Node server via `npx tsx src/cli.ts --no-open`, parses the server URL from stdout ("running at ..."), and navigates the webview — the same pattern production uses with the sidecar. This enables automatic port selection in dev mode, avoiding failures when port 4183 is already in use. The `beforeDevCommand` only builds client assets (CSS/JS). The sidecar binary is never used — `ensure-sidecar-stub.sh` creates a no-op placeholder so Tauri's build system doesn't complain.
 
 ## Build pipeline
 

@@ -76,6 +76,7 @@ export interface AppState {
   currentFileId: string | null;
   diffMode: 'split' | 'unified';
   wrapLines: boolean;
+  ignoreWhitespace: boolean;
   files: ReviewFile[];
   fileOrder: string[];
   annotationCounts: Record<string, number>;
@@ -108,6 +109,7 @@ export const state: AppState = {
   currentFileId: null,
   diffMode: 'split',
   wrapLines: false,
+  ignoreWhitespace: false,
   files: [],
   fileOrder: [],
   annotationCounts: {},

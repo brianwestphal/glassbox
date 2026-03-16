@@ -33,7 +33,7 @@ All project documentation lives in `docs/`. There are two types:
 - `1-review-workflow.md` — Review creation, resumption, completion, history
 - `2-cli-and-server.md` — CLI options, HTTP server, API endpoints, browser launch
 - `3-git-integration.md` — Repository detection, diff generation, review modes
-- `4-diff-viewing.md` — Split/unified modes, syntax highlighting, context expansion
+- `4-diff-viewing.md` — Split/unified modes, syntax highlighting, context expansion, image comparison
 - `5-annotations.md` — Categories, CRUD, drag-and-drop, stale handling
 - `6-export.md` — Markdown export format and AI tool instructions
 - `7-ai-analysis.md` — Risk scoring, narrative ordering, guided review, API keys
@@ -74,6 +74,7 @@ All project documentation lives in `docs/`. There are two types:
 - `src/ai/analyze-risk.ts` — Risk analysis orchestration with multi-turn context loop
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
 - `src/git/diff.ts` — Git operations: diff generation, parsing, file listing
+- `src/git/image.ts` — Image diff support: old/new image retrieval from git, metadata extraction via sharp
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
 - `src/jsx-runtime.ts` — Custom JSX runtime (server-side HTML string generation)
 - `src/types.ts` — Shared Hono environment types
@@ -122,6 +123,7 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `diff/hunkExpander.tsx` — Context expansion
 - `diff/lineClicks.ts` — Diff line click handling
 - `diff/mode.ts` — Diff mode toggle, wrap toggle, scroll sync
+- `diff/imageDiff.ts` — Image comparison: mode switching, metadata loading, slice tool
 - `diff/dragDrop.ts` — Annotation drag-and-drop
 - `annotations/form.tsx` — Annotation creation form
 - `annotations/render.tsx` — Annotation inline rendering

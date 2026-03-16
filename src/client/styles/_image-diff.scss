@@ -1,0 +1,181 @@
+// --- Image Diff ---
+
+.image-diff {
+  padding: 0;
+
+  .image-diff-metadata { padding: 16px; }
+}
+
+.image-diff-panel {
+  display: none;
+  &.active { display: block; }
+}
+
+// --- Metadata Mode ---
+
+.image-metadata-loading,
+.image-metadata-error {
+  padding: 12px 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.image-metadata-diff,
+.image-metadata-single {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.metadata-line {
+  padding: 2px 16px;
+
+  &.context { color: var(--text); }
+  &.add {
+    background: rgba(166,227,161,0.1);
+    color: var(--green);
+    &::before { content: '+ '; }
+  }
+  &.remove {
+    background: rgba(243,139,168,0.1);
+    color: var(--red);
+    &::before { content: '- '; }
+  }
+}
+
+// --- Visual Canvas (shared by difference + slice) ---
+
+// Fill the entire area between diff-header (~41px) and bottom toolbar (~39px)
+.image-visual-canvas {
+  height: calc(100vh - 80px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+// Zoom wrapper: sized by JS to match image aspect ratio, centered by flex
+.image-zoom-wrap {
+  position: relative;
+  transform-origin: 0 0;
+
+  // Both images fill the wrapper exactly (wrapper is aspect-ratio-correct)
+  .image-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// --- Difference Mode ---
+
+[data-panel="difference"] {
+  .image-visual-canvas { background: #000; }
+
+  .image-layer-old { z-index: 1; }
+  .image-blend {
+    z-index: 2;
+    mix-blend-mode: difference;
+  }
+}
+
+// --- Slice Mode ---
+
+.image-slice-clipped {
+  z-index: 2;
+}
+
+.slice-line {
+  position: absolute;
+  height: 2px;
+  background: var(--accent);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.slice-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  z-index: 11;
+  cursor: grab;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+
+  &:active { cursor: grabbing; }
+}
+
+// --- Image Toolbar (in bottom diff-toolbar) ---
+
+.diff-toolbar-image {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+
+  .diff-toolbar-left,
+  .diff-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+.image-zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+
+  &:hover { color: var(--text); background: var(--bg-hover); }
+
+  svg { display: block; }
+}
+
+// Text toolbar also needs full width
+.diff-toolbar-text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+// --- Single Image (added/deleted) ---
+
+.image-diff-single {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+
+  img {
+    max-width: 100%;
+    max-height: 70vh;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+}
+
+.image-diff-status {
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: 13px;
+}

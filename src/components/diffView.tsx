@@ -1,7 +1,9 @@
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
+import { isImageFile } from '../git/image.js';
 import { raw } from '../jsx-runtime.js';
 import { escapeHtml } from '../utils/escapeHtml.js';
+import { ImageDiff } from './imageDiff.js';
 
 export function DiffView({ file, diff, annotations, mode }: {
   file: ReviewFile;
@@ -24,7 +26,9 @@ export function DiffView({ file, diff, annotations, mode }: {
           <span className={`file-status ${diff.status}`}>{diff.status}</span>
         </div>
       </div>
-      {diff.isBinary ? (
+      {diff.isBinary && isImageFile(diff.filePath) ? (
+        <ImageDiff file={file} diff={diff} />
+      ) : diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
       ) : (diff.status === 'added' || diff.status === 'deleted' || mode === 'unified') ? (
         <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} />

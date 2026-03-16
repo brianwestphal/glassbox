@@ -7,6 +7,7 @@ import { renderAINotes } from './aiNotes.js';
 import { bindDragDrop } from './dragDrop.js';
 import { applyHighlighting,detectLanguage } from './highlight.js';
 import { bindHunkExpanders } from './hunkExpander.js';
+import { bindImageDiff } from './imageDiff.js';
 import { bindDiffLineClicks } from './lineClicks.js';
 import { loadOutline } from './outline.js';
 import { syncSplitColumnHeights } from './splitSync.js';
@@ -24,8 +25,14 @@ export async function selectFile(fileId: string) {
   container.style.display = 'block';
   const toolbar = document.getElementById('diff-toolbar');
   if (toolbar !== null) toolbar.style.display = '';
+  // Default to text toolbar — image mode will switch it after content loads
+  const textToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-text');
+  const imageToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-image');
+  if (textToolbar) textToolbar.style.display = '';
+  if (imageToolbar) imageToolbar.style.display = 'none';
 
-  const res = await fetch('/file/' + fileId + '?mode=' + state.diffMode);
+  const params = '?mode=' + state.diffMode + (state.ignoreWhitespace ? '&ignoreWhitespace=1' : '');
+  const res = await fetch('/file/' + fileId + params);
   container.innerHTML = await res.text();
 
   container.classList.toggle('wrap-lines', state.wrapLines);
@@ -54,6 +61,13 @@ export async function selectFile(fileId: string) {
   bindHunkExpanders();
   bindDragDrop();
   bindServerAnnotations();
+
+  // Switch toolbar for image files
+  const isImage = container.querySelector('.image-diff') !== null;
+  if (textToolbar) textToolbar.style.display = isImage ? 'none' : '';
+  if (imageToolbar) imageToolbar.style.display = isImage ? '' : 'none';
+
+  bindImageDiff();
 
   // Show AI notes if available for this file
   const hasNotes = (state.sortMode !== 'folder' && fileId in state.fileNotes) ||

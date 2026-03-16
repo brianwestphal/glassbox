@@ -279,6 +279,37 @@ export function getHeadCommit(cwd: string): string {
   return execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8' }).trim();
 }
 
+export function parseModeString(modeStr: string): ReviewMode {
+  if (modeStr === 'uncommitted') return { type: 'uncommitted' };
+  if (modeStr === 'staged') return { type: 'staged' };
+  if (modeStr === 'unstaged') return { type: 'unstaged' };
+  if (modeStr === 'all') return { type: 'all' };
+  if (modeStr.startsWith('commit:')) return { type: 'commit', sha: modeStr.slice(7) };
+  if (modeStr.startsWith('range:')) {
+    const parts = modeStr.slice(6).split('..');
+    return { type: 'range', from: parts[0], to: parts[1] || 'HEAD' };
+  }
+  if (modeStr.startsWith('branch:')) return { type: 'branch', name: modeStr.slice(7) };
+  if (modeStr.startsWith('files:')) return { type: 'files', patterns: modeStr.slice(6).split(',') };
+  return { type: 'uncommitted' };
+}
+
+/** Regenerate a diff for a single file with optional flags (e.g. -w for ignore whitespace). */
+export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: string, extraFlags: string = ''): FileDiff | null {
+  if (mode.type === 'all') {
+    return createNewFileDiff(filePath, repoRoot);
+  }
+  const diffArgs = getDiffArgs(mode);
+  let rawDiff: string;
+  try {
+    rawDiff = git(`${diffArgs} -U3 ${extraFlags} -- ${filePath}`, repoRoot);
+  } catch {
+    rawDiff = '';
+  }
+  const diffs = parseDiff(rawDiff);
+  return diffs[0] ?? null;
+}
+
 export function getModeString(mode: ReviewMode): string {
   switch (mode.type) {
     case 'uncommitted': return 'uncommitted';

@@ -17,20 +17,33 @@ Requirements for displaying file diffs and navigating changes.
 
 - **Status badge** — Files shall display a status badge indicating their change type: added, modified, deleted, or renamed.
 - **Reviewed toggle** — Users shall be able to mark individual files as "reviewed" or "pending."
-- **Binary indicator** — Binary files shall be identified and displayed with a "Binary file" indicator, not rendered as text diffs.
+- **Binary indicator** — Non-image binary files shall be identified and displayed with a "Binary file" indicator, not rendered as text diffs.
 
-### 4.3 Line Wrapping and Display
+### 4.3 Image Comparison
+
+For binary image files (PNG, JPEG, GIF, WebP), the system shall provide three comparison modes:
+
+- **Metadata comparison** — Extract metadata (format, dimensions, file size, color space, channels, bit depth, alpha, density, EXIF) from both old and new versions using `sharp` and display as a text diff. Changed properties are highlighted as additions/removals.
+- **Difference mode** — Overlay the new (B) image on top of the old (A) image using CSS `mix-blend-mode: difference`. Identical pixels appear black; changed pixels light up. Images are centered in the container.
+- **Slice mode** — Overlay images center-to-center with a draggable cutting line. Two handles on the container edges define the line (supports any angle — vertical, horizontal, diagonal). The new (B) image is clipped by the line, showing old (A) on one side and new (B) on the other.
+
+For newly added or deleted images (no A or B side), only the single image is displayed without comparison modes.
+
+SVG files are text-based and render as normal text diffs (not image comparisons).
+
+### 4.4 Line Wrapping and Display
 
 - **Wrap toggle** — The system shall provide a toggle to enable/disable line wrapping for long lines.
+- **Ignore whitespace toggle** — The system shall provide a toggle to hide whitespace-only changes. When enabled, the diff is regenerated from git with `-w` flag. The setting is persisted across sessions via user preferences.
 - **Syntax highlighting** — Syntax highlighting shall be applied based on auto-detected file language.
 - **Manual language selection** — Users shall be able to manually select a language for syntax highlighting.
 
-### 4.4 Context Expansion
+### 4.5 Context Expansion
 
 - **Expand beyond hunks** — Users shall be able to expand context beyond the default hunk boundaries to see surrounding lines from the working directory file.
 - **Live file reads** — Context expansion shall fetch lines from the current file on disk, not from the git diff.
 
-### 4.5 Code Outline
+### 4.6 Code Outline
 
 - **Symbol parsing** — The system shall parse and display a symbol outline (functions, classes, methods) for the currently viewed file.
 - **Click to navigate** — Users shall be able to click outline entries to navigate to the corresponding line in the diff.

@@ -548,7 +548,7 @@ aiApiRoutes.get('/preferences', async (c) => {
 });
 
 aiApiRoutes.post('/preferences', async (c) => {
-  const body = await c.req.json<{ sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean }>();
+  const body = await c.req.json<{ sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean; ignore_whitespace?: boolean }>();
   await saveUserPreferences(body);
   return c.json({ ok: true });
 });

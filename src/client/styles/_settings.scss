@@ -223,10 +223,9 @@
 
 // --- Settings Gear ---
 
-.settings-gear {
+.sidebar-header-btn {
   position: absolute;
   top: 12px;
-  right: 12px;
   padding: 4px;
   color: var(--text-dim);
   background: none;
@@ -243,4 +242,14 @@
   }
 
   svg { display: block; }
+}
+
+.settings-gear {
+  @extend .sidebar-header-btn;
+  right: 12px;
+}
+
+.refresh-btn {
+  @extend .sidebar-header-btn;
+  right: 36px;
 }

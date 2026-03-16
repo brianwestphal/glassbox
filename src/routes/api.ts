@@ -11,8 +11,10 @@ keepAllStaleAnnotations,
 listReviews,   markAnnotationCurrent, moveAnnotation,
 updateAnnotation,   updateFileStatus, updateReviewStatus, } from '../db/queries.js';
 import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt,generateReviewExport, shouldPromptGitignore } from '../export/generate.js';
-import { getFileContent } from '../git/diff.js';
+import { getFileContent, getFileDiffs, getHeadCommit, parseModeString } from '../git/diff.js';
+import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isImageFile } from '../git/image.js';
 import { parseOutline } from '../outline/parser.js';
+import { updateReviewDiffs } from '../review-update.js';
 import type { AppEnv } from '../types.js';
 
 export const apiRoutes = new Hono<AppEnv>();
@@ -63,6 +65,25 @@ apiRoutes.post('/review/reopen', async (c) => {
   const reviewId = resolveReviewId(c);
   await updateReviewStatus(reviewId, 'in_progress');
   return c.json({ status: 'in_progress' });
+});
+
+apiRoutes.post('/review/refresh', async (c) => {
+  const reviewId = resolveReviewId(c);
+  const repoRoot = c.get('repoRoot');
+  const review = await getReview(reviewId);
+  if (!review) return c.json({ error: 'Review not found' }, 404);
+
+  const mode = parseModeString(review.mode);
+  const headCommit = getHeadCommit(repoRoot);
+  const diffs = getFileDiffs(mode, repoRoot);
+  const result = await updateReviewDiffs(reviewId, diffs, headCommit);
+
+  return c.json({
+    updated: result.updated,
+    added: result.added,
+    stale: result.stale,
+    fileCount: diffs.length,
+  });
 });
 
 apiRoutes.delete('/review/:id', async (c) => {
@@ -266,4 +287,63 @@ apiRoutes.patch('/project-settings', async (c) => {
   if (body.appName !== undefined) current.appName = body.appName || undefined;
   writeProjectSettings(repoRoot, current);
   return c.json(current);
+});
+
+// --- Image Diff ---
+
+// Metadata route must come before the :side wildcard route
+apiRoutes.get('/image/:fileId/metadata', async (c) => {
+  const fileId = c.req.param('fileId');
+  const file = await getReviewFile(fileId);
+  if (!file) return c.json({ error: 'Not found' }, 404);
+
+  const repoRoot = c.get('repoRoot');
+  const review = await getReview(file.review_id);
+  if (!review) return c.json({ error: 'Review not found' }, 404);
+
+  const mode = parseModeString(review.mode);
+  const diff = JSON.parse(file.diff_data ?? '{}');
+  const oldPath = diff.oldPath ?? null;
+  const status = diff.status ?? 'modified';
+
+  const oldImage = status !== 'added' ? getOldImage(mode, file.file_path, oldPath, repoRoot) : null;
+  const newImage = status !== 'deleted' ? getNewImage(mode, file.file_path, repoRoot) : null;
+
+  const [oldMeta, newMeta] = await Promise.all([
+    oldImage ? extractMetadata(oldImage.data, oldPath ?? file.file_path) : null,
+    newImage ? extractMetadata(newImage.data, file.file_path) : null,
+  ]);
+
+  return c.json({
+    old: oldMeta ? formatMetadataLines(oldMeta) : null,
+    new: newMeta ? formatMetadataLines(newMeta) : null,
+  });
+});
+
+apiRoutes.get('/image/:fileId/:side', async (c) => {
+  const fileId = c.req.param('fileId');
+  const side = c.req.param('side');
+  if (side !== 'old' && side !== 'new') return c.text('Invalid side', 400);
+
+  const file = await getReviewFile(fileId);
+  if (!file) return c.text('Not found', 404);
+
+  const repoRoot = c.get('repoRoot');
+  const review = await getReview(file.review_id);
+  if (!review) return c.text('Review not found', 404);
+
+  const mode = parseModeString(review.mode);
+  const diff = JSON.parse(file.diff_data ?? '{}');
+  const oldPath = diff.oldPath ?? null;
+
+  const image = side === 'old'
+    ? getOldImage(mode, file.file_path, oldPath, repoRoot)
+    : getNewImage(mode, file.file_path, repoRoot);
+
+  if (!image) return c.text('Image not available', 404);
+
+  const contentType = getContentType(file.file_path);
+  return new Response(image.data, {
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' },
+  });
 });
