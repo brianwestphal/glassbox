@@ -51,6 +51,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
 
+      - name: Extract release notes from tag
+        id: tag_notes
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          NOTES=$(git tag -l --format='%(contents)' "$TAG" | sed '/^$/d')
+          if [ -z "$NOTES" ]; then
+            NOTES="See the assets below to download and install."
+          fi
+          # Use heredoc delimiter for multiline output
+          echo "body<<ENDOFNOTES" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "ENDOFNOTES" >> "$GITHUB_OUTPUT"
+        shell: bash
+
       - name: Install npm dependencies
         run: npm ci
 
@@ -75,6 +89,6 @@ jobs:
         with:
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseName: 'Glassbox ${{ github.event_name == ''workflow_dispatch'' && inputs.tag || github.ref_name }}'
-          releaseBody: 'See the assets below to download and install.'
+          releaseBody: ${{ steps.tag_notes.outputs.body }}
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }}
           args: --target ${{ matrix.target }}

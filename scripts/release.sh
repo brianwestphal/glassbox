@@ -396,27 +396,6 @@ step_git_push() {
   fi
 }
 
-step_github_release() {
-  local version
-  version=$(get_state "version")
-  local notes
-  notes=$(get_state "release_notes")
-  local tag="v${version}"
-
-  if ! command -v gh &>/dev/null; then
-    warn "gh CLI not found — skipping GitHub Release."
-    echo "    Install: https://cli.github.com"
-    return
-  fi
-
-  if confirm "Create GitHub Release for ${tag}?"; then
-    echo -e "$notes" | gh release create "$tag" --title "$tag" --notes-file -
-    success "GitHub Release created: ${tag}"
-  else
-    warn "Skipped GitHub Release. Create manually:"
-    echo "    gh release create ${tag} --notes-from-tag"
-  fi
-}
 
 # --- Main ---
 main() {
@@ -505,11 +484,9 @@ main() {
     set_step 9
   fi
 
-  # Step 10: Push + GitHub Release (optional, not tracked)
+  # Step 10: Push
   echo ""
   step_git_push
-  echo ""
-  step_github_release
 
   # Done — clean up
   echo ""
