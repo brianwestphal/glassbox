@@ -27,7 +27,7 @@ For binary image files (PNG, JPEG, GIF, WebP), the system shall provide three co
 - **Difference mode** — Overlay the new (B) image on top of the old (A) image using CSS `mix-blend-mode: difference`. Identical pixels appear black; changed pixels light up. Images are centered in the container.
 - **Slice mode** — Overlay images center-to-center with a draggable cutting line. Two handles on the container edges define the line (supports any angle — vertical, horizontal, diagonal). The new (B) image is clipped by the line, showing old (A) on one side and new (B) on the other.
 
-For newly added or deleted images (no A or B side), only the single image is displayed without comparison modes.
+For newly added or deleted images (no A or B side), the toolbar shows "Metadata / Image" instead of the full comparison set. Metadata displays single-side properties (no diff). Image mode shows the file in a zoom/pan-enabled viewer.
 
 SVG files are text-based and render as normal text diffs (not image comparisons).
 

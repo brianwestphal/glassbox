@@ -34,7 +34,7 @@
     "dev:server": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts --no-open --strict-port",
     "tauri": "tauri",
     "tauri:clean": "rm -rf src-tauri/target",
-    "tauri:dev": "bash scripts/ensure-sidecar-stub.sh && tauri dev",
+    "tauri:dev": "bash scripts/tauri-dev.sh",
     "tauri:build": "bash scripts/build-sidecar.sh && tauri build",
     "test": "vitest run",
     "test:watch": "vitest",

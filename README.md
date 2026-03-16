@@ -65,13 +65,13 @@ Glassbox gives you a proper diff viewer with annotation categories designed for 
 | **Note**              | Context for the AI to consider.                 |
 | **Remember**          | A rule to persist to the AI's long-term config. |
 
-When you're done, click **Complete Review** and tell your AI tool:
+As you annotate, `.glassbox/latest-review.md` is updated automatically. You can tell your AI tool at any time:
 
 ```
 Read .glassbox/latest-review.md and apply the feedback.
 ```
 
-The AI gets a structured file with every annotation, organized by file and line number, with clear instructions on how to interpret each category. It fixes the bugs, applies your style preferences, avoids the anti-patterns, and updates its own config with your "remember" items.
+The AI gets a structured file with every annotation, organized by file and line number, with clear instructions on how to interpret each category. It fixes the bugs, applies your style preferences, avoids the anti-patterns, and updates its own config with your "remember" items. You don't need to formally "complete" a review to share feedback — just annotate and switch to your AI tool.
 
 Then you run `glassbox` again. Your previous annotations carry forward — matched to the updated diff. Stale comments that no longer apply are flagged so you can keep or discard them. The loop continues until you're satisfied.
 

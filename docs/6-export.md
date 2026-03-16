@@ -1,14 +1,16 @@
 # 6. Export
 
-Requirements for generating structured output from completed reviews.
+Requirements for generating structured output from reviews.
 
 ## Functional Requirements
 
 ### 6.1 Export Generation
 
-- **Output path** — On review completion, the system shall generate a markdown file at `<repo>/.glassbox/latest-review.md`.
+- **Output path** — The system shall generate a markdown file at `<repo>/.glassbox/latest-review.md`.
 - **Archived copy** — An archived copy shall also be written to `<repo>/.glassbox/review-{reviewId}.md`.
-- **Overwrite behavior** — The `latest-review.md` file shall be overwritten on each review completion (always reflects the most recent review).
+- **Overwrite behavior** — The `latest-review.md` file shall be overwritten on each export (always reflects the most recent state).
+- **Continuous auto-export** — The system shall automatically regenerate `latest-review.md` when annotations are created, modified, moved, or deleted, debounced with a 2-second delay. This allows AI tools to read the latest feedback without requiring explicit review completion.
+- **Completion export** — On explicit review completion, the export shall be generated immediately (no debounce).
 
 ### 6.2 Export Format
 

@@ -10,6 +10,7 @@ getReviewFiles,   getStaleCountsForReview,
 keepAllStaleAnnotations,
 listReviews,   markAnnotationCurrent, moveAnnotation,
 updateAnnotation,   updateFileStatus, updateReviewStatus, } from '../db/queries.js';
+import { scheduleAutoExport } from '../export/auto-export.js';
 import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt,generateReviewExport, shouldPromptGitignore } from '../export/generate.js';
 import { getFileContent, getFileDiffs, getHeadCommit, parseModeString } from '../git/diff.js';
 import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isImageFile } from '../git/image.js';
@@ -151,6 +152,11 @@ apiRoutes.patch('/files/:fileId/status', async (c) => {
 
 // --- Annotations ---
 
+/** Trigger debounced auto-export after any annotation mutation. */
+function autoExport(c: { get: (key: 'reviewId' | 'repoRoot') => string }) {
+  scheduleAutoExport(c.get('reviewId'), c.get('repoRoot'));
+}
+
 apiRoutes.post('/annotations', async (c) => {
   const body = await c.req.json<{
     reviewFileId: string;
@@ -162,40 +168,47 @@ apiRoutes.post('/annotations', async (c) => {
   const annotation = await addAnnotation(
     body.reviewFileId, body.lineNumber, body.side, body.category, body.content
   );
+  autoExport(c);
   return c.json(annotation, 201);
 });
 
 apiRoutes.patch('/annotations/:id', async (c) => {
   const { content, category } = await c.req.json<{ content: string; category: string }>();
   await updateAnnotation(c.req.param('id'), content, category);
+  autoExport(c);
   return c.json({ ok: true });
 });
 
 apiRoutes.delete('/annotations/:id', async (c) => {
   await deleteAnnotation(c.req.param('id'));
+  autoExport(c);
   return c.json({ ok: true });
 });
 
 apiRoutes.patch('/annotations/:id/move', async (c) => {
   const { lineNumber, side } = await c.req.json<{ lineNumber: number; side: string }>();
   await moveAnnotation(c.req.param('id'), lineNumber, side);
+  autoExport(c);
   return c.json({ ok: true });
 });
 
 apiRoutes.post('/annotations/:id/keep', async (c) => {
   await markAnnotationCurrent(c.req.param('id'));
+  autoExport(c);
   return c.json({ ok: true });
 });
 
 apiRoutes.post('/annotations/stale/delete-all', async (c) => {
   const reviewId = resolveReviewId(c);
   await deleteStaleAnnotations(reviewId);
+  autoExport(c);
   return c.json({ ok: true });
 });
 
 apiRoutes.post('/annotations/stale/keep-all', async (c) => {
   const reviewId = resolveReviewId(c);
   await keepAllStaleAnnotations(reviewId);
+  autoExport(c);
   return c.json({ ok: true });
 });
 

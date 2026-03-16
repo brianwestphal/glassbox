@@ -39,6 +39,7 @@ pageRoutes.get('/', async (c) => {
             <button id="update-banner-dismiss" className="btn btn-sm">Later</button>
           </div>
         </div>
+        <div className="review-body">
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>
@@ -81,6 +82,7 @@ pageRoutes.get('/', async (c) => {
                   <button className="segment active" data-image-mode="metadata">Metadata</button>
                   <button className="segment" data-image-mode="difference">Difference</button>
                   <button className="segment" data-image-mode="slice">Slice</button>
+                  <button className="segment" data-image-mode="image" style="display:none">Image</button>
                 </div>
               </div>
               <div className="diff-toolbar-right">
@@ -92,6 +94,7 @@ pageRoutes.get('/', async (c) => {
             </div>
           </div>
         </main>
+        </div>
       </div>
     </Layout>
   );
@@ -154,6 +157,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             <button id="update-banner-dismiss" className="btn btn-sm">Later</button>
           </div>
         </div>
+        <div className="review-body">
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>
@@ -201,6 +205,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
                   <button className="segment active" data-image-mode="metadata">Metadata</button>
                   <button className="segment" data-image-mode="difference">Difference</button>
                   <button className="segment" data-image-mode="slice">Slice</button>
+                  <button className="segment" data-image-mode="image" style="display:none">Image</button>
                 </div>
               </div>
               <div className="diff-toolbar-right">
@@ -212,6 +217,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             </div>
           </div>
         </main>
+        </div>
       </div>
     </Layout>
   );

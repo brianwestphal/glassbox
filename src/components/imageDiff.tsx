@@ -50,12 +50,15 @@ export function ImageDiff({ file, diff }: ImageDiffProps) {
         </div>
       )}
 
-      {/* Single image display for added/deleted files */}
+      {/* Image viewer for added/deleted files (zoom/pan enabled) */}
       {!hasComparison && (
-        <div className="image-diff-single">
-          <img src={`/api/image/${fileId}/${isAdded ? 'new' : 'old'}`}
-            alt={isAdded ? 'New image' : 'Deleted image'} />
-          <p className="image-diff-status">{isAdded ? 'New file' : 'Deleted file'}</p>
+        <div className="image-diff-panel image-diff-visual" data-panel="image">
+          <div className="image-visual-canvas" data-zoomable="true">
+            <div className="image-zoom-wrap">
+              <img className="image-layer image-layer-old" src={`/api/image/${fileId}/${isAdded ? 'new' : 'old'}`}
+                alt={isAdded ? 'New image' : 'Deleted image'} />
+            </div>
+          </div>
         </div>
       )}
     </div>

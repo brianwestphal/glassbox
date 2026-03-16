@@ -327,8 +327,22 @@ pub fn run() {
                     .expect("CARGO_MANIFEST_DIR has no parent")
                     .to_path_buf();
 
+                // Forward CLI args (e.g. --all, --staged) from `tauri dev -- --all`
+                let app_args: Vec<String> = std::env::args().collect();
+                let mut cli_args = vec![
+                    "tsx".to_string(),
+                    "--tsconfig".to_string(),
+                    "tsconfig.json".to_string(),
+                    "src/cli.ts".to_string(),
+                    "--no-open".to_string(),
+                ];
+                // Skip argv[0] (binary name) and pass through any glassbox flags
+                for arg in app_args.iter().skip(1) {
+                    cli_args.push(arg.clone());
+                }
+
                 let child = std::process::Command::new("npx")
-                    .args(["tsx", "--tsconfig", "tsconfig.json", "src/cli.ts", "--no-open"])
+                    .args(&cli_args)
                     .current_dir(&project_root)
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::inherit())

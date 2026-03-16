@@ -63,9 +63,29 @@ export async function selectFile(fileId: string) {
   bindServerAnnotations();
 
   // Switch toolbar for image files
-  const isImage = container.querySelector('.image-diff') !== null;
+  const imageDiffEl = container.querySelector<HTMLElement>('.image-diff');
+  const isImage = imageDiffEl !== null;
   if (textToolbar) textToolbar.style.display = isImage ? 'none' : '';
   if (imageToolbar) imageToolbar.style.display = isImage ? '' : 'none';
+
+  // Adapt image toolbar segments based on whether both sides exist
+  if (isImage && imageToolbar) {
+    const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
+    const diffBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="difference"]');
+    const sliceBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="slice"]');
+    const imageBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="image"]');
+    if (hasComparison) {
+      if (diffBtn) diffBtn.style.display = '';
+      if (sliceBtn) sliceBtn.style.display = '';
+      if (imageBtn) imageBtn.style.display = 'none';
+    } else {
+      if (diffBtn) diffBtn.style.display = 'none';
+      if (sliceBtn) sliceBtn.style.display = 'none';
+      if (imageBtn) imageBtn.style.display = '';
+    }
+    // Reset to metadata active
+    imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === 'metadata'));
+  }
 
   bindImageDiff();
 

@@ -10,13 +10,12 @@ export function bindImageDiff() {
   const hasOld = (container as HTMLElement).dataset.hasOld === 'true';
   const hasNew = (container as HTMLElement).dataset.hasNew === 'true';
 
+  const hasComparison = hasOld && hasNew;
+
   loadMetadata(fileId, container);
 
-  if (!(hasOld && hasNew)) return;
-
-  // Shared zoom/pan state across difference + slice modes
+  // Shared zoom/pan state across all visual modes
   const sharedZoom: ZoomState = { zoom: 1, panX: 0, panY: 0 };
-  // Track whether the user has zoomed (so resize doesn't reset)
   let userHasZoomed = false;
 
   // Collect all visual canvases
@@ -173,9 +172,20 @@ export function bindImageDiff() {
     });
   });
 
-  // Init slice tool on the slice canvas
-  const sliceCanvas = container.querySelector('[data-panel="slice"] .image-visual-canvas') as HTMLElement | null;
-  if (sliceCanvas) initSliceTool(sliceCanvas);
+  // Init slice tool (comparison mode only)
+  if (hasComparison) {
+    const sliceCanvas = container.querySelector('[data-panel="slice"] .image-visual-canvas') as HTMLElement | null;
+    if (sliceCanvas) initSliceTool(sliceCanvas);
+  }
+
+  // For one-sided images, activate the image panel by default
+  if (!hasComparison) {
+    const imagePanel = container.querySelector('[data-panel="image"]');
+    const metaPanel = container.querySelector('[data-panel="metadata"]');
+    if (imagePanel && metaPanel) {
+      // Start with metadata active (default), image panel is available via toolbar
+    }
+  }
 }
 
 // --- Metadata ---
