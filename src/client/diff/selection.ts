@@ -83,8 +83,14 @@ export async function selectFile(fileId: string) {
       if (sliceBtn) sliceBtn.style.display = 'none';
       if (imageBtn) imageBtn.style.display = '';
     }
-    // Reset to metadata active
-    imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === 'metadata'));
+    // Apply remembered mode with mapping
+    let mode = state.lastImageMode;
+    if (!hasComparison && (mode === 'difference' || mode === 'slice')) mode = 'image';
+    if (hasComparison && mode === 'image') mode = 'slice';
+    imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === mode));
+    // Activate the corresponding panel
+    const diffContainer = document.getElementById('diff-container');
+    diffContainer?.querySelectorAll('.image-diff-panel').forEach(p => p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
   }
 
   bindImageDiff();

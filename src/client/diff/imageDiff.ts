@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { state } from '../state.js';
 
 // --- Public entry ---
 
@@ -87,6 +88,7 @@ export function bindImageDiff() {
   imageToolbar?.querySelectorAll('[data-image-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.imageMode!;
+      state.lastImageMode = mode;
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p => p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
       requestAnimationFrame(() => syncVisible());
