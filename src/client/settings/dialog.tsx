@@ -4,6 +4,7 @@ import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { state } from '../state.js';
+import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
 
 interface KeyStatusResponse {
   status: Record<string, { configured: boolean; source: string | null }>;
@@ -249,13 +250,6 @@ function renderSettingsModal(
     bindModalEvents();
   }
 
-  function getTauriInvoke(): ((cmd: string) => Promise<unknown>) | null {
-    const tauri = (window as unknown as Record<string, unknown>).__TAURI__ as
-      | { core?: { invoke: (cmd: string) => Promise<unknown> } }
-      | undefined;
-    return tauri?.core?.invoke ?? null;
-  }
-
   function bindModalEvents() {
     // Check for Updates button
     const checkUpdatesBtn = overlay.querySelector<HTMLButtonElement>('#check-updates-btn');
@@ -271,6 +265,7 @@ function renderSettingsModal(
           const version = (await invoke('check_for_update')) as string | null;
           if (version) {
             checkUpdatesStatus.textContent = `Update available: v${version}`;
+            showUpdateBanner(version);
           } else {
             checkUpdatesStatus.textContent = 'Your software is up to date.';
           }
