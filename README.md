@@ -291,7 +291,7 @@ Point the tool at the file. The export includes an "Instructions for AI Tools" s
 | Database | PGLite (embedded PostgreSQL)                         |
 | UI       | Custom server-side JSX (no React), vanilla client JS |
 | Build    | tsup (single-file bundle)                            |
-| Storage  | `~/.glassbox/data/`                                  |
+| Storage  | `.glassbox/data/` (local to each project)            |
 
 Data stays local. The only network calls are an optional once-per-day npm update check and AI analysis requests if you opt in.
 
@@ -311,6 +311,10 @@ npm run tauri:build      # Build desktop app for distribution
 npm run clean            # Remove dist and caches
 npm link                 # Symlink for global 'glassbox' command
 ```
+
+## See Also
+
+- **[Hot Sheet](https://github.com/brianwestphal/hotsheet)** — Lightweight local project management for AI-assisted development. Pairs well with Glassbox for tracking review feedback as actionable tickets.
 
 ## License
 
