@@ -51,8 +51,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.3.15",
     "@hono/node-server": "^1.19.9",
-    "hono": "^4.12.2",
-    "sharp": "^0.34.5"
+    "hono": "^4.12.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",

@@ -13,7 +13,7 @@ export default defineConfig([
     clean: true,
     sourcemap: true,
     // Bundle everything except node_modules dependencies
-    noExternal: [/^(?!@electric-sql|hono|@hono|sharp)/],
+    noExternal: [/^(?!@electric-sql|hono|@hono)/],
     define: {
       'process.env.BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
     },
