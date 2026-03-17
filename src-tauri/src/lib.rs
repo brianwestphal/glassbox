@@ -4,7 +4,8 @@ use std::sync::Mutex;
 #[cfg(not(debug_assertions))]
 use serde::Deserialize;
 use serde::Serialize;
-use tauri::Manager;
+use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
+use tauri::{Emitter, Manager};
 
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::ShellExt;
@@ -316,6 +317,64 @@ pub fn run() {
         .setup(|_app| {
             #[allow(unused_variables)]
             let app = _app;
+
+            // Build native menu with Edit > Find
+            let app_handle = app.handle();
+            let edit_menu = SubmenuBuilder::new(app_handle, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .separator()
+                .item(&MenuItem::with_id(
+                    app_handle,
+                    "find",
+                    "Find",
+                    true,
+                    Some("CmdOrCtrl+F"),
+                )?)
+                .build()?;
+
+            #[cfg(target_os = "macos")]
+            let menu = MenuBuilder::new(app_handle)
+                .item(&SubmenuBuilder::new(app_handle, "Glassbox")
+                    .about(None)
+                    .separator()
+                    .services()
+                    .separator()
+                    .hide()
+                    .hide_others()
+                    .show_all()
+                    .separator()
+                    .quit()
+                    .build()?)
+                .item(&edit_menu)
+                .item(&SubmenuBuilder::new(app_handle, "Window")
+                    .minimize()
+                    .item(&PredefinedMenuItem::maximize(app_handle, None)?)
+                    .close_window()
+                    .separator()
+                    .fullscreen()
+                    .build()?)
+                .build()?;
+
+            #[cfg(not(target_os = "macos"))]
+            let menu = MenuBuilder::new(app_handle)
+                .item(&edit_menu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            // Handle Edit > Find menu click
+            let handle = app_handle.clone();
+            app.on_menu_event(move |_app, event| {
+                if event.id().0 == "find" {
+                    let _ = handle.emit("menu-find", ());
+                }
+            });
 
             // Dev mode: spawn the Node server via tsx and navigate once it's ready.
             // Uses automatic port selection (no --strict-port) so dev isn't blocked

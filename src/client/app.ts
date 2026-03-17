@@ -1,4 +1,5 @@
 import { api, initDebug } from "./api.js";
+import { bindFind } from "./diff/find.js";
 import { initScrollSync } from "./diff/mode.js";
 import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
@@ -119,6 +120,7 @@ async function init() {
 
   bindSidebarEvents();
   bindToolbar();
+  bindFind();
   bindFileFilter();
   bindSidebarResize();
   bindCompleteButton();

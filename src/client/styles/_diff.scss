@@ -357,6 +357,61 @@
   overflow-x: visible !important;
 }
 
+// --- Find Bar ---
+
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.find-input {
+  width: 240px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+
+  &:focus { border-color: var(--accent); }
+}
+
+.find-match-count {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 60px;
+}
+
+.find-nav-btn,
+.find-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 13px;
+  border-radius: var(--radius);
+
+  &:hover { color: var(--text); background: var(--bg-hover); }
+}
+
+.find-highlight {
+  background: rgba(250, 204, 21, 0.35);
+  border-radius: 2px;
+}
+
+.find-highlight-active {
+  background: rgba(250, 204, 21, 0.7);
+  outline: 2px solid rgba(250, 204, 21, 0.9);
+}
+
 // --- Bottom Toolbar ---
 
 .diff-toolbar {
