@@ -60,42 +60,74 @@ ask() {
   set_state "$key" "$REPLY"
 }
 
-# Ask for multiline input (release notes)
+# Resolve the user's preferred editor
+resolve_editor() {
+  if [[ -n "${EDITOR:-}" ]]; then echo "$EDITOR"; return; fi
+  if [[ -n "${VISUAL:-}" ]]; then echo "$VISUAL"; return; fi
+  for cmd in nano vim vi; do
+    if command -v "$cmd" &>/dev/null; then echo "$cmd"; return; fi
+  done
+  echo ""
+}
+
+# Ask for multiline input via $EDITOR
 ask_multiline() {
   local key="$1"
   local prompt="$2"
+  local initial="${3:-}"
   local prev
   prev=$(get_state "$key")
 
+  # Use previous value as starting content if available
   if [[ -n "$prev" ]]; then
-    echo -e "${CYAN}${BOLD}>>>${RESET} ${prompt}"
-    echo -e "    ${DIM}Previous value:${RESET}"
-    echo "$prev" | sed 's/^/    /'
-    echo ""
-    if confirm "Keep this?"; then
-      REPLY="$prev"
-      return
-    fi
+    initial="$prev"
   fi
 
-  echo -e "${CYAN}${BOLD}>>>${RESET} ${prompt}"
-  echo -e "    ${DIM}Enter your text (blank line to finish):${RESET}"
+  local editor
+  editor=$(resolve_editor)
 
-  local lines=""
+  if [[ -z "$editor" ]]; then
+    error "No editor found. Set \$EDITOR and try again."
+    exit 1
+  fi
+
+  local tmpfile
+  tmpfile=$(mktemp "${TMPDIR:-/tmp}/release-notes.XXXXXX")
+  trap "rm -f '$tmpfile'" RETURN
+
+  # Pre-populate the temp file
+  if [[ -n "$initial" ]]; then
+    echo -e "$initial" > "$tmpfile"
+  fi
+
   while true; do
-    local line
-    read -r line || true
-    if [[ -z "$line" ]]; then
+    info "${prompt} ${DIM}(opening ${editor##*/})${RESET}"
+    $editor "$tmpfile"
+
+    # Read back, strip trailing blank lines
+    REPLY=$(sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$tmpfile")
+
+    if [[ -z "$REPLY" ]]; then
+      warn "Release notes are empty."
+      if ! confirm "Open editor again?"; then
+        error "Aborted — release notes are required."
+        exit 1
+      fi
+      continue
+    fi
+
+    echo ""
+    echo -e "    ${DIM}Release notes:${RESET}"
+    echo "$REPLY" | sed 's/^/    /'
+    echo ""
+
+    if confirm "Use this text?"; then
       break
     fi
-    if [[ -n "$lines" ]]; then
-      lines="${lines}\n${line}"
-    else
-      lines="$line"
-    fi
+    # Otherwise loop back to the editor with the current content
+    echo "$REPLY" > "$tmpfile"
   done
 
-  REPLY="$lines"
   set_state "$key" "$REPLY"
 }
 
@@ -234,21 +266,15 @@ step_version() {
 
 step_release_notes() {
   echo ""
-  info "Release notes"
 
-  # Show recent commits as context
+  # Build initial content from commits since last tag
   local last_tag
   last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-  if [[ -n "$last_tag" ]]; then
-    echo -e "    ${DIM}Commits since ${last_tag}:${RESET}"
-  else
-    echo -e "    ${DIM}Recent commits:${RESET}"
-  fi
   local log_range="${last_tag:+${last_tag}..HEAD}"
-  git log ${log_range:-"-10"} --oneline --no-decorate | sed 's/^/    /'
-  echo ""
+  local initial
+  initial=$(git log ${log_range:-"-10"} --format="- %s" --no-decorate)
 
-  ask_multiline "release_notes" "Enter release notes (changelog entries):"
+  ask_multiline "release_notes" "Release notes" "$initial"
 }
 
 step_review() {
