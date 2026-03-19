@@ -45,10 +45,33 @@
   }
 }
 
+.diff-header-file {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .diff-header-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.reveal-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+  flex-shrink: 0;
+
+  &:hover { color: var(--text); background: var(--bg-hover); }
+  svg { display: block; }
 }
 
 // --- Outline Bar ---

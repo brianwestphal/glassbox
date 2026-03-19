@@ -18,6 +18,7 @@ const zoomOutSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="1
 const zoomInSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 const actualSizeSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><text x="12" y="15.5" text-anchor="middle" font-size="9" font-weight="bold" fill="currentColor" stroke="none">1:1</text></svg>';
 const fitSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>';
+const revealSvgIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 11 15 14"/></svg>';
 
 export const pageRoutes = new Hono<AppEnv>();
 
@@ -148,7 +149,10 @@ pageRoutes.get('/file/:fileId', async (c) => {
     const html = (
       <div className="diff-view" data-file-id={file.id} data-file-path={file.file_path} data-is-svg="true">
         <div className="diff-header">
-          <span className="file-path">{diff.filePath}</span>
+          <div className="diff-header-file">
+            <span className="file-path">{diff.filePath}</span>
+            <button className="reveal-btn" data-file-id={file.id} title="Reveal in file manager">{raw(revealSvgIcon)}</button>
+          </div>
           <div className="diff-header-actions">
             <span className={`file-status ${diff.status}`}>{diff.status}</span>
           </div>

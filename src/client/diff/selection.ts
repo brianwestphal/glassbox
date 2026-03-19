@@ -44,6 +44,12 @@ export async function selectFile(fileId: string) {
 
   container.classList.toggle('wrap-lines', state.wrapLines);
 
+  // Bind reveal button
+  container.querySelector<HTMLElement>('.reveal-btn')?.addEventListener('click', (e) => {
+    const fid = ((e.currentTarget as HTMLElement).dataset.fileId) ?? '';
+    void api('/files/' + fid + '/reveal', { method: 'POST' });
+  });
+
   // Mark as reviewed on first visit
   if (file !== undefined && file.status === 'pending') {
     await api('/files/' + fileId + '/status', { method: 'PATCH', body: { status: 'reviewed' } });

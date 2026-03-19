@@ -1,6 +1,7 @@
+import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Hono } from 'hono';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 import {
   addAnnotation, deleteAnnotation, deleteReview,
@@ -148,6 +149,24 @@ apiRoutes.get('/files/:fileId', async (c) => {
 apiRoutes.patch('/files/:fileId/status', async (c) => {
   const { status } = await c.req.json<{ status: string }>();
   await updateFileStatus(c.req.param('fileId'), status);
+  return c.json({ ok: true });
+});
+
+apiRoutes.post('/files/:fileId/reveal', async (c) => {
+  const file = await getReviewFile(c.req.param('fileId'));
+  if (!file) return c.json({ error: 'Not found' }, 404);
+  const repoRoot = c.get('repoRoot');
+  const fullPath = resolve(repoRoot, file.file_path);
+  try {
+    if (process.platform === 'darwin') {
+      execSync(`open -R "${fullPath}"`);
+    } else if (process.platform === 'win32') {
+      execSync(`explorer /select,"${fullPath}"`);
+    } else {
+      // Linux: open the containing directory
+      execSync(`xdg-open "${resolve(fullPath, '..')}"`);
+    }
+  } catch { /* ignore errors (e.g. file doesn't exist yet for added files) */ }
   return c.json({ ok: true });
 });
 
