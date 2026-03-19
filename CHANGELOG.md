@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.1] - 2026-03-19
+
+- Fixed production build issue with SVG support
+- Fixed issue where last view mode choices weren't remembered
+
 ## [0.4.0] - 2026-03-19
 
 - Added special support for SVGs
