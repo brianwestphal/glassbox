@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] - 2026-03-19
+
+- Added special support for SVGs
+- Added Show in Finder (or other OS equivalent) button
+
 ## [0.3.6] - 2026-03-17
 
 - Added support for Edit > Find option when running as native app
