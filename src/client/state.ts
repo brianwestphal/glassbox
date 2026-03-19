@@ -78,6 +78,7 @@ export interface AppState {
   wrapLines: boolean;
   ignoreWhitespace: boolean;
   lastImageMode: string;
+  svgViewMode: 'code' | 'rendered';
   files: ReviewFile[];
   fileOrder: string[];
   annotationCounts: Record<string, number>;
@@ -112,6 +113,7 @@ export const state: AppState = {
   wrapLines: false,
   ignoreWhitespace: false,
   lastImageMode: 'metadata',
+  svgViewMode: 'code',
   files: [],
   fileOrder: [],
   annotationCounts: {},

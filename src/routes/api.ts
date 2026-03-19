@@ -13,7 +13,8 @@ updateAnnotation,   updateFileStatus, updateReviewStatus, } from '../db/queries.
 import { scheduleAutoExport } from '../export/auto-export.js';
 import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt,generateReviewExport, shouldPromptGitignore } from '../export/generate.js';
 import { getFileContent, getFileDiffs, getHeadCommit, parseModeString } from '../git/diff.js';
-import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isImageFile } from '../git/image.js';
+import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isImageFile, isSvgFile } from '../git/image.js';
+import { rasterizeSvg } from '../git/svg-rasterize.js';
 import { parseOutline } from '../outline/parser.js';
 import { updateReviewDiffs } from '../review-update.js';
 import type { AppEnv } from '../types.js';
@@ -354,6 +355,18 @@ apiRoutes.get('/image/:fileId/:side', async (c) => {
     : getNewImage(mode, file.file_path, repoRoot);
 
   if (!image) return c.text('Image not available', 404);
+
+  // SVGs need rasterization for image comparison modes (difference, slice)
+  if (isSvgFile(file.file_path)) {
+    try {
+      const png = await rasterizeSvg(image.data);
+      return new Response(png, {
+        headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
+      });
+    } catch {
+      return c.text('SVG rasterization failed', 500);
+    }
+  }
 
   const contentType = getContentType(file.file_path);
   return new Response(image.data, {

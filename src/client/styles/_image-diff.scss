@@ -11,6 +11,16 @@
   &.active { display: block; }
 }
 
+// --- Font Warning ---
+
+.image-font-warning {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--yellow, #f9e2af);
+  background: rgba(249, 226, 175, 0.08);
+  border-bottom: 1px solid rgba(249, 226, 175, 0.15);
+}
+
 // --- Metadata Mode ---
 
 .image-metadata-loading,
@@ -156,6 +166,24 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+// --- SVG Code/Rendered Toggle ---
+
+.diff-toolbar-svg-toggle {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+// When SVG toggle is visible, sibling toolbars flex-fill instead of width: 100%
+.diff-toolbar.svg-file {
+  .diff-toolbar-text,
+  .diff-toolbar-image {
+    width: auto;
+    flex: 1;
+  }
 }
 
 // --- Single Image (added/deleted) ---

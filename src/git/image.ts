@@ -10,6 +10,10 @@ export function isImageFile(filePath: string): boolean {
   return IMAGE_EXTENSIONS.has(ext);
 }
 
+export function isSvgFile(filePath: string): boolean {
+  return filePath.slice(filePath.lastIndexOf('.')).toLowerCase() === '.svg';
+}
+
 export function getContentType(filePath: string): string {
   const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
   switch (ext) {

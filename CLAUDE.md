@@ -74,7 +74,8 @@ All project documentation lives in `docs/`. There are two types:
 - `src/ai/analyze-risk.ts` — Risk analysis orchestration with multi-turn context loop
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
 - `src/git/diff.ts` — Git operations: diff generation, parsing, file listing
-- `src/git/image.ts` — Image diff support: old/new image retrieval from git, metadata extraction via sharp
+- `src/git/image.ts` — Image diff support: old/new image retrieval from git, metadata extraction from headers
+- `src/git/svg-rasterize.ts` — SVG to PNG rasterization using `@resvg/resvg-wasm` for rendered comparison mode
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
 - `src/jsx-runtime.ts` — Custom JSX runtime (server-side HTML string generation)
 - `src/types.ts` — Shared Hono environment types

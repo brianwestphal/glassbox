@@ -2,11 +2,15 @@ import { Hono } from 'hono';
 
 import { DiffView } from '../components/diffView.js';
 import { FileList } from '../components/fileList.js';
+import { ImageDiff } from '../components/imageDiff.js';
 import { Layout } from '../components/layout.js';
 import { ReviewHistory } from '../components/reviewHistory.js';
 import { getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../db/queries.js';
 import type { FileDiff } from '../git/diff.js';
 import { getSingleFileDiff, parseModeString } from '../git/diff.js';
+import { isSvgFile } from '../git/image.js';
+import { getNewImage, getOldImage } from '../git/image.js';
+import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-rasterize.js';
 import { raw } from '../jsx-runtime.js';
 import type { AppEnv } from '../types.js';
 
@@ -63,6 +67,12 @@ pageRoutes.get('/', async (c) => {
           </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
           <div className="diff-toolbar" id="diff-toolbar" style="display:none">
+            <div className="diff-toolbar-svg-toggle" style="display:none">
+              <div className="segmented-control">
+                <button className="segment active" data-svg-mode="code">Code</button>
+                <button className="segment" data-svg-mode="rendered">Rendered</button>
+              </div>
+            </div>
             <div className="diff-toolbar-text">
               <div className="diff-toolbar-left">
                 <div className="segmented-control">
@@ -106,11 +116,53 @@ pageRoutes.get('/file/:fileId', async (c) => {
   const fileId = c.req.param('fileId');
   const mode = (c.req.query('mode') === 'unified' ? 'unified' : 'split');
   const ignoreWhitespace = c.req.query('ignoreWhitespace') === '1';
+  const view = c.req.query('view');
   const file = await getReviewFile(fileId);
   if (!file) return c.text('File not found', 404);
 
+  const diff: FileDiff = JSON.parse(file.diff_data ?? '{}') as FileDiff;
+
+  // SVG rendered view: return ImageDiff component
+  if (view === 'rendered' && isSvgFile(file.file_path)) {
+    const repoRoot = c.get('repoRoot');
+    const review = await getReview(file.review_id);
+    let fontWarning = false;
+    let svgBaseWidth = 300;
+    let svgBaseHeight = 150;
+    if (review) {
+      const reviewMode = parseModeString(review.mode);
+      const oldImg = diff.status !== 'added' ? getOldImage(reviewMode, file.file_path, diff.oldPath ?? null, repoRoot) : null;
+      const newImg = diff.status !== 'deleted' ? getNewImage(reviewMode, file.file_path, repoRoot) : null;
+      // Use the new-side SVG for dimensions (or old-side for deletions)
+      const svgData = newImg ?? oldImg;
+      if (svgData) {
+        const dims = parseSvgDimensions(svgData.data.toString('utf-8'));
+        svgBaseWidth = dims.width;
+        svgBaseHeight = dims.height;
+      }
+      if ((oldImg && svgUsesExternalFonts(oldImg.data)) || (newImg && svgUsesExternalFonts(newImg.data))) {
+        fontWarning = true;
+      }
+    }
+
+    const html = (
+      <div className="diff-view" data-file-id={file.id} data-file-path={file.file_path} data-is-svg="true">
+        <div className="diff-header">
+          <span className="file-path">{diff.filePath}</span>
+          <div className="diff-header-actions">
+            <span className={`file-status ${diff.status}`}>{diff.status}</span>
+          </div>
+        </div>
+        <ImageDiff file={file} diff={diff} fontWarning={fontWarning}
+          baseWidth={svgBaseWidth} baseHeight={svgBaseHeight} />
+      </div>
+    );
+    return c.html(html.toString());
+  }
+
+  // Normal text diff view
   const annotations = await getAnnotationsForFile(fileId);
-  let diff: FileDiff = JSON.parse(file.diff_data ?? '{}') as FileDiff;
+  let finalDiff = diff;
 
   if (ignoreWhitespace) {
     const repoRoot = c.get('repoRoot');
@@ -119,12 +171,12 @@ pageRoutes.get('/file/:fileId', async (c) => {
       const reviewMode = parseModeString(review.mode);
       const regenerated = getSingleFileDiff(reviewMode, file.file_path, repoRoot, '-w');
       if (regenerated) {
-        diff = regenerated;
+        finalDiff = regenerated;
       }
     }
   }
 
-  const html = <DiffView file={file} diff={diff} annotations={annotations} mode={mode} />;
+  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} />;
   return c.html(html.toString());
 });
 
@@ -186,6 +238,12 @@ pageRoutes.get('/review/:reviewId', async (c) => {
           </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
           <div className="diff-toolbar" id="diff-toolbar" style="display:none">
+            <div className="diff-toolbar-svg-toggle" style="display:none">
+              <div className="segmented-control">
+                <button className="segment active" data-svg-mode="code">Code</button>
+                <button className="segment" data-svg-mode="rendered">Rendered</button>
+              </div>
+            </div>
             <div className="diff-toolbar-text">
               <div className="diff-toolbar-left">
                 <div className="segmented-control">

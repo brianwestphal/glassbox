@@ -1,6 +1,6 @@
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
-import { isImageFile } from '../git/image.js';
+import { isImageFile, isSvgFile } from '../git/image.js';
 import { raw } from '../jsx-runtime.js';
 import { escapeHtml } from '../utils/escapeHtml.js';
 import { ImageDiff } from './imageDiff.js';
@@ -19,7 +19,8 @@ export function DiffView({ file, diff, annotations, mode }: {
   }
 
   return (
-    <div className="diff-view" data-file-id={file.id} data-file-path={file.file_path}>
+    <div className="diff-view" data-file-id={file.id} data-file-path={file.file_path}
+      {...(isSvgFile(diff.filePath) ? { 'data-is-svg': 'true' } : {})}>
       <div className="diff-header">
         <span className="file-path">{diff.filePath}</span>
         <div className="diff-header-actions">

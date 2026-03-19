@@ -162,7 +162,11 @@ export function bindImageDiff() {
         userHasZoomed = false;
         syncVisible();
       } else if (action === 'actual') {
-        const nw = refImg.naturalWidth, nh = refImg.naturalHeight;
+        // For SVGs, use the base SVG dimensions (not the inflated raster size)
+        const bw = parseInt((container as HTMLElement).dataset.baseWidth ?? '', 10);
+        const bh = parseInt((container as HTMLElement).dataset.baseHeight ?? '', 10);
+        const nw = (bw && bh) ? bw : refImg.naturalWidth;
+        const nh = (bw && bh) ? bh : refImg.naturalHeight;
         if (nw && nh) {
           vis.wrap.style.width = `${nw}px`;
           vis.wrap.style.height = `${nh}px`;

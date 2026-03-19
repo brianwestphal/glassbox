@@ -23,13 +23,20 @@ Requirements for displaying file diffs and navigating changes.
 
 For binary image files (PNG, JPEG, GIF, WebP), the system shall provide three comparison modes:
 
-- **Metadata comparison** — Extract metadata (format, dimensions, file size, color space, channels, bit depth, alpha, density, EXIF) from both old and new versions using `sharp` and display as a text diff. Changed properties are highlighted as additions/removals.
+- **Metadata comparison** — Extract metadata (format, dimensions, file size, color space, channels, bit depth, alpha, density) from both old and new versions and display as a text diff. Changed properties are highlighted as additions/removals. Metadata is parsed from image headers (PNG IHDR, JPEG SOF/JFIF, GIF header, WebP VP8/VP8L/VP8X) with no native dependencies.
 - **Difference mode** — Overlay the new (B) image on top of the old (A) image using CSS `mix-blend-mode: difference`. Identical pixels appear black; changed pixels light up. Images are centered in the container.
 - **Slice mode** — Overlay images center-to-center with a draggable cutting line. Two handles on the container edges define the line (supports any angle — vertical, horizontal, diagonal). The new (B) image is clipped by the line, showing old (A) on one side and new (B) on the other.
 
 For newly added or deleted images (no A or B side), the toolbar shows "Metadata / Image" instead of the full comparison set. Metadata displays single-side properties (no diff). Image mode shows the file in a zoom/pan-enabled viewer.
 
-SVG files are text-based and render as normal text diffs (not image comparisons).
+### 4.3.1 SVG Dual Mode
+
+SVG files support both code and rendered viewing via a "Code | Rendered" toggle in the bottom toolbar:
+
+- **Code mode** (default) — Shows the SVG as a normal text diff with split/unified, wrap, ignore whitespace, and syntax highlighting controls. Annotations are supported.
+- **Rendered mode** — Rasterizes the SVG to PNG using `@resvg/resvg-wasm` (WASM, no native bindings) and shows the same image comparison modes as binary images (metadata, difference, slice). Base size is determined from `width`/`height`/`viewBox` attributes (default 300x150 per HTML spec), scaled to 10x with a maximum of 8000px in the largest dimension.
+
+The user's Code/Rendered choice is remembered across file selections.
 
 ### 4.4 Line Wrapping and Display
 

@@ -20,6 +20,20 @@ export function bindToolbar() {
   bindWrapToggle();
   bindWhitespaceToggle();
   bindLanguageSelector();
+  bindSvgModeToggle();
+}
+
+function bindSvgModeToggle() {
+  document.querySelectorAll('[data-svg-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = (btn as HTMLElement).dataset.svgMode as 'code' | 'rendered';
+      state.svgViewMode = mode;
+      document.querySelectorAll('[data-svg-mode]').forEach(b => b.classList.toggle('active', b === btn));
+      if (state.currentFileId !== null) {
+        void selectFile(state.currentFileId);
+      }
+    });
+  });
 }
 
 function bindDiffModeSegments() {

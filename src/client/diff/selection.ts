@@ -25,19 +25,26 @@ export async function selectFile(fileId: string) {
   container.style.display = 'block';
   const toolbar = document.getElementById('diff-toolbar');
   if (toolbar !== null) toolbar.style.display = '';
-  // Default to text toolbar — image mode will switch it after content loads
+
   const textToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-text');
   const imageToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-image');
-  if (textToolbar) textToolbar.style.display = '';
-  if (imageToolbar) imageToolbar.style.display = 'none';
+  const svgToggle = toolbar?.querySelector<HTMLElement>('.diff-toolbar-svg-toggle');
 
-  const params = '?mode=' + state.diffMode + (state.ignoreWhitespace ? '&ignoreWhitespace=1' : '');
+  // Determine if this is an SVG file (from state, before fetch)
+  const file = state.files.find(f => f.id === fileId);
+  const filePath = file?.file_path ?? '';
+  const isSvg = filePath.toLowerCase().endsWith('.svg');
+  const svgRendered = isSvg && state.svgViewMode === 'rendered';
+
+  // Build fetch URL
+  let params = '?mode=' + state.diffMode + (state.ignoreWhitespace ? '&ignoreWhitespace=1' : '');
+  if (svgRendered) params += '&view=rendered';
   const res = await fetch('/file/' + fileId + params);
   container.innerHTML = await res.text();
 
   container.classList.toggle('wrap-lines', state.wrapLines);
 
-  const file = state.files.find(f => f.id === fileId);
+  // Mark as reviewed on first visit
   if (file !== undefined && file.status === 'pending') {
     await api('/files/' + fileId + '/status', { method: 'PATCH', body: { status: 'reviewed' } });
     file.status = 'reviewed';
@@ -45,57 +52,64 @@ export async function selectFile(fileId: string) {
     updateProgress();
   }
 
-  // Auto-detect language and apply syntax highlighting
-  const diffView = container.querySelector<HTMLElement>('.diff-view');
-  const filePath = diffView?.dataset.filePath ?? '';
-  state._detectedLang = detectLanguage(filePath);
-  if (state.highlightAuto) {
-    state.highlightLang = state._detectedLang;
+  // SVG toggle visibility + active state
+  if (svgToggle) {
+    svgToggle.style.display = isSvg ? '' : 'none';
+    svgToggle.querySelectorAll('[data-svg-mode]').forEach(btn => {
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.svgMode === state.svgViewMode);
+    });
   }
-  applyHighlighting();
-  updateToolbarLanguage();
-  syncSplitColumnHeights();
+  toolbar?.classList.toggle('svg-file', isSvg);
 
-  void loadOutline(fileId);
-  bindDiffLineClicks();
-  bindHunkExpanders();
-  bindDragDrop();
-  bindServerAnnotations();
-
-  // Switch toolbar for image files
+  // Determine what's in the container after fetch
   const imageDiffEl = container.querySelector<HTMLElement>('.image-diff');
-  const isImage = imageDiffEl !== null;
-  if (textToolbar) textToolbar.style.display = isImage ? 'none' : '';
-  if (imageToolbar) imageToolbar.style.display = isImage ? '' : 'none';
+  const isImageView = imageDiffEl !== null;
 
-  // Adapt image toolbar segments based on whether both sides exist
-  if (isImage && imageToolbar) {
-    const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
-    const diffBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="difference"]');
-    const sliceBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="slice"]');
-    const imageBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="image"]');
-    if (hasComparison) {
-      if (diffBtn) diffBtn.style.display = '';
-      if (sliceBtn) sliceBtn.style.display = '';
-      if (imageBtn) imageBtn.style.display = 'none';
-    } else {
-      if (diffBtn) diffBtn.style.display = 'none';
-      if (sliceBtn) sliceBtn.style.display = 'none';
-      if (imageBtn) imageBtn.style.display = '';
+  // Show appropriate toolbar section
+  if (textToolbar) textToolbar.style.display = isImageView ? 'none' : '';
+  if (imageToolbar) imageToolbar.style.display = isImageView ? '' : 'none';
+
+  if (isImageView) {
+    // Image view: adapt toolbar segments and bind image diff
+    if (imageToolbar) {
+      const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
+      const diffBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="difference"]');
+      const sliceBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="slice"]');
+      const imageBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="image"]');
+      if (hasComparison) {
+        if (diffBtn) diffBtn.style.display = '';
+        if (sliceBtn) sliceBtn.style.display = '';
+        if (imageBtn) imageBtn.style.display = 'none';
+      } else {
+        if (diffBtn) diffBtn.style.display = 'none';
+        if (sliceBtn) sliceBtn.style.display = 'none';
+        if (imageBtn) imageBtn.style.display = '';
+      }
+      let mode = state.lastImageMode;
+      if (!hasComparison && (mode === 'difference' || mode === 'slice')) mode = 'image';
+      if (hasComparison && mode === 'image') mode = 'slice';
+      imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === mode));
+      container.querySelectorAll('.image-diff-panel').forEach(p => p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
     }
-    // Apply remembered mode with mapping
-    let mode = state.lastImageMode;
-    if (!hasComparison && (mode === 'difference' || mode === 'slice')) mode = 'image';
-    if (hasComparison && mode === 'image') mode = 'slice';
-    imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === mode));
-    // Activate the corresponding panel
-    const diffContainer = document.getElementById('diff-container');
-    diffContainer?.querySelectorAll('.image-diff-panel').forEach(p => p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
+    bindImageDiff();
+  } else {
+    // Text/code view: syntax highlighting, outline, annotations
+    const diffView = container.querySelector<HTMLElement>('.diff-view');
+    const dvPath = diffView?.dataset.filePath ?? '';
+    state._detectedLang = detectLanguage(dvPath);
+    if (state.highlightAuto) state.highlightLang = state._detectedLang;
+    applyHighlighting();
+    updateToolbarLanguage();
+    syncSplitColumnHeights();
+
+    void loadOutline(fileId);
+    bindDiffLineClicks();
+    bindHunkExpanders();
+    bindDragDrop();
+    bindServerAnnotations();
   }
 
-  bindImageDiff();
-
-  // Show AI notes if available for this file
+  // Show AI notes if available
   const hasNotes = (state.sortMode !== 'folder' && fileId in state.fileNotes) ||
     (state.guidedReviewEnabled && fileId in state.guidedNotes);
   if (hasNotes) {
