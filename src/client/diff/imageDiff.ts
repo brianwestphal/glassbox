@@ -89,6 +89,7 @@ export function bindImageDiff() {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.imageMode!;
       state.lastImageMode = mode;
+      void api('/ai/preferences', { method: 'POST', body: { last_image_mode: mode } });
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p => p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
       requestAnimationFrame(() => syncVisible());

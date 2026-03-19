@@ -15,13 +15,15 @@ import { state } from "./state.js";
 async function initAISorting() {
   try {
     // Load user preferences
-    const prefs = await api<{ sort_mode: string; risk_sort_dimension: string; show_risk_scores: boolean; ignore_whitespace: boolean }>(
+    const prefs = await api<{ sort_mode: string; risk_sort_dimension: string; show_risk_scores: boolean; ignore_whitespace: boolean; svg_view_mode: string; last_image_mode: string }>(
       "/ai/preferences",
     );
     state.sortMode = prefs.sort_mode as SortMode;
     state.riskSortDimension = prefs.risk_sort_dimension;
     state.showRiskScores = prefs.show_risk_scores;
     state.ignoreWhitespace = prefs.ignore_whitespace ?? false;
+    state.svgViewMode = (prefs.svg_view_mode as 'code' | 'rendered') ?? 'code';
+    state.lastImageMode = prefs.last_image_mode ?? 'metadata';
 
     // Check if AI is configured
     const config = await api<{ keyConfigured: boolean; guidedReview: { enabled: boolean } }>("/ai/config");

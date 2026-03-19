@@ -30,7 +30,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
       )}
 
       {/* Metadata mode */}
-      <div className="image-diff-panel image-diff-metadata active" data-panel="metadata">
+      <div className="image-diff-panel image-diff-metadata" data-panel="metadata">
         <div className="image-metadata-loading">Loading metadata...</div>
       </div>
 

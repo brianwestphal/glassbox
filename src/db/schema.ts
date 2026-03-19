@@ -82,6 +82,8 @@ export const SCHEMA_AI_SQL = `
     sort_mode TEXT NOT NULL DEFAULT 'folder',
     risk_sort_dimension TEXT NOT NULL DEFAULT 'aggregate',
     show_risk_scores BOOLEAN NOT NULL DEFAULT FALSE,
-    ignore_whitespace BOOLEAN NOT NULL DEFAULT FALSE
+    ignore_whitespace BOOLEAN NOT NULL DEFAULT FALSE,
+    svg_view_mode TEXT NOT NULL DEFAULT 'code',
+    last_image_mode TEXT NOT NULL DEFAULT 'metadata'
   );
 `;

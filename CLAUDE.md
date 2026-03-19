@@ -170,9 +170,21 @@ npm run tauri:build    # Build sidecar + package native desktop app
 
 The build produces:
 
-- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`) are kept external.
+- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`) are kept external.
 - `dist/client/app.global.js` — Client JS bundle (IIFE, minified, es2020 target)
 - `dist/client/styles.css` — Compiled and compressed CSS from SCSS
+
+### External Dependencies and Production Builds
+
+**CRITICAL**: When adding a new server-side npm dependency that is kept external (not bundled by tsup), you MUST update **three places** or the production desktop app will break:
+
+1. **`tsup.config.ts`** — Add to the `noExternal` exclusion regex so tsup keeps it external (e.g., `/^(?!@electric-sql|hono|@hono|@resvg)/`)
+2. **`scripts/build-sidecar.sh`** — Add to the `for pkg in ...` loop that copies external deps into the sidecar's `node_modules/`
+3. **This section** — Update the list above
+
+In dev mode (`npm run dev` or `tauri:dev`), external packages resolve from the project's `node_modules/` automatically. In production Tauri builds, the sidecar runs from `src-tauri/server/` with only the explicitly copied packages available. Forgetting step 2 causes "module not found" errors that only appear in production.
+
+Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`
 
 ## Conventions
 

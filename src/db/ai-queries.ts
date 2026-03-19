@@ -219,6 +219,8 @@ export interface UserPreferences {
   risk_sort_dimension: string;
   show_risk_scores: boolean;
   ignore_whitespace: boolean;
+  svg_view_mode: string;
+  last_image_mode: string;
 }
 
 export async function getUserPreferences(): Promise<UserPreferences> {
@@ -228,7 +230,7 @@ export async function getUserPreferences(): Promise<UserPreferences> {
     ['singleton']
   );
   if (result.rows.length === 0) {
-    return { sort_mode: 'folder', risk_sort_dimension: 'aggregate', show_risk_scores: false, ignore_whitespace: false };
+    return { sort_mode: 'folder', risk_sort_dimension: 'aggregate', show_risk_scores: false, ignore_whitespace: false, svg_view_mode: 'code', last_image_mode: 'metadata' };
   }
   return result.rows[0];
 }
@@ -238,13 +240,15 @@ export async function saveUserPreferences(prefs: Partial<UserPreferences>): Prom
   const current = await getUserPreferences();
   const merged = { ...current, ...prefs };
   await db.query(
-    `INSERT INTO user_preferences (id, sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO user_preferences (id, sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace, svg_view_mode, last_image_mode)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (id) DO UPDATE SET
        sort_mode = EXCLUDED.sort_mode,
        risk_sort_dimension = EXCLUDED.risk_sort_dimension,
        show_risk_scores = EXCLUDED.show_risk_scores,
-       ignore_whitespace = EXCLUDED.ignore_whitespace`,
-    ['singleton', merged.sort_mode, merged.risk_sort_dimension, merged.show_risk_scores, merged.ignore_whitespace]
+       ignore_whitespace = EXCLUDED.ignore_whitespace,
+       svg_view_mode = EXCLUDED.svg_view_mode,
+       last_image_mode = EXCLUDED.last_image_mode`,
+    ['singleton', merged.sort_mode, merged.risk_sort_dimension, merged.show_risk_scores, merged.ignore_whitespace, merged.svg_view_mode, merged.last_image_mode]
   );
 }

@@ -28,6 +28,7 @@ function bindSvgModeToggle() {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.svgMode as 'code' | 'rendered';
       state.svgViewMode = mode;
+      void api('/ai/preferences', { method: 'POST', body: { svg_view_mode: mode } });
       document.querySelectorAll('[data-svg-mode]').forEach(b => b.classList.toggle('active', b === btn));
       if (state.currentFileId !== null) {
         void selectFile(state.currentFileId);
