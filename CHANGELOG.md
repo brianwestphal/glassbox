@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.2] - 2026-03-20
+
+- Renaming DMG files to be more friendly in the GitHub release artifacts list
+- cli install script now creates /use/local/bin if needed
+
 ## [0.4.1] - 2026-03-19
 
 - Fixed production build issue with SVG support
