@@ -68,7 +68,8 @@ fn manual_install_command(source: &PathBuf, dest: &PathBuf) -> String {
     #[cfg(target_os = "macos")]
     {
         format!(
-            "sudo ln -sf \"{}\" \"{}\"",
+            "sudo sh -c 'mkdir -p \"{}\" && ln -sf \"{}\" \"{}\"'",
+            dest.parent().unwrap_or(dest).display(),
             source.display(),
             dest.display()
         )
@@ -163,12 +164,13 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
 
     #[cfg(target_os = "macos")]
     {
-        // Use osascript to get admin privileges for /usr/local/bin
+        // Use osascript to get admin privileges — single prompt for both mkdir and symlink
         let status = std::process::Command::new("osascript")
             .args([
                 "-e",
                 &format!(
-                    "do shell script \"ln -sf '{}' '{}'\" with administrator privileges",
+                    "do shell script \"mkdir -p '{}' && ln -sf '{}' '{}'\" with administrator privileges",
+                    dest.parent().unwrap_or(&dest).display(),
                     source.display(),
                     dest.display()
                 ),

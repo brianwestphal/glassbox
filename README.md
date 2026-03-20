@@ -168,7 +168,7 @@ On first launch, the app will prompt you to install the `glassbox` CLI command. 
 
 **macOS:**
 ```bash
-sudo ln -sf "/Applications/Glassbox.app/Contents/Resources/resources/glassbox" /usr/local/bin/glassbox
+sudo sh -c 'mkdir -p /usr/local/bin && ln -sf "/Applications/Glassbox.app/Contents/Resources/resources/glassbox" /usr/local/bin/glassbox'
 ```
 
 **Linux:**
