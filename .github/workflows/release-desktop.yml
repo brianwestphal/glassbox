@@ -62,12 +62,16 @@ jobs:
         include:
           - platform: macos-latest
             target: aarch64-apple-darwin
+            friendly: macOS-Apple-Silicon
           - platform: macos-latest
             target: x86_64-apple-darwin
+            friendly: macOS-Intel
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            friendly: Linux-x64
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
+            friendly: Windows-x64
 
     runs-on: ${{ matrix.platform }}
 
@@ -113,3 +117,43 @@ jobs:
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: --target ${{ matrix.target }}
+
+      - name: Rename user-facing download assets to friendly names
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+          FRIENDLY: ${{ matrix.friendly }}
+        with:
+          script: |
+            const releaseId = parseInt(process.env.RELEASE_ID);
+            const friendly = process.env.FRIENDLY;
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: releaseId,
+            });
+
+            // Only rename DMGs — other artifacts keep original names
+            // (updater assets are referenced by URL in latest.json)
+            const renames = {
+              '_aarch64.dmg': `_${friendly}.dmg`,
+              '_x64.dmg': `_${friendly}.dmg`,
+            };
+
+            for (const asset of assets) {
+              for (const [suffix, newSuffix] of Object.entries(renames)) {
+                if (asset.name.endsWith(suffix)) {
+                  const newName = asset.name.replace(suffix, newSuffix);
+                  if (newName !== asset.name) {
+                    console.log(`Renaming: ${asset.name} -> ${newName}`);
+                    await github.rest.repos.updateReleaseAsset({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      asset_id: asset.id,
+                      name: newName,
+                    });
+                  }
+                  break;
+                }
+              }
+            }
