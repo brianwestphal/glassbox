@@ -1,10 +1,5 @@
 /** Client script for the review history page. Built separately from app.ts. */
-
-function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
+import { toElement } from './dom.js';
 
 function updateBulkVisibility() {
   const bulk = document.querySelector('.bulk-actions');
@@ -14,17 +9,18 @@ function updateBulkVisibility() {
 }
 
 function showConfirm(message: string, onConfirm: () => void) {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML =
-    '<div class="modal">' +
-      '<h3>Confirm</h3>' +
-      '<p>' + esc(message) + '</p>' +
-      '<div class="modal-actions">' +
-        '<button class="btn btn-sm modal-cancel">Cancel</button>' +
-        '<button class="btn btn-sm btn-danger modal-confirm">Delete</button>' +
-      '</div>' +
-    '</div>';
+  const overlay = toElement(
+    <div className="modal-overlay">
+      <div className="modal">
+        <h3>Confirm</h3>
+        <p>{message}</p>
+        <div className="modal-actions">
+          <button className="btn btn-sm modal-cancel">Cancel</button>
+          <button className="btn btn-sm btn-danger modal-confirm">Delete</button>
+        </div>
+      </div>
+    </div>
+  );
   overlay.querySelector('.modal-cancel')!.addEventListener('click', () => { overlay.remove(); });
   overlay.querySelector('.modal-confirm')!.addEventListener('click', () => { overlay.remove(); onConfirm(); });
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });

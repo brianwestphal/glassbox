@@ -31,7 +31,7 @@ export default defineConfig([
   },
   // Client bundle (browser JS + SCSS)
   {
-    entry: ['src/client/app.ts', 'src/client/history.ts'],
+    entry: ['src/client/app.tsx', 'src/client/history.tsx'],
     format: 'iife',
     outDir: 'dist/client',
     target: 'es2020',

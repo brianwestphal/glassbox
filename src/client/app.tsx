@@ -1,4 +1,6 @@
+import { IconGear, IconRefresh } from "../icons.js";
 import { api, initDebug } from "./api.js";
+import { toElement } from "./dom.js";
 import { bindFind } from "./diff/find.js";
 import { initScrollSync } from "./diff/mode.js";
 import { selectFile } from "./diff/selection.js";
@@ -55,20 +57,17 @@ async function initAISorting() {
   // Add refresh and settings buttons to sidebar header
   const sidebarHeader = document.querySelector(".sidebar-header");
   if (sidebarHeader !== null) {
-    const refreshBtn = document.createElement("button");
-    refreshBtn.className = "btn btn-xs refresh-btn";
-    refreshBtn.title = "Refresh diffs";
-    refreshBtn.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg>';
+    const refreshBtn = toElement(
+      <button className="btn btn-xs refresh-btn" title="Refresh diffs"><IconRefresh /></button>
+    );
     refreshBtn.addEventListener("click", async () => {
       refreshBtn.style.opacity = "0.4";
       refreshBtn.style.pointerEvents = "none";
       try {
-        const result = await api<{ updated: number; added: number; stale: number; fileCount: number }>("/review/refresh", {
+        await api<{ updated: number; added: number; stale: number; fileCount: number }>("/review/refresh", {
           method: "POST",
         });
         await loadFiles();
-        // Re-select current file to pick up diff changes
         if (state.currentFileId !== null) {
           void selectFile(state.currentFileId);
         }
@@ -81,11 +80,9 @@ async function initAISorting() {
     });
     sidebarHeader.appendChild(refreshBtn);
 
-    const gearBtn = document.createElement("button");
-    gearBtn.className = "btn btn-xs settings-gear";
-    gearBtn.title = "Settings";
-    gearBtn.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const gearBtn = toElement(
+      <button className="btn btn-xs settings-gear" title="Settings"><IconGear /></button>
+    );
     gearBtn.addEventListener("click", () => {
       void import("./settings/dialog.js").then((m) => {
         m.showSettingsDialog();

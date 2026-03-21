@@ -3,6 +3,7 @@
  * Triggered by Cmd/Ctrl+F. Searches visible text in the diff container,
  * highlights matches, and allows navigation between them.
  */
+import { toElement } from '../dom.js';
 
 let findBar: HTMLElement | null = null;
 let findInput: HTMLInputElement | null = null;
@@ -51,15 +52,15 @@ function hideFindBar() {
 }
 
 function createFindBar() {
-  findBar = document.createElement('div');
-  findBar.className = 'find-bar';
-  findBar.innerHTML = `
-    <input type="text" class="find-input" placeholder="Find in diff..." />
-    <span class="find-match-count"></span>
-    <button class="find-nav-btn" data-dir="prev" title="Previous (Shift+Enter)">&#x25B2;</button>
-    <button class="find-nav-btn" data-dir="next" title="Next (Enter)">&#x25BC;</button>
-    <button class="find-close-btn" title="Close (Esc)">&times;</button>
-  `;
+  findBar = toElement(
+    <div className="find-bar">
+      <input type="text" className="find-input" placeholder="Find in diff..." />
+      <span className="find-match-count"></span>
+      <button className="find-nav-btn" data-dir="prev" title="Previous (Shift+Enter)">{'\u25B2'}</button>
+      <button className="find-nav-btn" data-dir="next" title="Next (Enter)">{'\u25BC'}</button>
+      <button className="find-close-btn" title="Close (Esc)">{'\u00D7'}</button>
+    </div>
+  );
 
   findInput = findBar.querySelector('.find-input') as HTMLInputElement;
   matchLabel = findBar.querySelector('.find-match-count') as HTMLElement;
