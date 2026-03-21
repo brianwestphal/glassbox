@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.3] - 2026-03-21
+
+- Internal code cleanup
+
 ## [0.4.2] - 2026-03-20
 
 - Renaming DMG files to be more friendly in the GitHub release artifacts list
