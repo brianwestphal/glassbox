@@ -3,7 +3,7 @@ name: hs-issue
 description: Create a new issue ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 2 -->
+<!-- hotsheet-skill-version: 3 -->
 
 Create a new Hot Sheet **issue** ticket. General issues that need attention.
 
@@ -13,7 +13,7 @@ Create a new Hot Sheet **issue** ticket. General issues that need attention.
 
 **Create the ticket** by running:
 ```bash
-curl -s -X POST http://localhost:4175/api/tickets \
+curl -s -X POST http://localhost:4177/api/tickets \
   -H "Content-Type: application/json" \
   -d '{"title": "<TITLE>", "defaults": {"category": "issue", "up_next": <true|false>}}'
 ```

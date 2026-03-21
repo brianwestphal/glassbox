@@ -3,7 +3,7 @@ name: hs-feature
 description: Create a new feature ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 2 -->
+<!-- hotsheet-skill-version: 3 -->
 
 Create a new Hot Sheet **feature** ticket. New features to be implemented.
 
@@ -13,7 +13,7 @@ Create a new Hot Sheet **feature** ticket. New features to be implemented.
 
 **Create the ticket** by running:
 ```bash
-curl -s -X POST http://localhost:4175/api/tickets \
+curl -s -X POST http://localhost:4177/api/tickets \
   -H "Content-Type: application/json" \
   -d '{"title": "<TITLE>", "defaults": {"category": "feature", "up_next": <true|false>}}'
 ```

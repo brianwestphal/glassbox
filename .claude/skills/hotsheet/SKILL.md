@@ -3,7 +3,7 @@ name: hotsheet
 description: Read the Hot Sheet worklist and work through the current priority items
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash
 ---
-<!-- hotsheet-skill-version: 2 -->
+<!-- hotsheet-skill-version: 3 -->
 
 Read `.hotsheet/worklist.md` and work through the tickets in priority order.
 

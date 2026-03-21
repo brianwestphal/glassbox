@@ -2,6 +2,8 @@ import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import { IconEdit, IconReveal, IconTrash } from '../icons.js';
+import type { SafeHtml } from '../jsx-runtime.js';
+import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { ImageDiff } from './imageDiff.js';
 
 export function DiffView({ file, diff, annotations, mode }: {
@@ -109,12 +111,12 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                   data-line={group.pair.left?.oldNum ?? ''} data-side="old"
                   data-new-line={group.pair.left?.newNum ?? group.pair.right?.newNum ?? ''}>
                   <span className="gutter" data-line-number={group.pair.left?.oldNum ?? ''}></span>
-                  <span className="code">{group.pair.left?.content ?? ''}</span>
+                  <span className="code">{renderPairContent(group.pair, 'left')}</span>
                 </div>
                 <div className={`diff-line split-right ${group.pair.right?.type || 'empty'}`}
                   data-line={group.pair.right?.newNum ?? ''} data-side="new">
                   <span className="gutter" data-line-number={group.pair.right?.newNum ?? ''}></span>
-                  <span className="code">{group.pair.right?.content ?? ''}</span>
+                  <span className="code">{renderPairContent(group.pair, 'right')}</span>
                 </div>
               </div>
               <AnnotationRows annotations={group.annotations} />
@@ -151,7 +153,7 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                     data-line={pair.left?.oldNum ?? ''} data-side="old"
                     data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
                     <span className="gutter" data-line-number={pair.left?.oldNum ?? ''}></span>
-                    <span className="code">{pair.left?.content ?? ''}</span>
+                    <span className="code">{renderPairContent(pair, 'left')}</span>
                   </div>
                 );
               })}
@@ -181,7 +183,7 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                   <div className={`diff-line split-right ${pair.right?.type || 'empty'}`}
                     data-line={pair.right?.newNum ?? ''} data-side="new">
                     <span className="gutter" data-line-number={pair.right?.newNum ?? ''}></span>
-                    <span className="code">{pair.right?.content ?? ''}</span>
+                    <span className="code">{renderPairContent(pair, 'right')}</span>
                   </div>
                 );
               })}
@@ -191,6 +193,25 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
       })}
     </div>
   );
+}
+
+/** Render content with optional character-level diff highlighting. */
+function renderSegments(segments: DiffSegment[]): SafeHtml {
+  return <>{segments.map(s => s.changed ? <span className="char-change">{s.text}</span> : <>{s.text}</>)}</>;
+}
+
+/** Get character-highlighted content for a paired remove+add line, or plain content. */
+function renderPairContent(pair: LinePair, side: 'left' | 'right'): SafeHtml | string {
+  const line = side === 'left' ? pair.left : pair.right;
+  if (!line) return '';
+  // Only compute char diff for paired remove+add lines
+  if (pair.left && pair.right && pair.left.type === 'remove' && pair.right.type === 'add') {
+    const diff = charDiff(pair.left.content, pair.right.content);
+    if (diff) {
+      return renderSegments(side === 'left' ? diff.oldSegments : diff.newSegments);
+    }
+  }
+  return line.content;
 }
 
 interface LinePair {
@@ -233,13 +254,40 @@ function pairLines(lines: DiffLine[]): LinePair[] {
   return pairs;
 }
 
+/** Pre-compute char diffs for paired remove/add lines in a hunk for unified view. */
+function buildUnifiedCharDiffs(lines: DiffLine[]): Map<DiffLine, DiffSegment[]> {
+  const result = new Map<DiffLine, DiffSegment[]>();
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].type === 'remove') {
+      const removes: DiffLine[] = [];
+      while (i < lines.length && lines[i].type === 'remove') { removes.push(lines[i]); i++; }
+      const adds: DiffLine[] = [];
+      while (i < lines.length && lines[i].type === 'add') { adds.push(lines[i]); i++; }
+      const pairCount = Math.min(removes.length, adds.length);
+      for (let j = 0; j < pairCount; j++) {
+        const diff = charDiff(removes[j].content, adds[j].content);
+        if (diff) {
+          result.set(removes[j], diff.oldSegments);
+          result.set(adds[j], diff.newSegments);
+        }
+      }
+    } else {
+      i++;
+    }
+  }
+  return result;
+}
+
 function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]> }) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
 
   return (
     <div className="diff-table-unified">
-      {hunks.map((hunk, hunkIdx) => (
+      {hunks.map((hunk, hunkIdx) => {
+        const charDiffs = buildUnifiedCharDiffs(hunk.lines);
+        return (
         <div className="hunk-block">
           <div className="hunk-separator" data-hunk-idx={hunkIdx}
             data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
@@ -250,6 +298,7 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
             const lineNum = line.type === 'remove' ? line.oldNum : line.newNum;
             const side = line.type === 'remove' ? 'old' : 'new';
             const anns = annotationsByLine[`${lineNum}:${side}`] ?? [];
+            const segments = charDiffs.get(line);
             return (
               <div>
                 <div
@@ -259,14 +308,15 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
                 >
                   <span className="gutter-old" data-line-number={line.oldNum ?? ''}></span>
                   <span className="gutter-new" data-line-number={line.newNum ?? ''}></span>
-                  <span className="code">{line.content}</span>
+                  <span className="code">{segments ? renderSegments(segments) : line.content}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}
               </div>
             );
           })}
         </div>
-      ))}
+        );
+      })}
       <div className="hunk-separator hunk-expander-tail" data-start={tailStart}>
         ↕ Show remaining lines
       </div>

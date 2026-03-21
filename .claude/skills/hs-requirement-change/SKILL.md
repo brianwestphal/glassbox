@@ -1,11 +1,11 @@
 ---
-name: hs-bug
-description: Create a new bug ticket in Hot Sheet
+name: hs-requirement-change
+description: Create a new req change ticket in Hot Sheet
 allowed-tools: Bash
 ---
 <!-- hotsheet-skill-version: 3 -->
 
-Create a new Hot Sheet **bug** ticket. Bugs that should be fixed in the codebase.
+Create a new Hot Sheet **req change** ticket. Changes to existing requirements.
 
 **Parsing the input:**
 - If the input starts with "next", "up next", or "do next" (case-insensitive), set `up_next` to `true` and use the remaining text as the title
@@ -15,7 +15,7 @@ Create a new Hot Sheet **bug** ticket. Bugs that should be fixed in the codebase
 ```bash
 curl -s -X POST http://localhost:4177/api/tickets \
   -H "Content-Type: application/json" \
-  -d '{"title": "<TITLE>", "defaults": {"category": "bug", "up_next": <true|false>}}'
+  -d '{"title": "<TITLE>", "defaults": {"category": "requirement_change", "up_next": <true|false>}}'
 ```
 
 Report the created ticket number and title to the user.

@@ -21,12 +21,26 @@ export function bindFind() {
   if (!isTauri) return;
 
   document.addEventListener('keydown', (e) => {
+    // Cmd/Ctrl+F: open find bar
     if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
       e.preventDefault();
       showFindBar();
+      return;
     }
+    // Escape: close find bar
     if (e.key === 'Escape' && findBar?.style.display !== 'none') {
       hideFindBar();
+      return;
+    }
+    // Find next/previous — OS-standard shortcuts
+    // macOS: Cmd+G / Shift+Cmd+G
+    // Windows/Linux: F3 / Shift+F3
+    if (findBar?.style.display !== 'none') {
+      if ((e.metaKey && e.key === 'g') || e.key === 'F3') {
+        e.preventDefault();
+        if (e.shiftKey) goToMatch(-1);
+        else goToMatch(1);
+      }
     }
   });
 
@@ -52,12 +66,15 @@ function hideFindBar() {
 }
 
 function createFindBar() {
+  const isMac = navigator.platform.includes('Mac');
   findBar = toElement(
     <div className="find-bar">
       <input type="text" className="find-input" placeholder="Find in diff..." />
       <span className="find-match-count"></span>
-      <button className="find-nav-btn" data-dir="prev" title="Previous (Shift+Enter)">{'\u25B2'}</button>
-      <button className="find-nav-btn" data-dir="next" title="Next (Enter)">{'\u25BC'}</button>
+      <button className="find-nav-btn" data-dir="prev"
+        title={isMac ? 'Previous (\u21E7\u2318G)' : 'Previous (Shift+F3)'}>{'\u25B2'}</button>
+      <button className="find-nav-btn" data-dir="next"
+        title={isMac ? 'Next (\u2318G)' : 'Next (F3)'}>{'\u25BC'}</button>
       <button className="find-close-btn" title="Close (Esc)">{'\u00D7'}</button>
     </div>
   );

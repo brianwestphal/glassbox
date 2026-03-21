@@ -96,15 +96,41 @@ export function applyHighlighting() {
 
   container.querySelectorAll('.code').forEach(el => {
     const codeEl = el as HTMLElement;
-    // Get raw text (strips any existing highlight spans)
-    const text = codeEl.textContent || '';
-    if (!text.trim()) return;
+    const charChangeSpans = codeEl.querySelectorAll('.char-change');
 
-    try {
-      const result = hljs.highlight(text, { language: lang, ignoreIllegals: true });
-      codeEl.innerHTML = result.value;
-    } catch {
-      // Language not registered or error — leave as-is
+    if (charChangeSpans.length === 0) {
+      // No char-change spans — highlight the whole thing
+      const text = codeEl.textContent || '';
+      if (!text.trim()) return;
+      try {
+        const result = hljs.highlight(text, { language: lang, ignoreIllegals: true });
+        codeEl.innerHTML = result.value;
+      } catch { /* leave as-is */ }
+    } else {
+      // Has char-change spans — highlight each segment individually,
+      // using hljs continuation to maintain syntax state across segments.
+      const segments: Array<{ text: string; isChange: boolean }> = [];
+      for (const child of Array.from(codeEl.childNodes)) {
+        if (child instanceof HTMLElement && child.classList.contains('char-change')) {
+          segments.push({ text: child.textContent ?? '', isChange: true });
+        } else {
+          segments.push({ text: child.textContent ?? '', isChange: false });
+        }
+      }
+      try {
+        let newHtml = '';
+        let continuation: any = undefined;
+        for (const seg of segments) {
+          const result = hljs.highlight(seg.text, { language: lang, ignoreIllegals: true, continuation });
+          continuation = result.top;
+          if (seg.isChange) {
+            newHtml += `<span class="char-change">${result.value}</span>`;
+          } else {
+            newHtml += result.value;
+          }
+        }
+        codeEl.innerHTML = newHtml;
+      } catch { /* leave as-is */ }
     }
   });
 }
@@ -115,7 +141,28 @@ function clearHighlighting() {
 
   container.querySelectorAll('.code').forEach(el => {
     const codeEl = el as HTMLElement;
-    const text = codeEl.textContent || '';
-    codeEl.textContent = text;
+    // Preserve char-change spans when clearing
+    const charChangeSpans = codeEl.querySelectorAll('.char-change');
+    if (charChangeSpans.length === 0) {
+      codeEl.textContent = codeEl.textContent || '';
+    } else {
+      // Strip highlight spans but keep char-change structure
+      const segments: Array<{ text: string; isChange: boolean }> = [];
+      for (const child of Array.from(codeEl.childNodes)) {
+        if (child instanceof HTMLElement && child.classList.contains('char-change')) {
+          segments.push({ text: child.textContent ?? '', isChange: true });
+        } else {
+          segments.push({ text: child.textContent ?? '', isChange: false });
+        }
+      }
+      codeEl.innerHTML = segments.map(s =>
+        s.isChange ? `<span class="char-change">${escapeForHtml(s.text)}</span>` : escapeForHtml(s.text)
+      ).join('');
+    }
   });
 }
+
+function escapeForHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+

@@ -297,6 +297,10 @@
   &.add .code::before { content: '+'; color: var(--green); margin-right: 4px; }
   &.remove .code::before { content: '-'; color: var(--red); margin-right: 4px; }
 
+  // Character-level change highlighting within partially modified lines
+  &.add .char-change { background: rgba(166,227,161,0.25); border-radius: 2px; }
+  &.remove .char-change { background: rgba(243,139,168,0.25); border-radius: 2px; }
+
   &.drag-over {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
