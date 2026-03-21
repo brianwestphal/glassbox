@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.4] - 2026-03-22
+
+- Individual character differences are now highlighted when at least 20% of lines are the same
+
 ## [0.4.3] - 2026-03-21
 
 - Internal code cleanup
