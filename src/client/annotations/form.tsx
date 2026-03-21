@@ -1,4 +1,3 @@
-import { raw } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
@@ -14,7 +13,7 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
   const container = toElement(
     <div className="annotation-form-container">
       <div className="annotation-form">
-        {raw(buildCategoryBadge(defaultCategory))}
+        {buildCategoryBadge(defaultCategory)}
         <textarea placeholder="Enter your annotation..." autofocus></textarea>
         <div className="annotation-form-actions">
           <button className="btn btn-sm cancel-btn">Cancel</button>

@@ -1,11 +1,8 @@
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
-import { raw } from '../jsx-runtime.js';
-import { escapeHtml } from '../utils/escapeHtml.js';
+import { IconEdit, IconReveal, IconTrash } from '../icons.js';
 import { ImageDiff } from './imageDiff.js';
-
-const revealSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 11 15 14"/></svg>';
 
 export function DiffView({ file, diff, annotations, mode }: {
   file: ReviewFile;
@@ -26,7 +23,7 @@ export function DiffView({ file, diff, annotations, mode }: {
       <div className="diff-header">
         <div className="diff-header-file">
           <span className="file-path">{diff.filePath}</span>
-          <button className="reveal-btn" data-file-id={file.id} title="Reveal in file manager">{raw(revealSvg)}</button>
+          <button className="reveal-btn" data-file-id={file.id} title="Reveal in file manager"><IconReveal /></button>
         </div>
         <div className="diff-header-actions">
           <span className={`file-status ${diff.status}`}>{diff.status}</span>
@@ -112,12 +109,12 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                   data-line={group.pair.left?.oldNum ?? ''} data-side="old"
                   data-new-line={group.pair.left?.newNum ?? group.pair.right?.newNum ?? ''}>
                   <span className="gutter" data-line-number={group.pair.left?.oldNum ?? ''}></span>
-                  <span className="code">{group.pair.left ? raw(escapeHtml(group.pair.left.content)) : ''}</span>
+                  <span className="code">{group.pair.left?.content ?? ''}</span>
                 </div>
                 <div className={`diff-line split-right ${group.pair.right?.type || 'empty'}`}
                   data-line={group.pair.right?.newNum ?? ''} data-side="new">
                   <span className="gutter" data-line-number={group.pair.right?.newNum ?? ''}></span>
-                  <span className="code">{group.pair.right ? raw(escapeHtml(group.pair.right.content)) : ''}</span>
+                  <span className="code">{group.pair.right?.content ?? ''}</span>
                 </div>
               </div>
               <AnnotationRows annotations={group.annotations} />
@@ -154,7 +151,7 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                     data-line={pair.left?.oldNum ?? ''} data-side="old"
                     data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
                     <span className="gutter" data-line-number={pair.left?.oldNum ?? ''}></span>
-                    <span className="code">{pair.left ? raw(escapeHtml(pair.left.content)) : ''}</span>
+                    <span className="code">{pair.left?.content ?? ''}</span>
                   </div>
                 );
               })}
@@ -184,7 +181,7 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                   <div className={`diff-line split-right ${pair.right?.type || 'empty'}`}
                     data-line={pair.right?.newNum ?? ''} data-side="new">
                     <span className="gutter" data-line-number={pair.right?.newNum ?? ''}></span>
-                    <span className="code">{pair.right ? raw(escapeHtml(pair.right.content)) : ''}</span>
+                    <span className="code">{pair.right?.content ?? ''}</span>
                   </div>
                 );
               })}
@@ -262,7 +259,7 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
                 >
                   <span className="gutter-old" data-line-number={line.oldNum ?? ''}></span>
                   <span className="gutter-new" data-line-number={line.newNum ?? ''}></span>
-                  <span className="code">{raw(escapeHtml(line.content))}</span>
+                  <span className="code">{line.content}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}
               </div>
@@ -288,8 +285,8 @@ function AnnotationRows({ annotations }: { annotations: Annotation[] }) {
           <span className="annotation-text">{a.content}</span>
           <div className="annotation-actions">
             {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}
-            <button className="btn btn-xs btn-icon" data-action="edit" title="Edit">{raw('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>')}</button>
-            <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete">{raw('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>')}</button>
+            <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
+            <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
           </div>
         </div>
       ))}

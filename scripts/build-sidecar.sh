@@ -88,6 +88,7 @@ mkdir -p "$SERVER_DIR"
 cp dist/cli.js "$SERVER_DIR/"
 mkdir -p "$SERVER_DIR/client"
 cp dist/client/app.global.js "$SERVER_DIR/client/"
+cp dist/client/history.global.js "$SERVER_DIR/client/"
 cp dist/client/styles.css "$SERVER_DIR/client/"
 
 # Copy only the external runtime dependencies (PGLite, Hono, @hono, resvg)

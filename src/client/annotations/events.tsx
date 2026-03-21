@@ -1,4 +1,3 @@
-import { raw } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
@@ -49,7 +48,7 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
       annotation.is_stale = false;
       item.classList.remove('annotation-stale');
       delete item.dataset.isStale;
-      item.innerHTML = buildAnnotationItemHtml(annotation);
+      item.innerHTML = buildAnnotationItemHtml(annotation).toString();
       bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
       const fileId = state.currentFileId ?? '';
       state.staleCounts[fileId] = Math.max(0, (state.staleCounts[fileId] ?? 1) - 1);
@@ -90,14 +89,13 @@ function showReclassifyPopup(badge: HTMLElement, item: HTMLElement, annotation: 
   document.querySelectorAll('.reclassify-popup').forEach(el => { el.remove(); });
 
   const rect = badge.getBoundingClientRect();
-  const optionsHtml = CATEGORIES.map(c => (
-    <div className={`reclassify-option${c.value === annotation.category ? ' active' : ''}`} data-value={c.value}>
-      <span className={`annotation-category category-${c.value}`}>{c.label}</span>
-    </div>
-  ).toString()).join('');
   const popup = toElement(
     <div className="reclassify-popup" style={`position:fixed;left:${rect.left}px;top:${rect.bottom + 4}px;z-index:1000`}>
-      {raw(optionsHtml)}
+      {CATEGORIES.map(c => (
+        <div className={`reclassify-option${c.value === annotation.category ? ' active' : ''}`} data-value={c.value}>
+          <span className={`annotation-category category-${c.value}`}>{c.label}</span>
+        </div>
+      ))}
     </div>
   );
 
@@ -110,7 +108,7 @@ function showReclassifyPopup(badge: HTMLElement, item: HTMLElement, annotation: 
     annotation.category = newCategory;
     void (async () => {
       await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content: annotation.content, category: newCategory } });
-      item.innerHTML = buildAnnotationItemHtml(annotation);
+      item.innerHTML = buildAnnotationItemHtml(annotation).toString();
       const row = item.closest('.annotation-row') as HTMLElement;
       const lineElRef = row.previousElementSibling as HTMLElement;
       bindAnnotationItemEvents(item, annotation, lineElRef, row);
@@ -133,7 +131,7 @@ function editAnnotation(item: HTMLElement, annotation: Annotation) {
   const formContainer = toElement(
     <div className="annotation-form-container">
       <div className="annotation-form">
-        {raw(buildCategoryBadge(annotation.category))}
+        {buildCategoryBadge(annotation.category)}
         <textarea>{annotation.content}</textarea>
         <div className="annotation-form-actions">
           <button className="btn btn-sm cancel-edit">Cancel</button>
@@ -167,7 +165,7 @@ function editAnnotation(item: HTMLElement, annotation: Annotation) {
       annotation.content = content;
       annotation.category = category;
       await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content, category } });
-      item.innerHTML = buildAnnotationItemHtml(annotation);
+      item.innerHTML = buildAnnotationItemHtml(annotation).toString();
       const row = item.closest('.annotation-row') as HTMLElement;
       const lineEl = row.previousElementSibling as HTMLElement;
       bindAnnotationItemEvents(item, annotation, lineEl, row);

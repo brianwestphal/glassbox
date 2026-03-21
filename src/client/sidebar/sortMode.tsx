@@ -1,14 +1,9 @@
-import { raw } from '../../jsx-runtime.js';
 import { api, clientLog } from '../api.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { getAnalysisState, state } from '../state.js';
+import { IconBook, IconFolder, IconShield } from '../../icons.js';
 import { renderFileList } from './fileTree.js';
-
-// Lucide icons (SVG)
-const ICON_FOLDER = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
-const ICON_SHIELD = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>';
-const ICON_BOOK = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
 
 export function renderSortControl(): HTMLElement {
   const control = toElement(
@@ -16,15 +11,15 @@ export function renderSortControl(): HTMLElement {
       <div className="segmented-control sort-mode-control">
         <button className={`segment sort-segment${state.sortMode === 'folder' ? ' active' : ''}`}
           data-sort-mode="folder" title="Group by folder">
-          {raw(ICON_FOLDER)}
+          <IconFolder />
         </button>
         <button className={`segment sort-segment${state.sortMode === 'risk' ? ' active' : ''}`}
           data-sort-mode="risk" title="Sort by risk">
-          {raw(ICON_SHIELD)}
+          <IconShield />
         </button>
         <button className={`segment sort-segment${state.sortMode === 'narrative' ? ' active' : ''}`}
           data-sort-mode="narrative" title="Reading order">
-          {raw(ICON_BOOK)}
+          <IconBook />
         </button>
       </div>
       <div className="sort-risk-controls" style={state.sortMode === 'risk' ? '' : 'display:none'}>

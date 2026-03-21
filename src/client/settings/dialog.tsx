@@ -1,4 +1,4 @@
-import { raw } from '../../jsx-runtime.js';
+import type { SafeHtml } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
@@ -25,7 +25,7 @@ interface ConfigResponse {
   guidedReview: { enabled: boolean; topics: string[] };
 }
 
-const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+import { IconCheck } from '../../icons.js';
 
 const TOP_LANGUAGES: Array<[string, string]> = [
   ['javascript', 'JavaScript'], ['python', 'Python'], ['typescript', 'TypeScript'],
@@ -81,36 +81,36 @@ function renderSettingsModal(
     return keyStatus.status[platform] ?? { configured: false, source: null };
   }
 
-  function renderPlatformModels(platform: string): string {
+  function renderPlatformModels(platform: string): SafeHtml[] {
     const models = modelsData.models[platform] ?? [];
     return models.map(m =>
-      `<option value="${m.id}"${m.id === currentModel ? ' selected' : ''}>${m.name}${m.isDefault ? ' (recommended)' : ''}</option>`
-    ).join('');
+      <option value={m.id} selected={m.id === currentModel}>{m.name}{m.isDefault ? ' (recommended)' : ''}</option>
+    );
   }
 
-  function keyStatusHtml(platform: string): string {
+  function keyStatusHtml(platform: string): SafeHtml {
     const info = getKeyInfo(platform);
     if (info.configured) {
       return (
         <div className="settings-key-status settings-key-configured">
-          {raw(ICON_CHECK)}
+          <IconCheck />
           <span>{'Configured via ' + (info.source ?? 'unknown')}</span>
           {info.source !== 'env' && (
             <button className="btn btn-xs btn-danger" id="remove-key">Remove</button>
           )}
         </div>
-      ).toString();
+      );
     }
     return (
       <div className="settings-key-status">
         <span className="settings-key-missing">Not configured</span>
       </div>
-    ).toString();
+    );
   }
 
-  function renderTag(key: string, label: string): string {
+  function renderTag(key: string, label: string): SafeHtml {
     const active = guidedTopics.has(key);
-    return `<button class="settings-tag${active ? ' active' : ''}" data-topic="${key}">${label}</button>`;
+    return <button className={`settings-tag${active ? ' active' : ''}`} data-topic={key}>{label}</button>;
   }
 
   function renderContent() {
@@ -120,8 +120,8 @@ function renderSettingsModal(
     const modalEl = overlay.querySelector('.modal');
     if (modalEl === null) return;
 
-    const langTags = TOP_LANGUAGES.map(([k, n]) => renderTag(k, n)).join('');
-    const moreLangTags = MORE_LANGUAGES.map(([k, n]) => renderTag(k, n)).join('');
+    const langTags = TOP_LANGUAGES.map(([k, n]) => renderTag(k, n));
+    const moreLangTags = MORE_LANGUAGES.map(([k, n]) => renderTag(k, n));
 
     modalEl.innerHTML = (
       <>
@@ -132,7 +132,7 @@ function renderSettingsModal(
             <span className="settings-heading">Desktop App</span>
             <div className="settings-section">
               <label className="settings-label">App Name</label>
-              {raw(`<input type="text" class="settings-input" id="settings-app-name" value="${appName.replace(/"/g, '&quot;')}" placeholder="Glassbox — project-name" />`)}
+              <input type="text" className="settings-input" id="settings-app-name" value={appName} placeholder="Glassbox — project-name" />
               <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
             </div>
 
@@ -168,12 +168,12 @@ function renderSettingsModal(
 
         <div className="settings-section">
           <label className="settings-label">Model</label>
-          {raw(`<select class="settings-select" id="settings-model">${renderPlatformModels(currentPlatform)}</select>`)}
+          <select className="settings-select" id="settings-model">{renderPlatformModels(currentPlatform)}</select>
         </div>
 
         <div className="settings-section">
           <label className="settings-label">API Key</label>
-          {raw(keyStatusHtml(currentPlatform))}
+          {keyStatusHtml(currentPlatform)}
           {showInput && (
             <div className="settings-key-input-group">
               <input type="password" className="settings-input" id="settings-key"
@@ -213,20 +213,20 @@ function renderSettingsModal(
         </p>
 
         <div className="settings-section">
-          {raw(`<label class="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" ${guidedEnabled ? 'checked' : ''} /><span>Enable guided review</span></label>`)}
+          <label className="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" checked={guidedEnabled} /><span>Enable guided review</span></label>
         </div>
 
         {guidedEnabled && (
           <div className="settings-guided-topics">
             <label className="settings-label">I'm new to...</label>
             <div className="settings-tags">
-              {raw(renderTag('programming', 'Programming'))}
-              {raw(renderTag('codebase', 'This codebase'))}
+              {renderTag('programming', 'Programming')}
+              {renderTag('codebase', 'This codebase')}
             </div>
 
             <label className="settings-label settings-label-spaced">I'm new to these languages</label>
             <div className="settings-tags">
-              {raw(langTags)}
+              {langTags}
             </div>
 
             {!showMoreLangs && (
@@ -234,7 +234,7 @@ function renderSettingsModal(
             )}
             {showMoreLangs && (
               <div className="settings-tags settings-tags-more">
-                {raw(moreLangTags)}
+                {moreLangTags}
               </div>
             )}
           </div>

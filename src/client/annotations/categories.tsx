@@ -1,14 +1,14 @@
-import { raw } from '../../jsx-runtime.js';
 import { toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
+import type { SafeHtml } from '../../jsx-runtime.js';
 
-export function buildCategoryBadge(value: string): string {
+export function buildCategoryBadge(value: string): SafeHtml {
   const cat = CATEGORIES.find(c => c.value === value);
   return (
     <span className={`annotation-category category-${value} form-category-badge`} data-category={value}>
       {cat ? cat.label : value}
     </span>
-  ).toString();
+  );
 }
 
 export function bindCategoryBadgeClick(container: Element) {
@@ -25,14 +25,13 @@ export function showCategoryPicker(badge: HTMLElement) {
 
   const current = badge.dataset.category;
   const rect = badge.getBoundingClientRect();
-  const optionsHtml = CATEGORIES.map(c => (
-    <div className={`reclassify-option${c.value === current ? ' active' : ''}`} data-value={c.value}>
-      <span className={`annotation-category category-${c.value}`}>{c.label}</span>
-    </div>
-  ).toString()).join('');
   const popup = toElement(
     <div className="reclassify-popup" style={`position:fixed;left:${rect.left}px;top:${rect.bottom + 4}px;z-index:1000`}>
-      {raw(optionsHtml)}
+      {CATEGORIES.map(c => (
+        <div className={`reclassify-option${c.value === current ? ' active' : ''}`} data-value={c.value}>
+          <span className={`annotation-category category-${c.value}`}>{c.label}</span>
+        </div>
+      ))}
     </div>
   );
 

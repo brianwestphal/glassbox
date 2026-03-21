@@ -51,6 +51,10 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
     const js = readFileSync(join(distDir, 'app.global.js'), 'utf-8');
     return c.text(js, 200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
   });
+  app.get('/static/history.js', (c) => {
+    const js = readFileSync(join(distDir, 'history.global.js'), 'utf-8');
+    return c.text(js, 200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
+  });
 
   // API routes
   app.route('/api', apiRoutes);

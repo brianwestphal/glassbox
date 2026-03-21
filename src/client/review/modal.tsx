@@ -86,19 +86,6 @@ function showCompleteModal() {
       ? 'Read .glassbox/latest-review.md and apply the feedback.'
       : 'Read .glassbox/review-' + result.reviewId + '.md and apply the feedback.';
 
-    let gitignoreHtml = '';
-    if (result.gitignorePrompt) {
-      gitignoreHtml = (
-        <div className="modal-gitignore">
-          <p className="modal-label">.glassbox/ is not in your .gitignore</p>
-          <div className="modal-actions" style="justify-content:flex-start;margin-top:4px">
-            <button className="btn btn-sm btn-primary" id="gitignore-add">Add to .gitignore</button>
-            <button className="btn btn-sm" id="gitignore-dismiss">{"Don't ask for 30 days"}</button>
-          </div>
-        </div>
-      ).toString();
-    }
-
     const modalEl = overlay.querySelector('.modal');
     if (modalEl === null) return;
     modalEl.innerHTML = (
@@ -108,11 +95,19 @@ function showCompleteModal() {
         <div className="modal-copyable" data-copy={result.exportPath} title="Click to copy">{result.exportPath}</div>
         <p className="modal-label">Tell your AI tool:</p>
         <div className="modal-copyable" data-copy={aiCommand} title="Click to copy">{aiCommand}</div>
+        {result.gitignorePrompt && (
+          <div className="modal-gitignore">
+            <p className="modal-label">.glassbox/ is not in your .gitignore</p>
+            <div className="modal-actions" style="justify-content:flex-start;margin-top:4px">
+              <button className="btn btn-sm btn-primary" id="gitignore-add">Add to .gitignore</button>
+              <button className="btn btn-sm" id="gitignore-dismiss">{"Don't ask for 30 days"}</button>
+            </div>
+          </div>
+        )}
+        <div className="modal-actions">
+          <button className="btn btn-sm btn-primary modal-done">Done</button>
+        </div>
       </>
-    ).toString() + gitignoreHtml + (
-      <div className="modal-actions">
-        <button className="btn btn-sm btn-primary modal-done">Done</button>
-      </div>
     ).toString();
 
     overlay.querySelector('.modal-done')?.addEventListener('click', () => { overlay.remove(); });
