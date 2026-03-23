@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-03-23
+
+- Jump to definition: command-clicking (or other OS equivalent) now jumps to symbol definition, where it can
+- Added navigation stack
+
 ## [0.4.4] - 2026-03-22
 
 - Individual character differences are now highlighted when at least 20% of lines are the same
