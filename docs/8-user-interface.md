@@ -49,6 +49,7 @@ Requirements for the browser-based UI and user interaction patterns.
 - `Cmd/Ctrl+Enter` shall save the current annotation form.
 - `Escape` shall close modals and annotation forms.
 - `j`/`k` shall navigate between files in the sidebar.
+- `Cmd+Click` (macOS) / `Ctrl+Click` (Windows/Linux) on a symbol in the diff shall navigate to its definition — same file (scrolls) or different file in the review (switches file and scrolls). Uses the existing regex-based outline parser to build a cross-file symbol index.
 
 ### 8.7 Completion Modal
 

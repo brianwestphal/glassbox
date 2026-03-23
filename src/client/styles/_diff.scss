@@ -301,6 +301,11 @@
   &.add .char-change { background: rgba(166,227,161,0.25); border-radius: 2px; }
   &.remove .char-change { background: rgba(243,139,168,0.25); border-radius: 2px; }
 
+  // Go-to-definition jump highlight
+  &.jump-highlight {
+    animation: jump-flash 1.5s ease-out;
+  }
+
   &.drag-over {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
@@ -554,4 +559,31 @@
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+// Go-to-definition toast
+.goto-toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 13px;
+  z-index: 1000;
+  animation: toast-fade 2s ease-out forwards;
+}
+
+@keyframes toast-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+// Go-to-definition flash animation
+@keyframes jump-flash {
+  0% { background: rgba(137, 180, 250, 0.3); }
+  100% { background: transparent; }
 }

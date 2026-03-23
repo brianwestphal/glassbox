@@ -2,6 +2,7 @@ import { IconGear, IconRefresh } from "../icons.js";
 import { api, initDebug } from "./api.js";
 import { toElement } from "./dom.js";
 import { bindFind } from "./diff/find.js";
+import { bindGoToDefinition } from "./diff/goToDefinition.js";
 import { initScrollSync } from "./diff/mode.js";
 import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
@@ -120,6 +121,7 @@ async function init() {
   bindSidebarEvents();
   bindToolbar();
   bindFind();
+  bindGoToDefinition();
   bindFileFilter();
   bindSidebarResize();
   bindCompleteButton();

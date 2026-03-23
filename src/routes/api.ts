@@ -265,6 +265,101 @@ apiRoutes.get('/outline/:fileId', async (c) => {
   return c.json({ symbols });
 });
 
+// --- Symbol Definition Search ---
+
+apiRoutes.get('/symbol-definition', async (c) => {
+  const name = c.req.query('name');
+  const currentFileId = c.req.query('currentFileId');
+  if (!name) return c.json({ definitions: [] });
+
+  const reviewId = resolveReviewId(c);
+  const repoRoot = c.get('repoRoot');
+
+  interface SymbolDef {
+    fileId: string | null;
+    filePath: string;
+    name: string;
+    kind: string;
+    line: number;
+  }
+
+  const definitions: SymbolDef[] = [];
+  const searchedPaths = new Set<string>();
+
+  // First pass: search files in the review (they have fileIds for navigation)
+  const reviewFiles = await getReviewFiles(reviewId);
+  for (const file of reviewFiles) {
+    searchedPaths.add(file.file_path);
+    const diff = JSON.parse(file.diff_data ?? '{}') as { status?: string };
+    const isDeleted = diff.status === 'deleted';
+    let content = '';
+    try {
+      content = isDeleted
+        ? getFileContent(file.file_path, 'HEAD', repoRoot)
+        : getFileContent(file.file_path, 'working', repoRoot);
+    } catch { continue; }
+    if (!content) continue;
+
+    const symbols = parseOutline(content, file.file_path);
+    collectDefinitions(symbols, name, file.id, file.file_path, definitions);
+  }
+
+  // Second pass: if no match found, search all tracked files in the repo
+  if (definitions.length === 0) {
+    try {
+      const allFiles = execSync('git ls-files', { cwd: repoRoot, encoding: 'utf-8' })
+        .trim().split('\n').filter(Boolean);
+      for (const filePath of allFiles) {
+        if (searchedPaths.has(filePath)) continue;
+        // Only search files the outline parser supports
+        const ext = filePath.slice(filePath.lastIndexOf('.'));
+        if (!/\.(js|mjs|cjs|jsx|ts|tsx|mts|cts|java|go|rs|c|h|cpp|cc|cxx|hpp|cs|swift|php|kt|kts|scala|dart|groovy|py|rb)$/i.test(ext)) continue;
+
+        let content = '';
+        try {
+          content = readFileSync(resolve(repoRoot, filePath), 'utf-8');
+        } catch { continue; }
+        if (!content) continue;
+
+        const symbols = parseOutline(content, filePath);
+        collectDefinitions(symbols, name, null, filePath, definitions);
+        // Stop after finding first match in repo scan (perf)
+        if (definitions.length > 0) break;
+      }
+    } catch { /* git ls-files failed */ }
+  }
+
+  // Sort: same file first, review files before repo files, class before function
+  definitions.sort((a, b) => {
+    if (a.fileId === currentFileId && b.fileId !== currentFileId) return -1;
+    if (b.fileId === currentFileId && a.fileId !== currentFileId) return 1;
+    if (a.fileId !== null && b.fileId === null) return -1;
+    if (b.fileId !== null && a.fileId === null) return 1;
+    if (a.kind === 'class' && b.kind !== 'class') return -1;
+    if (b.kind === 'class' && a.kind !== 'class') return 1;
+    return 0;
+  });
+
+  return c.json({ definitions });
+});
+
+function collectDefinitions(
+  symbols: Array<{ name: string; kind: string; line: number; children: any[] }>,
+  targetName: string,
+  fileId: string | null,
+  filePath: string,
+  out: Array<{ fileId: string | null; filePath: string; name: string; kind: string; line: number }>
+) {
+  for (const sym of symbols) {
+    if (sym.name === targetName) {
+      out.push({ fileId, filePath, name: sym.name, kind: sym.kind, line: sym.line });
+    }
+    if (sym.children?.length > 0) {
+      collectDefinitions(sym.children, targetName, fileId, filePath, out);
+    }
+  }
+}
+
 // --- Context expansion ---
 
 apiRoutes.get('/context/:fileId', async (c) => {

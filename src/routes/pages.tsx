@@ -1,4 +1,6 @@
+import { readFileSync } from 'fs';
 import { Hono } from 'hono';
+import { resolve } from 'path';
 
 import { DiffView } from '../components/diffView.js';
 import { FileList } from '../components/fileList.js';
@@ -175,6 +177,42 @@ pageRoutes.get('/file/:fileId', async (c) => {
   }
 
   const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} />;
+  return c.html(html.toString());
+});
+
+// View a raw repo file (not in the diff) — used by go-to-definition for non-diff files
+pageRoutes.get('/file-raw', (c) => {
+  const filePath = c.req.query('path');
+  if (!filePath) return c.text('Missing path', 400);
+  const repoRoot = c.get('repoRoot');
+
+  let content: string;
+  try {
+    content = readFileSync(resolve(repoRoot, filePath), 'utf-8');
+  } catch {
+    return c.text('File not found', 404);
+  }
+
+  const lines = content.split('\n');
+  const diff: FileDiff = {
+    filePath,
+    oldPath: null,
+    status: 'added',
+    isBinary: false,
+    hunks: [{
+      oldStart: 0, oldCount: 0,
+      newStart: 1, newCount: lines.length,
+      lines: lines.map((line, i) => ({
+        type: 'context' as const,
+        oldNum: i + 1,
+        newNum: i + 1,
+        content: line,
+      })),
+    }],
+  };
+
+  const fakeFile = { id: '', review_id: '', file_path: filePath, status: 'reviewed', diff_data: null };
+  const html = <DiffView file={fakeFile as any} diff={diff} annotations={[]} mode="unified" />;
   return c.html(html.toString());
 });
 

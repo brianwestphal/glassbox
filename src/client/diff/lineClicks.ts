@@ -13,6 +13,8 @@ export function bindDiffLineClicks() {
     });
 
     el.addEventListener('click', (e) => {
+      // Ignore Cmd/Ctrl+Click (go-to-definition)
+      if ((e as MouseEvent).metaKey || (e as MouseEvent).ctrlKey) return;
       // Ignore clicks on annotation UI elements
       if ((e.target as HTMLElement).closest('.annotation-form-container') || (e.target as HTMLElement).closest('.annotation-row')) return;
 
