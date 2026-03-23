@@ -42,6 +42,7 @@ All project documentation lives in `docs/`. There are two types:
 - `10-desktop-app.md` — Tauri sidecar, launch flows, CLI install, updates
 - `11-build-and-distribution.md` — Build pipeline, npm/desktop packaging, CI/CD
 - `12-demo-mode.md` — Demo scenarios and isolation
+- `13-navigation.md` — Go-to-definition, navigation stack (back/forward)
 
 **Architecture documents** describe system design and setup:
 

@@ -25,6 +25,43 @@
   h3 { color: var(--text); }
 }
 
+// --- Navigation Bar ---
+
+.diff-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+
+  &:hover:not(.disabled) { color: var(--text); background: var(--bg-hover); }
+  &.disabled { opacity: 0.3; cursor: default; }
+  svg { display: block; }
+}
+
+.nav-file-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 // --- Diff Header ---
 
 .diff-header {

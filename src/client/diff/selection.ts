@@ -9,11 +9,15 @@ import { applyHighlighting,detectLanguage } from './highlight.js';
 import { bindHunkExpanders } from './hunkExpander.js';
 import { bindImageDiff } from './imageDiff.js';
 import { bindDiffLineClicks } from './lineClicks.js';
+import { navPush, getVisibleScrollLine } from './navStack.js';
 import { loadOutline } from './outline.js';
 import { syncSplitColumnHeights } from './splitSync.js';
 
 export async function selectFile(fileId: string) {
   state.currentFileId = fileId;
+  const file = state.files.find(f => f.id === fileId);
+  navPush({ fileId, filePath: file?.file_path ?? null, scrollLine: 1 });
+  updateNavFilePath(file?.file_path ?? '');
   document.querySelectorAll('.file-item').forEach(el => {
     (el as HTMLElement).classList.toggle('active', (el as HTMLElement).dataset.fileId === fileId);
   });
@@ -23,6 +27,8 @@ export async function selectFile(fileId: string) {
   const welcome = document.querySelector<HTMLElement>('.welcome-message');
   if (welcome !== null) welcome.style.display = 'none';
   container.style.display = 'block';
+  const navBar = document.getElementById('diff-nav-bar');
+  if (navBar) navBar.style.display = '';
   const toolbar = document.getElementById('diff-toolbar');
   if (toolbar !== null) toolbar.style.display = '';
 
@@ -31,7 +37,6 @@ export async function selectFile(fileId: string) {
   const svgToggle = toolbar?.querySelector<HTMLElement>('.diff-toolbar-svg-toggle');
 
   // Determine if this is an SVG file (from state, before fetch)
-  const file = state.files.find(f => f.id === fileId);
   const filePath = file?.file_path ?? '';
   const isSvg = filePath.toLowerCase().endsWith('.svg');
   const svgRendered = isSvg && state.svgViewMode === 'rendered';
@@ -121,6 +126,11 @@ export async function selectFile(fileId: string) {
   if (hasNotes) {
     renderAINotes(container, fileId);
   }
+}
+
+export function updateNavFilePath(filePath: string) {
+  const el = document.getElementById('nav-file-path');
+  if (el) el.textContent = filePath;
 }
 
 export function updateToolbarLanguage() {

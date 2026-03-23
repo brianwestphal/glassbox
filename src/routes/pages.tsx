@@ -62,6 +62,15 @@ pageRoutes.get('/', async (c) => {
             <p>{files.length} file(s) to review</p>
             <p className="progress-summary" id="progress-summary"></p>
           </div>
+          <div className="diff-nav-bar" id="diff-nav-bar" style="display:none">
+            <button className="nav-btn disabled" id="nav-back-btn" disabled title="Back">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button className="nav-btn disabled" id="nav-forward-btn" disabled title="Forward">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <span className="nav-file-path" id="nav-file-path"></span>
+          </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
           <div className="diff-toolbar" id="diff-toolbar" style="display:none">
             <div className="diff-toolbar-svg-toggle" style="display:none">
@@ -271,6 +280,15 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             <h3>Select a file to begin reviewing</h3>
             <p>{files.length} file(s) to review</p>
             <p className="progress-summary" id="progress-summary"></p>
+          </div>
+          <div className="diff-nav-bar" id="diff-nav-bar" style="display:none">
+            <button className="nav-btn disabled" id="nav-back-btn" disabled title="Back">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button className="nav-btn disabled" id="nav-forward-btn" disabled title="Forward">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <span className="nav-file-path" id="nav-file-path"></span>
           </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
           <div className="diff-toolbar" id="diff-toolbar" style="display:none">

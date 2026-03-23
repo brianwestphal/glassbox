@@ -4,6 +4,8 @@ import { toElement } from "./dom.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
 import { initScrollSync } from "./diff/mode.js";
+import { navBack, navForward, navUpdateScroll, getVisibleScrollLine, setNavigating } from "./diff/navStack.js";
+import { updateNavFilePath } from "./diff/selection.js";
 import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
 import { triggerGuidedAnalysis } from "./guided.js";
@@ -93,6 +95,71 @@ async function initAISorting() {
   }
 }
 
+async function navigateToEntry(entry: { fileId: string | null; filePath: string | null; scrollLine: number }) {
+  setNavigating(true);
+  try {
+    if (entry.fileId) {
+      await selectFile(entry.fileId);
+    } else if (entry.filePath) {
+      // Raw file — fetch and display
+      const container = document.getElementById("diff-container");
+      if (!container) return;
+      const res = await fetch("/file-raw?path=" + encodeURIComponent(entry.filePath));
+      if (res.ok) {
+        container.innerHTML = await res.text();
+        container.style.display = "block";
+        const { detectLanguage: dl, applyHighlighting: ah } = await import("./diff/highlight.js");
+        state._detectedLang = dl(entry.filePath);
+        if (state.highlightAuto) state.highlightLang = state._detectedLang;
+        ah();
+        document.querySelectorAll(".file-item.active").forEach((el) => el.classList.remove("active"));
+        state.currentFileId = null;
+        updateNavFilePath(entry.filePath);
+      }
+    }
+    // Scroll to the saved line position
+    requestAnimationFrame(() => {
+      const lineEl = document.querySelector(`.diff-line[data-line="${entry.scrollLine}"][data-side="new"]`) as HTMLElement | null;
+      if (lineEl) lineEl.scrollIntoView({ block: 'start' });
+    });
+  } finally {
+    setNavigating(false);
+  }
+}
+
+function bindNavButtons() {
+  document.getElementById("nav-back-btn")?.addEventListener("click", () => {
+    const entry = navBack();
+    if (entry) void navigateToEntry(entry);
+  });
+  document.getElementById("nav-forward-btn")?.addEventListener("click", () => {
+    const entry = navForward();
+    if (entry) void navigateToEntry(entry);
+  });
+
+  // Keyboard shortcuts: Cmd+[ / Cmd+] (macOS), Alt+Left / Alt+Right (Windows/Linux)
+  document.addEventListener("keydown", (e) => {
+    const isMac = navigator.platform.includes("Mac");
+    if (isMac && e.metaKey && e.key === "[") {
+      e.preventDefault();
+      const entry = navBack();
+      if (entry) void navigateToEntry(entry);
+    } else if (isMac && e.metaKey && e.key === "]") {
+      e.preventDefault();
+      const entry = navForward();
+      if (entry) void navigateToEntry(entry);
+    } else if (!isMac && e.altKey && e.key === "ArrowLeft") {
+      e.preventDefault();
+      const entry = navBack();
+      if (entry) void navigateToEntry(entry);
+    } else if (!isMac && e.altKey && e.key === "ArrowRight") {
+      e.preventDefault();
+      const entry = navForward();
+      if (entry) void navigateToEntry(entry);
+    }
+  });
+}
+
 async function init() {
   await initDebug();
   await initAISorting();
@@ -133,6 +200,19 @@ async function init() {
     document.querySelectorAll(".diff-line.drag-over").forEach((d) => {
       d.classList.remove("drag-over");
     });
+  });
+
+  // Navigation stack: back/forward buttons
+  bindNavButtons();
+
+  // Track scroll position for nav stack
+  const diffContainer = document.getElementById("diff-container");
+  let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+  diffContainer?.addEventListener("scroll", () => {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      navUpdateScroll(getVisibleScrollLine());
+    }, 300);
   });
 }
 

@@ -4,7 +4,8 @@
  */
 import { api } from '../api.js';
 import { state } from '../state.js';
-import { selectFile } from './selection.js';
+import { navPush } from './navStack.js';
+import { selectFile, updateNavFilePath } from './selection.js';
 
 interface SymbolDef {
   fileId: string | null;
@@ -159,6 +160,14 @@ async function loadRawFile(filePath: string, targetLine: number) {
   // Clear sidebar selection (this file isn't in the sidebar)
   document.querySelectorAll('.file-item.active').forEach(el => el.classList.remove('active'));
   state.currentFileId = null;
+
+  // Show nav bar and update file path
+  const navBar = document.getElementById('diff-nav-bar');
+  if (navBar) navBar.style.display = '';
+  updateNavFilePath(filePath);
+
+  // Push to nav stack
+  navPush({ fileId: null, filePath, scrollLine: targetLine });
 
   // Scroll to the target line
   requestAnimationFrame(() => scrollToLine(targetLine));
