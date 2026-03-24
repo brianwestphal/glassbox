@@ -5,6 +5,7 @@ dist
 .DS_Store
 .hotsheet/
 coverage/
+.claude
 
 # Tauri
 src-tauri/target
