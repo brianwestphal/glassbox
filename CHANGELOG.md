@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.1] - 2026-03-27
+
+- Redesigned settings dialog with tabbed interface
+
 ## [0.5.0] - 2026-03-23
 
 - Jump to definition: command-clicking (or other OS equivalent) now jumps to symbol definition, where it can
