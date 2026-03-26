@@ -35,13 +35,20 @@ Requirements for the browser-based UI and user interaction patterns.
 ### 8.5 Settings Dialog
 
 - A settings dialog shall be accessible via a gear icon in the sidebar header.
-- The settings dialog shall include:
-  - AI platform selection (segmented control)
-  - Model selection (dropdown per platform)
-  - API key management (add, view source, remove)
-  - Guided review toggle and topic selection
-- When running in the Tauri desktop app, the settings dialog shall additionally include:
-  - Custom app name input
+- The dialog shall be closeable at any time via the close button, clicking outside, or pressing Escape.
+- All settings shall save automatically when changed (no Save/Cancel buttons).
+- The settings dialog shall use a tabbed interface with icon-and-label tabs:
+  - **General** — App name (Tauri desktop app only; tab hidden in browser)
+  - **Experimental** — AI configuration and guided review
+  - **Updates** — Software update checks (Tauri desktop app only; tab hidden in browser)
+- When running in the Tauri desktop app, the General tab shall include:
+  - Custom app name input (auto-saved on change, debounced)
+- The Experimental tab shall include:
+  - AI platform selection (segmented control, saved immediately on switch)
+  - Model selection (dropdown per platform, saved immediately on change)
+  - API key management (add with inline "Save Key" button, view source, remove)
+  - Guided review toggle and topic selection (saved immediately / debounced for rapid topic changes)
+- When running in the Tauri desktop app, the Updates tab shall include:
   - "Check for Updates" button with status display
 
 ### 8.6 Keyboard Shortcuts

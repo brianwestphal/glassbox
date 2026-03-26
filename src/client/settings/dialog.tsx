@@ -25,7 +25,7 @@ interface ConfigResponse {
   guidedReview: { enabled: boolean; topics: string[] };
 }
 
-import { IconCheck } from '../../icons.js';
+import { IconCheck, IconSliders, IconFlask, IconDownload } from '../../icons.js';
 
 const TOP_LANGUAGES: Array<[string, string]> = [
   ['javascript', 'JavaScript'], ['python', 'Python'], ['typescript', 'TypeScript'],
@@ -47,7 +47,7 @@ interface ProjectSettingsResponse {
   appName?: string;
 }
 
-export function showSettingsDialog(onSave?: () => void) {
+export function showSettingsDialog(onClose?: () => void) {
   void (async () => {
     const [keyStatus, modelsData, configData, projectSettings] = await Promise.all([
       api<KeyStatusResponse>('/ai/key-status'),
@@ -56,7 +56,7 @@ export function showSettingsDialog(onSave?: () => void) {
       api<ProjectSettingsResponse>('/project-settings'),
     ]);
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, onSave);
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, onClose);
   })();
 }
 
@@ -65,7 +65,7 @@ function renderSettingsModal(
   modelsData: ModelsResponse,
   configData: ConfigResponse,
   projectSettings: ProjectSettingsResponse,
-  onSave?: () => void,
+  onClose?: () => void,
 ) {
   const overlay = toElement(<div className="modal-overlay"></div>);
 
@@ -76,6 +76,74 @@ function renderSettingsModal(
   let showMoreLangs = false;
   let appName = projectSettings.appName ?? '';
   const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI__;
+  let activeTab = isTauri ? 'general' : 'experimental';
+
+  // Track last-saved guided review state for cache invalidation
+  let lastSavedGuidedEnabled = guidedEnabled;
+  let lastSavedGuidedTopics = new Set(guidedTopics);
+
+  // Debounce timers
+  let configTimer: ReturnType<typeof setTimeout> | null = null;
+  let appNameTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function closeDialog() {
+    if (configTimer) clearTimeout(configTimer);
+    if (appNameTimer) clearTimeout(appNameTimer);
+    document.removeEventListener('keydown', handleEscape);
+    overlay.remove();
+    if (onClose !== undefined) onClose();
+  }
+
+  function handleEscape(e: KeyboardEvent) {
+    if (e.key === 'Escape') closeDialog();
+  }
+
+  function saveConfig() {
+    const newTopics = Array.from(guidedTopics);
+    const guidedChanged = guidedEnabled !== lastSavedGuidedEnabled ||
+      newTopics.length !== lastSavedGuidedTopics.size ||
+      newTopics.some(t => !lastSavedGuidedTopics.has(t));
+
+    void (async () => {
+      await api('/ai/config', {
+        method: 'POST',
+        body: {
+          platform: currentPlatform,
+          model: currentModel,
+          guidedReview: { enabled: guidedEnabled, topics: newTopics },
+        },
+      });
+
+      const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+      state.aiConfigured = newConfig.keyConfigured;
+      state.guidedReviewEnabled = guidedEnabled;
+      configData.guidedReview = { enabled: guidedEnabled, topics: newTopics };
+
+      if (guidedChanged && state.aiConfigured) {
+        invalidateAnalysisCache();
+        invalidateGuidedAnalysis();
+      }
+
+      lastSavedGuidedEnabled = guidedEnabled;
+      lastSavedGuidedTopics = new Set(guidedTopics);
+    })();
+  }
+
+  function saveConfigDebounced() {
+    if (configTimer) clearTimeout(configTimer);
+    configTimer = setTimeout(saveConfig, 300);
+  }
+
+  function saveAppNameDebounced() {
+    if (appNameTimer) clearTimeout(appNameTimer);
+    appNameTimer = setTimeout(() => {
+      const val = appName.trim();
+      if (val !== (projectSettings.appName ?? '')) {
+        void api('/project-settings', { method: 'PATCH', body: { appName: val } });
+        projectSettings.appName = val || undefined;
+      }
+    }, 500);
+  }
 
   function getKeyInfo(platform: string): { configured: boolean; source: string | null } {
     return keyStatus.status[platform] ?? { configured: false, source: null };
@@ -125,124 +193,153 @@ function renderSettingsModal(
 
     modalEl.innerHTML = (
       <>
-        <h3>Settings</h3>
-
-        {isTauri && (
-          <>
-            <span className="settings-heading">Desktop App</span>
-            <div className="settings-section">
-              <label className="settings-label">App Name</label>
-              <input type="text" className="settings-input" id="settings-app-name" value={appName} placeholder="Glassbox — project-name" />
-              <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-section-header">
-                <span className="settings-label">Software Updates</span>
-                <button className="btn btn-xs" id="check-updates-btn">Check for Updates</button>
-              </div>
-              <p className="settings-hint" id="check-updates-status"></p>
-            </div>
-
-            <div className="settings-divider"></div>
-          </>
-        )}
-
-        <div className="settings-section-header">
-          <span className="settings-heading">AI</span>
-          <span className="settings-beta-badge">Beta</span>
-        </div>
-        <p className="settings-disclaimer">
-          AI features are in early beta and provided for evaluation purposes only, without warranty of any kind.
-        </p>
-
-        <div className="settings-section">
-          <label className="settings-label">Platform</label>
-          <div className="segmented-control settings-platform-control">
-            {Object.entries(modelsData.platforms).map(([key, name]) => (
-              <button className={`segment${key === currentPlatform ? ' active' : ''}`}
-                data-platform={key}>{name}</button>
-            ))}
-          </div>
+        <div className="settings-header">
+          <h3>Settings</h3>
+          <button className="settings-close" id="settings-close">&times;</button>
         </div>
 
-        <div className="settings-section">
-          <label className="settings-label">Model</label>
-          <select className="settings-select" id="settings-model">{renderPlatformModels(currentPlatform)}</select>
-        </div>
-
-        <div className="settings-section">
-          <label className="settings-label">API Key</label>
-          {keyStatusHtml(currentPlatform)}
-          {showInput && (
-            <div className="settings-key-input-group">
-              <input type="password" className="settings-input" id="settings-key"
-                placeholder="Enter API key..." autocomplete="off" />
-              {keyStatus.keychainAvailable ? (
-                <div className="settings-storage-options">
-                  <label className="settings-radio">
-                    <input type="radio" name="key-storage" value="keychain" checked />
-                    <span>{'Store in ' + keyStatus.keychainLabel}</span>
-                  </label>
-                  <label className="settings-radio">
-                    <input type="radio" name="key-storage" value="config" />
-                    <span>Store in config file</span>
-                  </label>
-                </div>
-              ) : (
-                <div className="settings-storage-options">
-                  <label className="settings-radio">
-                    <input type="radio" name="key-storage" value="config" checked />
-                    <span>Store in ~/.glassbox/config.json</span>
-                  </label>
-                  <p className="settings-warning">Key will be stored with basic encoding (not encrypted). Only use for local development.</p>
-                </div>
-              )}
-            </div>
+        <div className="settings-tabs">
+          {isTauri && (
+            <button className={`settings-tab${activeTab === 'general' ? ' active' : ''}`} data-tab="general">
+              <IconSliders />
+              <span>General</span>
+            </button>
+          )}
+          <button className={`settings-tab${activeTab === 'experimental' ? ' active' : ''}`} data-tab="experimental">
+            <IconFlask />
+            <span>Experimental</span>
+          </button>
+          {isTauri && (
+            <button className={`settings-tab${activeTab === 'updates' ? ' active' : ''}`} data-tab="updates">
+              <IconDownload />
+              <span>Updates</span>
+            </button>
           )}
         </div>
 
-        <div className="settings-divider"></div>
+        <div className="settings-body">
+          {/* General tab (Tauri only) */}
+          {isTauri && (
+            <div className={`settings-tab-panel${activeTab === 'general' ? ' active' : ''}`} data-panel="general">
+              <div className="settings-section">
+                <label className="settings-label">App Name</label>
+                <input type="text" className="settings-input" id="settings-app-name" value={appName} placeholder="Glassbox — project-name" />
+                <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
+              </div>
+            </div>
+          )}
 
-        <div className="settings-section-header">
-          <span className="settings-heading">Guided Review</span>
-          <span className="settings-beta-badge">Beta</span>
-        </div>
-        <p className="settings-disclaimer">
-          Get AI explanations tailored to your experience level.
-        </p>
+          {/* Experimental tab */}
+          <div className={`settings-tab-panel${activeTab === 'experimental' ? ' active' : ''}`} data-panel="experimental">
+            <div className="settings-section-header">
+              <span className="settings-heading">AI</span>
+              <span className="settings-beta-badge">Beta</span>
+            </div>
+            <p className="settings-disclaimer">
+              AI features are in early beta and provided for evaluation purposes only, without warranty of any kind.
+            </p>
 
-        <div className="settings-section">
-          <label className="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" checked={guidedEnabled} /><span>Enable guided review</span></label>
-        </div>
-
-        {guidedEnabled && (
-          <div className="settings-guided-topics">
-            <label className="settings-label">I'm new to...</label>
-            <div className="settings-tags">
-              {renderTag('programming', 'Programming')}
-              {renderTag('codebase', 'This codebase')}
+            <div className="settings-section">
+              <label className="settings-label">Platform</label>
+              <div className="segmented-control settings-platform-control">
+                {Object.entries(modelsData.platforms).map(([key, name]) => (
+                  <button className={`segment${key === currentPlatform ? ' active' : ''}`}
+                    data-platform={key}>{name}</button>
+                ))}
+              </div>
             </div>
 
-            <label className="settings-label settings-label-spaced">I'm new to these languages</label>
-            <div className="settings-tags">
-              {langTags}
+            <div className="settings-section">
+              <label className="settings-label">Model</label>
+              <select className="settings-select" id="settings-model">{renderPlatformModels(currentPlatform)}</select>
             </div>
 
-            {!showMoreLangs && (
-              <button className="settings-more-toggle" id="show-more-langs">More languages...</button>
-            )}
-            {showMoreLangs && (
-              <div className="settings-tags settings-tags-more">
-                {moreLangTags}
+            <div className="settings-section">
+              <label className="settings-label">API Key</label>
+              {keyStatusHtml(currentPlatform)}
+              {showInput && (
+                <div className="settings-key-input-group">
+                  <div className="settings-key-row">
+                    <input type="password" className="settings-input" id="settings-key"
+                      placeholder="Enter API key..." autocomplete="off" />
+                    <button className="btn btn-xs btn-primary" id="save-key-btn">Save Key</button>
+                  </div>
+                  {keyStatus.keychainAvailable ? (
+                    <div className="settings-storage-options">
+                      <label className="settings-radio">
+                        <input type="radio" name="key-storage" value="keychain" checked />
+                        <span>{'Store in ' + keyStatus.keychainLabel}</span>
+                      </label>
+                      <label className="settings-radio">
+                        <input type="radio" name="key-storage" value="config" />
+                        <span>Store in config file</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="settings-storage-options">
+                      <label className="settings-radio">
+                        <input type="radio" name="key-storage" value="config" checked />
+                        <span>Store in ~/.glassbox/config.json</span>
+                      </label>
+                      <p className="settings-warning">Key will be stored with basic encoding (not encrypted). Only use for local development.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="settings-divider"></div>
+
+            <div className="settings-section-header">
+              <span className="settings-heading">Guided Review</span>
+              <span className="settings-beta-badge">Beta</span>
+            </div>
+            <p className="settings-disclaimer">
+              Get AI explanations tailored to your experience level.
+            </p>
+
+            <div className="settings-section">
+              <label className="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" checked={guidedEnabled} /><span>Enable guided review</span></label>
+            </div>
+
+            {guidedEnabled && (
+              <div className="settings-guided-topics">
+                <label className="settings-label">I'm new to...</label>
+                <div className="settings-tags">
+                  {renderTag('programming', 'Programming')}
+                  {renderTag('codebase', 'This codebase')}
+                </div>
+
+                <label className="settings-label settings-label-spaced">I'm new to these languages</label>
+                <div className="settings-tags">
+                  {langTags}
+                </div>
+
+                {!showMoreLangs && (
+                  <button className="settings-more-toggle" id="show-more-langs">More languages...</button>
+                )}
+                {showMoreLangs && (
+                  <div className="settings-tags settings-tags-more">
+                    {moreLangTags}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        <div className="modal-actions">
-          <button className="btn btn-sm modal-cancel">Cancel</button>
-          <button className="btn btn-sm btn-primary" id="settings-save">Save</button>
+          {/* Updates tab (Tauri only) */}
+          {isTauri && (
+            <div className={`settings-tab-panel${activeTab === 'updates' ? ' active' : ''}`} data-panel="updates">
+              <div className="settings-section">
+                <div className="settings-section-header">
+                  <span className="settings-heading">Software Updates</span>
+                </div>
+                <p className="settings-disclaimer">Check for new versions of the Glassbox desktop app.</p>
+                <button className="btn btn-sm" id="check-updates-btn">Check for Updates</button>
+                <p className="settings-hint" id="check-updates-status"></p>
+              </div>
+            </div>
+          )}
         </div>
       </>
     ).toString();
@@ -250,7 +347,36 @@ function renderSettingsModal(
     bindModalEvents();
   }
 
+  function saveKey() {
+    const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
+    if (keyInput === null || keyInput.value.trim() === '') return;
+    const storageRadio = overlay.querySelector<HTMLInputElement>('input[name="key-storage"]:checked');
+    const storage = storageRadio?.value ?? 'config';
+    void (async () => {
+      await api('/ai/key', {
+        method: 'POST',
+        body: { platform: currentPlatform, key: keyInput.value.trim(), storage },
+      });
+      const newStatus = await api<KeyStatusResponse>('/ai/key-status');
+      keyStatus.status = newStatus.status;
+      const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+      state.aiConfigured = newConfig.keyConfigured;
+      renderContent();
+    })();
+  }
+
   function bindModalEvents() {
+    // Tab switching
+    overlay.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeTab = (tab as HTMLElement).dataset.tab ?? 'experimental';
+        renderContent();
+      });
+    });
+
+    // Close button
+    overlay.querySelector('#settings-close')?.addEventListener('click', closeDialog);
+
     // Check for Updates button
     const checkUpdatesBtn = overlay.querySelector<HTMLButtonElement>('#check-updates-btn');
     const checkUpdatesStatus = overlay.querySelector<HTMLElement>('#check-updates-status');
@@ -277,22 +403,24 @@ function renderSettingsModal(
       });
     }
 
-    // Platform switching
+    // Platform switching — save immediately
     overlay.querySelectorAll('.settings-platform-control .segment').forEach(btn => {
       btn.addEventListener('click', () => {
         currentPlatform = (btn as HTMLElement).dataset.platform ?? currentPlatform;
         const models = modelsData.models[currentPlatform] ?? [];
         const defaultModel = models.find(m => m.isDefault);
         currentModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
+        saveConfig();
         renderContent();
       });
     });
 
-    // Model selection
+    // Model selection — save immediately
     const modelSelect = overlay.querySelector<HTMLSelectElement>('#settings-model');
     if (modelSelect !== null) {
       modelSelect.addEventListener('change', () => {
         currentModel = modelSelect.value;
+        saveConfig();
       });
     }
 
@@ -304,21 +432,35 @@ function renderSettingsModal(
           await api(`/ai/key?platform=${currentPlatform}`, { method: 'DELETE' });
           const newStatus = await api<KeyStatusResponse>('/ai/key-status');
           keyStatus.status = newStatus.status;
+          const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+          state.aiConfigured = newConfig.keyConfigured;
           renderContent();
         })();
       });
     }
 
-    // Guided review checkbox
+    // Save key button
+    overlay.querySelector('#save-key-btn')?.addEventListener('click', saveKey);
+
+    // Save key on Enter
+    const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
+    if (keyInput !== null) {
+      keyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); saveKey(); }
+      });
+    }
+
+    // Guided review checkbox — save immediately
     const guidedCheckbox = overlay.querySelector<HTMLInputElement>('#settings-guided-enabled');
     if (guidedCheckbox !== null) {
       guidedCheckbox.addEventListener('change', () => {
         guidedEnabled = guidedCheckbox.checked;
+        saveConfig();
         renderContent();
       });
     }
 
-    // Topic tags
+    // Topic tags — debounced save
     overlay.querySelectorAll('.settings-tag').forEach(tag => {
       tag.addEventListener('click', () => {
         const topic = (tag as HTMLElement).dataset.topic;
@@ -327,7 +469,6 @@ function renderSettingsModal(
             guidedTopics.delete(topic);
           } else {
             guidedTopics.add(topic);
-            // When "Programming" is selected and no languages are checked, auto-select all
             if (topic === 'programming') {
               const hasAnyLang = [...guidedTopics].some(t => ALL_LANG_KEYS.has(t));
               if (!hasAnyLang) {
@@ -336,6 +477,7 @@ function renderSettingsModal(
               }
             }
           }
+          saveConfigDebounced();
           renderContent();
         }
       });
@@ -350,88 +492,22 @@ function renderSettingsModal(
       });
     }
 
-    // Cancel
-    overlay.querySelector('.modal-cancel')?.addEventListener('click', () => { overlay.remove(); });
-
-    // App name input
+    // App name input — debounced save
     const appNameInput = overlay.querySelector<HTMLInputElement>('#settings-app-name');
     if (appNameInput !== null) {
       appNameInput.addEventListener('input', () => {
         appName = appNameInput.value;
+        saveAppNameDebounced();
       });
     }
 
-    // Save
-    overlay.querySelector('#settings-save')?.addEventListener('click', () => {
-      void (async () => {
-        // Save project settings (app name)
-        const appNameVal = appName.trim();
-        if (appNameVal !== (projectSettings.appName ?? '')) {
-          await api('/project-settings', {
-            method: 'PATCH',
-            body: { appName: appNameVal },
-          });
-          projectSettings.appName = appNameVal || undefined;
-        }
-
-        // Detect if guided review settings changed
-        const prevEnabled = configData.guidedReview.enabled;
-        const prevTopics = new Set(configData.guidedReview.topics);
-        const newTopics = Array.from(guidedTopics);
-        const guidedChanged = guidedEnabled !== prevEnabled ||
-          newTopics.length !== prevTopics.size ||
-          newTopics.some(t => !prevTopics.has(t));
-
-        await api('/ai/config', {
-          method: 'POST',
-          body: {
-            platform: currentPlatform,
-            model: currentModel,
-            guidedReview: {
-              enabled: guidedEnabled,
-              topics: newTopics,
-            },
-          },
-        });
-
-        // Save API key if entered
-        const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
-        if (keyInput !== null && keyInput.value.trim() !== '') {
-          const storageRadio = overlay.querySelector<HTMLInputElement>('input[name="key-storage"]:checked');
-          const storage = storageRadio?.value ?? 'config';
-          await api('/ai/key', {
-            method: 'POST',
-            body: { platform: currentPlatform, key: keyInput.value.trim(), storage },
-          });
-        }
-
-        // Check if now configured
-        const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
-        state.aiConfigured = newConfig.keyConfigured;
-        state.guidedReviewEnabled = guidedEnabled;
-
-        // Update configData so subsequent saves detect changes correctly
-        configData.guidedReview = { enabled: guidedEnabled, topics: newTopics };
-
-        // Invalidate caches if guided review settings changed
-        if (guidedChanged && state.aiConfigured) {
-          // Invalidate risk/narrative (they use guided review hints)
-          invalidateAnalysisCache();
-          // Invalidate guided analysis (its own pipeline)
-          invalidateGuidedAnalysis();
-        }
-
-        overlay.remove();
-        if (onSave !== undefined) onSave();
-      })();
-    });
-
     // Click outside to close
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
+      if (e.target === overlay) closeDialog();
     });
   }
 
+  document.addEventListener('keydown', handleEscape);
   overlay.innerHTML = (<div className="modal settings-dialog"></div>).toString();
   document.body.appendChild(overlay);
   renderContent();

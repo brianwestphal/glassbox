@@ -6,6 +6,7 @@ dist
 .hotsheet/
 coverage/
 .claude
+.mcp.json
 
 # Tauri
 src-tauri/target

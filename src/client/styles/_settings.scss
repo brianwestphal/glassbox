@@ -1,8 +1,93 @@
 // --- Settings Dialog ---
 
 .settings-dialog {
-  max-width: 460px;
+  max-width: 480px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  overflow: hidden;
 }
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+
+  h3 { margin-bottom: 0; }
+}
+
+.settings-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+
+  &:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+}
+
+// --- Tabs ---
+
+.settings-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 12px;
+  gap: 2px;
+}
+
+.settings-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px 10px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  color: var(--text-dim);
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  cursor: pointer;
+  transition: color 0.15s;
+
+  svg { flex-shrink: 0; }
+
+  &:hover { color: var(--text); }
+
+  &.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+}
+
+// --- Tab content ---
+
+.settings-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-tab-panel {
+  display: none;
+
+  &.active { display: block; }
+}
+
+// --- Sections ---
 
 .settings-section {
   margin-bottom: 16px;
@@ -67,6 +152,8 @@
   }
 }
 
+// --- Controls ---
+
 .settings-platform-control {
   width: 100%;
 
@@ -105,6 +192,8 @@
   &::placeholder { color: var(--text-dim); }
 }
 
+// --- API Key ---
+
 .settings-key-status {
   display: flex;
   align-items: center;
@@ -125,6 +214,21 @@
 
 .settings-key-input-group {
   margin-top: 4px;
+}
+
+.settings-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+
+  .settings-input {
+    flex: 1;
+  }
+
+  .btn {
+    flex-shrink: 0;
+    margin-top: 8px;
+  }
 }
 
 .settings-storage-options {
@@ -252,4 +356,12 @@
 .refresh-btn {
   @extend .sidebar-header-btn;
   right: 36px;
+}
+
+// --- Modal actions override for settings ---
+
+.settings-dialog .modal-actions {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
