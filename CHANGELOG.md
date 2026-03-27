@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-03-27
+
+- Security hardening: localhost binding, shell injection fixes, and security requirements doc
+
 ## [0.5.1] - 2026-03-27
 
 - Redesigned settings dialog with tabbed interface
