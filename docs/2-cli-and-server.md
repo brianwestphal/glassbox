@@ -46,6 +46,7 @@ The CLI shall accept the following options:
 ### 2.4 HTTP Server
 
 - **Framework** — The server shall be a Hono HTTP application running on `@hono/node-server`.
+- **Localhost binding** — The server shall bind to `127.0.0.1` only (see doc 14, section 14.1).
 - **Default port** — The default port shall be 4183.
 - **Port fallback** — If the default port is in use, the server shall try up to 20 successive ports automatically.
 - **Strict port mode** — With `--strict-port`, the server shall fail if the requested port is in use rather than trying alternatives.

@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 import type { ReviewMode } from './diff.js';
@@ -63,12 +63,10 @@ function getNewRef(mode: ReviewMode): string | null {
 
 /** Read a file at a specific git ref. Returns null if the file doesn't exist at that ref. */
 function gitShowFile(ref: string, filePath: string, repoRoot: string): Buffer | null {
-  try {
-    const spec = ref === ':' ? `:${filePath}` : `${ref}:${filePath}`;
-    return execSync(`git show "${spec}"`, { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
-  } catch {
-    return null;
-  }
+  const spec = ref === ':' ? `:${filePath}` : `${ref}:${filePath}`;
+  const result = spawnSync('git', ['show', spec], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+  if (result.status !== 0 || result.stdout.length === 0) return null;
+  return result.stdout;
 }
 
 /** Read a file from the working directory. Returns null if not found. */

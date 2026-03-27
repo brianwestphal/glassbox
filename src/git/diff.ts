@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -25,18 +25,19 @@ export interface FileDiff {
   isBinary: boolean;
 }
 
-function git(args: string, cwd: string): string {
-  try {
-    return execSync(`git ${args}`, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
-  } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string };
-    if (err.stdout !== undefined && err.stdout !== '') return err.stdout;
-    throw e;
-  }
+function git(args: string[], cwd: string): string {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+  if (result.status === 0) return result.stdout;
+  if (result.stdout !== '') return result.stdout;
+  const err: Error & { stdout?: string; stderr?: string; status?: number | null } = new Error(result.stderr);
+  err.stdout = result.stdout;
+  err.stderr = result.stderr;
+  err.status = result.status;
+  throw err;
 }
 
 export function getRepoRoot(cwd: string): string {
-  return git('rev-parse --show-toplevel', cwd).trim();
+  return git(['rev-parse', '--show-toplevel'], cwd).trim();
 }
 
 export function getRepoName(cwd: string): string {
@@ -46,7 +47,7 @@ export function getRepoName(cwd: string): string {
 
 export function isGitRepo(cwd: string): boolean {
   try {
-    git('rev-parse --is-inside-work-tree', cwd);
+    git(['rev-parse', '--is-inside-work-tree'], cwd);
     return true;
   } catch {
     return false;
@@ -63,25 +64,24 @@ export type ReviewMode =
   | { type: 'files'; patterns: string[] }
   | { type: 'all' };
 
-export function getDiffArgs(mode: ReviewMode): string {
+export function getDiffArgs(mode: ReviewMode): string[] {
   switch (mode.type) {
     case 'uncommitted':
-      return 'diff HEAD';
+      return ['diff', 'HEAD'];
     case 'staged':
-      return 'diff --cached';
+      return ['diff', '--cached'];
     case 'unstaged':
-      return 'diff';
+      return ['diff'];
     case 'commit':
-      return `diff ${mode.sha}~1 ${mode.sha}`;
+      return ['diff', `${mode.sha}~1`, mode.sha];
     case 'range':
-      return `diff ${mode.from} ${mode.to}`;
-    case 'branch': {
-      return `diff ${mode.name}...HEAD`;
-    }
+      return ['diff', mode.from, mode.to];
+    case 'branch':
+      return ['diff', `${mode.name}...HEAD`];
     case 'files':
-      return `diff HEAD -- ${mode.patterns.join(' ')}`;
+      return ['diff', 'HEAD', '--', ...mode.patterns];
     case 'all':
-      return 'diff --no-index /dev/null .';
+      return ['diff', '--no-index', '/dev/null', '.'];
   }
 }
 
@@ -95,7 +95,7 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
   const diffArgs = getDiffArgs(mode);
   let rawDiff: string;
   try {
-    rawDiff = git(`${diffArgs} -U3`, repoRoot);
+    rawDiff = git([...diffArgs, '-U3'], repoRoot);
   } catch {
     rawDiff = '';
   }
@@ -104,7 +104,7 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
   const diffs = parseDiff(rawDiff);
 
   if (mode.type === 'uncommitted') {
-    const untracked = git('ls-files --others --exclude-standard', repoRoot).trim();
+    const untracked = git(['ls-files', '--others', '--exclude-standard'], repoRoot).trim();
     if (untracked) {
       for (const file of untracked.split('\n').filter(Boolean)) {
         if (!diffs.some(d => d.filePath === file)) {
@@ -118,7 +118,7 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
 }
 
 function getAllFiles(repoRoot: string): FileDiff[] {
-  const files = git('ls-files', repoRoot).trim().split('\n').filter(Boolean);
+  const files = git(['ls-files'], repoRoot).trim().split('\n').filter(Boolean);
   return files.map(file => createNewFileDiff(file, repoRoot));
 }
 
@@ -267,16 +267,16 @@ export function getFileContent(filePath: string, ref: string, cwd: string): stri
   const repoRoot = getRepoRoot(cwd);
   try {
     if (ref === 'working') {
-      return execSync(`cat "${resolve(repoRoot, filePath)}"`, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+      return readFileSync(resolve(repoRoot, filePath), 'utf-8');
     }
-    return git(`show ${ref}:${filePath}`, repoRoot);
+    return git(['show', `${ref}:${filePath}`], repoRoot);
   } catch {
     return '';
   }
 }
 
 export function getHeadCommit(cwd: string): string {
-  return execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8' }).trim();
+  return spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf-8' }).stdout.trim();
 }
 
 export function parseModeString(modeStr: string): ReviewMode {
@@ -300,9 +300,12 @@ export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: 
     return createNewFileDiff(filePath, repoRoot);
   }
   const diffArgs = getDiffArgs(mode);
+  const args = [...diffArgs, '-U3'];
+  if (extraFlags) args.push(...extraFlags.split(' ').filter(Boolean));
+  args.push('--', filePath);
   let rawDiff: string;
   try {
-    rawDiff = git(`${diffArgs} -U3 ${extraFlags} -- ${filePath}`, repoRoot);
+    rawDiff = git(args, repoRoot);
   } catch {
     rawDiff = '';
   }

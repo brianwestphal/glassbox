@@ -12,7 +12,7 @@ import type { AppEnv } from './types.js';
 
 function tryServe(fetch: Hono['fetch'], port: number): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = serve({ fetch, port });
+    const server = serve({ fetch, port, hostname: '127.0.0.1' });
     server.on('listening', () => { resolve(port); });
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {

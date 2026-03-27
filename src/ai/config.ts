@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -95,29 +95,23 @@ function getKeyFromKeychain(platform: AIPlatform): string | null {
 
   try {
     if (os === 'darwin') {
-      const result = execSync(
-        `security find-generic-password -s glassbox -a "${account}" -w 2>/dev/null`,
-        { encoding: 'utf-8' }
-      ).trim();
-      return result !== '' ? result : null;
+      const r = spawnSync('security', ['find-generic-password', '-s', 'glassbox', '-a', account, '-w'], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const result = (r.stdout ?? '').trim();
+      return r.status === 0 && result !== '' ? result : null;
     }
 
     if (os === 'linux') {
-      const result = execSync(
-        `secret-tool lookup service glassbox account "${account}" 2>/dev/null`,
-        { encoding: 'utf-8' }
-      ).trim();
-      return result !== '' ? result : null;
+      const r = spawnSync('secret-tool', ['lookup', 'service', 'glassbox', 'account', account], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const result = (r.stdout ?? '').trim();
+      return r.status === 0 && result !== '' ? result : null;
     }
 
     if (os === 'win32') {
       const target = winCredTarget(platform);
       const script = WIN_CRED_READ_PS + `Write-Output ([CredHelper]::Read('${target}'))`;
-      const result = execSync('powershell -NoProfile -Command -', {
-        input: script,
-        encoding: 'utf-8',
-      }).trim();
-      return result !== '' ? result : null;
+      const r = spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' });
+      const result = (r.stdout ?? '').trim();
+      return r.status === 0 && result !== '' ? result : null;
     }
   } catch {
     return null;
@@ -185,21 +179,14 @@ function saveKeyToKeychain(platform: AIPlatform, key: string): void {
   const account = `${platform}-api-key`;
 
   if (os === 'darwin') {
-    try {
-      execSync(`security delete-generic-password -s glassbox -a "${account}" 2>/dev/null`);
-    } catch { /* may not exist */ }
-    execSync(
-      `security add-generic-password -s glassbox -a "${account}" -w "${key.replace(/"/g, '\\"')}"`,
-    );
+    spawnSync('security', ['delete-generic-password', '-s', 'glassbox', '-a', account], { stdio: 'pipe' });
+    spawnSync('security', ['add-generic-password', '-s', 'glassbox', '-a', account, '-w', key]);
     return;
   }
 
   if (os === 'linux') {
     // secret-tool reads the password from stdin
-    execSync(
-      `secret-tool store --label='Glassbox API Key' service glassbox account "${account}"`,
-      { input: key, encoding: 'utf-8' },
-    );
+    spawnSync('secret-tool', ['store', '--label=Glassbox API Key', 'service', 'glassbox', 'account', account], { input: key, encoding: 'utf-8' });
     return;
   }
 
@@ -208,10 +195,7 @@ function saveKeyToKeychain(platform: AIPlatform, key: string): void {
     // Escape single quotes for PowerShell single-quoted string
     const escapedKey = key.replace(/'/g, "''");
     const script = `cmdkey /generic:'${target}' /user:'glassbox' /pass:'${escapedKey}'`;
-    execSync('powershell -NoProfile -Command -', {
-      input: script,
-      encoding: 'utf-8',
-    });
+    spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' });
   }
 }
 
@@ -222,15 +206,12 @@ export function deleteAPIKey(platform: AIPlatform): void {
   // Remove from system keychain
   try {
     if (os === 'darwin') {
-      execSync(`security delete-generic-password -s glassbox -a "${account}" 2>/dev/null`);
+      spawnSync('security', ['delete-generic-password', '-s', 'glassbox', '-a', account], { stdio: 'pipe' });
     } else if (os === 'linux') {
-      execSync(`secret-tool clear service glassbox account "${account}" 2>/dev/null`);
+      spawnSync('secret-tool', ['clear', 'service', 'glassbox', 'account', account], { stdio: 'pipe' });
     } else if (os === 'win32') {
       const target = winCredTarget(platform);
-      execSync('powershell -NoProfile -Command -', {
-        input: `cmdkey /delete:'${target}'`,
-        encoding: 'utf-8',
-      });
+      spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: `cmdkey /delete:'${target}'`, encoding: 'utf-8' });
     }
   } catch { /* may not exist */ }
 
@@ -257,12 +238,7 @@ export function isKeychainAvailable(): boolean {
   const os = process.platform;
   if (os === 'darwin' || os === 'win32') return true;
   if (os === 'linux') {
-    try {
-      execSync('which secret-tool 2>/dev/null', { encoding: 'utf-8' });
-      return true;
-    } catch {
-      return false;
-    }
+    return spawnSync('which', ['secret-tool'], { stdio: 'pipe' }).status === 0;
   }
   return false;
 }

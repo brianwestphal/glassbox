@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { appendFileSync,existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -24,12 +24,8 @@ function saveDismissals(data: Record<string, number>): void {
 
 export function isGlassboxGitignored(repoRoot: string): boolean {
   // Use git check-ignore to see if .glassbox is ignored
-  try {
-    execSync('git check-ignore -q .glassbox', { cwd: repoRoot, stdio: 'pipe' });
-    return true; // exit code 0 = ignored
-  } catch {
-    return false; // exit code 1 = not ignored
-  }
+  const result = spawnSync('git', ['check-ignore', '-q', '.glassbox'], { cwd: repoRoot, stdio: 'pipe' });
+  return result.status === 0;
 }
 
 export function shouldPromptGitignore(repoRoot: string): boolean {

@@ -43,6 +43,7 @@ All project documentation lives in `docs/`. There are two types:
 - `11-build-and-distribution.md` — Build pipeline, npm/desktop packaging, CI/CD
 - `12-demo-mode.md` — Demo scenarios and isolation
 - `13-navigation.md` — Go-to-definition, navigation stack (back/forward)
+- `14-security.md` — Network binding, input validation, command execution safety
 
 **Architecture documents** describe system design and setup:
 

@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Hono } from 'hono';
 import { join, resolve } from 'path';
@@ -159,12 +159,12 @@ apiRoutes.post('/files/:fileId/reveal', async (c) => {
   const fullPath = resolve(repoRoot, file.file_path);
   try {
     if (process.platform === 'darwin') {
-      execSync(`open -R "${fullPath}"`);
+      execFileSync('open', ['-R', fullPath]);
     } else if (process.platform === 'win32') {
-      execSync(`explorer /select,"${fullPath}"`);
+      execFileSync('explorer', ['/select,' + fullPath]);
     } else {
       // Linux: open the containing directory
-      execSync(`xdg-open "${resolve(fullPath, '..')}"`);
+      execFileSync('xdg-open', [resolve(fullPath, '..')]);
     }
   } catch { /* ignore errors (e.g. file doesn't exist yet for added files) */ }
   return c.json({ ok: true });
@@ -307,8 +307,8 @@ apiRoutes.get('/symbol-definition', async (c) => {
   // Second pass: if no match found, search all tracked files in the repo
   if (definitions.length === 0) {
     try {
-      const allFiles = execSync('git ls-files', { cwd: repoRoot, encoding: 'utf-8' })
-        .trim().split('\n').filter(Boolean);
+      const allFiles = spawnSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf-8' })
+        .stdout.trim().split('\n').filter(Boolean);
       for (const filePath of allFiles) {
         if (searchedPaths.has(filePath)) continue;
         // Only search files the outline parser supports
