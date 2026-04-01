@@ -196,6 +196,7 @@ export function jsx(tag: string | ((props: Props) => SafeHtml), props: Props): S
 }
 
 export { jsx as jsxs };
+export { jsx as jsxDEV };
 
 export function Fragment({ children }: { children?: Children }): SafeHtml {
   return new SafeHtml(children != null ? renderChildren(children) : "");

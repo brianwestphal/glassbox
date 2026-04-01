@@ -356,35 +356,35 @@ index abc1234..def5678 100644
 
 describe('getDiffArgs', () => {
   it('returns correct args for uncommitted mode', () => {
-    expect(getDiffArgs({ type: 'uncommitted' })).toBe('diff HEAD');
+    expect(getDiffArgs({ type: 'uncommitted' })).toEqual(['diff', 'HEAD']);
   });
 
   it('returns correct args for staged mode', () => {
-    expect(getDiffArgs({ type: 'staged' })).toBe('diff --cached');
+    expect(getDiffArgs({ type: 'staged' })).toEqual(['diff', '--cached']);
   });
 
   it('returns correct args for unstaged mode', () => {
-    expect(getDiffArgs({ type: 'unstaged' })).toBe('diff');
+    expect(getDiffArgs({ type: 'unstaged' })).toEqual(['diff']);
   });
 
   it('returns correct args for commit mode', () => {
-    expect(getDiffArgs({ type: 'commit', sha: 'abc' })).toBe('diff abc~1 abc');
+    expect(getDiffArgs({ type: 'commit', sha: 'abc' })).toEqual(['diff', 'abc~1', 'abc']);
   });
 
   it('returns correct args for range mode', () => {
-    expect(getDiffArgs({ type: 'range', from: 'a', to: 'b' })).toBe('diff a b');
+    expect(getDiffArgs({ type: 'range', from: 'a', to: 'b' })).toEqual(['diff', 'a', 'b']);
   });
 
   it('returns correct args for branch mode', () => {
-    expect(getDiffArgs({ type: 'branch', name: 'main' })).toBe('diff main...HEAD');
+    expect(getDiffArgs({ type: 'branch', name: 'main' })).toEqual(['diff', 'main...HEAD']);
   });
 
   it('returns correct args for files mode', () => {
-    expect(getDiffArgs({ type: 'files', patterns: ['*.ts', '*.js'] })).toBe('diff HEAD -- *.ts *.js');
+    expect(getDiffArgs({ type: 'files', patterns: ['*.ts', '*.js'] })).toEqual(['diff', 'HEAD', '--', '*.ts', '*.js']);
   });
 
   it('returns correct args for all mode', () => {
-    expect(getDiffArgs({ type: 'all' })).toBe('diff --no-index /dev/null .');
+    expect(getDiffArgs({ type: 'all' })).toEqual(['diff', '--no-index', '/dev/null', '.']);
   });
 });
 

@@ -50,7 +50,7 @@ Examples:
 `);
 }
 
-function parseArgs(
+export function parseArgs(
   argv: string[],
 ): {
   mode: ReviewMode;
@@ -293,7 +293,11 @@ async function main() {
   await startServer(port, review.id, repoRoot, { noOpen, strictPort });
 }
 
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run main() when executed as entry point (not when imported for testing)
+const isDirectRun = process.argv[1]?.endsWith('cli.js') || process.argv[1]?.endsWith('cli.ts');
+if (isDirectRun) {
+  main().catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
