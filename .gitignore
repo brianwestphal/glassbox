@@ -5,6 +5,8 @@ dist
 .DS_Store
 .hotsheet/
 coverage/
+.coverage-tmp/
+test-results/
 .claude
 .mcp.json
 

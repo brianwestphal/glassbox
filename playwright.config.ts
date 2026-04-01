@@ -9,7 +9,7 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1280, height: 720 },
   },
-  webServer: {
+  webServer: process.env.SKIP_WEBSERVER ? undefined : {
     command: 'npx tsx src/cli.ts --demo:4 --no-open --strict-port --port 4183',
     port: 4183,
     reuseExistingServer: false,

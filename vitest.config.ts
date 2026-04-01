@@ -7,7 +7,7 @@ export default defineConfig({
     exclude: ['tests/e2e/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text', 'html', 'json'],
       reportsDirectory: 'coverage',
       all: true,
       include: ['src/**/*.ts', 'src/**/*.tsx'],
