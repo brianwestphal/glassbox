@@ -9,39 +9,17 @@ on:
     tags:
       - 'v*-rc.*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20'
 
 jobs:
   # ══════════════════════════════════════════════════════════════
-  # Phase 1: Validate — run all checks in parallel
+  # Phase 1a: Fast checks — cheap, catch most issues
   # ══════════════════════════════════════════════════════════════
-
-  test-unit:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm test
-
-  test-e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm run build:client
-      - run: npx playwright install chromium
-      - run: npm run test:e2e
 
   lint:
     name: Lint
@@ -67,8 +45,40 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
 
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 1b: Expensive checks — only run if fast checks pass
+  # ══════════════════════════════════════════════════════════════
+
+  test-e2e:
+    name: E2E Tests
+    needs: [lint, typecheck, test-unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:client
+      - run: npx playwright install chromium
+      - run: npm run test:e2e
+
   npm-pack:
     name: npm Pack (Dry Run)
+    needs: [lint, typecheck, test-unit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,8 +92,9 @@ jobs:
 
   build-tauri:
     name: Build Tauri (${{ matrix.friendly }})
+    needs: [lint, typecheck, test-unit]
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - platform: macos-latest
@@ -141,7 +152,7 @@ jobs:
 
   publish-beta:
     name: Publish npm Beta
-    needs: [test-unit, test-e2e, lint, typecheck, npm-pack, build-tauri]
+    needs: [test-e2e, npm-pack, build-tauri]
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:

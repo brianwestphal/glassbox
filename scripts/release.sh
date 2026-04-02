@@ -294,6 +294,31 @@ step_review() {
   echo ""
 }
 
+step_validate() {
+  info "Running local checks..."
+
+  echo -e "  ${DIM}Lint...${RESET}"
+  if ! npm run lint --silent 2>&1; then
+    error "Lint failed. Fix errors and try again."
+    exit 1
+  fi
+  success "Lint passed"
+
+  echo -e "  ${DIM}Type check...${RESET}"
+  if ! npx tsc --noEmit 2>&1; then
+    error "Type check failed. Fix errors and try again."
+    exit 1
+  fi
+  success "Type check passed"
+
+  echo -e "  ${DIM}Unit tests...${RESET}"
+  if ! npm test --silent 2>&1; then
+    error "Unit tests failed. Fix errors and try again."
+    exit 1
+  fi
+  success "All local checks passed"
+}
+
 step_build() {
   info "Building..."
   npm run build
@@ -455,7 +480,7 @@ main() {
   local resume_step
   resume_step=$(get_step)
   if [[ -n "$resume_step" && "$resume_step" -gt 0 ]]; then
-    warn "Found saved progress (step ${resume_step}/10). Steps: preflight → version → notes → review → update-version → changelog → build → commit → rc-tag → push"
+    warn "Found saved progress (step ${resume_step}/11). Steps: preflight → notes → version → review → validate → update-version → changelog → build → commit → rc-tag → push"
     if confirm "Resume from where you left off?"; then
       echo ""
     else
@@ -475,16 +500,16 @@ main() {
     set_step 1
   fi
 
-  # Step 2: Version
+  # Step 2: Release notes (before version so you see what changed first)
   if ! past_step 2; then
-    echo ""
-    step_version
+    step_release_notes
     set_step 2
   fi
 
-  # Step 3: Release notes
+  # Step 3: Version
   if ! past_step 3; then
-    step_release_notes
+    echo ""
+    step_version
     set_step 3
   fi
 
@@ -498,40 +523,47 @@ main() {
     set_step 4
   fi
 
-  # Step 5: Update version in package.json + Cargo.toml + tauri.conf.json
+  # Step 5: Local validation (lint, typecheck, unit tests)
   if ! past_step 5; then
     echo ""
-    step_update_version
+    step_validate
     set_step 5
   fi
 
-  # Step 6: Update CHANGELOG.md
+  # Step 6: Update version in package.json + Cargo.toml + tauri.conf.json
   if ! past_step 6; then
     echo ""
-    step_changelog
+    step_update_version
     set_step 6
   fi
 
-  # Step 7: Build
+  # Step 7: Update CHANGELOG.md
   if ! past_step 7; then
     echo ""
-    step_build
+    step_changelog
     set_step 7
   fi
 
-  # Step 8: Git commit
+  # Step 8: Build
   if ! past_step 8; then
-    step_git_commit
+    echo ""
+    step_build
     set_step 8
   fi
 
-  # Step 9: Create RC tag
+  # Step 9: Git commit
   if ! past_step 9; then
-    step_rc_tag
+    step_git_commit
     set_step 9
   fi
 
-  # Step 10: Push RC tag to trigger CI pipeline
+  # Step 10: Create RC tag
+  if ! past_step 10; then
+    step_rc_tag
+    set_step 10
+  fi
+
+  # Step 11: Push RC tag to trigger CI pipeline
   echo ""
   step_push_rc
 
