@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.1] - 2026-04-02
+
+- fixed npm installed versions
+- Lint fixes, input validation, docs updates, TypeScript strict-mode fixes, and createElement cleanup
+- Updated for some inconsistencies between docs and code
+
 ## [0.7.0] - 2026-04-02
 
 - Added support for themes with several built-in options and customization support
