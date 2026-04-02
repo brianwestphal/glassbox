@@ -1,4 +1,4 @@
-import { mkdirSync } from "fs";
+import { mkdirSync, realpathSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 
@@ -296,8 +296,7 @@ async function main() {
 
 // Only run main() when executed as entry point (not when imported for testing).
 // Resolve symlinks (e.g. npm global bin symlink) before checking the filename.
-import { realpathSync } from 'fs';
-const resolvedArg = process.argv[1] !== undefined ? realpathSync(process.argv[1]) : '';
+const resolvedArg = process.argv[1] ? realpathSync(process.argv[1]) : '';
 const isDirectRun = resolvedArg.endsWith('cli.js') || resolvedArg.endsWith('cli.ts');
 if (isDirectRun) {
   main().catch((err: unknown) => {
