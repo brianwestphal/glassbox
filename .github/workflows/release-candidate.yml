@@ -1,0 +1,254 @@
+name: Release Candidate Pipeline
+
+permissions:
+  contents: write
+  id-token: write
+
+on:
+  push:
+    tags:
+      - 'v*-rc.*'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # Phase 1: Validate — run all checks in parallel
+  # ══════════════════════════════════════════════════════════════
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:client
+      - run: npx playwright install chromium
+      - run: npm run test:e2e
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  npm-pack:
+    name: npm Pack (Dry Run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm pack --dry-run
+
+  build-tauri:
+    name: Build Tauri (${{ matrix.friendly }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            friendly: macOS-ARM
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            friendly: macOS-Intel
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            friendly: Linux-x64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            friendly: Windows-x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+      - run: npm ci
+      - run: bash scripts/build-sidecar.sh ${{ matrix.target }}
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          args: --target ${{ matrix.target }}
+      - name: Upload Tauri artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-${{ matrix.friendly }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 2: Publish beta to npm
+  # ══════════════════════════════════════════════════════════════
+
+  publish-beta:
+    name: Publish npm Beta
+    needs: [test-unit, test-e2e, lint, typecheck, npm-pack, build-tauri]
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run build
+      - name: Publish beta
+        run: npm publish --tag beta --provenance
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 3: Install & upgrade smoke tests
+  # ══════════════════════════════════════════════════════════════
+
+  smoke-fresh-install:
+    name: Smoke Test (Fresh Install)
+    needs: publish-beta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install beta globally
+        run: npm install -g glassbox@beta
+      - name: Run smoke tests
+        run: bash tests/smoke/smoke-test.sh glassbox
+
+  smoke-upgrade:
+    name: Smoke Test (Upgrade from Latest)
+    needs: publish-beta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install current stable
+        run: npm install -g glassbox@latest || echo "No previous stable version — skipping upgrade test"
+      - name: Smoke test stable version
+        run: |
+          if command -v glassbox &>/dev/null; then
+            bash tests/smoke/smoke-test.sh glassbox
+          fi
+      - name: Upgrade to beta
+        run: npm install -g glassbox@beta
+      - name: Smoke test beta version
+        run: bash tests/smoke/smoke-test.sh glassbox
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 4: Promote to final release
+  # ══════════════════════════════════════════════════════════════
+
+  promote-release:
+    name: Promote to Final Release
+    needs: [smoke-fresh-install, smoke-upgrade]
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Extract version from RC tag
+        id: version
+        run: |
+          RC_TAG="${GITHUB_REF_NAME}"
+          # v0.7.0-rc.1 → 0.7.0
+          VERSION=$(echo "$RC_TAG" | sed 's/^v//' | sed 's/-rc\..*//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Promote beta to latest on npm
+        run: npm dist-tag add "glassbox@${{ steps.version.outputs.version }}" latest
+
+      - name: Create final release tag
+        run: |
+          # Copy the RC tag's annotation to the final tag
+          NOTES=$(git tag -l --format='%(contents)' "${{ steps.version.outputs.rc_tag }}" | sed '/^$/d')
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${{ steps.version.outputs.tag }}"
+          fi
+          git tag -a "${{ steps.version.outputs.tag }}" -m "$NOTES"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Summary
+        run: |
+          echo "## Release Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Version:** ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **npm:** \`npm install glassbox@${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **RC tag:** ${{ steps.version.outputs.rc_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Release tag:** ${{ steps.version.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The final tag push will trigger the desktop release workflow." >> "$GITHUB_STEP_SUMMARY"

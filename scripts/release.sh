@@ -379,46 +379,67 @@ step_changelog() {
   success "CHANGELOG.md updated"
 }
 
-step_git_tag() {
+step_git_commit() {
   local version
   version=$(get_state "version")
-  local notes
-  notes=$(get_state "release_notes")
-  local tag="v${version}"
 
-  info "Creating git commit and tag ${BOLD}${tag}${RESET}..."
+  info "Creating git commit..."
 
   git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md 2>/dev/null || git add package.json CHANGELOG.md
   git commit -m "release: v${version}" --allow-empty
 
-  # Create annotated tag with release notes
-  echo -e "$notes" | git tag -a "$tag" -F -
-
-  success "Created tag ${tag}"
+  success "Committed release changes"
 }
 
-step_publish() {
+step_rc_tag() {
   local version
   version=$(get_state "version")
+  local notes
+  notes=$(get_state "release_notes")
 
-  info "Publishing to npm..."
-  npm publish
+  # Find the next RC number for this version
+  local rc_num=1
+  while git tag -l "v${version}-rc.${rc_num}" | grep -q .; do
+    rc_num=$((rc_num + 1))
+  done
 
-  success "Published glassbox@${version} to npm"
+  local rc_tag="v${version}-rc.${rc_num}"
+  info "Creating release candidate tag ${BOLD}${rc_tag}${RESET}..."
+
+  # Create annotated RC tag with release notes
+  echo -e "$notes" | git tag -a "$rc_tag" -F -
+
+  set_state "rc_tag" "$rc_tag"
+  success "Created tag ${rc_tag}"
 }
 
-step_git_push() {
+step_push_rc() {
   local version
   version=$(get_state "version")
-  local tag="v${version}"
+  local rc_tag
+  rc_tag=$(get_state "rc_tag")
 
-  if confirm "Push commit and tag to remote?"; then
+  info "Pushing to remote to trigger CI pipeline..."
+  echo ""
+  echo -e "  ${DIM}This will push the commit and RC tag to GitHub.${RESET}"
+  echo -e "  ${DIM}GitHub Actions will then:${RESET}"
+  echo -e "  ${DIM}  1. Run all tests, lint, and type checks${RESET}"
+  echo -e "  ${DIM}  2. Build Tauri for all platforms${RESET}"
+  echo -e "  ${DIM}  3. Publish a beta to npm${RESET}"
+  echo -e "  ${DIM}  4. Run install/upgrade smoke tests${RESET}"
+  echo -e "  ${DIM}  5. If all passes: publish final release${RESET}"
+  echo ""
+
+  if confirm "Push ${rc_tag} to trigger the release pipeline?"; then
     git push
-    git push origin "$tag"
-    success "Pushed to remote"
+    git push origin "$rc_tag"
+    success "Pushed ${rc_tag} — CI pipeline started"
+    echo ""
+    echo -e "  ${DIM}Monitor progress at:${RESET}"
+    echo -e "  ${CYAN}https://github.com/brianwestphal/glassbox/actions${RESET}"
   else
     warn "Skipped push. Run manually:"
-    echo "    git push && git push origin ${tag}"
+    echo "    git push && git push origin ${rc_tag}"
   fi
 }
 
@@ -434,7 +455,7 @@ main() {
   local resume_step
   resume_step=$(get_step)
   if [[ -n "$resume_step" && "$resume_step" -gt 0 ]]; then
-    warn "Found saved progress (step ${resume_step}/10)."
+    warn "Found saved progress (step ${resume_step}/10). Steps: preflight → version → notes → review → update-version → changelog → build → commit → rc-tag → push"
     if confirm "Resume from where you left off?"; then
       echo ""
     else
@@ -498,25 +519,25 @@ main() {
     set_step 7
   fi
 
-  # Step 8: Git commit + tag
+  # Step 8: Git commit
   if ! past_step 8; then
-    step_git_tag
+    step_git_commit
     set_step 8
   fi
 
-  # Step 9: Publish to npm
+  # Step 9: Create RC tag
   if ! past_step 9; then
-    step_publish
+    step_rc_tag
     set_step 9
   fi
 
-  # Step 10: Push
+  # Step 10: Push RC tag to trigger CI pipeline
   echo ""
-  step_git_push
+  step_push_rc
 
   # Done — clean up
   echo ""
-  success "Release complete!"
+  success "Release candidate submitted! CI will handle testing and publishing."
   cleanup_state
 }
 

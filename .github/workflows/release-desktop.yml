@@ -6,7 +6,8 @@ permissions:
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]*'
+      - '!v*-rc.*'
 
   workflow_dispatch:
     inputs:
