@@ -55,13 +55,21 @@ The user's Code/Rendered choice is remembered across file selections.
 - **Symbol parsing** — The system shall parse and display a symbol outline (functions, classes, methods) for the currently viewed file.
 - **Click to navigate** — Users shall be able to click outline entries to navigate to the corresponding line in the diff.
 
+### 4.7 Find in Diff
+
+- **Find bar** — `Cmd/Ctrl+F` shall open a find bar within the diff view for searching the currently displayed diff content.
+- **Match highlighting** — Search matches shall be highlighted in the diff.
+- **Match navigation** — Users shall be able to navigate between matches using up/down arrows or `Enter`/`Shift+Enter`.
+- **Dismiss** — The find bar shall be closeable via `Escape`.
+- **Tauri integration** — In the Tauri desktop app, the native find command shall be intercepted and routed to the in-app find bar.
+
 ## Non-Functional Requirements
 
-### 4.6 Rendering Performance
+### 4.8 Rendering Performance
 
 - **Large file handling** — Diff rendering shall handle files of typical production size (thousands of lines) without noticeable lag.
 - **Scroll sync** — Split mode shall synchronize horizontal scroll position between old and new columns.
 
-### 4.7 Binary Detection
+### 4.9 Binary Detection
 
 - **Detection method** — Binary files shall be detected via git's binary indicator and by scanning the first 8KB for null bytes.

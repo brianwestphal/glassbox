@@ -23,6 +23,12 @@ import type { AppEnv } from '../types.js';
 
 export const apiRoutes = new Hono<AppEnv>();
 
+// --- Validation constants ---
+
+const VALID_CATEGORIES = ['bug', 'fix', 'style', 'pattern-follow', 'pattern-avoid', 'note', 'remember'] as const;
+const VALID_SIDES = ['old', 'new'] as const;
+const VALID_FILE_STATUSES = ['pending', 'reviewed'] as const;
+
 // Helper: resolve reviewId from query param or middleware
 function resolveReviewId(c: { req: { query: (k: string) => string | undefined }; get: (k: string) => string }): string {
   return c.req.query('reviewId') ?? c.get('reviewId');
@@ -149,6 +155,11 @@ apiRoutes.get('/files/:fileId', async (c) => {
 
 apiRoutes.patch('/files/:fileId/status', async (c) => {
   const { status } = await c.req.json<{ status: string }>();
+
+  if (!VALID_FILE_STATUSES.includes(status as typeof VALID_FILE_STATUSES[number])) {
+    return c.json({ error: `status must be one of: ${VALID_FILE_STATUSES.join(', ')}` }, 400);
+  }
+
   await updateFileStatus(c.req.param('fileId'), status);
   return c.json({ ok: true });
 });
@@ -186,6 +197,23 @@ apiRoutes.post('/annotations', async (c) => {
     category: string;
     content: string;
   }>();
+
+  if (typeof body.reviewFileId !== 'string' || body.reviewFileId === '') {
+    return c.json({ error: 'reviewFileId must be a non-empty string' }, 400);
+  }
+  if (typeof body.lineNumber !== 'number' || !Number.isInteger(body.lineNumber) || body.lineNumber < 1) {
+    return c.json({ error: 'lineNumber must be a positive integer' }, 400);
+  }
+  if (!VALID_SIDES.includes(body.side as typeof VALID_SIDES[number])) {
+    return c.json({ error: `side must be one of: ${VALID_SIDES.join(', ')}` }, 400);
+  }
+  if (!VALID_CATEGORIES.includes(body.category as typeof VALID_CATEGORIES[number])) {
+    return c.json({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }, 400);
+  }
+  if (typeof body.content !== 'string' || body.content.trim() === '') {
+    return c.json({ error: 'content must be a non-empty string' }, 400);
+  }
+
   const annotation = await addAnnotation(
     body.reviewFileId, body.lineNumber, body.side, body.category, body.content
   );
@@ -195,6 +223,14 @@ apiRoutes.post('/annotations', async (c) => {
 
 apiRoutes.patch('/annotations/:id', async (c) => {
   const { content, category } = await c.req.json<{ content: string; category: string }>();
+
+  if (typeof content !== 'string' || content.trim() === '') {
+    return c.json({ error: 'content must be a non-empty string' }, 400);
+  }
+  if (!VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])) {
+    return c.json({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }, 400);
+  }
+
   await updateAnnotation(c.req.param('id'), content, category);
   autoExport(c);
   return c.json({ ok: true });
@@ -208,6 +244,14 @@ apiRoutes.delete('/annotations/:id', async (c) => {
 
 apiRoutes.patch('/annotations/:id/move', async (c) => {
   const { lineNumber, side } = await c.req.json<{ lineNumber: number; side: string }>();
+
+  if (typeof lineNumber !== 'number' || !Number.isInteger(lineNumber) || lineNumber < 1) {
+    return c.json({ error: 'lineNumber must be a positive integer' }, 400);
+  }
+  if (!VALID_SIDES.includes(side as typeof VALID_SIDES[number])) {
+    return c.json({ error: `side must be one of: ${VALID_SIDES.join(', ')}` }, 400);
+  }
+
   await moveAnnotation(c.req.param('id'), lineNumber, side);
   autoExport(c);
   return c.json({ ok: true });
@@ -413,6 +457,11 @@ apiRoutes.get('/project-settings', (c) => {
 apiRoutes.patch('/project-settings', async (c) => {
   const repoRoot = c.get('repoRoot');
   const body = await c.req.json<Partial<ProjectSettings>>();
+
+  if (body.appName !== undefined && typeof body.appName !== 'string') {
+    return c.json({ error: 'appName must be a string' }, 400);
+  }
+
   const current = readProjectSettings(repoRoot);
   if (body.appName !== undefined) current.appName = body.appName || undefined;
   writeProjectSettings(repoRoot, current);

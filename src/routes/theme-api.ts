@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 import type { CustomTheme } from '../themes/built-in.js';
-import { BUILT_IN_THEMES, getBuiltInTheme } from '../themes/built-in.js';
+import { BUILT_IN_THEMES, getBuiltInTheme, THEME_VARIABLES } from '../themes/built-in.js';
 import {
   deleteCustomTheme, generateThemeId, getActiveThemeColors, getActiveThemeId,
   getAllThemes, resolveTheme, saveCustomTheme, setActiveThemeId,
@@ -9,6 +9,23 @@ import {
 import type { AppEnv } from '../types.js';
 
 export const themeApiRoutes = new Hono<AppEnv>();
+
+/** Validate that a colors object only contains known theme keys with string values. */
+function validateColors(colors: unknown): string | null {
+  if (typeof colors !== 'object' || colors === null || Array.isArray(colors)) {
+    return 'colors must be an object';
+  }
+  const validKeys = new Set<string>(THEME_VARIABLES);
+  for (const [key, value] of Object.entries(colors)) {
+    if (!validKeys.has(key)) {
+      return `colors contains unknown key: ${key}`;
+    }
+    if (typeof value !== 'string') {
+      return `colors.${key} must be a string`;
+    }
+  }
+  return null;
+}
 
 /** GET /themes — list all available themes with metadata */
 themeApiRoutes.get('/', (c) => {
@@ -35,7 +52,7 @@ themeApiRoutes.get('/active', (c) => {
 /** POST /themes/active — set the active theme */
 themeApiRoutes.post('/active', async (c) => {
   const body = await c.req.json<{ id: string }>();
-  if (!body.id) return c.json({ error: 'Missing theme id' }, 400);
+  if (typeof body.id !== 'string' || body.id === '') return c.json({ error: 'id must be a non-empty string' }, 400);
 
   const theme = resolveTheme(body.id);
   if (!theme) return c.json({ error: 'Theme not found' }, 404);
@@ -47,7 +64,10 @@ themeApiRoutes.post('/active', async (c) => {
 /** POST /themes — create a new custom theme (duplicate an existing one) */
 themeApiRoutes.post('/', async (c) => {
   const body = await c.req.json<{ sourceId: string; name?: string }>();
-  if (!body.sourceId) return c.json({ error: 'Missing sourceId' }, 400);
+  if (typeof body.sourceId !== 'string' || body.sourceId === '') return c.json({ error: 'sourceId must be a non-empty string' }, 400);
+  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim() === '')) {
+    return c.json({ error: 'name must be a non-empty string when provided' }, 400);
+  }
 
   const source = resolveTheme(body.sourceId);
   if (!source) return c.json({ error: 'Source theme not found' }, 404);
@@ -71,6 +91,14 @@ themeApiRoutes.post('/', async (c) => {
 themeApiRoutes.post('/:id/edit', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json<{ colors?: Record<string, string>; name?: string }>();
+
+  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim() === '')) {
+    return c.json({ error: 'name must be a non-empty string when provided' }, 400);
+  }
+  if (body.colors !== undefined) {
+    const colorsError = validateColors(body.colors);
+    if (colorsError !== null) return c.json({ error: colorsError }, 400);
+  }
 
   const source = resolveTheme(id);
   if (!source) return c.json({ error: 'Theme not found' }, 404);
@@ -115,6 +143,14 @@ themeApiRoutes.patch('/:id', async (c) => {
   }
 
   const body = await c.req.json<{ name?: string; colors?: Partial<typeof existing.colors> }>();
+
+  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim() === '')) {
+    return c.json({ error: 'name must be a non-empty string when provided' }, 400);
+  }
+  if (body.colors !== undefined) {
+    const colorsError = validateColors(body.colors);
+    if (colorsError !== null) return c.json({ error: colorsError }, 400);
+  }
 
   const updated: CustomTheme = {
     ...existing,

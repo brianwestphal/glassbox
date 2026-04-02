@@ -1032,7 +1032,7 @@ describe('POST /api/annotations (error handling)', () => {
     expect(annotation.line_number).toBe(3);
   });
 
-  it('creates annotation with empty content', async () => {
+  it('rejects annotation with empty content', async () => {
     const res = await app.request('/api/annotations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1044,10 +1044,10 @@ describe('POST /api/annotations (error handling)', () => {
         content: '',
       }),
     });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
 
-    const annotation = await res.json();
-    expect(annotation.content).toBe('');
+    const body = await res.json();
+    expect(body.error).toContain('content');
   });
 });
 

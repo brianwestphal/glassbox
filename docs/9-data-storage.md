@@ -26,6 +26,7 @@ The system shall persist the following entities:
 
 - Global AI configuration shall be stored in `~/.glassbox/config.json` with `0600` file permissions.
 - Project-specific settings shall be stored in `<repo>/.glassbox/settings.json`.
+- Project-specific settings shall also be accessible via `GET /api/project-settings` and `PATCH /api/project-settings` API endpoints.
 - API keys in the config file shall be stored with base64 encoding.
 
 ## Non-Functional Requirements

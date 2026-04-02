@@ -92,9 +92,10 @@ describe('FR-14.2: API input validation', () => {
 
   it('ai-analysis.ts validates analysis type', () => {
     const content = readFileSync(join(SRC_ROOT, 'routes', 'ai-analysis.ts'), 'utf-8');
-    expect(content).toContain("analysisType !== 'risk'");
-    expect(content).toContain("analysisType !== 'narrative'");
-    expect(content).toContain('Invalid analysis type');
+    expect(content).toContain('VALID_ANALYSIS_TYPES');
+    expect(content).toContain("'risk'");
+    expect(content).toContain("'narrative'");
+    expect(content).toContain("'guided'");
     expect(content).toContain('400');
   });
 });

@@ -204,7 +204,7 @@ describe('POST /api/ai/analyze', () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Invalid analysis type');
+    expect(body.error).toBe('type must be one of: risk, narrative, guided');
   });
 
   it('returns 400 when no API key configured', async () => {

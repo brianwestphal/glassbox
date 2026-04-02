@@ -30,6 +30,12 @@ import type { AppEnv } from '../types.js';
 
 export const aiAnalysisRoutes = new Hono<AppEnv>();
 
+const VALID_SORT_MODES = ['folder', 'risk', 'narrative', 'guided'] as const;
+const VALID_RISK_DIMENSIONS = ['aggregate', 'security', 'correctness', 'error-handling', 'maintainability', 'architecture', 'performance'] as const;
+const VALID_SVG_VIEW_MODES = ['code', 'rendered'] as const;
+const VALID_IMAGE_MODES = ['metadata', 'side-by-side', 'difference', 'slice'] as const;
+const VALID_ANALYSIS_TYPES = ['risk', 'narrative', 'guided'] as const;
+
 // Track cancelled analysis IDs — checked by batch runner before starting new batches.
 // When a user switches from risk→narrative (or vice versa), the old analysis is added here.
 // Switching to folder mode does NOT cancel anything.
@@ -46,8 +52,8 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
 
   debugLog(`POST /analyze: type=${analysisType}, reviewId=${reviewId}`);
 
-  if (analysisType !== 'risk' && analysisType !== 'narrative' && analysisType !== 'guided') {
-    return c.json({ error: 'Invalid analysis type' }, 400);
+  if (!VALID_ANALYSIS_TYPES.includes(analysisType as typeof VALID_ANALYSIS_TYPES[number])) {
+    return c.json({ error: `type must be one of: ${VALID_ANALYSIS_TYPES.join(', ')}` }, 400);
   }
 
   const testMode = isAIServiceTest();
@@ -387,6 +393,10 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
   const reviewId = c.req.query('reviewId') ?? '';
   const analysisType = c.req.param('type');
 
+  if (!VALID_ANALYSIS_TYPES.includes(analysisType as typeof VALID_ANALYSIS_TYPES[number])) {
+    return c.json({ error: `type must be one of: ${VALID_ANALYSIS_TYPES.join(', ')}` }, 400);
+  }
+
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
     debugLog(`GET /analysis/${analysisType}: no analysis found`);
@@ -425,6 +435,10 @@ aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
   const reviewId = c.req.query('reviewId') ?? '';
   const analysisType = c.req.param('type');
 
+  if (!VALID_ANALYSIS_TYPES.includes(analysisType as typeof VALID_ANALYSIS_TYPES[number])) {
+    return c.json({ error: `type must be one of: ${VALID_ANALYSIS_TYPES.join(', ')}` }, 400);
+  }
+
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
     debugLog(`GET /analysis/${analysisType}/status: no analysis found`);
@@ -460,6 +474,9 @@ aiAnalysisRoutes.get('/debug-status', (c) => {
 aiAnalysisRoutes.post('/debug-log', async (c) => {
   if (!isDebug()) return c.json({ ok: true });
   const body = await c.req.json<{ message: string }>();
+  if (typeof body.message !== 'string') {
+    return c.json({ error: 'message must be a string' }, 400);
+  }
   debugLog(`[client] ${body.message}`);
   return c.json({ ok: true });
 });
@@ -473,6 +490,26 @@ aiAnalysisRoutes.get('/preferences', async (c) => {
 
 aiAnalysisRoutes.post('/preferences', async (c) => {
   const body = await c.req.json<{ sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean; ignore_whitespace?: boolean; svg_view_mode?: string; last_image_mode?: string }>();
+
+  if (body.sort_mode !== undefined && !VALID_SORT_MODES.includes(body.sort_mode as typeof VALID_SORT_MODES[number])) {
+    return c.json({ error: `sort_mode must be one of: ${VALID_SORT_MODES.join(', ')}` }, 400);
+  }
+  if (body.risk_sort_dimension !== undefined && !VALID_RISK_DIMENSIONS.includes(body.risk_sort_dimension as typeof VALID_RISK_DIMENSIONS[number])) {
+    return c.json({ error: `risk_sort_dimension must be one of: ${VALID_RISK_DIMENSIONS.join(', ')}` }, 400);
+  }
+  if (body.show_risk_scores !== undefined && typeof body.show_risk_scores !== 'boolean') {
+    return c.json({ error: 'show_risk_scores must be a boolean' }, 400);
+  }
+  if (body.ignore_whitespace !== undefined && typeof body.ignore_whitespace !== 'boolean') {
+    return c.json({ error: 'ignore_whitespace must be a boolean' }, 400);
+  }
+  if (body.svg_view_mode !== undefined && !VALID_SVG_VIEW_MODES.includes(body.svg_view_mode as typeof VALID_SVG_VIEW_MODES[number])) {
+    return c.json({ error: `svg_view_mode must be one of: ${VALID_SVG_VIEW_MODES.join(', ')}` }, 400);
+  }
+  if (body.last_image_mode !== undefined && !VALID_IMAGE_MODES.includes(body.last_image_mode as typeof VALID_IMAGE_MODES[number])) {
+    return c.json({ error: `last_image_mode must be one of: ${VALID_IMAGE_MODES.join(', ')}` }, 400);
+  }
+
   await saveUserPreferences(body);
   return c.json({ ok: true });
 });

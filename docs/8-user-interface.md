@@ -9,6 +9,7 @@ Requirements for the browser-based UI and user interaction patterns.
 - The UI shall consist of a sidebar (file list) and a main content area (diff viewer).
 - The sidebar shall be resizable via drag handle.
 - The sidebar shall contain: repository name, review mode, file filter, sort mode control, file list, and action buttons (Complete Review, Review History).
+- The diff header shall include a "Reveal in Finder" button that opens the file's parent directory in the OS file manager.
 
 ### 8.2 File Navigation
 
@@ -63,6 +64,7 @@ Requirements for the browser-based UI and user interaction patterns.
 - `Cmd/Ctrl+Enter` shall save the current annotation form.
 - `Escape` shall close modals and annotation forms.
 - `j`/`k` shall navigate between files in the sidebar.
+- `Cmd/Ctrl+F` shall open the find-in-diff bar (see FR-4.7 in `4-diff-viewing.md`).
 - `Cmd+Click` (macOS) / `Ctrl+Click` (Windows/Linux) on a symbol in the diff shall navigate to its definition — same file (scrolls) or different file in the review (switches file and scrolls). Uses the existing regex-based outline parser to build a cross-file symbol index.
 
 ### 8.7 Completion Modal
