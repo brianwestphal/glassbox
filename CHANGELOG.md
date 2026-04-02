@@ -8,6 +8,10 @@ All notable changes to Glassbox are documented here. Format follows [Keep a Chan
 
 ## [0.7.2] - 2026-04-03
 
+- Updated GitHub actions configuration
+
+## [0.7.2] - 2026-04-03
+
 - Fixed lint issues
 
 ## [0.7.2] - 2026-04-03
