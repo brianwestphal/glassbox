@@ -7,6 +7,11 @@ import { state } from '../state.js';
 import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
 import { showThemeManager } from './themeManager.js';
+import { renderExperimentalTab, bindExperimentalTabEvents } from './experimentalTab.js';
+import { renderGeneralTab, bindGeneralTabEvents } from './generalTab.js';
+import { renderProfileTab, bindProfileTabEvents, ALL_LANG_KEYS } from './profileTab.js';
+
+import { IconSliders, IconFlask, IconDownload, IconUser } from '../../icons.js';
 
 interface KeyStatusResponse {
   status: Record<string, { configured: boolean; source: string | null }>;
@@ -27,36 +32,12 @@ interface ConfigResponse {
   guidedReview: { enabled: boolean; topics: string[] };
 }
 
-import { IconCheck, IconSliders, IconFlask, IconDownload, IconUser } from '../../icons.js';
-
-const TOP_LANGUAGES: Array<[string, string]> = [
-  ['javascript', 'JavaScript'], ['python', 'Python'], ['typescript', 'TypeScript'],
-  ['java', 'Java'], ['csharp', 'C#'], ['cpp', 'C++'],
-  ['go', 'Go'], ['rust', 'Rust'], ['php', 'PHP'], ['swift', 'Swift'],
-];
-
-const MORE_LANGUAGES: Array<[string, string]> = [
-  ['c', 'C'], ['ruby', 'Ruby'], ['kotlin', 'Kotlin'], ['scala', 'Scala'],
-  ['dart', 'Dart'], ['objectivec', 'Objective-C'], ['elixir', 'Elixir'],
-  ['haskell', 'Haskell'], ['clojure', 'Clojure'], ['bash', 'Shell'],
-  ['perl', 'Perl'], ['lua', 'Lua'], ['r', 'R'], ['ocaml', 'OCaml'],
-  ['zig', 'Zig'], ['nim', 'Nim'], ['erlang', 'Erlang'], ['groovy', 'Groovy'],
-];
-
-const ALL_LANG_KEYS = new Set([...TOP_LANGUAGES, ...MORE_LANGUAGES].map(([k]) => k));
-
 interface ProjectSettingsResponse {
   appName?: string;
 }
 
-interface ThemeSummary {
-  id: string;
-  name: string;
-  builtIn: boolean;
-}
-
 interface ThemesResponse {
-  themes: ThemeSummary[];
+  themes: Array<{ id: string; name: string; builtIn: boolean }>;
   activeId: string;
 }
 
@@ -165,230 +146,6 @@ function renderSettingsModal(
     return keyStatus.status[platform] ?? { configured: false, source: null };
   }
 
-  function renderPlatformModels(platform: string): SafeHtml[] {
-    const models = modelsData.models[platform] ?? [];
-    return models.map(m =>
-      <option value={m.id} selected={m.id === currentModel}>{m.name}{m.isDefault ? ' (recommended)' : ''}</option>
-    );
-  }
-
-  function keyStatusHtml(platform: string): SafeHtml {
-    const info = getKeyInfo(platform);
-    if (info.configured) {
-      return (
-        <div className="settings-key-status settings-key-configured">
-          <IconCheck />
-          <span>{'Configured via ' + (info.source ?? 'unknown')}</span>
-          {info.source !== 'env' && (
-            <button className="btn btn-xs btn-danger" id="remove-key">Remove</button>
-          )}
-        </div>
-      );
-    }
-    return (
-      <div className="settings-key-status">
-        <span className="settings-key-missing">Not configured</span>
-      </div>
-    );
-  }
-
-  function renderTag(key: string, label: string): SafeHtml {
-    const active = guidedTopics.has(key);
-    return <button className={`settings-tag${active ? ' active' : ''}`} data-topic={key}>{label}</button>;
-  }
-
-  function renderContent() {
-    const info = getKeyInfo(currentPlatform);
-    const showInput = !info.configured;
-
-    const modalEl = overlay.querySelector('.modal');
-    if (modalEl === null) return;
-
-    const langTags = TOP_LANGUAGES.map(([k, n]) => renderTag(k, n));
-    const moreLangTags = MORE_LANGUAGES.map(([k, n]) => renderTag(k, n));
-
-    modalEl.innerHTML = (
-      <>
-        <div className="settings-header">
-          <h3>Settings</h3>
-          <button className="settings-close" id="settings-close">&times;</button>
-        </div>
-
-        <div className="settings-tabs">
-          <button className={`settings-tab${activeTab === 'general' ? ' active' : ''}`} data-tab="general">
-            <IconSliders />
-            <span>General</span>
-          </button>
-          <button className={`settings-tab${activeTab === 'profile' ? ' active' : ''}`} data-tab="profile">
-            <IconUser />
-            <span>Profile</span>
-          </button>
-          <button className={`settings-tab${activeTab === 'experimental' ? ' active' : ''}`} data-tab="experimental">
-            <IconFlask />
-            <span>Experimental</span>
-          </button>
-          {isTauri && (
-            <button className={`settings-tab${activeTab === 'updates' ? ' active' : ''}`} data-tab="updates">
-              <IconDownload />
-              <span>Updates</span>
-            </button>
-          )}
-        </div>
-
-        <div className="settings-body">
-          {/* General tab */}
-          <div className={`settings-tab-panel${activeTab === 'general' ? ' active' : ''}`} data-panel="general">
-            <div className="settings-section">
-              <label className="settings-label">Theme</label>
-              <div className="settings-theme-row">
-                <select className="settings-select" id="settings-theme">
-                  {themesData.themes.filter(t => t.builtIn).map(t =>
-                    <option value={t.id} selected={t.id === activeThemeId}>{t.name}</option>
-                  )}
-                  {themesData.themes.some(t => !t.builtIn) && (
-                    <>
-                      <option disabled>{'─'.repeat(20)}</option>
-                      {themesData.themes.filter(t => !t.builtIn).map(t =>
-                        <option value={t.id} selected={t.id === activeThemeId}>{t.name}</option>
-                      )}
-                    </>
-                  )}
-                </select>
-                <button className="btn btn-sm" id="manage-themes-btn">Manage Themes</button>
-              </div>
-            </div>
-            {isTauri && (
-              <div className="settings-section">
-                <label className="settings-label">App Name</label>
-                <input type="text" className="settings-input" id="settings-app-name" value={appName} placeholder="Glassbox — project-name" />
-                <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Profile tab */}
-          <div className={`settings-tab-panel${activeTab === 'profile' ? ' active' : ''}`} data-panel="profile">
-            <p className="settings-disclaimer">
-              Tell us about your experience level so AI features can tailor explanations to you.
-            </p>
-
-            <div className="settings-guided-topics">
-              <label className="settings-label">I'm new to...</label>
-              <div className="settings-tags">
-                {renderTag('programming', 'Programming')}
-                {renderTag('codebase', 'This codebase')}
-              </div>
-
-              <label className="settings-label settings-label-spaced">I'm new to these languages</label>
-              <div className="settings-tags">
-                {langTags}
-              </div>
-
-              {!showMoreLangs && (
-                <button className="settings-more-toggle" id="show-more-langs">More languages...</button>
-              )}
-              {showMoreLangs && (
-                <div className="settings-tags settings-tags-more">
-                  {moreLangTags}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Experimental tab */}
-          <div className={`settings-tab-panel${activeTab === 'experimental' ? ' active' : ''}`} data-panel="experimental">
-            <div className="settings-section-header">
-              <span className="settings-heading">AI</span>
-              <span className="settings-beta-badge">Beta</span>
-            </div>
-            <p className="settings-disclaimer">
-              AI features are in early beta and provided for evaluation purposes only, without warranty of any kind.
-            </p>
-
-            <div className="settings-section">
-              <label className="settings-label">Platform</label>
-              <div className="segmented-control settings-platform-control">
-                {Object.entries(modelsData.platforms).map(([key, name]) => (
-                  <button className={`segment${key === currentPlatform ? ' active' : ''}`}
-                    data-platform={key}>{name}</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <label className="settings-label">Model</label>
-              <select className="settings-select" id="settings-model">{renderPlatformModels(currentPlatform)}</select>
-            </div>
-
-            <div className="settings-section">
-              <label className="settings-label">API Key</label>
-              {keyStatusHtml(currentPlatform)}
-              {showInput && (
-                <div className="settings-key-input-group">
-                  <div className="settings-key-row">
-                    <input type="password" className="settings-input" id="settings-key"
-                      placeholder="Enter API key..." autocomplete="off" />
-                    <button className="btn btn-xs btn-primary" id="save-key-btn">Save Key</button>
-                  </div>
-                  {keyStatus.keychainAvailable ? (
-                    <div className="settings-storage-options">
-                      <label className="settings-radio">
-                        <input type="radio" name="key-storage" value="keychain" checked />
-                        <span>{'Store in ' + keyStatus.keychainLabel}</span>
-                      </label>
-                      <label className="settings-radio">
-                        <input type="radio" name="key-storage" value="config" />
-                        <span>Store in config file</span>
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="settings-storage-options">
-                      <label className="settings-radio">
-                        <input type="radio" name="key-storage" value="config" checked />
-                        <span>Store in ~/.glassbox/config.json</span>
-                      </label>
-                      <p className="settings-warning">Key will be stored with basic encoding (not encrypted). Only use for local development.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="settings-divider"></div>
-
-            <div className="settings-section-header">
-              <span className="settings-heading">Guided Review</span>
-              <span className="settings-beta-badge">Beta</span>
-            </div>
-            <p className="settings-disclaimer">
-              Get AI explanations tailored to your experience level. Configure your profile in the Profile tab.
-            </p>
-
-            <div className="settings-section">
-              <label className="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" checked={guidedEnabled} /><span>Enable guided review</span></label>
-            </div>
-          </div>
-
-          {/* Updates tab (Tauri only) */}
-          {isTauri && (
-            <div className={`settings-tab-panel${activeTab === 'updates' ? ' active' : ''}`} data-panel="updates">
-              <div className="settings-section">
-                <div className="settings-section-header">
-                  <span className="settings-heading">Software Updates</span>
-                </div>
-                <p className="settings-disclaimer">Check for new versions of the Glassbox desktop app.</p>
-                <button className="btn btn-sm" id="check-updates-btn">Check for Updates</button>
-                <p className="settings-hint" id="check-updates-status"></p>
-              </div>
-            </div>
-          )}
-        </div>
-      </>
-    ).toString();
-
-    bindModalEvents();
-  }
-
   function saveKey() {
     const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
     if (keyInput === null || keyInput.value.trim() === '') return;
@@ -407,6 +164,57 @@ function renderSettingsModal(
     })();
   }
 
+  function removeKey() {
+    void (async () => {
+      await api(`/ai/key?platform=${currentPlatform}`, { method: 'DELETE' });
+      const newStatus = await api<KeyStatusResponse>('/ai/key-status');
+      keyStatus.status = newStatus.status;
+      const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+      state.aiConfigured = newConfig.keyConfigured;
+      renderContent();
+    })();
+  }
+
+  function toggleTopic(topic: string) {
+    if (guidedTopics.has(topic)) {
+      guidedTopics.delete(topic);
+    } else {
+      guidedTopics.add(topic);
+      if (topic === 'programming') {
+        const hasAnyLang = [...guidedTopics].some(t => ALL_LANG_KEYS.has(t));
+        if (!hasAnyLang) {
+          for (const key of ALL_LANG_KEYS) guidedTopics.add(key);
+          showMoreLangs = true;
+        }
+      }
+    }
+    saveConfigDebounced();
+  }
+
+  function renderContent() {
+    const modalEl = overlay.querySelector('.modal');
+    if (modalEl === null) return;
+
+    modalEl.innerHTML = renderSettingsShell({
+      activeTab,
+      isTauri,
+      generalContent: renderGeneralTab({ themesData, activeThemeId, appName, isTauri }),
+      profileContent: renderProfileTab({ guidedTopics, showMoreLangs }),
+      experimentalContent: renderExperimentalTab({
+        platforms: modelsData.platforms,
+        currentPlatform,
+        currentModel,
+        platformModels: modelsData.models[currentPlatform] ?? [],
+        keyInfo: getKeyInfo(currentPlatform),
+        keychainAvailable: keyStatus.keychainAvailable,
+        keychainLabel: keyStatus.keychainLabel,
+        guidedEnabled,
+      }),
+    }).toString();
+
+    bindModalEvents();
+  }
+
   function bindModalEvents() {
     // Tab switching
     overlay.querySelectorAll('.settings-tab').forEach(tab => {
@@ -419,7 +227,7 @@ function renderSettingsModal(
     // Close button
     overlay.querySelector('#settings-close')?.addEventListener('click', closeDialog);
 
-    // Check for Updates button
+    // Check for Updates button (Tauri only)
     const checkUpdatesBtn = overlay.querySelector<HTMLButtonElement>('#check-updates-btn');
     const checkUpdatesStatus = overlay.querySelector<HTMLElement>('#check-updates-status');
     if (checkUpdatesBtn !== null && checkUpdatesStatus !== null) {
@@ -445,124 +253,43 @@ function renderSettingsModal(
       });
     }
 
-    // Platform switching — save immediately
-    overlay.querySelectorAll('.settings-platform-control .segment').forEach(btn => {
-      btn.addEventListener('click', () => {
-        currentPlatform = (btn as HTMLElement).dataset.platform ?? currentPlatform;
+    // General tab events
+    bindGeneralTabEvents(overlay, {
+      switchTheme: (id) => void switchTheme(id),
+      showThemeManager,
+      saveAppNameDebounced,
+      refreshThemes: () => api<ThemesResponse>('/themes').then(updated => {
+        themesData.themes = updated.themes;
+        themesData.activeId = updated.activeId;
+        return updated;
+      }),
+      setAppName: (name) => { appName = name; },
+      setActiveThemeId: (id) => { activeThemeId = id; },
+      renderContent,
+    });
+
+    // Profile tab events
+    bindProfileTabEvents(overlay, {
+      toggleTopic,
+      setShowMoreLangs: (val) => { showMoreLangs = val; },
+      renderContent,
+    });
+
+    // Experimental tab events
+    bindExperimentalTabEvents(overlay, {
+      switchPlatform: (platform) => {
+        currentPlatform = platform;
         const models = modelsData.models[currentPlatform] ?? [];
         const defaultModel = models.find(m => m.isDefault);
         currentModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
-        saveConfig();
-        renderContent();
-      });
+      },
+      setModel: (model) => { currentModel = model; },
+      saveConfig,
+      saveKey,
+      removeKey,
+      toggleGuided: (enabled) => { guidedEnabled = enabled; },
+      renderContent,
     });
-
-    // Model selection — save immediately
-    const modelSelect = overlay.querySelector<HTMLSelectElement>('#settings-model');
-    if (modelSelect !== null) {
-      modelSelect.addEventListener('change', () => {
-        currentModel = modelSelect.value;
-        saveConfig();
-      });
-    }
-
-    // Remove key
-    const removeBtn = overlay.querySelector('#remove-key');
-    if (removeBtn !== null) {
-      removeBtn.addEventListener('click', () => {
-        void (async () => {
-          await api(`/ai/key?platform=${currentPlatform}`, { method: 'DELETE' });
-          const newStatus = await api<KeyStatusResponse>('/ai/key-status');
-          keyStatus.status = newStatus.status;
-          const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
-          state.aiConfigured = newConfig.keyConfigured;
-          renderContent();
-        })();
-      });
-    }
-
-    // Save key button
-    overlay.querySelector('#save-key-btn')?.addEventListener('click', saveKey);
-
-    // Save key on Enter
-    const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
-    if (keyInput !== null) {
-      keyInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); saveKey(); }
-      });
-    }
-
-    // Guided review checkbox — save immediately
-    const guidedCheckbox = overlay.querySelector<HTMLInputElement>('#settings-guided-enabled');
-    if (guidedCheckbox !== null) {
-      guidedCheckbox.addEventListener('change', () => {
-        guidedEnabled = guidedCheckbox.checked;
-        saveConfig();
-        renderContent();
-      });
-    }
-
-    // Topic tags — debounced save
-    overlay.querySelectorAll('.settings-tag').forEach(tag => {
-      tag.addEventListener('click', () => {
-        const topic = (tag as HTMLElement).dataset.topic;
-        if (topic !== undefined) {
-          if (guidedTopics.has(topic)) {
-            guidedTopics.delete(topic);
-          } else {
-            guidedTopics.add(topic);
-            if (topic === 'programming') {
-              const hasAnyLang = [...guidedTopics].some(t => ALL_LANG_KEYS.has(t));
-              if (!hasAnyLang) {
-                for (const key of ALL_LANG_KEYS) guidedTopics.add(key);
-                showMoreLangs = true;
-              }
-            }
-          }
-          saveConfigDebounced();
-          renderContent();
-        }
-      });
-    });
-
-    // More languages toggle
-    const moreBtn = overlay.querySelector('#show-more-langs');
-    if (moreBtn !== null) {
-      moreBtn.addEventListener('click', () => {
-        showMoreLangs = true;
-        renderContent();
-      });
-    }
-
-    // Theme selection — save immediately
-    const themeSelect = overlay.querySelector<HTMLSelectElement>('#settings-theme');
-    if (themeSelect !== null) {
-      themeSelect.addEventListener('change', () => {
-        activeThemeId = themeSelect.value;
-        void switchTheme(activeThemeId);
-      });
-    }
-
-    // Manage Themes button
-    overlay.querySelector('#manage-themes-btn')?.addEventListener('click', () => {
-      showThemeManager(async () => {
-        // Refresh theme list in settings dropdown after manager changes
-        const updated = await api<ThemesResponse>('/themes');
-        themesData.themes = updated.themes;
-        themesData.activeId = updated.activeId;
-        activeThemeId = updated.activeId;
-        renderContent();
-      });
-    });
-
-    // App name input — debounced save
-    const appNameInput = overlay.querySelector<HTMLInputElement>('#settings-app-name');
-    if (appNameInput !== null) {
-      appNameInput.addEventListener('input', () => {
-        appName = appNameInput.value;
-        saveAppNameDebounced();
-      });
-    }
 
     // Click outside to close
     overlay.addEventListener('click', (e) => {
@@ -574,4 +301,72 @@ function renderSettingsModal(
   overlay.innerHTML = (<div className="modal settings-dialog"></div>).toString();
   document.body.appendChild(overlay);
   renderContent();
+}
+
+interface ShellData {
+  activeTab: string;
+  isTauri: boolean;
+  generalContent: SafeHtml;
+  profileContent: SafeHtml;
+  experimentalContent: SafeHtml;
+}
+
+function renderSettingsShell(data: ShellData): SafeHtml {
+  const { activeTab, isTauri, generalContent, profileContent, experimentalContent } = data;
+  return (
+    <>
+      <div className="settings-header">
+        <h3>Settings</h3>
+        <button className="settings-close" id="settings-close">&times;</button>
+      </div>
+
+      <div className="settings-tabs">
+        <button className={`settings-tab${activeTab === 'general' ? ' active' : ''}`} data-tab="general">
+          <IconSliders />
+          <span>General</span>
+        </button>
+        <button className={`settings-tab${activeTab === 'profile' ? ' active' : ''}`} data-tab="profile">
+          <IconUser />
+          <span>Profile</span>
+        </button>
+        <button className={`settings-tab${activeTab === 'experimental' ? ' active' : ''}`} data-tab="experimental">
+          <IconFlask />
+          <span>Experimental</span>
+        </button>
+        {isTauri && (
+          <button className={`settings-tab${activeTab === 'updates' ? ' active' : ''}`} data-tab="updates">
+            <IconDownload />
+            <span>Updates</span>
+          </button>
+        )}
+      </div>
+
+      <div className="settings-body">
+        <div className={`settings-tab-panel${activeTab === 'general' ? ' active' : ''}`} data-panel="general">
+          {generalContent}
+        </div>
+
+        <div className={`settings-tab-panel${activeTab === 'profile' ? ' active' : ''}`} data-panel="profile">
+          {profileContent}
+        </div>
+
+        <div className={`settings-tab-panel${activeTab === 'experimental' ? ' active' : ''}`} data-panel="experimental">
+          {experimentalContent}
+        </div>
+
+        {isTauri && (
+          <div className={`settings-tab-panel${activeTab === 'updates' ? ' active' : ''}`} data-panel="updates">
+            <div className="settings-section">
+              <div className="settings-section-header">
+                <span className="settings-heading">Software Updates</span>
+              </div>
+              <p className="settings-disclaimer">Check for new versions of the Glassbox desktop app.</p>
+              <button className="btn btn-sm" id="check-updates-btn">Check for Updates</button>
+              <p className="settings-hint" id="check-updates-status"></p>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }

@@ -30,8 +30,8 @@ describe('FR-14.3: Shell command safety', () => {
     expect(content).not.toMatch(/execSync\(`git\s/);
   });
 
-  it('ai/config.ts uses spawnSync for keychain commands', () => {
-    const content = readFileSync(join(SRC_ROOT, 'ai', 'config.ts'), 'utf-8');
+  it('ai/keychain.ts uses spawnSync for keychain commands', () => {
+    const content = readFileSync(join(SRC_ROOT, 'ai', 'keychain.ts'), 'utf-8');
     expect(content).toContain('spawnSync');
     expect(content).not.toMatch(/execSync\(/);
   });
@@ -90,8 +90,8 @@ describe('FR-14.2: API input validation', () => {
     expect(content).toContain('content');
   });
 
-  it('ai-api.ts validates analysis type', () => {
-    const content = readFileSync(join(SRC_ROOT, 'routes', 'ai-api.ts'), 'utf-8');
+  it('ai-analysis.ts validates analysis type', () => {
+    const content = readFileSync(join(SRC_ROOT, 'routes', 'ai-analysis.ts'), 'utf-8');
     expect(content).toContain("analysisType !== 'risk'");
     expect(content).toContain("analysisType !== 'narrative'");
     expect(content).toContain('Invalid analysis type');
@@ -100,8 +100,8 @@ describe('FR-14.2: API input validation', () => {
 });
 
 describe('FR-14.4.2: Config file key encoding', () => {
-  it('ai/config.ts base64-encodes API keys in config file', () => {
-    const content = readFileSync(join(SRC_ROOT, 'ai', 'config.ts'), 'utf-8');
+  it('ai/api-keys.ts base64-encodes API keys in config file', () => {
+    const content = readFileSync(join(SRC_ROOT, 'ai', 'api-keys.ts'), 'utf-8');
     expect(content).toContain("Buffer.from(key).toString('base64')");
     expect(content).toContain("Buffer.from(encoded, 'base64')");
   });

@@ -2,28 +2,12 @@ import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-export interface DiffHunk {
-  oldStart: number;
-  oldCount: number;
-  newStart: number;
-  newCount: number;
-  lines: DiffLine[];
-}
+import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
+import { getRepoRoot } from './repo.js';
 
-export interface DiffLine {
-  type: 'add' | 'remove' | 'context';
-  oldNum: number | null;
-  newNum: number | null;
-  content: string;
-}
-
-export interface FileDiff {
-  filePath: string;
-  oldPath: string | null;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
-  hunks: DiffHunk[];
-  isBinary: boolean;
-}
+// Re-export types and repo functions so existing importers don't break
+export type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
+export { getRepoRoot, getRepoName, isGitRepo, getHeadCommit } from './repo.js';
 
 function git(args: string[], cwd: string): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
@@ -35,34 +19,6 @@ function git(args: string[], cwd: string): string {
   err.status = result.status;
   throw err;
 }
-
-export function getRepoRoot(cwd: string): string {
-  return git(['rev-parse', '--show-toplevel'], cwd).trim();
-}
-
-export function getRepoName(cwd: string): string {
-  const root = getRepoRoot(cwd);
-  return root.split('/').pop() ?? 'unknown';
-}
-
-export function isGitRepo(cwd: string): boolean {
-  try {
-    git(['rev-parse', '--is-inside-work-tree'], cwd);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export type ReviewMode =
-  | { type: 'uncommitted' }
-  | { type: 'staged' }
-  | { type: 'unstaged' }
-  | { type: 'commit'; sha: string }
-  | { type: 'range'; from: string; to: string }
-  | { type: 'branch'; name: string }
-  | { type: 'files'; patterns: string[] }
-  | { type: 'all' };
 
 export function getDiffArgs(mode: ReviewMode): string[] {
   switch (mode.type) {
@@ -100,7 +56,6 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
     rawDiff = '';
   }
 
-  // For uncommitted mode, also include untracked files
   const diffs = parseDiff(rawDiff);
 
   if (mode.type === 'uncommitted') {
@@ -126,7 +81,6 @@ function createNewFileDiff(filePath: string, repoRoot: string): FileDiff {
   let content: string;
   try {
     const buf = readFileSync(resolve(repoRoot, filePath));
-    // Check first 8KB of raw bytes for null bytes
     const checkLen = Math.min(buf.length, 8192);
     for (let i = 0; i < checkLen; i++) {
       if (buf[i] === 0) {
@@ -167,11 +121,9 @@ export function parseDiff(raw: string): FileDiff[] {
 
   for (const chunk of fileChunks) {
     const headerEnd = chunk.indexOf('@@');
-    // Only check the header portion for binary indicators (not diff content which may contain "Binary file" as text)
     const header = headerEnd === -1 ? chunk : chunk.slice(0, headerEnd);
 
     if (headerEnd === -1 && !header.includes('Binary')) {
-      // Possibly a file with no changes or binary
       const pathMatch = chunk.match(/^a\/(.+?) b\/(.+)/m);
       if (pathMatch) {
         const isBinary = header.includes('Binary');
@@ -244,7 +196,7 @@ function parseHunks(raw: string): DiffHunk[] {
         lines.push({ type: 'remove', oldNum, newNum: null, content: line.slice(1) });
         oldNum++;
       } else if (line.startsWith(' ') || line.startsWith('\\')) {
-        if (line.startsWith('\\')) continue; // "No newline at end of file"
+        if (line.startsWith('\\')) continue;
         lines.push({ type: 'context', oldNum, newNum, content: line.slice(1) });
         oldNum++;
         newNum++;
@@ -273,10 +225,6 @@ export function getFileContent(filePath: string, ref: string, cwd: string): stri
   } catch {
     return '';
   }
-}
-
-export function getHeadCommit(cwd: string): string {
-  return spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf-8' }).stdout.trim();
 }
 
 export function parseModeString(modeStr: string): ReviewMode {
