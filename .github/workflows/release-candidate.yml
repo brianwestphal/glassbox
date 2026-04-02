@@ -156,6 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -163,11 +164,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
       - run: npm ci
       - run: npm run build
       - name: Publish beta
-        run: npm publish --tag beta --provenance
+        run: npm publish --tag beta --provenance --access public
 
   # ══════════════════════════════════════════════════════════════
   # Phase 3: Install & upgrade smoke tests
@@ -242,6 +242,8 @@ jobs:
 
       - name: Promote beta to latest on npm
         run: npm dist-tag add "glassbox@${{ steps.version.outputs.version }}" latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create final release tag
         run: |
