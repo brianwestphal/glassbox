@@ -11,9 +11,10 @@ import { pageRoutes } from './routes/pages.js';
 import { themeApiRoutes } from './routes/theme-api.js';
 import type { AppEnv } from './types.js';
 
-function tryServe(fetch: Hono['fetch'], port: number): Promise<number> {
+function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = serve({ fetch, port, hostname: '127.0.0.1' });
+    // Cast needed: Hono's fetch Env param is typed as `object` but serve() expects `unknown`
+    const server = serve({ fetch: appFetch as never, port, hostname: '127.0.0.1' });
     server.on('listening', () => { resolve(port); });
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {

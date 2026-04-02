@@ -1,3 +1,4 @@
+import type { SafeHtml } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 
@@ -149,7 +150,7 @@ function showDropdown() {
   setTimeout(() => { document.addEventListener('click', close, true); }, 0);
 }
 
-function renderSymbolList(symbols: OutlineSymbol[], depth: number): JSX.Element {
+function renderSymbolList(symbols: OutlineSymbol[], depth: number): SafeHtml {
   return (
     <div>
       {symbols.map(s => (

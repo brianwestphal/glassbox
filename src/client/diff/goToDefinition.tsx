@@ -3,6 +3,7 @@
  * in the diff view navigates to its definition.
  */
 import { api } from '../api.js';
+import { toElement } from '../dom.js';
 import { state } from '../state.js';
 import { navPush } from './navStack.js';
 import { selectFile, updateNavFilePath } from './selection.js';
@@ -171,9 +172,7 @@ async function loadRawFile(filePath: string, targetLine: number) {
 function showToast(message: string) {
   const existing = document.querySelector('.goto-toast');
   if (existing) existing.remove();
-  const toast = document.createElement('div');
-  toast.className = 'goto-toast';
-  toast.textContent = message;
+  const toast = toElement(<div className="goto-toast">{message}</div>);
   document.body.appendChild(toast);
   setTimeout(() => { toast.remove(); }, 2000);
 }

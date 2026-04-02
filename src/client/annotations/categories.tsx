@@ -12,7 +12,7 @@ export function buildCategoryBadge(value: string): SafeHtml {
 }
 
 export function bindCategoryBadgeClick(container: Element) {
-  const badge = container.querySelector('.form-category-badge');
+  const badge = container.querySelector<HTMLElement>('.form-category-badge');
   if (!badge) return;
   badge.addEventListener('click', (e) => {
     e.stopPropagation();

@@ -38,12 +38,13 @@ export function bindImageDiff() {
   // Get the reference image (any canvas — they all load the same image)
   const refImg = container.querySelector<HTMLImageElement>('.image-layer-old');
   if (refImg === null) return;
+  const ref = refImg; // capture for closure narrowing
 
   /** Size a canvas's wrapper to fit the image, preserving zoom/pan. */
   function sizeWrap(canvas: ImageCanvas) {
     const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
     if (wrap === null) return;
-    const nw = refImg.naturalWidth, nh = refImg.naturalHeight;
+    const nw = ref.naturalWidth, nh = ref.naturalHeight;
     if (!nw || !nh) return;
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
     if (!cw || !ch) return;

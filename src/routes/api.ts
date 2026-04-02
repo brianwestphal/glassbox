@@ -523,7 +523,7 @@ apiRoutes.get('/image/:fileId/:side', async (c) => {
   if (isSvgFile(file.file_path)) {
     try {
       const png = await rasterizeSvg(image.data);
-      return new Response(png, {
+      return new Response(new Uint8Array(png), {
         headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
       });
     } catch {
@@ -532,7 +532,7 @@ apiRoutes.get('/image/:fileId/:side', async (c) => {
   }
 
   const contentType = getContentType(file.file_path);
-  return new Response(image.data, {
+  return new Response(new Uint8Array(image.data), {
     headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' },
   });
 });

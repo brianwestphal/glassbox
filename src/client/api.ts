@@ -13,9 +13,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 export function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // --- Client-side debug logging (sends to server console when --debug is active) ---

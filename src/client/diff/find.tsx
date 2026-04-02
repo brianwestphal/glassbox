@@ -17,7 +17,7 @@ const ACTIVE_HIGHLIGHT_CLASS = 'find-highlight-active';
 
 export function bindFind() {
   // Only activate in Tauri — browsers have their own find
-  const isTauri = (window as Record<string, unknown>).__TAURI__ !== undefined;
+  const isTauri = (window as unknown as Record<string, unknown>).__TAURI__ !== undefined;
   if (!isTauri) return;
 
   document.addEventListener('keydown', (e) => {
@@ -45,7 +45,7 @@ export function bindFind() {
   });
 
   // Listen for Tauri menu event (Edit > Find)
-  const tauriObj = (window as Record<string, unknown>).__TAURI__ as
+  const tauriObj = (window as unknown as Record<string, unknown>).__TAURI__ as
     | { event?: { listen: (name: string, cb: () => void) => void } }
     | undefined;
   tauriObj?.event?.listen('menu-find', () => {
@@ -160,6 +160,7 @@ function runSearch(query: string) {
 
 function highlightRange(range: Range) {
   try {
+    // Range.surroundContents() requires a raw DOM element; toElement() not applicable here
     const span = document.createElement('mark');
     span.className = HIGHLIGHT_CLASS;
     range.surroundContents(span);

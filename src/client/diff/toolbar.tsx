@@ -109,8 +109,9 @@ function showLanguagePicker(btn: HTMLElement) {
   popup.style.position = 'fixed';
   popup.style.bottom = String(window.innerHeight - rect.top + 4) + 'px';
 
-  const listEl = popup.querySelector('.language-list');
-  if (listEl === null) return;
+  const listQuery = popup.querySelector('.language-list');
+  if (listQuery === null) return;
+  const listEl = listQuery as HTMLElement;
   const filterInput = popup.querySelector('.language-filter') as HTMLInputElement;
 
   function selectLang(lang: string, auto: boolean) {
