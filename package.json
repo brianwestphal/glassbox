@@ -40,6 +40,7 @@
     "test:watch": "vitest",
     "test:all": "bash scripts/test-all.sh",
     "test:e2e": "npx playwright test",
+    "test:smoke": "bash tests/smoke/smoke-test.sh",
     "lint": "eslint src/",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
