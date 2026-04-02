@@ -294,8 +294,11 @@ async function main() {
   await startServer(port, review.id, repoRoot, { noOpen, strictPort });
 }
 
-// Only run main() when executed as entry point (not when imported for testing)
-const isDirectRun = process.argv[1]?.endsWith('cli.js') || process.argv[1]?.endsWith('cli.ts');
+// Only run main() when executed as entry point (not when imported for testing).
+// Resolve symlinks (e.g. npm global bin symlink) before checking the filename.
+import { realpathSync } from 'fs';
+const resolvedArg = process.argv[1] !== undefined ? realpathSync(process.argv[1]) : '';
+const isDirectRun = resolvedArg.endsWith('cli.js') || resolvedArg.endsWith('cli.ts');
 if (isDirectRun) {
   main().catch((err: unknown) => {
     console.error(err);
