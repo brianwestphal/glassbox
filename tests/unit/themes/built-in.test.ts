@@ -5,13 +5,17 @@ import {
 import type { ThemeColors } from '../../../src/themes/built-in.js';
 
 describe('BUILT_IN_THEMES', () => {
-  it('has 6 built-in themes', () => {
-    expect(BUILT_IN_THEMES).toHaveLength(6);
+  it('has 16 built-in themes', () => {
+    expect(BUILT_IN_THEMES).toHaveLength(16);
   });
 
-  it('includes Dark, Light, High Contrast Dark, High Contrast Light, Dracula, Tokyo Night', () => {
+  it('includes all expected themes in order', () => {
     const ids = BUILT_IN_THEMES.map(t => t.id);
-    expect(ids).toEqual(['dark', 'light', 'high-contrast-dark', 'high-contrast-light', 'dracula', 'tokyo-night']);
+    expect(ids).toEqual([
+      'dark', 'light', 'high-contrast-dark', 'high-contrast-light', 'dracula', 'tokyo-night',
+      'one-dark-pro', 'solarized-dark', 'solarized-light', 'monokai', 'nord',
+      'gruvbox-dark', 'gruvbox-light', 'github-dark', 'rose-pine', 'ayu-dark',
+    ]);
   });
 
   it('all themes are marked as builtIn: true', () => {

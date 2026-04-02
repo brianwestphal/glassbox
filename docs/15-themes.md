@@ -20,6 +20,16 @@ Requirements for visual theming, built-in theme selection, and custom theme crea
   - **High Contrast Light** — WCAG AAA-compliant light theme with increased contrast ratios
   - **Dracula** — Dracula color scheme
   - **Tokyo Night** — Tokyo Night color scheme
+  - **One Dark Pro** — Atom's One Dark theme
+  - **Solarized Dark** — Ethan Schoonover's dark color scheme
+  - **Solarized Light** — Ethan Schoonover's light color scheme
+  - **Monokai** — Classic TextMate/Sublime theme
+  - **Nord** — Arctic north-bluish color palette
+  - **Gruvbox Dark** — Retro groove dark color scheme
+  - **Gruvbox Light** — Retro groove light color scheme
+  - **GitHub Dark** — GitHub's dark color scheme
+  - **Rosé Pine** — Soho vibes dark theme with muted rose accents
+  - **Ayu Dark** — Ayu Mirage dark color scheme
 - Built-in themes shall not be directly editable or deletable.
 
 ### 15.3 Custom Themes
