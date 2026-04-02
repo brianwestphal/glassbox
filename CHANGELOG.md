@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.2] - 2026-04-03
+
+- Testing new CI/CD integration
+
 ## [0.7.1] - 2026-04-02
 
 - fixed npm installed versions
