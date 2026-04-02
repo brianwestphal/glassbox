@@ -38,16 +38,23 @@ Requirements for the browser-based UI and user interaction patterns.
 - The dialog shall be closeable at any time via the close button, clicking outside, or pressing Escape.
 - All settings shall save automatically when changed (no Save/Cancel buttons).
 - The settings dialog shall use a tabbed interface with icon-and-label tabs:
-  - **General** — App name (Tauri desktop app only; tab hidden in browser)
-  - **Experimental** — AI configuration and guided review
+  - **General** — Theme selection, app name (Tauri desktop app only)
+  - **Profile** — Experience level and language familiarity (for AI-tailored explanations)
+  - **Experimental** — AI configuration and guided review toggle
   - **Updates** — Software update checks (Tauri desktop app only; tab hidden in browser)
-- When running in the Tauri desktop app, the General tab shall include:
+- The General tab shall include:
+  - Theme selection dropdown and "Manage Themes" button (see `15-themes.md`)
+- When running in the Tauri desktop app, the General tab shall additionally include:
   - Custom app name input (auto-saved on change, debounced)
+- The Profile tab shall include:
+  - "I'm new to..." topic tags: Programming, This codebase
+  - "I'm new to these languages" language tags with "More languages..." toggle
+  - Topic changes saved immediately / debounced for rapid changes
 - The Experimental tab shall include:
   - AI platform selection (segmented control, saved immediately on switch)
   - Model selection (dropdown per platform, saved immediately on change)
   - API key management (add with inline "Save Key" button, view source, remove)
-  - Guided review toggle and topic selection (saved immediately / debounced for rapid topic changes)
+  - Guided review toggle (saved immediately)
 - When running in the Tauri desktop app, the Updates tab shall include:
   - "Check for Updates" button with status display
 
@@ -74,5 +81,5 @@ Requirements for the browser-based UI and user interaction patterns.
 
 ### 8.9 Responsiveness
 
-- The UI shall support both light and dark color schemes via `prefers-color-scheme` media query.
+- The UI shall support light and dark color schemes via the theme system (see `15-themes.md`).
 - The layout shall function at minimum window dimensions of 800x500 pixels.

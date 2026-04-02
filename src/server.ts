@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { aiApiRoutes } from './routes/ai-api.js';
 import { apiRoutes } from './routes/api.js';
 import { pageRoutes } from './routes/pages.js';
+import { themeApiRoutes } from './routes/theme-api.js';
 import type { AppEnv } from './types.js';
 
 function tryServe(fetch: Hono['fetch'], port: number): Promise<number> {
@@ -59,6 +60,7 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   // API routes
   app.route('/api', apiRoutes);
   app.route('/api/ai', aiApiRoutes);
+  app.route('/api/themes', themeApiRoutes);
 
   // Page routes
   app.route('/', pageRoutes);

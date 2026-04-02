@@ -44,6 +44,7 @@ All project documentation lives in `docs/`. There are two types:
 - `12-demo-mode.md` — Demo scenarios and isolation
 - `13-navigation.md` — Go-to-definition, navigation stack (back/forward)
 - `14-security.md` — Network binding, input validation, command execution safety
+- `15-themes.md` — Theme system, built-in themes, custom themes, theme editor
 
 **Architecture documents** describe system design and setup:
 
@@ -78,6 +79,10 @@ All project documentation lives in `docs/`. There are two types:
 - `src/git/diff.ts` — Git operations: diff generation, parsing, file listing
 - `src/git/image.ts` — Image diff support: old/new image retrieval from git, metadata extraction from headers
 - `src/git/svg-rasterize.ts` — SVG to PNG rasterization using `@resvg/resvg-wasm` for rendered comparison mode
+- `src/themes/built-in.ts` — Built-in theme definitions (Dark, Light, High Contrast, Dracula, Tokyo Night), ThemeColors type
+- `src/themes/config.ts` — Theme persistence: active theme in config.json, custom themes in ~/.glassbox/themes/
+- `src/routes/theme-api.ts` — Theme REST API: list, get/set active, create/update/delete custom themes
+- `src/client/themes.ts` — Client-side theme switching: applyThemeColors(), switchTheme()
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
 - `src/jsx-runtime.ts` — Custom JSX runtime (server-side HTML string generation)
 - `src/types.ts` — Shared Hono environment types
@@ -187,6 +192,29 @@ The build produces:
 In dev mode (`npm run dev` or `tauri:dev`), external packages resolve from the project's `node_modules/` automatically. In production Tauri builds, the sidecar runs from `src-tauri/server/` with only the explicitly copied packages available. Forgetting step 2 causes "module not found" errors that only appear in production.
 
 Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`
+
+## Testing
+
+```bash
+npm test              # Unit tests with coverage (vitest)
+npm run test:e2e      # E2E tests (Playwright, Chromium)
+npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
+```
+
+### Testing Philosophy
+
+- **Double coverage**: Every feature should be covered by both unit tests and E2E tests. Unit tests verify individual functions in isolation; E2E tests verify the full stack works end-to-end in a real browser. Neither alone is sufficient — unit tests can pass while the real UI is broken (e.g., incorrect API call serialization, CSS issues, event wiring bugs).
+- **E2E tests are not optional**: If a feature involves user interaction (clicking, typing, navigating), it must have E2E tests that exercise the real UI against a running server. E2E tests catch integration bugs that unit tests with mocked boundaries cannot.
+- **Unit tests mock at boundaries, E2E tests don't**: Unit tests mock database, filesystem, and external APIs. E2E tests run against the real server with a real database (demo mode) and real browser rendering. The only thing E2E tests don't test is external AI API calls.
+- **Coverage merging**: `npm run test:all` collects V8 coverage from the server process (via `NODE_V8_COVERAGE`), browser coverage (via Playwright's `page.coverage` API with esbuild source maps), and unit test coverage (vitest), then merges all three as lcov files via concatenation and generates a combined HTML report with `genhtml`.
+
+### Test Infrastructure
+
+- `vitest.config.ts` — Unit test config, excludes `tests/e2e/`, coverage via `@vitest/coverage-v8`
+- `playwright.config.ts` — E2E config, Chromium only, starts server in demo mode on port 4183
+- `tests/e2e/coverage-fixture.ts` — Playwright fixture that collects browser V8 coverage per test
+- `scripts/test-all.sh` — Orchestrates unit + E2E runs and merges coverage
+- `scripts/test-e2e-coverage.sh` — Manages server lifecycle for E2E coverage collection
 
 ## Conventions
 

@@ -5,6 +5,8 @@ import { invalidateGuidedAnalysis } from '../guided.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { state } from '../state.js';
 import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
+import { switchTheme } from '../themes.js';
+import { showThemeManager } from './themeManager.js';
 
 interface KeyStatusResponse {
   status: Record<string, { configured: boolean; source: string | null }>;
@@ -25,7 +27,7 @@ interface ConfigResponse {
   guidedReview: { enabled: boolean; topics: string[] };
 }
 
-import { IconCheck, IconSliders, IconFlask, IconDownload } from '../../icons.js';
+import { IconCheck, IconSliders, IconFlask, IconDownload, IconUser } from '../../icons.js';
 
 const TOP_LANGUAGES: Array<[string, string]> = [
   ['javascript', 'JavaScript'], ['python', 'Python'], ['typescript', 'TypeScript'],
@@ -47,16 +49,28 @@ interface ProjectSettingsResponse {
   appName?: string;
 }
 
+interface ThemeSummary {
+  id: string;
+  name: string;
+  builtIn: boolean;
+}
+
+interface ThemesResponse {
+  themes: ThemeSummary[];
+  activeId: string;
+}
+
 export function showSettingsDialog(onClose?: () => void) {
   void (async () => {
-    const [keyStatus, modelsData, configData, projectSettings] = await Promise.all([
+    const [keyStatus, modelsData, configData, projectSettings, themesData] = await Promise.all([
       api<KeyStatusResponse>('/ai/key-status'),
       api<ModelsResponse>('/ai/models'),
       api<ConfigResponse>('/ai/config'),
       api<ProjectSettingsResponse>('/project-settings'),
+      api<ThemesResponse>('/themes'),
     ]);
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, onClose);
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, onClose);
   })();
 }
 
@@ -65,6 +79,7 @@ function renderSettingsModal(
   modelsData: ModelsResponse,
   configData: ConfigResponse,
   projectSettings: ProjectSettingsResponse,
+  themesData: ThemesResponse,
   onClose?: () => void,
 ) {
   const overlay = toElement(<div className="modal-overlay"></div>);
@@ -76,7 +91,8 @@ function renderSettingsModal(
   let showMoreLangs = false;
   let appName = projectSettings.appName ?? '';
   const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI__;
-  let activeTab = isTauri ? 'general' : 'experimental';
+  let activeTab = 'general';
+  let activeThemeId = themesData.activeId;
 
   // Track last-saved guided review state for cache invalidation
   let lastSavedGuidedEnabled = guidedEnabled;
@@ -199,12 +215,14 @@ function renderSettingsModal(
         </div>
 
         <div className="settings-tabs">
-          {isTauri && (
-            <button className={`settings-tab${activeTab === 'general' ? ' active' : ''}`} data-tab="general">
-              <IconSliders />
-              <span>General</span>
-            </button>
-          )}
+          <button className={`settings-tab${activeTab === 'general' ? ' active' : ''}`} data-tab="general">
+            <IconSliders />
+            <span>General</span>
+          </button>
+          <button className={`settings-tab${activeTab === 'profile' ? ' active' : ''}`} data-tab="profile">
+            <IconUser />
+            <span>Profile</span>
+          </button>
           <button className={`settings-tab${activeTab === 'experimental' ? ' active' : ''}`} data-tab="experimental">
             <IconFlask />
             <span>Experimental</span>
@@ -218,16 +236,64 @@ function renderSettingsModal(
         </div>
 
         <div className="settings-body">
-          {/* General tab (Tauri only) */}
-          {isTauri && (
-            <div className={`settings-tab-panel${activeTab === 'general' ? ' active' : ''}`} data-panel="general">
+          {/* General tab */}
+          <div className={`settings-tab-panel${activeTab === 'general' ? ' active' : ''}`} data-panel="general">
+            <div className="settings-section">
+              <label className="settings-label">Theme</label>
+              <div className="settings-theme-row">
+                <select className="settings-select" id="settings-theme">
+                  {themesData.themes.filter(t => t.builtIn).map(t =>
+                    <option value={t.id} selected={t.id === activeThemeId}>{t.name}</option>
+                  )}
+                  {themesData.themes.some(t => !t.builtIn) && (
+                    <>
+                      <option disabled>{'─'.repeat(20)}</option>
+                      {themesData.themes.filter(t => !t.builtIn).map(t =>
+                        <option value={t.id} selected={t.id === activeThemeId}>{t.name}</option>
+                      )}
+                    </>
+                  )}
+                </select>
+                <button className="btn btn-sm" id="manage-themes-btn">Manage Themes</button>
+              </div>
+            </div>
+            {isTauri && (
               <div className="settings-section">
                 <label className="settings-label">App Name</label>
                 <input type="text" className="settings-input" id="settings-app-name" value={appName} placeholder="Glassbox — project-name" />
                 <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
               </div>
+            )}
+          </div>
+
+          {/* Profile tab */}
+          <div className={`settings-tab-panel${activeTab === 'profile' ? ' active' : ''}`} data-panel="profile">
+            <p className="settings-disclaimer">
+              Tell us about your experience level so AI features can tailor explanations to you.
+            </p>
+
+            <div className="settings-guided-topics">
+              <label className="settings-label">I'm new to...</label>
+              <div className="settings-tags">
+                {renderTag('programming', 'Programming')}
+                {renderTag('codebase', 'This codebase')}
+              </div>
+
+              <label className="settings-label settings-label-spaced">I'm new to these languages</label>
+              <div className="settings-tags">
+                {langTags}
+              </div>
+
+              {!showMoreLangs && (
+                <button className="settings-more-toggle" id="show-more-langs">More languages...</button>
+              )}
+              {showMoreLangs && (
+                <div className="settings-tags settings-tags-more">
+                  {moreLangTags}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Experimental tab */}
           <div className={`settings-tab-panel${activeTab === 'experimental' ? ' active' : ''}`} data-panel="experimental">
@@ -295,36 +361,12 @@ function renderSettingsModal(
               <span className="settings-beta-badge">Beta</span>
             </div>
             <p className="settings-disclaimer">
-              Get AI explanations tailored to your experience level.
+              Get AI explanations tailored to your experience level. Configure your profile in the Profile tab.
             </p>
 
             <div className="settings-section">
               <label className="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" checked={guidedEnabled} /><span>Enable guided review</span></label>
             </div>
-
-            {guidedEnabled && (
-              <div className="settings-guided-topics">
-                <label className="settings-label">I'm new to...</label>
-                <div className="settings-tags">
-                  {renderTag('programming', 'Programming')}
-                  {renderTag('codebase', 'This codebase')}
-                </div>
-
-                <label className="settings-label settings-label-spaced">I'm new to these languages</label>
-                <div className="settings-tags">
-                  {langTags}
-                </div>
-
-                {!showMoreLangs && (
-                  <button className="settings-more-toggle" id="show-more-langs">More languages...</button>
-                )}
-                {showMoreLangs && (
-                  <div className="settings-tags settings-tags-more">
-                    {moreLangTags}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Updates tab (Tauri only) */}
@@ -491,6 +533,27 @@ function renderSettingsModal(
         renderContent();
       });
     }
+
+    // Theme selection — save immediately
+    const themeSelect = overlay.querySelector<HTMLSelectElement>('#settings-theme');
+    if (themeSelect !== null) {
+      themeSelect.addEventListener('change', () => {
+        activeThemeId = themeSelect.value;
+        void switchTheme(activeThemeId);
+      });
+    }
+
+    // Manage Themes button
+    overlay.querySelector('#manage-themes-btn')?.addEventListener('click', () => {
+      showThemeManager(async () => {
+        // Refresh theme list in settings dropdown after manager changes
+        const updated = await api<ThemesResponse>('/themes');
+        themesData.themes = updated.themes;
+        themesData.activeId = updated.activeId;
+        activeThemeId = updated.activeId;
+        renderContent();
+      });
+    });
 
     // App name input — debounced save
     const appNameInput = overlay.querySelector<HTMLInputElement>('#settings-app-name');

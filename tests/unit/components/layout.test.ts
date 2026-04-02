@@ -1,14 +1,21 @@
+vi.mock('../../../src/themes/config.js', () => ({
+  getActiveThemeId: vi.fn().mockReturnValue('dark'),
+  getActiveThemeColors: vi.fn().mockReturnValue({ bg: '#1e1e2e', text: '#cdd6f4' }),
+}));
+
 import { Layout } from '../../../src/components/layout.js';
 import { raw } from '../../../src/jsx-runtime.js';
 
 describe('Layout', () => {
   it('renders an HTML page structure', () => {
     const result = Layout({ title: 'Test Page', reviewId: 'r-123' }).toString();
-    expect(result).toContain('<html lang="en">');
+    expect(result).toContain('<html');
+    expect(result).toContain('lang="en"');
     expect(result).toContain('<title>Test Page</title>');
     expect(result).toContain('data-review-id="r-123"');
     expect(result).toContain('/static/styles.css');
     expect(result).toContain('/static/app.js');
+    expect(result).toContain('data-theme="dark"');
   });
 
   it('includes SafeHtml children in the body', () => {

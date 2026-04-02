@@ -1,6 +1,13 @@
+import { getActiveThemeColors, getActiveThemeId } from '../themes/config.js';
+import { themeToInlineStyle } from '../themes/built-in.js';
+
 export function Layout({ title, reviewId, children }: { title: string; reviewId: string; children?: unknown }) {
+  const themeId = getActiveThemeId();
+  const themeColors = getActiveThemeColors();
+  const themeStyle = themeToInlineStyle(themeColors);
+
   return (
-    <html lang="en">
+    <html lang="en" style={themeStyle} data-theme={themeId}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
