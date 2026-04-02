@@ -164,10 +164,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
       - run: npm ci
       - run: npm run build
       - name: Publish beta
         run: npm publish --tag beta --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ══════════════════════════════════════════════════════════════
   # Phase 3: Install & upgrade smoke tests
