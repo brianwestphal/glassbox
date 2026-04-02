@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] - 2026-04-02
+
+- Added support for themes with several built-in options and customization support
+- Moved AI-supporting profile settings into their own tab
+- Code cleanup and more testing
+
 ## [0.6.0] - 2026-03-27
 
 - Security hardening: localhost binding, shell injection fixes, and security requirements doc
