@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import type { Resvg } from '@resvg/resvg-wasm';
+import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { join } from 'path';
 
 let initialized = false;
-let ResvgClass: any;
+let ResvgClass: typeof Resvg;
 let fontBuffers: Uint8Array[] = [];
 
 async function ensureInit() {
@@ -41,63 +42,66 @@ function loadSystemFonts(): Uint8Array[] {
 }
 
 function getFontCandidates(): string[] {
-  switch (process.platform) {
-    case 'darwin': {
-      const sys = '/System/Library/Fonts';
-      const sup = '/System/Library/Fonts/Supplemental';
-      return [
-        // Core system fonts (serif, sans-serif, monospace)
-        join(sys, 'Helvetica.ttc'),
-        join(sys, 'Times.ttc'),
-        join(sys, 'Courier.ttc'),
-        join(sys, 'Menlo.ttc'),
-        join(sys, 'SFPro.ttf'),
-        join(sys, 'SFNS.ttf'),
-        join(sys, 'SFNSMono.ttf'),
-        // Supplemental (common named fonts in SVGs)
-        join(sup, 'Arial.ttf'),
-        join(sup, 'Arial Bold.ttf'),
-        join(sup, 'Georgia.ttf'),
-        join(sup, 'Verdana.ttf'),
-        join(sup, 'Tahoma.ttf'),
-        join(sup, 'Trebuchet MS.ttf'),
-        join(sup, 'Impact.ttf'),
-        join(sup, 'Comic Sans MS.ttf'),
-        join(sup, 'Courier New.ttf'),
-        join(sup, 'Times New Roman.ttf'),
-      ];
-    }
-    case 'linux':
-      return [
-        // DejaVu (most common Linux fallback)
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',
-        // Liberation (metric-compatible with Arial/Times/Courier)
-        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-        '/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf',
-        '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf',
-        // Noto (common on modern distros)
-        '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
-      ];
-    case 'win32': {
-      const winFonts = join(process.env.WINDIR ?? 'C:\\Windows', 'Fonts');
-      return [
-        join(winFonts, 'arial.ttf'),
-        join(winFonts, 'arialbd.ttf'),
-        join(winFonts, 'times.ttf'),
-        join(winFonts, 'cour.ttf'),
-        join(winFonts, 'verdana.ttf'),
-        join(winFonts, 'tahoma.ttf'),
-        join(winFonts, 'georgia.ttf'),
-        join(winFonts, 'consola.ttf'),
-        join(winFonts, 'segoeui.ttf'),
-      ];
-    }
-    default:
-      return [];
+  const os = process.platform;
+
+  if (os === 'darwin') {
+    const sys = '/System/Library/Fonts';
+    const sup = '/System/Library/Fonts/Supplemental';
+    return [
+      // Core system fonts (serif, sans-serif, monospace)
+      join(sys, 'Helvetica.ttc'),
+      join(sys, 'Times.ttc'),
+      join(sys, 'Courier.ttc'),
+      join(sys, 'Menlo.ttc'),
+      join(sys, 'SFPro.ttf'),
+      join(sys, 'SFNS.ttf'),
+      join(sys, 'SFNSMono.ttf'),
+      // Supplemental (common named fonts in SVGs)
+      join(sup, 'Arial.ttf'),
+      join(sup, 'Arial Bold.ttf'),
+      join(sup, 'Georgia.ttf'),
+      join(sup, 'Verdana.ttf'),
+      join(sup, 'Tahoma.ttf'),
+      join(sup, 'Trebuchet MS.ttf'),
+      join(sup, 'Impact.ttf'),
+      join(sup, 'Comic Sans MS.ttf'),
+      join(sup, 'Courier New.ttf'),
+      join(sup, 'Times New Roman.ttf'),
+    ];
   }
+
+  if (os === 'linux') {
+    return [
+      // DejaVu (most common Linux fallback)
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',
+      // Liberation (metric-compatible with Arial/Times/Courier)
+      '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+      '/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf',
+      '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf',
+      // Noto (common on modern distros)
+      '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+    ];
+  }
+
+  if (os === 'win32') {
+    const winFonts = join(process.env.WINDIR ?? 'C:\\Windows', 'Fonts');
+    return [
+      join(winFonts, 'arial.ttf'),
+      join(winFonts, 'arialbd.ttf'),
+      join(winFonts, 'times.ttf'),
+      join(winFonts, 'cour.ttf'),
+      join(winFonts, 'verdana.ttf'),
+      join(winFonts, 'tahoma.ttf'),
+      join(winFonts, 'georgia.ttf'),
+      join(winFonts, 'consola.ttf'),
+      join(winFonts, 'segoeui.ttf'),
+    ];
+  }
+
+  return [];
 }
 
 /** Parse SVG dimensions from width/height/viewBox attributes, following browser defaults. */

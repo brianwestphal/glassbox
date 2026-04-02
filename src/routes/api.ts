@@ -14,8 +14,9 @@ updateAnnotation,   updateFileStatus, updateReviewStatus, } from '../db/queries.
 import { scheduleAutoExport } from '../export/auto-export.js';
 import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt,generateReviewExport, shouldPromptGitignore } from '../export/generate.js';
 import { getFileContent, getFileDiffs, getHeadCommit, parseModeString } from '../git/diff.js';
-import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isImageFile, isSvgFile } from '../git/image.js';
+import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isSvgFile } from '../git/image.js';
 import { rasterizeSvg } from '../git/svg-rasterize.js';
+import type { OutlineSymbol } from '../outline/parser.js';
 import { parseOutline } from '../outline/parser.js';
 import { updateReviewDiffs } from '../review-update.js';
 import type { AppEnv } from '../types.js';
@@ -270,7 +271,7 @@ apiRoutes.get('/outline/:fileId', async (c) => {
 apiRoutes.get('/symbol-definition', async (c) => {
   const name = c.req.query('name');
   const currentFileId = c.req.query('currentFileId');
-  if (!name) return c.json({ definitions: [] });
+  if (name === undefined || name === '') return c.json({ definitions: [] });
 
   const reviewId = resolveReviewId(c);
   const repoRoot = c.get('repoRoot');
@@ -324,6 +325,7 @@ apiRoutes.get('/symbol-definition', async (c) => {
         const symbols = parseOutline(content, filePath);
         collectDefinitions(symbols, name, null, filePath, definitions);
         // Stop after finding first match in repo scan (perf)
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array mutated by collectDefinitions
         if (definitions.length > 0) break;
       }
     } catch { /* git ls-files failed */ }
@@ -344,7 +346,7 @@ apiRoutes.get('/symbol-definition', async (c) => {
 });
 
 function collectDefinitions(
-  symbols: Array<{ name: string; kind: string; line: number; children: any[] }>,
+  symbols: OutlineSymbol[],
   targetName: string,
   fileId: string | null,
   filePath: string,
@@ -354,7 +356,7 @@ function collectDefinitions(
     if (sym.name === targetName) {
       out.push({ fileId, filePath, name: sym.name, kind: sym.kind, line: sym.line });
     }
-    if (sym.children?.length > 0) {
+    if (sym.children.length > 0) {
       collectDefinitions(sym.children, targetName, fileId, filePath, out);
     }
   }
@@ -430,17 +432,15 @@ apiRoutes.get('/image/:fileId/metadata', async (c) => {
   if (!review) return c.json({ error: 'Review not found' }, 404);
 
   const mode = parseModeString(review.mode);
-  const diff = JSON.parse(file.diff_data ?? '{}');
-  const oldPath = diff.oldPath ?? null;
+  const diff = JSON.parse(file.diff_data ?? '{}') as { oldPath?: string; status?: string };
+  const oldPath: string | null = diff.oldPath ?? null;
   const status = diff.status ?? 'modified';
 
   const oldImage = status !== 'added' ? getOldImage(mode, file.file_path, oldPath, repoRoot) : null;
   const newImage = status !== 'deleted' ? getNewImage(mode, file.file_path, repoRoot) : null;
 
-  const [oldMeta, newMeta] = await Promise.all([
-    oldImage ? extractMetadata(oldImage.data, oldPath ?? file.file_path) : null,
-    newImage ? extractMetadata(newImage.data, file.file_path) : null,
-  ]);
+  const oldMeta = oldImage !== null ? extractMetadata(oldImage.data, oldPath ?? file.file_path) : null;
+  const newMeta = newImage !== null ? extractMetadata(newImage.data, file.file_path) : null;
 
   return c.json({
     old: oldMeta ? formatMetadataLines(oldMeta) : null,
@@ -461,8 +461,8 @@ apiRoutes.get('/image/:fileId/:side', async (c) => {
   if (!review) return c.text('Review not found', 404);
 
   const mode = parseModeString(review.mode);
-  const diff = JSON.parse(file.diff_data ?? '{}');
-  const oldPath = diff.oldPath ?? null;
+  const diff = JSON.parse(file.diff_data ?? '{}') as { oldPath?: string };
+  const oldPath: string | null = diff.oldPath ?? null;
 
   const image = side === 'old'
     ? getOldImage(mode, file.file_path, oldPath, repoRoot)

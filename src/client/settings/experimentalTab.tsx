@@ -1,5 +1,5 @@
-import type { SafeHtml } from '../../jsx-runtime.js';
 import { IconCheck } from '../../icons.js';
+import type { SafeHtml } from '../../jsx-runtime.js';
 
 interface KeyStatusInfo {
   configured: boolean;

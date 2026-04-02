@@ -1,8 +1,9 @@
 import { mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
-import { addReviewFile, createReview, getLatestInProgressReview } from "./db/queries.js";
+
 import { setDataDir } from "./db/connection.js";
+import { addReviewFile, createReview, getLatestInProgressReview } from "./db/queries.js";
 import { setAIServiceTest, setDebug, setDemoMode } from "./debug.js";
 import { DEMO_SCENARIOS, setupDemoReview } from "./demo.js";
 import type { ReviewMode } from "./git/diff.js";
@@ -181,7 +182,7 @@ async function main() {
   }
 
   // Change working directory if --project-dir was passed (used by Tauri desktop app)
-  if (projectDir) {
+  if (projectDir !== null) {
     process.chdir(projectDir);
   }
 

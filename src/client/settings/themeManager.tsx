@@ -30,7 +30,7 @@ function showDeleteConfirm(themeName: string, onConfirm: () => void) {
     </div>
   ).toString();
 
-  confirmOverlay.querySelector('#del-cancel')?.addEventListener('click', () => confirmOverlay.remove());
+  confirmOverlay.querySelector('#del-cancel')?.addEventListener('click', () => { confirmOverlay.remove(); });
   confirmOverlay.querySelector('#del-confirm')?.addEventListener('click', () => {
     confirmOverlay.remove();
     onConfirm();
@@ -187,36 +187,42 @@ export function showThemeManager(onThemeChanged?: () => void) {
       contextMenuEl = menu;
 
       // HS-430: Use stopPropagation on menu items so document click handler doesn't interfere
-      menu.addEventListener('click', (e) => e.stopPropagation());
+      menu.addEventListener('click', (e) => { e.stopPropagation(); });
 
       menu.querySelector('[data-ctx="edit"]')?.addEventListener('click', () => {
         removeContextMenu();
-        showThemeEditor(themeId, async () => {
-          await refresh();
-          if (onThemeChanged) onThemeChanged();
+        showThemeEditor(themeId, () => {
+          void (async () => {
+            await refresh();
+            if (onThemeChanged) onThemeChanged();
+          })();
         });
       });
 
-      menu.querySelector('[data-ctx="duplicate"]')?.addEventListener('click', async () => {
-        removeContextMenu();
-        await api('/themes', { method: 'POST', body: { sourceId: themeId } });
-        await refresh();
-        if (onThemeChanged) onThemeChanged();
+      menu.querySelector('[data-ctx="duplicate"]')?.addEventListener('click', () => {
+        void (async () => {
+          removeContextMenu();
+          await api('/themes', { method: 'POST', body: { sourceId: themeId } });
+          await refresh();
+          if (onThemeChanged) onThemeChanged();
+        })();
       });
 
       menu.querySelector('[data-ctx="delete"]')?.addEventListener('click', () => {
         removeContextMenu();
-        showDeleteConfirm(theme.name, async () => {
-          const wasActive = themeId === data.activeId;
-          await api(`/themes/${themeId}`, { method: 'DELETE' });
-          if (wasActive) {
-            const active = await api<{ id: string; colors: Record<string, string> }>('/themes/active');
-            applyThemeColors(active.colors);
-            document.documentElement.setAttribute('data-theme', active.id);
-            data.activeId = active.id;
-          }
-          await refresh();
-          if (onThemeChanged) onThemeChanged();
+        showDeleteConfirm(theme.name, () => {
+          void (async () => {
+            const wasActive = themeId === data.activeId;
+            await api(`/themes/${themeId}`, { method: 'DELETE' });
+            if (wasActive) {
+              const active = await api<{ id: string; colors: Record<string, string> }>('/themes/active');
+              applyThemeColors(active.colors);
+              document.documentElement.setAttribute('data-theme', active.id);
+              data.activeId = active.id;
+            }
+            await refresh();
+            if (onThemeChanged) onThemeChanged();
+          })();
         });
       });
 
@@ -226,7 +232,7 @@ export function showThemeManager(onThemeChanged?: () => void) {
           removeContextMenu();
         }
       };
-      setTimeout(() => document.addEventListener('click', closeOnClick, { once: true }), 0);
+      setTimeout(() => { document.addEventListener('click', closeOnClick, { once: true }); }, 0);
     }
 
     function bindEvents() {
@@ -235,7 +241,7 @@ export function showThemeManager(onThemeChanged?: () => void) {
       // Click theme name/info to switch
       overlay.querySelectorAll('[data-click-use]').forEach(el => {
         el.addEventListener('click', () => {
-          const id = (el as HTMLElement).dataset.clickUse!;
+          const id = (el as HTMLElement).dataset.clickUse ?? '';
           void useTheme(id);
         });
       });
@@ -243,10 +249,12 @@ export function showThemeManager(onThemeChanged?: () => void) {
       // Double-click theme item to open editor
       overlay.querySelectorAll('.theme-manager-item').forEach(el => {
         el.addEventListener('dblclick', () => {
-          const id = (el as HTMLElement).dataset.themeId!;
-          showThemeEditor(id, async () => {
-            await refresh();
-            if (onThemeChanged) onThemeChanged();
+          const id = (el as HTMLElement).dataset.themeId ?? '';
+          showThemeEditor(id, () => {
+            void (async () => {
+              await refresh();
+              if (onThemeChanged) onThemeChanged();
+            })();
           });
         });
       });
@@ -255,7 +263,7 @@ export function showThemeManager(onThemeChanged?: () => void) {
       overlay.querySelectorAll('.tm-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const id = (btn as HTMLElement).dataset.menuId!;
+          const id = (btn as HTMLElement).dataset.menuId ?? '';
           showContextMenu(id, btn as HTMLElement);
         });
       });

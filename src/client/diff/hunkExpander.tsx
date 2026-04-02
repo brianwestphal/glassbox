@@ -1,6 +1,5 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { state } from '../state.js';
 import { applyHighlighting } from './highlight.js';
 import { bindDiffLineClicks } from './lineClicks.js';
 import { syncSplitColumnHeights } from './splitSync.js';

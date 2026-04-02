@@ -1,6 +1,6 @@
+import type { SafeHtml } from '../../jsx-runtime.js';
 import { toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
-import type { SafeHtml } from '../../jsx-runtime.js';
 
 export function buildCategoryBadge(value: string): SafeHtml {
   const cat = CATEGORIES.find(c => c.value === value);

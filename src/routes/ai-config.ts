@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 
-import type { AIPlatform } from '../ai/models.js';
 import {
   deleteAPIKey,
   detectAvailablePlatforms,
@@ -13,6 +12,7 @@ import {
   saveAPIKey,
   saveGuidedReviewConfig,
 } from '../ai/config.js';
+import type { AIPlatform } from '../ai/models.js';
 import { MODELS, PLATFORMS } from '../ai/models.js';
 import { getDemoMode, isAIServiceTest } from '../debug.js';
 import type { AppEnv } from '../types.js';

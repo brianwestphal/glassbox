@@ -1,11 +1,11 @@
 import { spawnSync } from 'child_process';
 
 import { readConfigFile, writeConfigFile } from './config.js';
-import { getKeyFromKeychain, isKeychainAvailable, getKeychainLabel, saveKeyToKeychain, winCredTarget } from './keychain.js';
+import { getKeyFromKeychain, saveKeyToKeychain, winCredTarget } from './keychain.js';
 import type { AIPlatform } from './models.js';
 import { ENV_KEY_NAMES } from './models.js';
 
-export { isKeychainAvailable, getKeychainLabel } from './keychain.js';
+export { getKeychainLabel, isKeychainAvailable } from './keychain.js';
 
 export function getKeyFromEnv(platform: AIPlatform): string | null {
   const envName = ENV_KEY_NAMES[platform];

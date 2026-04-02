@@ -1,7 +1,7 @@
+import { IconEdit, IconTrash } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
-import { IconEdit, IconTrash } from '../../icons.js';
 import { bindAnnotationItemEvents } from './events.js';
 
 export function buildAnnotationItemHtml(annotation: Annotation): SafeHtml {

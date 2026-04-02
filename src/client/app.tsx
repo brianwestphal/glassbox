@@ -1,13 +1,12 @@
 import { IconGear, IconRefresh } from "../icons.js";
 import { api, initDebug } from "./api.js";
-import { toElement } from "./dom.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
 import { initScrollSync } from "./diff/mode.js";
-import { navBack, navForward, navUpdateScroll, getVisibleScrollLine, setNavigating } from "./diff/navStack.js";
-import { updateNavFilePath } from "./diff/selection.js";
-import { selectFile } from "./diff/selection.js";
+import { getVisibleScrollLine, navBack, navForward, navUpdateScroll, setNavigating } from "./diff/navStack.js";
+import { selectFile,updateNavFilePath  } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
+import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
 import { updateProgress } from "./review/progress.js";
@@ -16,6 +15,8 @@ import { loadFiles } from "./sidebar/fileTree.js";
 import { bindSortMode, loadAnalysisResults, renderSortControl, triggerAnalysis } from "./sidebar/sortMode.js";
 import type { SortMode } from "./state.js";
 import { state } from "./state.js";
+// --- Tauri update notification ---
+import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
 
 async function initAISorting() {
   try {
@@ -26,9 +27,9 @@ async function initAISorting() {
     state.sortMode = prefs.sort_mode as SortMode;
     state.riskSortDimension = prefs.risk_sort_dimension;
     state.showRiskScores = prefs.show_risk_scores;
-    state.ignoreWhitespace = prefs.ignore_whitespace ?? false;
-    state.svgViewMode = (prefs.svg_view_mode as 'code' | 'rendered') ?? 'code';
-    state.lastImageMode = prefs.last_image_mode ?? 'metadata';
+    state.ignoreWhitespace = prefs.ignore_whitespace;
+    state.svgViewMode = prefs.svg_view_mode as 'code' | 'rendered';
+    state.lastImageMode = prefs.last_image_mode;
 
     // Check if AI is configured
     const config = await api<{ keyConfigured: boolean; guidedReview: { enabled: boolean } }>("/ai/config");
@@ -63,7 +64,8 @@ async function initAISorting() {
     const refreshBtn = toElement(
       <button className="btn btn-xs refresh-btn" title="Refresh diffs"><IconRefresh /></button>
     );
-    refreshBtn.addEventListener("click", async () => {
+    refreshBtn.addEventListener("click", () => {
+      void (async () => {
       refreshBtn.style.opacity = "0.4";
       refreshBtn.style.pointerEvents = "none";
       try {
@@ -80,6 +82,7 @@ async function initAISorting() {
       }
       refreshBtn.style.opacity = "";
       refreshBtn.style.pointerEvents = "";
+      })();
     });
     sidebarHeader.appendChild(refreshBtn);
 
@@ -98,9 +101,9 @@ async function initAISorting() {
 async function navigateToEntry(entry: { fileId: string | null; filePath: string | null; scrollLine: number }) {
   setNavigating(true);
   try {
-    if (entry.fileId) {
+    if (entry.fileId !== null && entry.fileId !== '') {
       await selectFile(entry.fileId);
-    } else if (entry.filePath) {
+    } else if (entry.filePath !== null && entry.filePath !== '') {
       // Raw file — fetch and display
       const container = document.getElementById("diff-container");
       if (!container) return;
@@ -112,14 +115,14 @@ async function navigateToEntry(entry: { fileId: string | null; filePath: string 
         state._detectedLang = dl(entry.filePath);
         if (state.highlightAuto) state.highlightLang = state._detectedLang;
         ah();
-        document.querySelectorAll(".file-item.active").forEach((el) => el.classList.remove("active"));
+        document.querySelectorAll(".file-item.active").forEach((el) => { el.classList.remove("active"); });
         state.currentFileId = null;
         updateNavFilePath(entry.filePath);
       }
     }
     // Scroll to the saved line position
     requestAnimationFrame(() => {
-      const lineEl = document.querySelector(`.diff-line[data-line="${entry.scrollLine}"][data-side="new"]`) as HTMLElement | null;
+      const lineEl = document.querySelector(`.diff-line[data-line="${entry.scrollLine}"][data-side="new"]`);
       if (lineEl) lineEl.scrollIntoView({ block: 'start' });
     });
   } finally {
@@ -139,7 +142,7 @@ function bindNavButtons() {
 
   // Keyboard shortcuts: Cmd+[ / Cmd+] (macOS), Alt+Left / Alt+Right (Windows/Linux)
   document.addEventListener("keydown", (e) => {
-    const isMac = navigator.platform.includes("Mac");
+    const isMac = navigator.userAgent.includes("Mac");
     if (isMac && e.metaKey && e.key === "[") {
       e.preventDefault();
       const entry = navBack();
@@ -216,10 +219,6 @@ async function init() {
   });
 }
 
-// --- Tauri update notification ---
-
-import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
-
 async function checkForUpdate() {
   const invoke = getTauriInvoke();
   if (!invoke) return;
@@ -231,7 +230,7 @@ async function checkForUpdate() {
     if (delay > 0) await new Promise((r) => setTimeout(r, delay));
     try {
       const version = (await invoke("get_pending_update")) as string | null;
-      if (version) {
+      if (version !== null && version !== '') {
         showUpdateBanner(version);
         return;
       }

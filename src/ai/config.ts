@@ -83,4 +83,4 @@ export function saveGuidedReviewConfig(settings: GuidedReviewConfig): void {
 }
 
 // Re-exports for backward compatibility — existing importers continue to work
-export { resolveAPIKey, saveAPIKey, deleteAPIKey, detectAvailablePlatforms, isKeychainAvailable, getKeychainLabel } from './api-keys.js';
+export { deleteAPIKey, detectAvailablePlatforms, getKeychainLabel,isKeychainAvailable, resolveAPIKey, saveAPIKey } from './api-keys.js';

@@ -1,5 +1,5 @@
-import { getActiveThemeColors, getActiveThemeId } from '../themes/config.js';
 import { themeToInlineStyle } from '../themes/built-in.js';
+import { getActiveThemeColors, getActiveThemeId } from '../themes/config.js';
 
 export function Layout({ title, reviewId, children }: { title: string; reviewId: string; children?: unknown }) {
   const themeId = getActiveThemeId();

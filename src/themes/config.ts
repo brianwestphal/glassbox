@@ -32,7 +32,8 @@ function writeConfigFile(config: Record<string, unknown>): void {
 export function getActiveThemeId(): string {
   const config = readConfigFile();
   const theme = config.theme as Record<string, unknown> | undefined;
-  return (theme?.active as string) ?? DEFAULT_THEME_ID;
+  const active = theme?.active as string | undefined;
+  return active ?? DEFAULT_THEME_ID;
 }
 
 /** Set the active theme ID in config. */
@@ -51,9 +52,9 @@ export function loadCustomThemes(): CustomTheme[] {
     const files = readdirSync(THEMES_DIR).filter(f => f.endsWith('.json'));
     for (const file of files) {
       try {
-        const data = JSON.parse(readFileSync(join(THEMES_DIR, file), 'utf-8')) as CustomTheme;
-        if (data.id && data.name && data.colors) {
-          themes.push({ ...data, builtIn: false });
+        const data = JSON.parse(readFileSync(join(THEMES_DIR, file), 'utf-8')) as Partial<CustomTheme>;
+        if (data.id !== undefined && data.id !== '' && data.name !== undefined && data.name !== '' && data.colors !== undefined) {
+          themes.push({ id: data.id, name: data.name, colors: data.colors, builtIn: false, baseTheme: data.baseTheme ?? '' });
         }
       } catch { /* skip corrupt theme files */ }
     }
@@ -104,7 +105,9 @@ export function getActiveThemeColors(): ThemeColors {
   const theme = resolveTheme(id);
   if (theme) return theme.colors;
   // Fallback to dark if active theme is missing
-  return getBuiltInTheme(DEFAULT_THEME_ID)!.colors;
+  const fallback = getBuiltInTheme(DEFAULT_THEME_ID);
+  if (fallback === undefined) throw new Error(`Default theme '${DEFAULT_THEME_ID}' not found`);
+  return fallback.colors;
 }
 
 /** Generate a unique ID for a new custom theme. */

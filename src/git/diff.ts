@@ -2,12 +2,12 @@ import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 import { getRepoRoot } from './repo.js';
+import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 
 // Re-export types and repo functions so existing importers don't break
+export { getHeadCommit,getRepoName, getRepoRoot, isGitRepo } from './repo.js';
 export type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
-export { getRepoRoot, getRepoName, isGitRepo, getHeadCommit } from './repo.js';
 
 function git(args: string[], cwd: string): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });

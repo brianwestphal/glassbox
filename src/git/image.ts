@@ -1,11 +1,12 @@
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+
 import type { ReviewMode } from './diff.js';
 
 // Re-export metadata utilities so existing importers don't break
-export { isImageFile, isSvgFile, getContentType, extractMetadata, formatMetadataLines } from './image-metadata.js';
 export type { ImageMetadata } from './image-metadata.js';
+export { extractMetadata, formatMetadataLines,getContentType, isImageFile, isSvgFile } from './image-metadata.js';
 
 /**
  * Get the git ref for the "old" (A) side of a diff, given the review mode.

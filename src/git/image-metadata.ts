@@ -34,7 +34,7 @@ export interface ImageMetadata {
   exif: Record<string, string> | null;
 }
 
-export async function extractMetadata(data: Buffer, filePath: string): Promise<ImageMetadata> {
+export function extractMetadata(data: Buffer, filePath: string): ImageMetadata {
   const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
 
   // SVG: parse text, not sharp
@@ -82,9 +82,9 @@ export function formatMetadataLines(meta: ImageMetadata): string[] {
     lines.push(`Dimensions: ${meta.width} × ${meta.height}`);
   }
   lines.push(`File size: ${formatBytes(meta.fileSize)}`);
-  if (meta.colorSpace) lines.push(`Color space: ${meta.colorSpace}`);
+  if (meta.colorSpace !== null) lines.push(`Color space: ${meta.colorSpace}`);
   if (meta.channels !== null) lines.push(`Channels: ${meta.channels}`);
-  if (meta.depth) lines.push(`Bit depth: ${meta.depth}`);
+  if (meta.depth !== null) lines.push(`Bit depth: ${meta.depth}`);
   if (meta.hasAlpha !== null) lines.push(`Alpha: ${meta.hasAlpha ? 'yes' : 'no'}`);
   if (meta.density !== null) lines.push(`Density: ${meta.density} DPI`);
   if (meta.exif) {
@@ -238,5 +238,5 @@ function parseWebp(data: Buffer): PartialMeta {
     height = (data[27] | (data[28] << 8) | (data[29] << 16)) + 1;
   }
 
-  return { format: 'webp', width, height, colorSpace: 'srgb', channels: hasAlpha ? 4 : 3, depth: null, hasAlpha, density: null, exif: null };
+  return { format: 'webp', width, height, colorSpace: 'srgb', channels: hasAlpha === true ? 4 : 3, depth: null, hasAlpha, density: null, exif: null };
 }

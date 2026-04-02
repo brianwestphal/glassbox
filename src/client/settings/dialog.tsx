@@ -1,3 +1,4 @@
+import { IconDownload, IconFlask, IconSliders, IconUser } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
@@ -6,12 +7,10 @@ import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { state } from '../state.js';
 import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
+import { bindExperimentalTabEvents,renderExperimentalTab } from './experimentalTab.js';
+import { bindGeneralTabEvents,renderGeneralTab } from './generalTab.js';
+import { ALL_LANG_KEYS,bindProfileTabEvents, renderProfileTab } from './profileTab.js';
 import { showThemeManager } from './themeManager.js';
-import { renderExperimentalTab, bindExperimentalTabEvents } from './experimentalTab.js';
-import { renderGeneralTab, bindGeneralTabEvents } from './generalTab.js';
-import { renderProfileTab, bindProfileTabEvents, ALL_LANG_KEYS } from './profileTab.js';
-
-import { IconSliders, IconFlask, IconDownload, IconUser } from '../../icons.js';
 
 interface KeyStatusResponse {
   status: Record<string, { configured: boolean; source: string | null }>;
@@ -71,7 +70,7 @@ function renderSettingsModal(
   const guidedTopics = new Set(configData.guidedReview.topics);
   let showMoreLangs = false;
   let appName = projectSettings.appName ?? '';
-  const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI__;
+  const isTauri = (window as unknown as Record<string, unknown>).__TAURI__ !== undefined;
   let activeTab = 'general';
   let activeThemeId = themesData.activeId;
 
@@ -231,7 +230,7 @@ function renderSettingsModal(
     const checkUpdatesBtn = overlay.querySelector<HTMLButtonElement>('#check-updates-btn');
     const checkUpdatesStatus = overlay.querySelector<HTMLElement>('#check-updates-status');
     if (checkUpdatesBtn !== null && checkUpdatesStatus !== null) {
-      checkUpdatesBtn.addEventListener('click', async () => {
+      checkUpdatesBtn.addEventListener('click', () => { void (async () => {
         const invoke = getTauriInvoke();
         if (!invoke) return;
         checkUpdatesBtn.disabled = true;
@@ -239,7 +238,7 @@ function renderSettingsModal(
         checkUpdatesStatus.textContent = '';
         try {
           const version = (await invoke('check_for_update')) as string | null;
-          if (version) {
+          if (version !== null && version !== '') {
             checkUpdatesStatus.textContent = `Update available: v${version}`;
             showUpdateBanner(version);
           } else {
@@ -250,7 +249,7 @@ function renderSettingsModal(
         }
         checkUpdatesBtn.textContent = 'Check for Updates';
         checkUpdatesBtn.disabled = false;
-      });
+      })(); });
     }
 
     // General tab events

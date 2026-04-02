@@ -1,8 +1,8 @@
+import { IconBook, IconFolder, IconShield } from '../../icons.js';
 import { api, clientLog } from '../api.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { getAnalysisState, state } from '../state.js';
-import { IconBook, IconFolder, IconShield } from '../../icons.js';
 import { renderFileList } from './fileTree.js';
 
 export function renderSortControl(): HTMLElement {

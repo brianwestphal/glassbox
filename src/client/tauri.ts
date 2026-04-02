@@ -15,8 +15,8 @@ export function showUpdateBanner(version: string) {
   banner.style.display = 'flex';
 
   const installBtn = document.getElementById('update-install-btn') as HTMLButtonElement | null;
-  installBtn?.addEventListener('click', async () => {
-    if (!installBtn) return;
+  installBtn?.addEventListener('click', () => {
+    void (async () => {
     installBtn.textContent = 'Installing...';
     installBtn.disabled = true;
     try {
@@ -28,6 +28,7 @@ export function showUpdateBanner(version: string) {
       installBtn.textContent = 'Install Failed';
       installBtn.disabled = false;
     }
+    })();
   });
 
   const dismissBtn = document.getElementById('update-banner-dismiss');

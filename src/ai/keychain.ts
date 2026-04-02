@@ -43,13 +43,13 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
   try {
     if (os === 'darwin') {
       const r = spawnSync('security', ['find-generic-password', '-s', 'glassbox', '-a', account, '-w'], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
-      const result = (r.stdout ?? '').trim();
+      const result = r.stdout.trim();
       return r.status === 0 && result !== '' ? result : null;
     }
 
     if (os === 'linux') {
       const r = spawnSync('secret-tool', ['lookup', 'service', 'glassbox', 'account', account], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
-      const result = (r.stdout ?? '').trim();
+      const result = r.stdout.trim();
       return r.status === 0 && result !== '' ? result : null;
     }
 
@@ -57,7 +57,7 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
       const target = winCredTarget(platform);
       const script = WIN_CRED_READ_PS + `Write-Output ([CredHelper]::Read('${target}'))`;
       const r = spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' });
-      const result = (r.stdout ?? '').trim();
+      const result = r.stdout.trim();
       return r.status === 0 && result !== '' ? result : null;
     }
   } catch {

@@ -9,7 +9,7 @@ import { applyHighlighting,detectLanguage } from './highlight.js';
 import { bindHunkExpanders } from './hunkExpander.js';
 import { bindImageDiff } from './imageDiff.js';
 import { bindDiffLineClicks } from './lineClicks.js';
-import { navPush, getVisibleScrollLine } from './navStack.js';
+import { navPush } from './navStack.js';
 import { loadOutline } from './outline.js';
 import { syncSplitColumnHeights } from './splitSync.js';
 

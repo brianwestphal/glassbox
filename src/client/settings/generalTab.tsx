@@ -69,10 +69,12 @@ export function bindGeneralTabEvents(overlay: HTMLElement, callbacks: GeneralTab
 
   // Manage Themes button
   overlay.querySelector('#manage-themes-btn')?.addEventListener('click', () => {
-    callbacks.showThemeManager(async () => {
-      const updated = await callbacks.refreshThemes();
-      callbacks.setActiveThemeId(updated.activeId);
-      callbacks.renderContent();
+    callbacks.showThemeManager(() => {
+      void (async () => {
+        const updated = await callbacks.refreshThemes();
+        callbacks.setActiveThemeId(updated.activeId);
+        callbacks.renderContent();
+      })();
     });
   });
 

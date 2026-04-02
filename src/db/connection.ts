@@ -1,7 +1,8 @@
 import { PGlite } from '@electric-sql/pglite';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from './schema.js';
+
+import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './schema.js';
 
 let db: PGlite | null = null;
 let currentDbPath: string | null = null;

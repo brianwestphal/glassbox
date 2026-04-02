@@ -24,7 +24,7 @@ export function syncSplitColumnHeights() {
       const lh = (leftLines[i] as HTMLElement).offsetHeight;
       const rh = (rightLines[i] as HTMLElement).offsetHeight;
       if (lh !== rh) {
-        const max = Math.max(lh, rh) + 'px';
+        const max = `${Math.max(lh, rh)}px`;
         (leftLines[i] as HTMLElement).style.minHeight = max;
         (rightLines[i] as HTMLElement).style.minHeight = max;
       }

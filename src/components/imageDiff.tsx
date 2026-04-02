@@ -20,10 +20,10 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
   return (
     <div className="image-diff" data-file-id={fileId} data-file-path={file.file_path}
       data-has-old={String(hasOld)} data-has-new={String(hasNew)}
-      {...(baseWidth ? { 'data-base-width': String(baseWidth) } : {})}
-      {...(baseHeight ? { 'data-base-height': String(baseHeight) } : {})}>
+      {...(baseWidth !== undefined ? { 'data-base-width': String(baseWidth) } : {})}
+      {...(baseHeight !== undefined ? { 'data-base-height': String(baseHeight) } : {})}>
 
-      {fontWarning && (
+      {fontWarning === true && (
         <div className="image-font-warning">
           This SVG uses text that may render differently depending on locally installed fonts.
         </div>

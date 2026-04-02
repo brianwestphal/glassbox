@@ -1,6 +1,20 @@
 import { api } from '../api.js';
 import { state } from '../state.js';
 
+// --- Zoom helpers ---
+
+interface ZoomState {
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+/** Extended canvas element with zoom/pan metadata attached at runtime. */
+interface ImageCanvas extends HTMLElement {
+  _zs?: ZoomState;
+  _onZoomChange?: (() => void) | null;
+}
+
 // --- Public entry ---
 
 export function bindImageDiff() {
@@ -13,21 +27,22 @@ export function bindImageDiff() {
 
   const hasComparison = hasOld && hasNew;
 
-  loadMetadata(fileId, container);
+  void loadMetadata(fileId, container);
 
   // Shared zoom/pan state across all visual modes
   const sharedZoom: ZoomState = { zoom: 1, panX: 0, panY: 0 };
-  let userHasZoomed = false;
 
   // Collect all visual canvases
-  const canvases = Array.from(container.querySelectorAll<HTMLElement>('.image-visual-canvas'));
+  const canvases = Array.from(container.querySelectorAll<ImageCanvas>('.image-visual-canvas'));
 
   // Get the reference image (any canvas — they all load the same image)
-  const refImg = container.querySelector<HTMLImageElement>('.image-layer-old')!;
+  const refImg = container.querySelector<HTMLImageElement>('.image-layer-old');
+  if (refImg === null) return;
 
   /** Size a canvas's wrapper to fit the image, preserving zoom/pan. */
-  function sizeWrap(canvas: HTMLElement) {
-    const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap')!;
+  function sizeWrap(canvas: ImageCanvas) {
+    const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
+    if (wrap === null) return;
     const nw = refImg.naturalWidth, nh = refImg.naturalHeight;
     if (!nw || !nh) return;
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
@@ -38,11 +53,12 @@ export function bindImageDiff() {
   }
 
   /** Apply shared zoom state to a canvas's wrapper. */
-  function applyToCanvas(canvas: HTMLElement) {
-    const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap')!;
+  function applyToCanvas(canvas: ImageCanvas) {
+    const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
+    if (wrap === null) return;
     applyZoom(wrap, sharedZoom);
     // Notify slice tool if registered
-    (canvas as any)._onZoomChange?.();
+    canvas._onZoomChange?.();
   }
 
   /** Apply zoom to all visible canvases. */
@@ -74,8 +90,8 @@ export function bindImageDiff() {
     for (const c of canvases) {
       if (c.offsetParent !== null) {
         sizeWrap(c);
-        const wrap = c.querySelector<HTMLElement>('.image-zoom-wrap')!;
-        clampPan(sharedZoom, c, wrap);
+        const wrap = c.querySelector<HTMLElement>('.image-zoom-wrap');
+        if (wrap !== null) clampPan(sharedZoom, c, wrap);
         applyToCanvas(c);
       }
     }
@@ -87,20 +103,21 @@ export function bindImageDiff() {
   // Mode switching from bottom toolbar
   imageToolbar?.querySelectorAll('[data-image-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const mode = (btn as HTMLElement).dataset.imageMode!;
+      const mode = (btn as HTMLElement).dataset.imageMode ?? '';
       state.lastImageMode = mode;
       void api('/ai/preferences', { method: 'POST', body: { last_image_mode: mode } });
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p => p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
-      requestAnimationFrame(() => syncVisible());
+      requestAnimationFrame(() => { syncVisible(); });
     });
   });
 
   // Helper: get the currently visible canvas
-  function getVisibleCanvas(): { canvas: HTMLElement; wrap: HTMLElement } | null {
+  function getVisibleCanvas(): { canvas: ImageCanvas; wrap: HTMLElement } | null {
     for (const c of canvases) {
       if (c.offsetParent !== null) {
-        return { canvas: c, wrap: c.querySelector<HTMLElement>('.image-zoom-wrap')! };
+        const wrap = c.querySelector<HTMLElement>('.image-zoom-wrap');
+        if (wrap !== null) return { canvas: c, wrap };
       }
     }
     return null;
@@ -108,15 +125,15 @@ export function bindImageDiff() {
 
   // Set up zoom/pan interaction on each canvas
   for (const canvas of canvases) {
-    const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap')!;
+    const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
+    if (wrap === null) continue;
 
-    (canvas as any)._zs = sharedZoom;
-    (canvas as any)._onZoomChange = null as (() => void) | null;
+    canvas._zs = sharedZoom;
+    canvas._onZoomChange = null;
 
     // Wheel zoom
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      userHasZoomed = true;
       zoomAt(sharedZoom, canvas, wrap, e.clientX, e.clientY, e.deltaY > 0 ? 0.9 : 1.1);
       applyToAll();
     }, { passive: false });
@@ -153,26 +170,22 @@ export function bindImageDiff() {
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       if (action === 'in') {
-        userHasZoomed = true;
         zoomAt(sharedZoom, vis.canvas, vis.wrap, cx, cy, 1.4);
       } else if (action === 'out') {
-        userHasZoomed = true;
         zoomAt(sharedZoom, vis.canvas, vis.wrap, cx, cy, 0.7);
       } else if (action === 'fit') {
         sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0;
-        userHasZoomed = false;
         syncVisible();
       } else if (action === 'actual') {
         // For SVGs, use the base SVG dimensions (not the inflated raster size)
         const bw = parseInt((container as HTMLElement).dataset.baseWidth ?? '', 10);
         const bh = parseInt((container as HTMLElement).dataset.baseHeight ?? '', 10);
-        const nw = (bw && bh) ? bw : refImg.naturalWidth;
-        const nh = (bw && bh) ? bh : refImg.naturalHeight;
-        if (nw && nh) {
+        const nw = (bw > 0 && bh > 0) ? bw : refImg.naturalWidth;
+        const nh = (bw > 0 && bh > 0) ? bh : refImg.naturalHeight;
+        if (nw > 0 && nh > 0) {
           vis.wrap.style.width = `${nw}px`;
           vis.wrap.style.height = `${nh}px`;
           sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0;
-          userHasZoomed = true;
         }
       }
       applyToAll();
@@ -181,7 +194,7 @@ export function bindImageDiff() {
 
   // Init slice tool (comparison mode only)
   if (hasComparison) {
-    const sliceCanvas = container.querySelector('[data-panel="slice"] .image-visual-canvas') as HTMLElement | null;
+    const sliceCanvas = container.querySelector('[data-panel="slice"] .image-visual-canvas');
     if (sliceCanvas) initSliceTool(sliceCanvas);
   }
 
@@ -209,9 +222,10 @@ async function loadMetadata(fileId: string, container: Element) {
 }
 
 function renderMetadataDiff(panel: Element, oldLines: string[] | null, newLines: string[] | null) {
-  if (!oldLines && !newLines) { panel.innerHTML = '<div class="image-metadata-error">No metadata available</div>'; return; }
-  if (!oldLines || !newLines) {
-    const lines = (oldLines ?? newLines)!;
+  if (oldLines === null && newLines === null) { panel.innerHTML = '<div class="image-metadata-error">No metadata available</div>'; return; }
+  if (oldLines === null || newLines === null) {
+    const lines = oldLines ?? newLines;
+    if (lines === null) return;
     panel.innerHTML = '<div class="image-metadata-single">' + lines.map(l => `<div class="metadata-line">${esc(l)}</div>`).join('') + '</div>';
     return;
   }
@@ -223,21 +237,13 @@ function renderMetadataDiff(panel: Element, oldLines: string[] | null, newLines:
   let html = '<div class="image-metadata-diff">';
   for (const key of allKeys) {
     const o = oldMap.get(key), n = newMap.get(key);
-    if (o && n && o === n) html += `<div class="metadata-line context">${esc(o)}</div>`;
-    else { if (o) html += `<div class="metadata-line remove">${esc(o)}</div>`; if (n) html += `<div class="metadata-line add">${esc(n)}</div>`; }
+    if (o !== undefined && n !== undefined && o === n) html += `<div class="metadata-line context">${esc(o)}</div>`;
+    else { if (o !== undefined) html += `<div class="metadata-line remove">${esc(o)}</div>`; if (n !== undefined) html += `<div class="metadata-line add">${esc(n)}</div>`; }
   }
   panel.innerHTML = html + '</div>';
 }
 
 function esc(t: string): string { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
-// --- Zoom helpers ---
-
-interface ZoomState {
-  zoom: number;
-  panX: number;
-  panY: number;
-}
 
 function zoomAt(zs: ZoomState, canvas: HTMLElement, wrap: HTMLElement, clientX: number, clientY: number, factor: number) {
   const contentX = canvas.getBoundingClientRect().left + canvas.clientLeft;
@@ -275,14 +281,14 @@ function applyZoom(wrap: HTMLElement, zs: ZoomState) {
   wrap.style.transform = zs.zoom <= 1
     ? ''
     : `translate(${zs.panX}px, ${zs.panY}px) scale(${zs.zoom})`;
-  const canvas = wrap.parentElement;
-  if (canvas) (canvas as any)._onZoomChange?.();
+  const canvas = wrap.parentElement as ImageCanvas | null;
+  canvas?._onZoomChange?.();
 }
 
 // --- Slice Tool ---
 
 interface SliceState {
-  canvas: HTMLElement;
+  canvas: ImageCanvas;
   wrap: HTMLElement;
   clipped: HTMLImageElement;
   line: HTMLElement;
@@ -301,12 +307,14 @@ function screenToCanvas(e: MouseEvent, canvas: HTMLElement): { x: number; y: num
   };
 }
 
-function initSliceTool(canvas: HTMLElement) {
-  const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap')!;
-  const clipped = canvas.querySelector<HTMLImageElement>('.image-slice-clipped')!;
-  const line = canvas.querySelector<HTMLElement>('.slice-line')!;
-  const handleA = canvas.querySelector<HTMLElement>('.slice-handle-a')!;
-  const handleB = canvas.querySelector<HTMLElement>('.slice-handle-b')!;
+function initSliceTool(canvasEl: Element) {
+  const canvas = canvasEl as ImageCanvas;
+  const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
+  const clipped = canvas.querySelector<HTMLImageElement>('.image-slice-clipped');
+  const line = canvas.querySelector<HTMLElement>('.slice-line');
+  const handleA = canvas.querySelector<HTMLElement>('.slice-handle-a');
+  const handleB = canvas.querySelector<HTMLElement>('.slice-handle-b');
+  if (wrap === null || clipped === null || line === null || handleA === null || handleB === null) return;
 
   const ss: SliceState = {
     canvas, wrap, clipped, line, handleA, handleB,
@@ -317,7 +325,7 @@ function initSliceTool(canvas: HTMLElement) {
 
   updateSlice(ss);
 
-  (canvas as any)._onZoomChange = () => updateSlice(ss);
+  canvas._onZoomChange = () => { updateSlice(ss); };
 
   handleA.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); ss.dragging = 'a'; });
   handleB.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); ss.dragging = 'b'; });
@@ -334,7 +342,7 @@ function initSliceTool(canvas: HTMLElement) {
 
   document.addEventListener('mouseup', () => { ss.dragging = null; });
 
-  new ResizeObserver(() => updateSlice(ss)).observe(canvas);
+  new ResizeObserver(() => { updateSlice(ss); }).observe(canvas);
 }
 
 type Edge = 'top' | 'right' | 'bottom' | 'left';
@@ -412,7 +420,7 @@ function canvasToImagePct(cnx: number, cny: number, ss: SliceState, zs: ZoomStat
 }
 
 function buildClipPath(ss: SliceState): string {
-  const zs: ZoomState = (ss.canvas as any)._zs ?? { zoom: 1, panX: 0, panY: 0 };
+  const zs: ZoomState = ss.canvas._zs ?? { zoom: 1, panX: 0, panY: 0 };
   const tA = edgePos(ss.ax, ss.ay);
   const tB = edgePos(ss.bx, ss.by);
   const dAB = cwDist(tA, tB);

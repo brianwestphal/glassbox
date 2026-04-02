@@ -26,7 +26,7 @@ export function bindGoToDefinition() {
     if ((e.target as HTMLElement).closest('button, a, .annotation-row, .annotation-form-container')) return;
 
     const word = getWordAtPoint(e.clientX, e.clientY);
-    if (!word || word.length < 2) return;
+    if (word === null || word.length < 2) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -47,16 +47,11 @@ function getWordAtPoint(x: number, y: number): string | null {
   let node: Node | null = null;
   let offset = 0;
 
-  if (document.caretRangeFromPoint) {
-    const range = document.caretRangeFromPoint(x, y);
-    if (!range) return null;
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- no cross-browser alternative exists
+  const range = document.caretRangeFromPoint(x, y);
+  if (range !== null) {
     node = range.startContainer;
     offset = range.startOffset;
-  } else if ((document as any).caretPositionFromPoint) {
-    const pos = (document as any).caretPositionFromPoint(x, y);
-    if (!pos) return null;
-    node = pos.offsetNode;
-    offset = pos.offset;
   }
 
   if (!node || node.nodeType !== Node.TEXT_NODE) return null;
@@ -112,13 +107,13 @@ async function navigateToDefinition(symbolName: string) {
 
   const def = data.definitions[0];
 
-  if (def.fileId && def.fileId === currentFileId) {
+  if (def.fileId !== null && def.fileId === currentFileId) {
     // Same file — scroll to the definition line
     scrollToLine(def.line);
-  } else if (def.fileId) {
+  } else if (def.fileId !== null) {
     // Different file in the review — switch to it and scroll after load
     await selectFile(def.fileId);
-    requestAnimationFrame(() => scrollToLine(def.line));
+    requestAnimationFrame(() => { scrollToLine(def.line); });
   } else {
     // File not in the review — load it as a read-only view
     await loadRawFile(def.filePath, def.line);
@@ -158,7 +153,7 @@ async function loadRawFile(filePath: string, targetLine: number) {
   applyHighlighting();
 
   // Clear sidebar selection (this file isn't in the sidebar)
-  document.querySelectorAll('.file-item.active').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.file-item.active').forEach(el => { el.classList.remove('active'); });
   state.currentFileId = null;
 
   // Show nav bar and update file path
@@ -170,7 +165,7 @@ async function loadRawFile(filePath: string, targetLine: number) {
   navPush({ fileId: null, filePath, scrollLine: targetLine });
 
   // Scroll to the target line
-  requestAnimationFrame(() => scrollToLine(targetLine));
+  requestAnimationFrame(() => { scrollToLine(targetLine); });
 }
 
 function showToast(message: string) {
@@ -180,19 +175,19 @@ function showToast(message: string) {
   toast.className = 'goto-toast';
   toast.textContent = message;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
+  setTimeout(() => { toast.remove(); }, 2000);
 }
 
 function scrollToLine(lineNumber: number) {
   // Find the diff line with this line number on the new side
   const lineEl = document.querySelector(
     `.diff-line[data-line="${lineNumber}"][data-side="new"]`
-  ) as HTMLElement | null;
+  );
 
   if (lineEl) {
     lineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
     // Brief highlight to show where we jumped to
     lineEl.classList.add('jump-highlight');
-    setTimeout(() => lineEl.classList.remove('jump-highlight'), 1500);
+    setTimeout(() => { lineEl.classList.remove('jump-highlight'); }, 1500);
   }
 }

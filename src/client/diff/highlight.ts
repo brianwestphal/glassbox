@@ -112,17 +112,19 @@ export function applyHighlighting() {
       const segments: Array<{ text: string; isChange: boolean }> = [];
       for (const child of Array.from(codeEl.childNodes)) {
         if (child instanceof HTMLElement && child.classList.contains('char-change')) {
-          segments.push({ text: child.textContent ?? '', isChange: true });
+          segments.push({ text: child.textContent, isChange: true });
         } else {
           segments.push({ text: child.textContent ?? '', isChange: false });
         }
       }
       try {
         let newHtml = '';
-        let continuation: any = undefined;
+        // hljs continuation state — uses internal API not in public types
+        let continuation: object | undefined = undefined;
         for (const seg of segments) {
-          const result = hljs.highlight(seg.text, { language: lang, ignoreIllegals: true, continuation });
-          continuation = result.top;
+          const opts: Record<string, unknown> = { language: lang, ignoreIllegals: true, continuation };
+          const result = hljs.highlight(seg.text, opts as { language: string; ignoreIllegals: boolean });
+          continuation = (result as unknown as { top?: object }).top;
           if (seg.isChange) {
             newHtml += `<span class="char-change">${result.value}</span>`;
           } else {
@@ -150,7 +152,7 @@ function clearHighlighting() {
       const segments: Array<{ text: string; isChange: boolean }> = [];
       for (const child of Array.from(codeEl.childNodes)) {
         if (child instanceof HTMLElement && child.classList.contains('char-change')) {
-          segments.push({ text: child.textContent ?? '', isChange: true });
+          segments.push({ text: child.textContent, isChange: true });
         } else {
           segments.push({ text: child.textContent ?? '', isChange: false });
         }

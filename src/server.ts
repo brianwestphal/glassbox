@@ -66,7 +66,7 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   app.route('/', pageRoutes);
 
   let actualPort = port;
-  if (options?.strictPort) {
+  if (options?.strictPort === true) {
     actualPort = await tryServe(app.fetch, port);
   } else {
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -90,7 +90,7 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   console.log(`\n  Glassbox running at ${url}\n`);
 
   // Open browser (unless --no-open was passed)
-  if (!options?.noOpen) {
+  if (options?.noOpen !== true) {
     const openCmd = process.platform === 'darwin' ? 'open'
       : process.platform === 'win32' ? 'start'
       : 'xdg-open';

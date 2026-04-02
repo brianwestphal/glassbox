@@ -88,7 +88,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
       if (!dirty) return;
       const body: Record<string, unknown> = { colors: editColors };
       // Include name if it changed from the original
-      if (editName !== theme!.name) body.name = editName;
+      if (theme !== undefined && editName !== theme.name) body.name = editName;
       const result = await api<{ theme: ThemeData; copied: boolean }>(`/themes/${currentThemeId}/edit`, {
         method: 'POST',
         body,
@@ -120,7 +120,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
       const modalEl = overlay.querySelector('.modal');
       if (!modalEl) return;
 
-      const isBuiltIn = theme!.builtIn;
+      const isBuiltIn = theme?.builtIn === true;
       const headerText = isBuiltIn ? 'Edit Theme (will create a copy)' : 'Edit Theme';
 
       modalEl.innerHTML = (
@@ -166,11 +166,11 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
       applyLive();
       const row = overlay.querySelector(`[data-var="${varName}"].theme-editor-row`);
       if (row) {
-        const swatch = row.querySelector('.theme-editor-swatch') as HTMLElement | null;
+        const swatch = row.querySelector<HTMLElement>('.theme-editor-swatch');
         if (swatch) swatch.style.background = value;
-        const picker = row.querySelector('.theme-editor-picker') as HTMLInputElement | null;
+        const picker = row.querySelector<HTMLInputElement>('.theme-editor-picker');
         if (picker && document.activeElement !== picker) picker.value = toHex(value);
-        const hex = row.querySelector('.theme-editor-hex') as HTMLInputElement | null;
+        const hex = row.querySelector<HTMLInputElement>('.theme-editor-hex');
         if (hex && document.activeElement !== hex) hex.value = value;
       }
     }
@@ -190,7 +190,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
       // Color pickers
       overlay.querySelectorAll('.theme-editor-picker').forEach(picker => {
         picker.addEventListener('input', () => {
-          const varName = (picker as HTMLElement).dataset.var!;
+          const varName = (picker as HTMLElement).dataset.var ?? '';
           updateColor(varName, (picker as HTMLInputElement).value);
         });
       });
@@ -198,18 +198,18 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
       // Hex text inputs
       overlay.querySelectorAll('.theme-editor-hex').forEach(input => {
         input.addEventListener('change', () => {
-          const varName = (input as HTMLElement).dataset.var!;
+          const varName = (input as HTMLElement).dataset.var ?? '';
           const value = (input as HTMLInputElement).value.trim();
-          if (value) updateColor(varName, value);
+          if (value !== '') updateColor(varName, value);
         });
       });
 
       // Per-color reset
       overlay.querySelectorAll('.theme-editor-reset').forEach(btn => {
         btn.addEventListener('click', () => {
-          const varName = (btn as HTMLElement).dataset.var!;
+          const varName = (btn as HTMLElement).dataset.var ?? '';
           const baseValue = baseColors[varName];
-          if (baseValue) updateColor(varName, baseValue);
+          if (baseValue !== '') updateColor(varName, baseValue);
         });
       });
 

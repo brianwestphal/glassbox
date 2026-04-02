@@ -7,11 +7,11 @@ import { FileList } from '../components/fileList.js';
 import { ImageDiff } from '../components/imageDiff.js';
 import { Layout } from '../components/layout.js';
 import { ReviewHistory } from '../components/reviewHistory.js';
+import type { ReviewFile } from '../db/queries.js';
 import { getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../db/queries.js';
 import type { FileDiff } from '../git/diff.js';
 import { getSingleFileDiff, parseModeString } from '../git/diff.js';
-import { isSvgFile } from '../git/image.js';
-import { getNewImage, getOldImage } from '../git/image.js';
+import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-rasterize.js';
 import { IconActualSize, IconFit, IconReveal, IconZoomIn, IconZoomOut } from '../icons.js';
 import type { AppEnv } from '../types.js';
@@ -192,7 +192,7 @@ pageRoutes.get('/file/:fileId', async (c) => {
 // View a raw repo file (not in the diff) — used by go-to-definition for non-diff files
 pageRoutes.get('/file-raw', (c) => {
   const filePath = c.req.query('path');
-  if (!filePath) return c.text('Missing path', 400);
+  if (filePath === undefined || filePath === '') return c.text('Missing path', 400);
   const repoRoot = c.get('repoRoot');
 
   let content: string;
@@ -220,8 +220,8 @@ pageRoutes.get('/file-raw', (c) => {
     }],
   };
 
-  const fakeFile = { id: '', review_id: '', file_path: filePath, status: 'reviewed', diff_data: null };
-  const html = <DiffView file={fakeFile as any} diff={diff} annotations={[]} mode="unified" />;
+  const fakeFile: ReviewFile = { id: '', review_id: '', file_path: filePath, status: 'reviewed', diff_data: null, created_at: '' };
+  const html = <DiffView file={fakeFile} diff={diff} annotations={[]} mode="unified" />;
   return c.html(html.toString());
 });
 

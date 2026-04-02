@@ -17,7 +17,7 @@ const ACTIVE_HIGHLIGHT_CLASS = 'find-highlight-active';
 
 export function bindFind() {
   // Only activate in Tauri — browsers have their own find
-  const isTauri = !!(window as any).__TAURI__;
+  const isTauri = (window as Record<string, unknown>).__TAURI__ !== undefined;
   if (!isTauri) return;
 
   document.addEventListener('keydown', (e) => {
@@ -45,16 +45,21 @@ export function bindFind() {
   });
 
   // Listen for Tauri menu event (Edit > Find)
-  (window as any).__TAURI__?.event?.listen('menu-find', () => {
+  const tauriObj = (window as Record<string, unknown>).__TAURI__ as
+    | { event?: { listen: (name: string, cb: () => void) => void } }
+    | undefined;
+  tauriObj?.event?.listen('menu-find', () => {
     showFindBar();
   });
 }
 
 function showFindBar() {
-  if (!findBar) createFindBar();
-  findBar!.style.display = 'flex';
-  findInput!.focus();
-  findInput!.select();
+  if (findBar === null) createFindBar();
+  if (findBar !== null) findBar.style.display = 'flex';
+  if (findInput !== null) {
+    findInput.focus();
+    findInput.select();
+  }
 }
 
 function hideFindBar() {
@@ -66,7 +71,7 @@ function hideFindBar() {
 }
 
 function createFindBar() {
-  const isMac = navigator.platform.includes('Mac');
+  const isMac = navigator.userAgent.includes('Mac');
   findBar = toElement(
     <div className="find-bar">
       <input type="text" className="find-input" placeholder="Find in diff..." />
@@ -83,7 +88,7 @@ function createFindBar() {
   matchLabel = findBar.querySelector('.find-match-count') as HTMLElement;
 
   findInput.addEventListener('input', () => {
-    runSearch(findInput!.value);
+    if (findInput !== null) runSearch(findInput.value);
   });
 
   findInput.addEventListener('keydown', (e) => {
@@ -94,12 +99,12 @@ function createFindBar() {
     }
   });
 
-  findBar.querySelector('[data-dir="prev"]')!.addEventListener('click', () => goToMatch(-1));
-  findBar.querySelector('[data-dir="next"]')!.addEventListener('click', () => goToMatch(1));
-  findBar.querySelector('.find-close-btn')!.addEventListener('click', () => hideFindBar());
+  findBar.querySelector('[data-dir="prev"]')?.addEventListener('click', () => { goToMatch(-1); });
+  findBar.querySelector('[data-dir="next"]')?.addEventListener('click', () => { goToMatch(1); });
+  findBar.querySelector('.find-close-btn')?.addEventListener('click', () => { hideFindBar(); });
 
   // Prevent clicks in the find bar from bubbling (e.g. triggering annotation creation)
-  findBar.addEventListener('mousedown', (e) => e.stopPropagation());
+  findBar.addEventListener('mousedown', (e) => { e.stopPropagation(); });
 
   const mainContent = document.querySelector('.main-content');
   if (mainContent) {
@@ -128,7 +133,7 @@ function runSearch(query: string) {
   let node: Text | null;
 
   while ((node = walker.nextNode() as Text | null)) {
-    const text = node.textContent ?? '';
+    const text = node.textContent;
     const lowerText = text.toLowerCase();
     let idx = 0;
     while ((idx = lowerText.indexOf(lowerQuery, idx)) !== -1) {
@@ -175,7 +180,7 @@ function clearHighlights() {
 
 function activateMatch(index: number) {
   // Remove previous active
-  document.querySelectorAll(`.${ACTIVE_HIGHLIGHT_CLASS}`).forEach(el => el.classList.remove(ACTIVE_HIGHLIGHT_CLASS));
+  document.querySelectorAll(`.${ACTIVE_HIGHLIGHT_CLASS}`).forEach(el => { el.classList.remove(ACTIVE_HIGHLIGHT_CLASS); });
 
   const allMarks = document.querySelectorAll(`.${HIGHLIGHT_CLASS}`);
   if (index >= 0 && index < allMarks.length) {

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
-import { BUILT_IN_THEMES, getBuiltInTheme } from '../themes/built-in.js';
 import type { CustomTheme } from '../themes/built-in.js';
+import { BUILT_IN_THEMES, getBuiltInTheme } from '../themes/built-in.js';
 import {
   deleteCustomTheme, generateThemeId, getActiveThemeColors, getActiveThemeId,
   getAllThemes, resolveTheme, saveCustomTheme, setActiveThemeId,
@@ -52,7 +52,7 @@ themeApiRoutes.post('/', async (c) => {
   const source = resolveTheme(body.sourceId);
   if (!source) return c.json({ error: 'Source theme not found' }, 404);
 
-  const baseTheme = source.builtIn ? source.id : (source as CustomTheme).baseTheme;
+  const baseTheme = source.builtIn ? source.id : (source).baseTheme;
   const name = body.name ?? `${source.name} (Copy)`;
 
   const newTheme: CustomTheme = {
@@ -84,7 +84,7 @@ themeApiRoutes.post('/:id/edit', async (c) => {
       baseTheme: source.id,
       colors: body.colors ? { ...source.colors, ...body.colors as Partial<typeof source.colors> } : { ...source.colors },
     };
-    if (body.name) newTheme.name = body.name;
+    if (body.name !== undefined && body.name !== '') newTheme.name = body.name;
     saveCustomTheme(newTheme);
     setActiveThemeId(newTheme.id);
     return c.json({ theme: newTheme, copied: true }, 201);
@@ -92,7 +92,7 @@ themeApiRoutes.post('/:id/edit', async (c) => {
 
   // Custom theme: edit in place
   const updated: CustomTheme = {
-    ...source as CustomTheme,
+    ...source,
     name: body.name ?? source.name,
     colors: body.colors ? { ...source.colors, ...body.colors as Partial<typeof source.colors> } : source.colors,
   };
@@ -117,7 +117,7 @@ themeApiRoutes.patch('/:id', async (c) => {
   const body = await c.req.json<{ name?: string; colors?: Partial<typeof existing.colors> }>();
 
   const updated: CustomTheme = {
-    ...existing as CustomTheme,
+    ...existing,
     name: body.name ?? existing.name,
     colors: body.colors ? { ...existing.colors, ...body.colors } : existing.colors,
   };

@@ -12,7 +12,7 @@ export interface DiffSegment {
 /**
  * Compute character-level diff segments for the old and new strings.
  * Returns two arrays: one for the old side, one for the new side.
- * Only computes if the strings are sufficiently similar (> 20% common).
+ * Only computes if the strings are sufficiently similar (\> 20% common).
  */
 export function charDiff(oldStr: string, newStr: string): { oldSegments: DiffSegment[]; newSegments: DiffSegment[] } | null {
   if (!oldStr && !newStr) return null;
@@ -51,7 +51,7 @@ export function charDiff(oldStr: string, newStr: string): { oldSegments: DiffSeg
 
 function lcsTable(a: string, b: string): number[][] {
   const m = a.length, n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       dp[i][j] = a[i - 1] === b[j - 1]
