@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './coverage-fixture.js';
 
 test.describe('Review page loads', () => {
   test('displays the main review UI', async ({ page }) => {

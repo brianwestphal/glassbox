@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run E2E tests with V8 coverage collection on the server process.
+# Run E2E tests with V8 coverage collection on both the server process
+# and the browser (via Playwright coverage API).
 # Manages the server lifecycle directly (instead of Playwright's webServer)
 # so the server exits cleanly and writes V8 coverage data.
 set -e
@@ -23,8 +24,8 @@ for i in $(seq 1 30); do
   sleep 0.5
 done
 
-# Run Playwright tests (server already running)
-SKIP_WEBSERVER=1 npx playwright test
+# Run Playwright tests (server already running, browser coverage enabled)
+SKIP_WEBSERVER=1 E2E_BROWSER_COVERAGE="$COVERAGE_DIR" npx playwright test
 TEST_EXIT=$?
 
 # Stop server gracefully so V8 coverage is written on exit
