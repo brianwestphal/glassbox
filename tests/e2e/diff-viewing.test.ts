@@ -77,8 +77,9 @@ test.describe('Diff viewing: Unified mode', () => {
     await openModifiedFile(page);
     await page.locator('[data-diff-mode="unified"]').click();
 
+    // Wait for unified table to fully render with diff lines
     const unifiedTable = page.locator('.diff-table-unified');
-    await expect(unifiedTable).toBeVisible();
+    await expect(unifiedTable.locator('.diff-line').first()).toBeVisible({ timeout: 5000 });
 
     // Should have gutter-old and gutter-new spans
     await expect(unifiedTable.locator('.gutter-old').first()).toBeVisible();
