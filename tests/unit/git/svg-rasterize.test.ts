@@ -1,4 +1,48 @@
-import { parseSvgDimensions, svgUsesExternalFonts } from '../../../src/git/svg-rasterize.js';
+import { vi } from 'vitest';
+
+const fakePngData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+const mockRendered = {
+  asPng: vi.fn(() => fakePngData),
+  free: vi.fn(),
+};
+const mockResvgInstance = {
+  render: vi.fn(() => mockRendered),
+  free: vi.fn(),
+};
+
+// Use a real function (not arrow) so it's constructable with `new`
+const MockResvgClass = vi.fn(function (this: any) {
+  Object.assign(this, mockResvgInstance);
+});
+
+vi.mock('@resvg/resvg-wasm', () => ({
+  initWasm: vi.fn(),
+  Resvg: MockResvgClass,
+}));
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(() => false),
+    readFileSync: vi.fn((path: string, ...args: any[]) => {
+      // Allow reading the WASM file path by returning a fake buffer
+      if (typeof path === 'string' && path.endsWith('.wasm')) {
+        return Buffer.from('fake-wasm');
+      }
+      return actual.readFileSync(path, ...args);
+    }),
+    readdirSync: vi.fn(() => []),
+  };
+});
+
+vi.mock('module', () => ({
+  createRequire: () => ({
+    resolve: () => '/fake/node_modules/@resvg/resvg-wasm/index.js',
+  }),
+}));
+
+import { parseSvgDimensions, svgUsesExternalFonts, rasterizeSvg } from '../../../src/git/svg-rasterize.js';
 
 describe('parseSvgDimensions', () => {
   it('extracts width and height from attributes', () => {
@@ -72,5 +116,88 @@ describe('svgUsesExternalFonts', () => {
   it('is case-insensitive', () => {
     const svg = '<svg><TEXT x="0" y="0">Hi</TEXT></svg>';
     expect(svgUsesExternalFonts(Buffer.from(svg))).toBe(true);
+  });
+});
+
+describe('rasterizeSvg', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Restore the default mock behaviors after clearAllMocks
+    mockRendered.asPng.mockReturnValue(fakePngData);
+    mockResvgInstance.render.mockReturnValue(mockRendered);
+  });
+
+  it('rasterizes a simple SVG to PNG buffer', async () => {
+    const svg = '<svg width="100" height="50"><rect width="100" height="50" fill="red"/></svg>';
+    const result = await rasterizeSvg(Buffer.from(svg));
+
+    expect(result).toBeInstanceOf(Buffer);
+    expect(MockResvgClass).toHaveBeenCalledWith(
+      svg,
+      expect.objectContaining({
+        fitTo: { mode: 'width', value: expect.any(Number) },
+        font: expect.objectContaining({
+          loadSystemFonts: false,
+          defaultFontFamily: 'Helvetica',
+        }),
+      })
+    );
+  });
+
+  it('calls render, asPng, and frees resources', async () => {
+    const svg = '<svg width="100" height="50"><rect/></svg>';
+    await rasterizeSvg(Buffer.from(svg));
+
+    // Verify the instance created by new MockResvgClass has render called via prototype chain
+    // Since we use Object.assign, the mock instance methods are on `this`
+    expect(mockResvgInstance.render).toHaveBeenCalled();
+    expect(mockRendered.asPng).toHaveBeenCalled();
+    expect(mockRendered.free).toHaveBeenCalled();
+    expect(mockResvgInstance.free).toHaveBeenCalled();
+  });
+
+  it('scales up to 10x base size', async () => {
+    // 100x50 SVG, scale = min(10, 8000/100) = 10, targetWidth = 1000
+    const svg = '<svg width="100" height="50"><rect/></svg>';
+    await rasterizeSvg(Buffer.from(svg));
+
+    const call = MockResvgClass.mock.calls[0];
+    expect(call[1].fitTo.value).toBe(1000); // 100 * 10
+  });
+
+  it('caps scale at 8000px max dimension', async () => {
+    // 2000x1000 SVG: maxDim=2000, scale=min(10, 8000/2000)=4, targetWidth=2000*4=8000
+    const svg = '<svg width="2000" height="1000"><rect/></svg>';
+    await rasterizeSvg(Buffer.from(svg));
+
+    const call = MockResvgClass.mock.calls[0];
+    expect(call[1].fitTo.value).toBe(8000); // 2000 * 4
+  });
+
+  it('uses viewBox dimensions when width/height are absent', async () => {
+    const svg = '<svg viewBox="0 0 400 200"><rect/></svg>';
+    await rasterizeSvg(Buffer.from(svg));
+
+    const call = MockResvgClass.mock.calls[0];
+    // maxDim=400, scale=min(10,8000/400)=10, targetWidth=400*10=4000
+    expect(call[1].fitTo.value).toBe(4000);
+  });
+
+  it('defaults to 300x150 for SVG without dimensions', async () => {
+    const svg = '<svg><rect/></svg>';
+    await rasterizeSvg(Buffer.from(svg));
+
+    const call = MockResvgClass.mock.calls[0];
+    // default 300x150, maxDim=300, scale=10, targetWidth=3000
+    expect(call[1].fitTo.value).toBe(3000);
+  });
+
+  it('propagates errors from render', async () => {
+    mockResvgInstance.render.mockImplementation(() => {
+      throw new Error('Render failed');
+    });
+
+    const svg = '<svg width="100" height="100"><rect/></svg>';
+    await expect(rasterizeSvg(Buffer.from(svg))).rejects.toThrow('Render failed');
   });
 });

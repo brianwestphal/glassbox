@@ -38,11 +38,40 @@ vi.mock('../../../src/export/generate.js', () => ({
 // Mock the git/diff module to avoid filesystem access
 vi.mock('../../../src/git/diff.js', () => ({
   getFileContent: vi.fn(() => 'line1\nline2\nline3\nline4\nline5\n'),
+  parseModeString: vi.fn(() => ({ type: 'uncommitted' })),
+  getHeadCommit: vi.fn(() => 'abc123'),
+  getFileDiffs: vi.fn(() => []),
 }));
 
 // Mock the outline parser to avoid filesystem access
 vi.mock('../../../src/outline/parser.js', () => ({
   parseOutline: vi.fn(() => []),
+}));
+
+// Mock auto-export to avoid side effects from annotation mutations
+vi.mock('../../../src/export/auto-export.js', () => ({
+  scheduleAutoExport: vi.fn(),
+}));
+
+// Mock review-update to avoid filesystem/git access
+vi.mock('../../../src/review-update.js', () => ({
+  updateReviewDiffs: vi.fn(async () => ({ updated: 1, added: 0, stale: 0 })),
+}));
+
+// Mock git/image module to avoid filesystem access
+vi.mock('../../../src/git/image.js', () => ({
+  getOldImage: vi.fn(() => null),
+  getNewImage: vi.fn(() => null),
+  isImageFile: vi.fn(() => false),
+  isSvgFile: vi.fn(() => false),
+  getContentType: vi.fn(() => 'image/png'),
+  extractMetadata: vi.fn(async () => null),
+  formatMetadataLines: vi.fn(() => []),
+}));
+
+// Mock svg-rasterize to avoid WASM dependency
+vi.mock('../../../src/git/svg-rasterize.js', () => ({
+  rasterizeSvg: vi.fn(),
 }));
 
 // Import the routes after mocks are set up (vi.mock is hoisted)
@@ -906,5 +935,456 @@ describe('POST /api/reviews/delete-all', () => {
       const check = await testDb.query('SELECT * FROM reviews WHERE id = $1', [id]);
       expect(check.rows.length).toBe(0);
     }
+  });
+});
+
+// ===== Review refresh =====
+
+describe('POST /api/review/refresh', () => {
+  it('returns updated diff stats for the review', async () => {
+    const res = await app.request('/api/review/refresh', { method: 'POST' });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(typeof body.updated).toBe('number');
+    expect(typeof body.added).toBe('number');
+    expect(typeof body.stale).toBe('number');
+    expect(typeof body.fileCount).toBe('number');
+  });
+
+  it('returns 404 when review does not exist', async () => {
+    // Use a reviewId query param that doesn't exist
+    const res = await app.request('/api/review/refresh?reviewId=nonexistent', { method: 'POST' });
+    expect(res.status).toBe(404);
+
+    const body = await res.json();
+    expect(body.error).toBe('Review not found');
+  });
+});
+
+// ===== File reveal =====
+
+describe('POST /api/files/:fileId/reveal', () => {
+  it('returns ok for an existing file', async () => {
+    const res = await app.request(`/api/files/${TEST_FILE_ID}/reveal`, { method: 'POST' });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+  });
+
+  it('returns 404 for a non-existent file', async () => {
+    const res = await app.request('/api/files/nonexistent/reveal', { method: 'POST' });
+    expect(res.status).toBe(404);
+
+    const body = await res.json();
+    expect(body.error).toBe('Not found');
+  });
+});
+
+// ===== Symbol definition search =====
+
+describe('GET /api/symbol-definition', () => {
+  it('returns empty definitions when name is not provided', async () => {
+    const res = await app.request('/api/symbol-definition');
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.definitions).toEqual([]);
+  });
+
+  it('returns definitions array when name is provided', async () => {
+    const res = await app.request('/api/symbol-definition?name=myFunction');
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(Array.isArray(body.definitions)).toBe(true);
+  });
+
+  it('accepts currentFileId parameter', async () => {
+    const res = await app.request(`/api/symbol-definition?name=myFunction&currentFileId=${TEST_FILE_ID}`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(Array.isArray(body.definitions)).toBe(true);
+  });
+});
+
+// ===== Annotation error handling =====
+
+describe('POST /api/annotations (error handling)', () => {
+  it('creates annotation on old side', async () => {
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 3,
+        side: 'old',
+        category: 'note',
+        content: 'Old side annotation',
+      }),
+    });
+    expect(res.status).toBe(201);
+
+    const annotation = await res.json();
+    expect(annotation.side).toBe('old');
+    expect(annotation.line_number).toBe(3);
+  });
+
+  it('creates annotation with empty content', async () => {
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 1,
+        side: 'new',
+        category: 'note',
+        content: '',
+      }),
+    });
+    expect(res.status).toBe(201);
+
+    const annotation = await res.json();
+    expect(annotation.content).toBe('');
+  });
+});
+
+// ===== Annotation move clears stale flag =====
+
+describe('PATCH /api/annotations/:id/move (stale clearing)', () => {
+  it('clears stale flag when moving a stale annotation', async () => {
+    // Create an annotation and mark it stale
+    const createRes = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 10,
+        side: 'new',
+        category: 'bug',
+        content: 'Stale annotation to move',
+      }),
+    });
+    const created = await createRes.json();
+
+    // Mark it stale directly in the database
+    await testDb.query(
+      'UPDATE annotations SET is_stale = TRUE, original_content = $1 WHERE id = $2',
+      ['original context', created.id]
+    );
+
+    // Verify it's stale
+    const beforeRes = await testDb.query('SELECT is_stale FROM annotations WHERE id = $1', [created.id]);
+    expect(beforeRes.rows[0].is_stale).toBe(true);
+
+    // Move it — moveAnnotation clears is_stale
+    const res = await app.request(`/api/annotations/${created.id}/move`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineNumber: 25, side: 'new' }),
+    });
+    expect(res.status).toBe(200);
+
+    // Verify stale flag was cleared
+    const afterRes = await testDb.query('SELECT is_stale, original_content, line_number FROM annotations WHERE id = $1', [created.id]);
+    expect(afterRes.rows[0].is_stale).toBe(false);
+    expect(afterRes.rows[0].original_content).toBeNull();
+    expect(afterRes.rows[0].line_number).toBe(25);
+  });
+});
+
+// ===== File status toggle edge cases =====
+
+describe('PATCH /api/files/:fileId/status (edge cases)', () => {
+  it('can set status to reviewed and back multiple times', async () => {
+    // Set to reviewed
+    await app.request(`/api/files/${TEST_FILE_ID}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'reviewed' }),
+    });
+
+    let fileRes = await app.request(`/api/files/${TEST_FILE_ID}`);
+    let fileBody = await fileRes.json();
+    expect(fileBody.file.status).toBe('reviewed');
+
+    // Back to pending
+    await app.request(`/api/files/${TEST_FILE_ID}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'pending' }),
+    });
+
+    fileRes = await app.request(`/api/files/${TEST_FILE_ID}`);
+    fileBody = await fileRes.json();
+    expect(fileBody.file.status).toBe('pending');
+
+    // Back to reviewed again
+    await app.request(`/api/files/${TEST_FILE_ID}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'reviewed' }),
+    });
+
+    fileRes = await app.request(`/api/files/${TEST_FILE_ID}`);
+    fileBody = await fileRes.json();
+    expect(fileBody.file.status).toBe('reviewed');
+  });
+
+  it('status update on second file does not affect first file', async () => {
+    // Reset both to pending
+    await app.request(`/api/files/${TEST_FILE_ID}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'pending' }),
+    });
+    await app.request(`/api/files/${TEST_FILE_ID_2}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'pending' }),
+    });
+
+    // Mark only file 2 as reviewed
+    await app.request(`/api/files/${TEST_FILE_ID_2}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'reviewed' }),
+    });
+
+    // File 1 should still be pending
+    const file1Res = await app.request(`/api/files/${TEST_FILE_ID}`);
+    const file1Body = await file1Res.json();
+    expect(file1Body.file.status).toBe('pending');
+
+    // File 2 should be reviewed
+    const file2Res = await app.request(`/api/files/${TEST_FILE_ID_2}`);
+    const file2Body = await file2Res.json();
+    expect(file2Body.file.status).toBe('reviewed');
+  });
+});
+
+// ===== Review deletion cascades =====
+
+describe('DELETE /api/review/:id (cascade)', () => {
+  it('deletes review along with its files and annotations', async () => {
+    // Create a review with a file and annotation
+    const reviewId = 'cascade-delete-review';
+    const fileId = 'cascade-delete-file';
+    await testDb.query(
+      `INSERT INTO reviews (id, repo_path, repo_name, mode, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [reviewId, TEST_REPO_ROOT, 'test-repo', 'uncommitted', 'completed']
+    );
+    await testDb.query(
+      `INSERT INTO review_files (id, review_id, file_path, diff_data, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [fileId, reviewId, 'src/cascade.ts', '{}', 'pending']
+    );
+    await testDb.query(
+      `INSERT INTO annotations (id, review_file_id, line_number, side, category, content)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      ['cascade-ann-1', fileId, 1, 'new', 'note', 'Will be cascaded']
+    );
+
+    // Delete the review
+    const res = await app.request(`/api/review/${reviewId}`, { method: 'DELETE' });
+    expect(res.status).toBe(200);
+
+    // Review should be gone
+    const reviewCheck = await testDb.query('SELECT * FROM reviews WHERE id = $1', [reviewId]);
+    expect(reviewCheck.rows.length).toBe(0);
+
+    // Files should be gone
+    const fileCheck = await testDb.query('SELECT * FROM review_files WHERE review_id = $1', [reviewId]);
+    expect(fileCheck.rows.length).toBe(0);
+
+    // Annotations should be gone
+    const annCheck = await testDb.query('SELECT * FROM annotations WHERE review_file_id = $1', [fileId]);
+    expect(annCheck.rows.length).toBe(0);
+  });
+});
+
+// ===== Review query param override =====
+
+describe('GET /api/review (query param override)', () => {
+  it('returns null or empty for a non-existent reviewId query param', async () => {
+    const res = await app.request('/api/review?reviewId=does-not-exist');
+    // The route calls getReview which returns undefined; Hono's c.json(undefined)
+    // will produce a 200 response — verify the response is not a valid review object
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    // undefined serializes as empty or "null"
+    expect(text === '' || text === 'null' || text === 'undefined').toBe(true);
+  });
+});
+
+// ===== Context expansion edge cases =====
+
+describe('GET /api/context/:fileId (edge cases)', () => {
+  it('handles start=1 and end=1 (single line)', async () => {
+    const res = await app.request(`/api/context/${TEST_FILE_ID}?start=1&end=1`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.lines.length).toBe(1);
+    expect(body.lines[0].num).toBe(1);
+  });
+
+  it('uses default range when start and end are omitted', async () => {
+    const res = await app.request(`/api/context/${TEST_FILE_ID}`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(Array.isArray(body.lines)).toBe(true);
+    // Default is start=1, end=20, but clamped to file length (5 lines)
+    expect(body.lines.length).toBeGreaterThan(0);
+  });
+
+  it('clamps end beyond file length', async () => {
+    const res = await app.request(`/api/context/${TEST_FILE_ID}?start=1&end=9999`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    // Mock returns 'line1\nline2\nline3\nline4\nline5\n' which splits to 6 elements
+    // (5 content lines + 1 trailing empty), clamped to allLines.length
+    expect(body.lines.length).toBeLessThanOrEqual(6);
+    expect(body.lines.length).toBeGreaterThan(0);
+    // First line should start at 1
+    expect(body.lines[0].num).toBe(1);
+  });
+});
+
+// ===== GET /api/files with reviewId query param =====
+
+describe('GET /api/files (with query params)', () => {
+  it('returns files for a specific review via reviewId param', async () => {
+    // The test review 2 has no files, so should return empty
+    const res = await app.request(`/api/files?reviewId=${TEST_REVIEW_ID_2}`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(Array.isArray(body.files)).toBe(true);
+    expect(body.files.length).toBe(0);
+  });
+});
+
+// ===== Stale annotation flow =====
+
+describe('Stale annotation lifecycle', () => {
+  beforeEach(async () => {
+    await testDb.query(
+      `DELETE FROM annotations WHERE review_file_id IN ($1, $2)`,
+      [TEST_FILE_ID, TEST_FILE_ID_2]
+    );
+  });
+
+  it('stale annotations appear in stale counts but not in regular annotation counts', async () => {
+    // Create two annotations: one normal, one stale
+    const res1 = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 1,
+        side: 'new',
+        category: 'note',
+        content: 'Normal annotation',
+      }),
+    });
+
+    const res2 = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 2,
+        side: 'new',
+        category: 'bug',
+        content: 'Will become stale',
+      }),
+    });
+    const a2 = await res2.json();
+
+    // Mark one as stale
+    await testDb.query('UPDATE annotations SET is_stale = TRUE, original_content = $1 WHERE id = $2',
+      ['old context', a2.id]);
+
+    // Check file list counts
+    const filesRes = await app.request('/api/files');
+    const filesBody = await filesRes.json();
+
+    // annotationCounts includes all annotations (stale and non-stale)
+    expect(filesBody.annotationCounts[TEST_FILE_ID]).toBe(2);
+    // staleCounts only counts stale ones
+    expect(filesBody.staleCounts[TEST_FILE_ID]).toBe(1);
+  });
+
+  it('keeping a stale annotation preserves its content but clears stale metadata', async () => {
+    const createRes = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 5,
+        side: 'new',
+        category: 'fix',
+        content: 'Important fix note',
+      }),
+    });
+    const created = await createRes.json();
+
+    // Mark stale
+    await testDb.query(
+      'UPDATE annotations SET is_stale = TRUE, original_content = $1 WHERE id = $2',
+      ['old surrounding code', created.id]
+    );
+
+    // Keep it
+    await app.request(`/api/annotations/${created.id}/keep`, { method: 'POST' });
+
+    // Verify the annotation content is preserved but stale metadata is cleared
+    const fileRes = await app.request(`/api/files/${TEST_FILE_ID}`);
+    const fileBody = await fileRes.json();
+    const kept = fileBody.annotations.find((a: { id: string }) => a.id === created.id);
+    expect(kept.content).toBe('Important fix note');
+    expect(kept.category).toBe('fix');
+    expect(kept.is_stale).toBe(false);
+  });
+
+  it('delete-all stale only removes stale annotations, not non-stale ones', async () => {
+    // Create 3 annotations: 2 stale, 1 not
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = await app.request('/api/annotations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewFileId: TEST_FILE_ID,
+          lineNumber: i + 1,
+          side: 'new',
+          category: 'note',
+          content: `Annotation ${i}`,
+        }),
+      });
+      const body = await res.json();
+      ids.push(body.id);
+    }
+
+    // Mark first two as stale
+    await testDb.query('UPDATE annotations SET is_stale = TRUE WHERE id IN ($1, $2)', [ids[0], ids[1]]);
+
+    // Delete all stale
+    const deleteRes = await app.request('/api/annotations/stale/delete-all', { method: 'POST' });
+    expect(deleteRes.status).toBe(200);
+
+    // Check: stale ones gone, non-stale remains
+    const check0 = await testDb.query('SELECT * FROM annotations WHERE id = $1', [ids[0]]);
+    expect(check0.rows.length).toBe(0);
+    const check1 = await testDb.query('SELECT * FROM annotations WHERE id = $1', [ids[1]]);
+    expect(check1.rows.length).toBe(0);
+    const check2 = await testDb.query('SELECT * FROM annotations WHERE id = $1', [ids[2]]);
+    expect(check2.rows.length).toBe(1);
   });
 });
