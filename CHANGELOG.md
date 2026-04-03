@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.3] - 2026-04-03
+
+- Fixed release candidate GitHub action script
+
 ## [0.7.2] - 2026-04-03
 
 - Updated GitHub actions configuration
