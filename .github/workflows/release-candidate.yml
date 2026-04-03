@@ -2,6 +2,7 @@ name: Release Candidate Pipeline
 
 permissions:
   contents: write
+  actions: write   # Required to trigger release-desktop.yml via workflow_dispatch
   id-token: write
 
 on:
