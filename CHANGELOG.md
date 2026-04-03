@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.5] - 2026-04-03
+
+- Making sure desktop apps get released after npm package release
+
 ## [0.7.4] - 2026-04-03
 
 - Fixed RC GitHub action
