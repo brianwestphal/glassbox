@@ -194,6 +194,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+      - name: Wait for npm registry propagation
+        run: |
+          echo "Waiting for glassbox@beta to become available on npm..."
+          for i in $(seq 1 30); do
+            if npm view glassbox@beta version 2>/dev/null; then
+              echo "Package available."
+              break
+            fi
+            echo "Attempt $i/30 — not yet available, waiting 10s..."
+            sleep 10
+          done
       - name: Install beta globally
         run: npm install -g glassbox@beta
       - name: Run smoke tests
@@ -215,6 +226,17 @@ jobs:
           if command -v glassbox &>/dev/null; then
             bash tests/smoke/smoke-test.sh glassbox
           fi
+      - name: Wait for npm registry propagation
+        run: |
+          echo "Waiting for glassbox@beta to become available on npm..."
+          for i in $(seq 1 30); do
+            if npm view glassbox@beta version 2>/dev/null; then
+              echo "Package available."
+              break
+            fi
+            echo "Attempt $i/30 — not yet available, waiting 10s..."
+            sleep 10
+          done
       - name: Upgrade to beta
         run: npm install -g glassbox@beta
       - name: Smoke test beta version
