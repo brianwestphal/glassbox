@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.7] - 2026-04-03
+
+- Fixed permissions on RC workflow
+
 ## [0.7.6] - 2026-04-03
 
 - Fixed permissions on RC workflow
