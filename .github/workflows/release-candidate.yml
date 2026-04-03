@@ -272,6 +272,18 @@ jobs:
           git tag -a "${{ steps.version.outputs.tag }}" -m "$NOTES"
           git push origin "${{ steps.version.outputs.tag }}"
 
+      - name: Trigger desktop release workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-desktop.yml',
+              ref: 'main',
+              inputs: { tag: '${{ steps.version.outputs.tag }}' },
+            });
+
       - name: Summary
         run: |
           echo "## Release Published" >> "$GITHUB_STEP_SUMMARY"
@@ -280,5 +292,4 @@ jobs:
           echo "- **npm:** \`npm install glassbox@${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- **RC tag:** ${{ steps.version.outputs.rc_tag }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Release tag:** ${{ steps.version.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "The final tag push will trigger the desktop release workflow." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Desktop release workflow triggered." >> "$GITHUB_STEP_SUMMARY"
