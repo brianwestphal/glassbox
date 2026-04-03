@@ -250,6 +250,8 @@ jobs:
 
       - name: Create final release tag
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Copy the RC tag's annotation to the final tag
           NOTES=$(git tag -l --format='%(contents)' "${{ steps.version.outputs.rc_tag }}" | sed '/^$/d')
           if [ -z "$NOTES" ]; then
