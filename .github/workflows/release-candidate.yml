@@ -166,6 +166,14 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
+
+      - name: Set pre-release version
+        run: |
+          # v0.7.3-rc.2 → 0.7.3-rc.2
+          RC_TAG="${GITHUB_REF_NAME}"
+          RC_VERSION=$(echo "$RC_TAG" | sed 's/^v//')
+          npm version "$RC_VERSION" --no-git-tag-version --allow-same-version
+
       - run: npm run build
       - name: Publish beta
         run: npm publish --tag beta --provenance --access public
@@ -243,8 +251,12 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Promote beta to latest on npm
-        run: npm dist-tag add "glassbox@${{ steps.version.outputs.version }}" latest
+      - run: npm ci
+      - name: Publish final version to npm
+        run: |
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+          npm run build
+          npm publish --tag latest --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
