@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.8] - 2026-04-07
+
+- Fixed image slice mode issue
+
 ## [0.7.7] - 2026-04-03
 
 - Fixed permissions on RC workflow
