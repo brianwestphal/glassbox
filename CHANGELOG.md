@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.9] - 2026-04-08
+
+- Add a Share Glassbox button and periodic prompt to share Glassbox with friends and colleagues
+
 ## [0.7.8] - 2026-04-07
 
 - Fixed image slice mode issue
