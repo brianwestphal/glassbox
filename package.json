@@ -36,6 +36,7 @@
     "tauri:clean": "rm -rf src-tauri/target",
     "tauri:dev": "bash scripts/tauri-dev.sh",
     "tauri:build": "bash scripts/build-sidecar.sh && tauri build",
+    "tauri:build:local": "read -rsp \"Password: \" MYPASS && echo && TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$MYPASS TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/glassbox.key) npm run tauri:build",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:all": "bash scripts/test-all.sh",

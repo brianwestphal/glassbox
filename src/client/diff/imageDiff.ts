@@ -291,6 +291,7 @@ function applyZoom(wrap: HTMLElement, zs: ZoomState) {
 interface SliceState {
   canvas: ImageCanvas;
   wrap: HTMLElement;
+  oldImg: HTMLImageElement;
   clipped: HTMLImageElement;
   line: HTMLElement;
   handleA: HTMLElement;
@@ -311,14 +312,15 @@ function screenToCanvas(e: MouseEvent, canvas: HTMLElement): { x: number; y: num
 function initSliceTool(canvasEl: Element) {
   const canvas = canvasEl as ImageCanvas;
   const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
+  const oldImg = canvas.querySelector<HTMLImageElement>('.image-layer-old');
   const clipped = canvas.querySelector<HTMLImageElement>('.image-slice-clipped');
   const line = canvas.querySelector<HTMLElement>('.slice-line');
   const handleA = canvas.querySelector<HTMLElement>('.slice-handle-a');
   const handleB = canvas.querySelector<HTMLElement>('.slice-handle-b');
-  if (wrap === null || clipped === null || line === null || handleA === null || handleB === null) return;
+  if (wrap === null || oldImg === null || clipped === null || line === null || handleA === null || handleB === null) return;
 
   const ss: SliceState = {
-    canvas, wrap, clipped, line, handleA, handleB,
+    canvas, wrap, oldImg, clipped, line, handleA, handleB,
     ax: 0.5, ay: 0,
     bx: 0.5, by: 1,
     dragging: null,
@@ -389,7 +391,9 @@ function updateSlice(ss: SliceState) {
   ss.line.style.transform = `rotate(${angle}deg)`;
   ss.line.style.transformOrigin = '0 0';
 
-  ss.clipped.style.clipPath = buildClipPath(ss);
+  // Clip new image to one side, old image to the opposite side
+  ss.clipped.style.clipPath = buildClipPath(ss, false);
+  ss.oldImg.style.clipPath = buildClipPath(ss, true);
 }
 
 // --- Clip-path geometry ---
@@ -420,11 +424,22 @@ function canvasToImagePct(cnx: number, cny: number, ss: SliceState, zs: ZoomStat
   return `${(wx / ww) * 100}% ${(wy / wh) * 100}%`;
 }
 
-function buildClipPath(ss: SliceState): string {
+/** Build a clip-path polygon for one side of the slice line.
+ *  invert=false: clips to the A→B clockwise side (used for the new image)
+ *  invert=true:  clips to the B→A clockwise side (used for the old image)
+ */
+function buildClipPath(ss: SliceState, invert: boolean): string {
   const zs: ZoomState = ss.canvas._zs ?? { zoom: 1, panX: 0, panY: 0 };
-  const tA = edgePos(ss.ax, ss.ay);
-  const tB = edgePos(ss.bx, ss.by);
-  const dAB = cwDist(tA, tB);
+
+  // For the inverted side, swap A and B so the polygon goes the other way around
+  const startX = invert ? ss.bx : ss.ax;
+  const startY = invert ? ss.by : ss.ay;
+  const endX = invert ? ss.ax : ss.bx;
+  const endY = invert ? ss.ay : ss.by;
+
+  const tStart = edgePos(startX, startY);
+  const tEnd = edgePos(endX, endY);
+  const dist = cwDist(tStart, tEnd);
 
   const corners = [
     { t: 0, x: 0, y: 0 },
@@ -434,12 +449,12 @@ function buildClipPath(ss: SliceState): string {
   ];
 
   const between = corners
-    .filter(c => { const d = cwDist(tA, c.t); return d > 0.001 && d < dAB - 0.001; })
-    .sort((a, b) => cwDist(tA, a.t) - cwDist(tA, b.t));
+    .filter(c => { const d = cwDist(tStart, c.t); return d > 0.001 && d < dist - 0.001; })
+    .sort((a, b) => cwDist(tStart, a.t) - cwDist(tStart, b.t));
 
-  const pts = [canvasToImagePct(ss.ax, ss.ay, ss, zs)];
+  const pts = [canvasToImagePct(startX, startY, ss, zs)];
   for (const c of between) pts.push(canvasToImagePct(c.x, c.y, ss, zs));
-  pts.push(canvasToImagePct(ss.bx, ss.by, ss, zs));
+  pts.push(canvasToImagePct(endX, endY, ss, zs));
 
   return `polygon(${pts.join(', ')})`;
 }
