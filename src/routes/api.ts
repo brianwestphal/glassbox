@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Hono } from 'hono';
+import { homedir } from 'os';
 import { join, resolve } from 'path';
 
 import {
@@ -535,4 +536,50 @@ apiRoutes.get('/image/:fileId/:side', async (c) => {
   return new Response(new Uint8Array(image.data), {
     headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' },
   });
+});
+
+// ── Share prompt ──
+
+function readGlobalConfig(): Record<string, unknown> {
+  const configPath = join(homedir(), '.glassbox', 'config.json');
+  try {
+    if (existsSync(configPath)) {
+      return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    }
+  } catch { /* corrupt config */ }
+  return {};
+}
+
+function writeGlobalConfig(config: Record<string, unknown>): void {
+  const configDir = join(homedir(), '.glassbox');
+  mkdirSync(configDir, { recursive: true });
+  writeFileSync(join(configDir, 'config.json'), JSON.stringify(config, null, 2), 'utf-8');
+}
+
+apiRoutes.get('/share-prompt/state', (c) => {
+  const config = readGlobalConfig();
+  const sp = config.sharePrompt as Record<string, unknown> | undefined;
+  const dismissedAt = sp !== undefined && typeof sp.dismissedAt === 'number' ? sp.dismissedAt : null;
+  const totalOpenMs = sp !== undefined && typeof sp.totalOpenMs === 'number' ? sp.totalOpenMs : 0;
+  return c.json({ dismissedAt, totalOpenMs });
+});
+
+apiRoutes.post('/share-prompt/dismiss', (c) => {
+  const config = readGlobalConfig();
+  if (config.sharePrompt === undefined) config.sharePrompt = {};
+  const sp = config.sharePrompt as Record<string, unknown>;
+  sp.dismissedAt = Date.now();
+  writeGlobalConfig(config);
+  return c.json({ ok: true });
+});
+
+apiRoutes.post('/share-prompt/tick', async (c) => {
+  const body = await c.req.json<{ sessionMs: number }>();
+  const config = readGlobalConfig();
+  if (config.sharePrompt === undefined) config.sharePrompt = {};
+  const sp = config.sharePrompt as Record<string, unknown>;
+  const current = typeof sp.totalOpenMs === 'number' ? sp.totalOpenMs : 0;
+  sp.totalOpenMs = current + (body.sessionMs > 0 ? body.sessionMs : 0);
+  writeGlobalConfig(config);
+  return c.json({ totalOpenMs: sp.totalOpenMs });
 });

@@ -45,6 +45,7 @@ All project documentation lives in `docs/`. There are two types:
 - `13-navigation.md` — Go-to-definition, navigation stack (back/forward)
 - `14-security.md` — Network binding, input validation, command execution safety
 - `15-themes.md` — Theme system, built-in themes, custom themes, theme editor
+- `16-share-prompt.md` — Share prompt trigger, share button, Web Share API
 
 **Architecture documents** describe system design and setup:
 

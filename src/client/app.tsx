@@ -10,6 +10,7 @@ import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
 import { updateProgress } from "./review/progress.js";
+import { initSharePrompt, triggerShare } from "./share.js";
 import { bindFileFilter, bindSidebarEvents, bindSidebarResize } from "./sidebar/controls.js";
 import { loadFiles } from "./sidebar/fileTree.js";
 import { bindSortMode, loadAnalysisResults, renderSortControl, triggerAnalysis } from "./sidebar/sortMode.js";
@@ -95,6 +96,33 @@ async function initAISorting() {
       });
     });
     sidebarHeader.appendChild(gearBtn);
+  }
+
+  // Share section above the footer
+  const shareContainer = document.getElementById("sidebar-share");
+  if (shareContainer) {
+    // Check if share section was dismissed
+    void api<{ dismissedAt: number | null }>('/share-prompt/state').then((state) => {
+      if (state.dismissedAt !== null) {
+        const elapsed = Date.now() - state.dismissedAt;
+        if (elapsed < 30 * 24 * 60 * 60 * 1000) return; // within 30-day cooldown
+      }
+      const shareSection = toElement(
+        <div className="sidebar-share-section">
+          <button className="sidebar-share-dismiss" id="share-dismiss-btn" title="Dismiss">&times;</button>
+          <p className="sidebar-share-label">Know someone who'd love this?</p>
+          <button className="btn btn-share" id="share-glassbox-btn">Share Glassbox</button>
+        </div>
+      );
+      shareSection.querySelector("#share-glassbox-btn")?.addEventListener("click", () => {
+        void triggerShare();
+      });
+      shareSection.querySelector("#share-dismiss-btn")?.addEventListener("click", () => {
+        shareSection.remove();
+        void api('/share-prompt/dismiss', { method: 'POST' });
+      });
+      shareContainer.appendChild(shareSection);
+    }).catch(() => { /* ignore */ });
   }
 }
 
@@ -242,3 +270,8 @@ async function checkForUpdate() {
 
 void init();
 void checkForUpdate();
+
+// Share prompt — detect demo mode from the review's mode field
+void api<{ mode: string }>('/review').then((review) => {
+  initSharePrompt(review.mode === 'demo');
+}).catch(() => { /* ignore */ });

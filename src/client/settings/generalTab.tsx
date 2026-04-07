@@ -1,4 +1,5 @@
 import type { SafeHtml } from '../../jsx-runtime.js';
+import { triggerShare } from '../share.js';
 
 interface ThemeSummary {
   id: string;
@@ -53,6 +54,10 @@ export function renderGeneralTab(data: GeneralTabData): SafeHtml {
           <p className="settings-hint">Custom window title for the desktop app. Leave blank for the default.</p>
         </div>
       )}
+      <div className="settings-divider"></div>
+      <div className="settings-section">
+        <a className="settings-share-link" id="settings-share-link" href="#">Know someone who'd love this? <strong>Share Glassbox</strong></a>
+      </div>
     </>
   );
 }
@@ -76,6 +81,12 @@ export function bindGeneralTabEvents(overlay: HTMLElement, callbacks: GeneralTab
         callbacks.renderContent();
       })();
     });
+  });
+
+  // Share link
+  overlay.querySelector('#settings-share-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    void triggerShare();
   });
 
   // App name input — debounced save

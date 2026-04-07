@@ -340,6 +340,17 @@
   line-height: 1.4;
 }
 
+.settings-share-link {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  cursor: pointer;
+
+  strong { color: var(--accent); }
+
+  &:hover { color: var(--text); strong { text-decoration: underline; } }
+}
+
 .settings-hint {
   font-size: 11px;
   color: var(--text-dim);

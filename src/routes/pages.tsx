@@ -50,6 +50,7 @@ pageRoutes.get('/', async (c) => {
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
           </div>
           <FileList files={files} annotationCounts={annotationCounts} staleCounts={{}} />
+          <div className="sidebar-share" id="sidebar-share"></div>
           <div className="sidebar-footer">
             <button className="btn btn-primary btn-complete" id="complete-review">Complete Review</button>
             <a href="/history" className="btn btn-sm btn-link">Review History</a>
@@ -264,6 +265,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
           </div>
           <FileList files={files} annotationCounts={annotationCounts} staleCounts={{}} />
+          <div className="sidebar-share" id="sidebar-share"></div>
           <div className="sidebar-footer">
             {review.status === 'completed' ? (
               <button className="btn btn-primary" id="reopen-review">Reopen Review</button>
