@@ -266,6 +266,20 @@ The exported review file is plain markdown. Any AI tool that can read files can 
 Read .glassbox/latest-review.md and apply the review feedback.
 ```
 
+Glassbox automatically generates a `/glassbox` skill for Claude Code, so you can just type `/glassbox` in Claude to have it read and apply your latest review.
+
+### Claude Channel Integration (Experimental)
+
+Glassbox can send review feedback directly to a running Claude Code session via MCP channels — no copy-pasting needed. When you complete a review, a "Send to Claude" button appears that pushes your feedback to Claude instantly.
+
+Enable it in Settings → Experimental → Claude Channel, then launch Claude with channel support:
+
+```bash
+claude --dangerously-load-development-channels server:glassbox-channel
+```
+
+Requires Claude Code v2.1.80+ with channel support. See [docs/17-claude-channel.md](docs/17-claude-channel.md) for details.
+
 ### Cursor / Copilot / other
 
 Point the tool at the file. The export includes an "Instructions for AI Tools" section that explains how to interpret each annotation category.
