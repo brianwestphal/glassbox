@@ -118,20 +118,22 @@ function showCompleteModal() {
         const channelStatus = await api<{ enabled: boolean; connected: boolean }>('/channel/status');
         if (channelStatus.enabled && channelStatus.connected) {
           const actionsDiv = overlay.querySelector('#complete-modal-actions');
-          const doneBtn = actionsDiv?.querySelector('.modal-done');
-          if (actionsDiv !== null && doneBtn !== null) {
-            const sendBtn = toElement(
-              <button className="btn btn-sm btn-primary" id="send-to-claude">Send to Claude</button>
-            );
-            actionsDiv.insertBefore(sendBtn, doneBtn);
-            sendBtn.addEventListener('click', () => {
-              void (async () => {
-                await api('/channel/trigger', { method: 'POST', body: { message: aiCommand } });
-                sendBtn.textContent = 'Sent!';
-                sendBtn.setAttribute('disabled', 'true');
-                setTimeout(() => { overlay.remove(); }, 1000);
-              })();
-            });
+          if (actionsDiv !== null) {
+            const doneBtn = actionsDiv.querySelector('.modal-done');
+            if (doneBtn !== null) {
+              const sendBtn = toElement(
+                <button className="btn btn-sm btn-primary" id="send-to-claude">Send to Claude</button>
+              );
+              actionsDiv.insertBefore(sendBtn, doneBtn);
+              sendBtn.addEventListener('click', () => {
+                void (async () => {
+                  await api('/channel/trigger', { method: 'POST', body: { message: aiCommand } });
+                  sendBtn.textContent = 'Sent!';
+                  sendBtn.setAttribute('disabled', 'true');
+                  setTimeout(() => { overlay.remove(); }, 1000);
+                })();
+              });
+            }
           }
         }
       } catch { /* channel unavailable — skip button */ }
