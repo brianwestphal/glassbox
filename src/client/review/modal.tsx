@@ -104,13 +104,38 @@ function showCompleteModal() {
             </div>
           </div>
         )}
-        <div className="modal-actions">
+        <div className="modal-actions" id="complete-modal-actions">
           <button className="btn btn-sm btn-primary modal-done">Done</button>
         </div>
       </>
     ).toString();
 
     overlay.querySelector('.modal-done')?.addEventListener('click', () => { overlay.remove(); });
+
+    // Check channel status and add "Send to Claude" button if connected
+    void (async () => {
+      try {
+        const channelStatus = await api<{ enabled: boolean; connected: boolean }>('/channel/status');
+        if (channelStatus.enabled && channelStatus.connected) {
+          const actionsDiv = overlay.querySelector('#complete-modal-actions');
+          const doneBtn = actionsDiv?.querySelector('.modal-done');
+          if (actionsDiv !== null && doneBtn !== null) {
+            const sendBtn = toElement(
+              <button className="btn btn-sm btn-primary" id="send-to-claude">Send to Claude</button>
+            );
+            actionsDiv.insertBefore(sendBtn, doneBtn);
+            sendBtn.addEventListener('click', () => {
+              void (async () => {
+                await api('/channel/trigger', { method: 'POST', body: { message: aiCommand } });
+                sendBtn.textContent = 'Sent!';
+                sendBtn.setAttribute('disabled', 'true');
+                setTimeout(() => { overlay.remove(); }, 1000);
+              })();
+            });
+          }
+        }
+      } catch { /* channel unavailable — skip button */ }
+    })();
 
     overlay.querySelectorAll('.modal-copyable').forEach(el => {
       el.addEventListener('click', () => {

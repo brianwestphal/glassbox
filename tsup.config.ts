@@ -2,9 +2,9 @@ import { defineConfig } from 'tsup';
 import { execSync } from 'child_process';
 
 export default defineConfig([
-  // Server bundle (CLI entry point)
+  // Server bundle (CLI entry point + channel server)
   {
-    entry: ['src/cli.ts'],
+    entry: ['src/cli.ts', 'src/channel.ts'],
     format: 'esm',
     outDir: 'dist',
     target: 'node20',
@@ -13,7 +13,7 @@ export default defineConfig([
     clean: true,
     sourcemap: true,
     // Bundle everything except node_modules dependencies
-    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg)/],
+    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg|@modelcontextprotocol)/],
     define: {
       'process.env.BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
     },

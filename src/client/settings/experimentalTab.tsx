@@ -6,6 +6,13 @@ interface KeyStatusInfo {
   source: string | null;
 }
 
+interface ChannelState {
+  enabled: boolean;
+  claudeInstalled: boolean;
+  claudeVersion: string | null;
+  meetsMinimum: boolean;
+}
+
 interface ExperimentalTabData {
   platforms: Record<string, string>;
   currentPlatform: string;
@@ -15,6 +22,7 @@ interface ExperimentalTabData {
   keychainAvailable: boolean;
   keychainLabel: string;
   guidedEnabled: boolean;
+  channelState: ChannelState;
 }
 
 interface ExperimentalTabCallbacks {
@@ -24,6 +32,7 @@ interface ExperimentalTabCallbacks {
   saveKey: () => void;
   removeKey: () => void;
   toggleGuided: (enabled: boolean) => void;
+  toggleChannel: (enabled: boolean) => void;
   renderContent: () => void;
 }
 
@@ -52,8 +61,18 @@ function renderPlatformModels(models: Array<{ id: string; name: string; isDefaul
   );
 }
 
+function channelHintHtml(channelState: ChannelState): SafeHtml {
+  if (!channelState.claudeInstalled) {
+    return <p className="settings-hint" id="channel-hint">Claude Code CLI not found. Install it to use this feature.</p>;
+  }
+  if (!channelState.meetsMinimum) {
+    return <p className="settings-hint" id="channel-hint">{'Claude Code v' + (channelState.claudeVersion ?? '?') + ' found. Version 2.1.80+ required.'}</p>;
+  }
+  return <p className="settings-hint settings-hint-ok" id="channel-hint">{'Claude Code v' + (channelState.claudeVersion ?? '') + ' detected.'}</p>;
+}
+
 export function renderExperimentalTab(data: ExperimentalTabData): SafeHtml {
-  const { platforms, currentPlatform, currentModel, platformModels, keyInfo, keychainAvailable, keychainLabel, guidedEnabled } = data;
+  const { platforms, currentPlatform, currentModel, platformModels, keyInfo, keychainAvailable, keychainLabel, guidedEnabled, channelState } = data;
   const showInput = !keyInfo.configured;
 
   return (
@@ -128,6 +147,31 @@ export function renderExperimentalTab(data: ExperimentalTabData): SafeHtml {
       <div className="settings-section">
         <label className="settings-checkbox"><input type="checkbox" id="settings-guided-enabled" checked={guidedEnabled} /><span>Enable guided review</span></label>
       </div>
+
+      <div className="settings-divider"></div>
+
+      <div className="settings-section-header">
+        <span className="settings-heading">Claude Channel</span>
+        <span className="settings-beta-badge">Beta</span>
+      </div>
+      <p className="settings-disclaimer">
+        Send review feedback directly to a running Claude Code session.
+      </p>
+
+      <div className="settings-section">
+        <label className="settings-checkbox"><input type="checkbox" id="settings-channel-enabled" checked={channelState.enabled} /><span>Enable Claude Channel</span></label>
+        {channelHintHtml(channelState)}
+      </div>
+
+      {channelState.enabled && (
+        <div className="settings-channel-instructions">
+          <p className="settings-label">Launch Claude Code in your project directory with channel support:</p>
+          <div className="settings-channel-cmd">
+            <code>claude --dangerously-load-development-channels server:glassbox-channel</code>
+            <button className="btn btn-xs settings-channel-copy" id="channel-copy-btn">Copy</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -180,6 +224,25 @@ export function bindExperimentalTabEvents(overlay: HTMLElement, callbacks: Exper
       callbacks.toggleGuided(guidedCheckbox.checked);
       callbacks.saveConfig();
       callbacks.renderContent();
+    });
+  }
+
+  // Channel checkbox — enable/disable
+  const channelCheckbox = overlay.querySelector<HTMLInputElement>('#settings-channel-enabled');
+  if (channelCheckbox !== null) {
+    channelCheckbox.addEventListener('change', () => {
+      callbacks.toggleChannel(channelCheckbox.checked);
+      callbacks.renderContent();
+    });
+  }
+
+  // Channel copy button
+  const copyBtn = overlay.querySelector('#channel-copy-btn');
+  if (copyBtn !== null) {
+    copyBtn.addEventListener('click', () => {
+      void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
     });
   }
 }

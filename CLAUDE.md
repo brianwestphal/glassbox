@@ -46,6 +46,7 @@ All project documentation lives in `docs/`. There are two types:
 - `14-security.md` — Network binding, input validation, command execution safety
 - `15-themes.md` — Theme system, built-in themes, custom themes, theme editor
 - `16-share-prompt.md` — Share prompt trigger, share button, Web Share API
+- `17-claude-channel.md` — Claude Code MCP channel integration, channel server, completion modal
 
 **Architecture documents** describe system design and setup:
 
@@ -192,7 +193,7 @@ The build produces:
 
 In dev mode (`npm run dev` or `tauri:dev`), external packages resolve from the project's `node_modules/` automatically. In production Tauri builds, the sidecar runs from `src-tauri/server/` with only the explicitly copied packages available. Forgetting step 2 causes "module not found" errors that only appear in production.
 
-Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`
+Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`
 
 ## Testing
 

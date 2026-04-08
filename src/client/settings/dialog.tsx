@@ -42,16 +42,32 @@ interface ThemesResponse {
 
 export function showSettingsDialog(onClose?: () => void) {
   void (async () => {
-    const [keyStatus, modelsData, configData, projectSettings, themesData] = await Promise.all([
+    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus] = await Promise.all([
       api<KeyStatusResponse>('/ai/key-status'),
       api<ModelsResponse>('/ai/models'),
       api<ConfigResponse>('/ai/config'),
       api<ProjectSettingsResponse>('/project-settings'),
       api<ThemesResponse>('/themes'),
+      api<{ installed: boolean; version: string | null; meetsMinimum: boolean }>('/channel/claude-check'),
+      api<{ enabled: boolean; connected: boolean }>('/channel/status'),
     ]);
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, onClose);
+    const channelState = {
+      enabled: channelStatus.enabled,
+      claudeInstalled: channelCheck.installed,
+      claudeVersion: channelCheck.version,
+      meetsMinimum: channelCheck.meetsMinimum,
+    };
+
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, onClose);
   })();
+}
+
+interface ChannelState {
+  enabled: boolean;
+  claudeInstalled: boolean;
+  claudeVersion: string | null;
+  meetsMinimum: boolean;
 }
 
 function renderSettingsModal(
@@ -60,6 +76,7 @@ function renderSettingsModal(
   configData: ConfigResponse,
   projectSettings: ProjectSettingsResponse,
   themesData: ThemesResponse,
+  channelState: ChannelState,
   onClose?: () => void,
 ) {
   const overlay = toElement(<div className="modal-overlay"></div>);
@@ -208,6 +225,7 @@ function renderSettingsModal(
         keychainAvailable: keyStatus.keychainAvailable,
         keychainLabel: keyStatus.keychainLabel,
         guidedEnabled,
+        channelState,
       }),
     }).toString();
 
@@ -287,6 +305,10 @@ function renderSettingsModal(
       saveKey,
       removeKey,
       toggleGuided: (enabled) => { guidedEnabled = enabled; },
+      toggleChannel: (enabled) => {
+        channelState.enabled = enabled;
+        void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
+      },
       renderContent,
     });
 
