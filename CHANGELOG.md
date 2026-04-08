@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0] - 2026-04-08
+
+- - Added support for experimental Claude channels, which lets one tell Claude to absorb / act on review feedback directly within Glassbox
+
 ## [0.7.9] - 2026-04-08
 
 - Add a Share Glassbox button and periodic prompt to share Glassbox with friends and colleagues
