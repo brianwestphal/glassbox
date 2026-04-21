@@ -26,7 +26,14 @@ The app is a single-entry CLI (`src/cli.ts`) that:
 
 ### Documentation
 
-All project documentation lives in `docs/`. There are two types:
+All project documentation lives in `docs/`. There are three types:
+
+**AI-oriented summaries** (`docs/ai/`) are the fastest way for a fresh AI session to orient. Read these at the start of a session before diving into individual docs or source files:
+
+- `docs/ai/code-summary.md` — codebase map: directory tree, routes catalog, schema, client modules, build pipeline, and a "Where do I look to…" reverse index. Also human-readable for sanity checking.
+- `docs/ai/requirements-summary.md` — synthesized view of every requirements doc, organized by theme with status markers.
+
+Both summaries are actively maintained. Update them in the same pass whenever you make a relevant change (see triggers listed in each file's final section). If you add, rename, or renumber a requirements doc, also update the index below.
 
 **Requirements documents** (`docs/N-topic.md`) define what the application does. They are numbered for linear reading order and contain functional (FR-) and non-functional (NFR-) requirements:
 
@@ -227,6 +234,16 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 - Hono context variables (`reviewId`, `repoRoot`) are typed via `AppEnv` in `src/types.ts`
 - Server-rendered HTML for initial page load; client JS for interactivity
 - Client CSS and JS are built separately and served as static files — never inlined in layout
+
+### Work Management
+
+When the user asks for work directly via the CLI (not via an MCP channel or Hot Sheet), analyze the request and create Hot Sheet tickets before starting implementation — especially for substantial or multi-step work. This helps track progress and keeps the work visible.
+
+- **Do create tickets** for: feature implementations, bug fixes requiring investigation, refactors, test coverage work, multi-file changes, anything that would take more than a few minutes.
+- **Don't create tickets** for: simple commits, answering questions, quick one-line fixes, running commands the user explicitly dictated.
+- **When in doubt, create the tickets** — the overhead is minimal and the traceability is valuable.
+
+Use the Hot Sheet API to create tickets (see `.hotsheet/worklist.md` for the API format). Mark them as `up_next: true` so they appear in the worklist.
 
 ### Code Organization
 
