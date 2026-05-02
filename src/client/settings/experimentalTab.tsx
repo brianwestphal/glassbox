@@ -1,40 +1,7 @@
-import { IconCheck } from '../../icons.js';
+import { IconCheck, IconFlask } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
-
-interface KeyStatusInfo {
-  configured: boolean;
-  source: string | null;
-}
-
-interface ChannelState {
-  enabled: boolean;
-  claudeInstalled: boolean;
-  claudeVersion: string | null;
-  meetsMinimum: boolean;
-}
-
-interface ExperimentalTabData {
-  platforms: Record<string, string>;
-  currentPlatform: string;
-  currentModel: string;
-  platformModels: Array<{ id: string; name: string; isDefault: boolean }>;
-  keyInfo: KeyStatusInfo;
-  keychainAvailable: boolean;
-  keychainLabel: string;
-  guidedEnabled: boolean;
-  channelState: ChannelState;
-}
-
-interface ExperimentalTabCallbacks {
-  switchPlatform: (platform: string) => void;
-  setModel: (model: string) => void;
-  saveConfig: () => void;
-  saveKey: () => void;
-  removeKey: () => void;
-  toggleGuided: (enabled: boolean) => void;
-  toggleChannel: (enabled: boolean) => void;
-  renderContent: () => void;
-}
+import { api } from '../api.js';
+import type { ChannelState, KeyStatusInfo, Tab, TabContext } from './tabContext.js';
 
 function keyStatusHtml(keyInfo: KeyStatusInfo): SafeHtml {
   if (keyInfo.configured) {
@@ -71,8 +38,11 @@ function channelHintHtml(channelState: ChannelState): SafeHtml {
   return <p className="settings-hint settings-hint-ok" id="channel-hint">{'Claude Code v' + (channelState.claudeVersion ?? '') + ' detected.'}</p>;
 }
 
-export function renderExperimentalTab(data: ExperimentalTabData): SafeHtml {
-  const { platforms, currentPlatform, currentModel, platformModels, keyInfo, keychainAvailable, keychainLabel, guidedEnabled, channelState } = data;
+function renderExperimentalTab(ctx: TabContext): SafeHtml {
+  const { modelsData, currentPlatform, currentModel, keyStatus, guidedEnabled, channelState } = ctx;
+  const platforms = modelsData.platforms;
+  const platformModels = modelsData.models[currentPlatform] ?? [];
+  const keyInfo = keyStatus.status[currentPlatform] ?? { configured: false, source: null };
   const showInput = !keyInfo.configured;
 
   return (
@@ -110,11 +80,11 @@ export function renderExperimentalTab(data: ExperimentalTabData): SafeHtml {
                 placeholder="Enter API key..." autocomplete="off" />
               <button className="btn btn-xs btn-primary" id="save-key-btn">Save Key</button>
             </div>
-            {keychainAvailable ? (
+            {keyStatus.keychainAvailable ? (
               <div className="settings-storage-options">
                 <label className="settings-radio">
                   <input type="radio" name="key-storage" value="keychain" checked />
-                  <span>{'Store in ' + keychainLabel}</span>
+                  <span>{'Store in ' + keyStatus.keychainLabel}</span>
                 </label>
                 <label className="settings-radio">
                   <input type="radio" name="key-storage" value="config" />
@@ -176,67 +146,55 @@ export function renderExperimentalTab(data: ExperimentalTabData): SafeHtml {
   );
 }
 
-export function bindExperimentalTabEvents(overlay: HTMLElement, callbacks: ExperimentalTabCallbacks): void {
-  // Platform switching — save immediately
+function bindExperimentalTab(overlay: HTMLElement, ctx: TabContext): void {
   overlay.querySelectorAll('.settings-platform-control .segment').forEach(btn => {
     btn.addEventListener('click', () => {
       const platform = (btn as HTMLElement).dataset.platform;
       if (platform !== undefined) {
-        callbacks.switchPlatform(platform);
-        callbacks.saveConfig();
-        callbacks.renderContent();
+        ctx.setCurrentPlatform(platform);
+        ctx.saveConfig();
+        ctx.renderContent();
       }
     });
   });
 
-  // Model selection — save immediately
   const modelSelect = overlay.querySelector<HTMLSelectElement>('#settings-model');
   if (modelSelect !== null) {
     modelSelect.addEventListener('change', () => {
-      callbacks.setModel(modelSelect.value);
-      callbacks.saveConfig();
+      ctx.setCurrentModel(modelSelect.value);
+      ctx.saveConfig();
     });
   }
 
-  // Remove key
-  const removeBtn = overlay.querySelector('#remove-key');
-  if (removeBtn !== null) {
-    removeBtn.addEventListener('click', () => {
-      callbacks.removeKey();
-    });
-  }
+  overlay.querySelector('#remove-key')?.addEventListener('click', ctx.removeKey);
+  overlay.querySelector('#save-key-btn')?.addEventListener('click', ctx.saveKey);
 
-  // Save key button
-  overlay.querySelector('#save-key-btn')?.addEventListener('click', callbacks.saveKey);
-
-  // Save key on Enter
   const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
   if (keyInput !== null) {
     keyInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); callbacks.saveKey(); }
+      if (e.key === 'Enter') { e.preventDefault(); ctx.saveKey(); }
     });
   }
 
-  // Guided review checkbox — save immediately
   const guidedCheckbox = overlay.querySelector<HTMLInputElement>('#settings-guided-enabled');
   if (guidedCheckbox !== null) {
     guidedCheckbox.addEventListener('change', () => {
-      callbacks.toggleGuided(guidedCheckbox.checked);
-      callbacks.saveConfig();
-      callbacks.renderContent();
+      ctx.setGuidedEnabled(guidedCheckbox.checked);
+      ctx.saveConfig();
+      ctx.renderContent();
     });
   }
 
-  // Channel checkbox — enable/disable
   const channelCheckbox = overlay.querySelector<HTMLInputElement>('#settings-channel-enabled');
   if (channelCheckbox !== null) {
     channelCheckbox.addEventListener('change', () => {
-      callbacks.toggleChannel(channelCheckbox.checked);
-      callbacks.renderContent();
+      const enabled = channelCheckbox.checked;
+      ctx.setChannelEnabled(enabled);
+      void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
+      ctx.renderContent();
     });
   }
 
-  // Channel copy button
   const copyBtn = overlay.querySelector('#channel-copy-btn');
   if (copyBtn !== null) {
     copyBtn.addEventListener('click', () => {
@@ -246,3 +204,11 @@ export function bindExperimentalTabEvents(overlay: HTMLElement, callbacks: Exper
     });
   }
 }
+
+export const experimentalTab: Tab = {
+  id: 'experimental',
+  label: 'Experimental',
+  icon: <IconFlask />,
+  render: renderExperimentalTab,
+  bind: bindExperimentalTab,
+};

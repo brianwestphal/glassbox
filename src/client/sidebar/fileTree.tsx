@@ -1,3 +1,4 @@
+import { parseDiffData } from '../../git/parseDiffData.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
 import { api, clientLog } from '../api.js';
 import { selectFile } from '../diff/selection.js';
@@ -11,10 +12,6 @@ interface FilesResponse {
   files: ReviewFile[];
   annotationCounts: Record<string, number>;
   staleCounts?: Record<string, number>;
-}
-
-interface DiffData {
-  status?: string;
 }
 
 export async function loadFiles() {
@@ -212,7 +209,7 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
   });
 
   node.files.forEach(f => {
-    const diff: DiffData = JSON.parse(f.diff_data !== '' ? f.diff_data : '{}') as DiffData;
+    const diff = parseDiffData(f.diff_data);
     const count = state.annotationCounts[f.id] ?? 0;
     const staleCount = state.staleCounts[f.id] ?? 0;
     const fileName = f.file_path.split('/').pop() ?? '';
@@ -221,7 +218,7 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
       <div className={`file-item${f.id === state.currentFileId ? ' active' : ''}`} data-file-id={f.id} style={pad(depth)}>
         <span className={`status-dot ${f.status}`}></span>
         <span className="file-name" title={f.file_path}>{fileName}</span>
-        <span className={`file-status ${diff.status ?? ''}`}>{diff.status ?? ''}</span>
+        <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>
         {staleCount > 0 ? <span className="stale-dot"></span> : null}
         {count > 0 ? <span className="annotation-count">{count}</span> : null}
       </div>

@@ -1,27 +1,18 @@
-import { IconDownload, IconFlask, IconSliders, IconUser } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { state } from '../state.js';
-import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
-import { bindExperimentalTabEvents,renderExperimentalTab } from './experimentalTab.js';
-import { bindGeneralTabEvents,renderGeneralTab } from './generalTab.js';
-import { ALL_LANG_KEYS,bindProfileTabEvents, renderProfileTab } from './profileTab.js';
+import { experimentalTab } from './experimentalTab.js';
+import { generalTab } from './generalTab.js';
+import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
+import type { ChannelState, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
+import { updatesTab } from './updatesTab.js';
 
-interface KeyStatusResponse {
-  status: Record<string, { configured: boolean; source: string | null }>;
-  keychainAvailable: boolean;
-  keychainLabel: string;
-}
-
-interface ModelsResponse {
-  platforms: Record<string, string>;
-  models: Record<string, Array<{ id: string; name: string; isDefault: boolean }>>;
-}
+const TABS: Tab[] = [generalTab, profileTab, experimentalTab, updatesTab];
 
 interface ConfigResponse {
   platform: string;
@@ -31,28 +22,19 @@ interface ConfigResponse {
   guidedReview: { enabled: boolean; topics: string[] };
 }
 
-interface ProjectSettingsResponse {
-  appName?: string;
-}
-
-interface ThemesResponse {
-  themes: Array<{ id: string; name: string; builtIn: boolean }>;
-  activeId: string;
-}
-
 export function showSettingsDialog(onClose?: () => void) {
   void (async () => {
     const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus] = await Promise.all([
       api<KeyStatusResponse>('/ai/key-status'),
       api<ModelsResponse>('/ai/models'),
       api<ConfigResponse>('/ai/config'),
-      api<ProjectSettingsResponse>('/project-settings'),
+      api<ProjectSettings>('/project-settings'),
       api<ThemesResponse>('/themes'),
       api<{ installed: boolean; version: string | null; meetsMinimum: boolean }>('/channel/claude-check'),
       api<{ enabled: boolean; connected: boolean }>('/channel/status'),
     ]);
 
-    const channelState = {
+    const channelState: ChannelState = {
       enabled: channelStatus.enabled,
       claudeInstalled: channelCheck.installed,
       claudeVersion: channelCheck.version,
@@ -63,39 +45,32 @@ export function showSettingsDialog(onClose?: () => void) {
   })();
 }
 
-interface ChannelState {
-  enabled: boolean;
-  claudeInstalled: boolean;
-  claudeVersion: string | null;
-  meetsMinimum: boolean;
-}
-
 function renderSettingsModal(
   keyStatus: KeyStatusResponse,
   modelsData: ModelsResponse,
   configData: ConfigResponse,
-  projectSettings: ProjectSettingsResponse,
+  projectSettings: ProjectSettings,
   themesData: ThemesResponse,
   channelState: ChannelState,
   onClose?: () => void,
 ) {
   const overlay = toElement(<div className="modal-overlay"></div>);
 
-  let currentPlatform = configData.platform;
-  let currentModel = configData.model;
-  let guidedEnabled = configData.guidedReview.enabled;
-  const guidedTopics = new Set(configData.guidedReview.topics);
-  let showMoreLangs = false;
-  let appName = projectSettings.appName ?? '';
-  const isTauri = (window as unknown as Record<string, unknown>).__TAURI__ !== undefined;
-  let activeTab = 'general';
-  let activeThemeId = themesData.activeId;
+  // Mutable per-dialog state lives here; tabs touch it via the TabContext mutators.
+  const ui = {
+    activeTab: 'general',
+    isTauri: (window as unknown as Record<string, unknown>).__TAURI__ !== undefined,
+    currentPlatform: configData.platform,
+    currentModel: configData.model,
+    guidedEnabled: configData.guidedReview.enabled,
+    guidedTopics: new Set(configData.guidedReview.topics),
+    showMoreLangs: false,
+    appName: projectSettings.appName ?? '',
+    activeThemeId: themesData.activeId,
+    lastSavedGuidedEnabled: configData.guidedReview.enabled,
+    lastSavedGuidedTopics: new Set(configData.guidedReview.topics),
+  };
 
-  // Track last-saved guided review state for cache invalidation
-  let lastSavedGuidedEnabled = guidedEnabled;
-  let lastSavedGuidedTopics = new Set(guidedTopics);
-
-  // Debounce timers
   let configTimer: ReturnType<typeof setTimeout> | null = null;
   let appNameTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -112,33 +87,33 @@ function renderSettingsModal(
   }
 
   function saveConfig() {
-    const newTopics = Array.from(guidedTopics);
-    const guidedChanged = guidedEnabled !== lastSavedGuidedEnabled ||
-      newTopics.length !== lastSavedGuidedTopics.size ||
-      newTopics.some(t => !lastSavedGuidedTopics.has(t));
+    const newTopics = Array.from(ui.guidedTopics);
+    const guidedChanged = ui.guidedEnabled !== ui.lastSavedGuidedEnabled ||
+      newTopics.length !== ui.lastSavedGuidedTopics.size ||
+      newTopics.some(t => !ui.lastSavedGuidedTopics.has(t));
 
     void (async () => {
       await api('/ai/config', {
         method: 'POST',
         body: {
-          platform: currentPlatform,
-          model: currentModel,
-          guidedReview: { enabled: guidedEnabled, topics: newTopics },
+          platform: ui.currentPlatform,
+          model: ui.currentModel,
+          guidedReview: { enabled: ui.guidedEnabled, topics: newTopics },
         },
       });
 
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
       state.aiConfigured = newConfig.keyConfigured;
-      state.guidedReviewEnabled = guidedEnabled;
-      configData.guidedReview = { enabled: guidedEnabled, topics: newTopics };
+      state.guidedReviewEnabled = ui.guidedEnabled;
+      configData.guidedReview = { enabled: ui.guidedEnabled, topics: newTopics };
 
       if (guidedChanged && state.aiConfigured) {
         invalidateAnalysisCache();
         invalidateGuidedAnalysis();
       }
 
-      lastSavedGuidedEnabled = guidedEnabled;
-      lastSavedGuidedTopics = new Set(guidedTopics);
+      ui.lastSavedGuidedEnabled = ui.guidedEnabled;
+      ui.lastSavedGuidedTopics = new Set(ui.guidedTopics);
     })();
   }
 
@@ -150,16 +125,12 @@ function renderSettingsModal(
   function saveAppNameDebounced() {
     if (appNameTimer) clearTimeout(appNameTimer);
     appNameTimer = setTimeout(() => {
-      const val = appName.trim();
+      const val = ui.appName.trim();
       if (val !== (projectSettings.appName ?? '')) {
         void api('/project-settings', { method: 'PATCH', body: { appName: val } });
         projectSettings.appName = val || undefined;
       }
     }, 500);
-  }
-
-  function getKeyInfo(platform: string): { configured: boolean; source: string | null } {
-    return keyStatus.status[platform] ?? { configured: false, source: null };
   }
 
   function saveKey() {
@@ -170,7 +141,7 @@ function renderSettingsModal(
     void (async () => {
       await api('/ai/key', {
         method: 'POST',
-        body: { platform: currentPlatform, key: keyInput.value.trim(), storage },
+        body: { platform: ui.currentPlatform, key: keyInput.value.trim(), storage },
       });
       const newStatus = await api<KeyStatusResponse>('/ai/key-status');
       keyStatus.status = newStatus.status;
@@ -182,7 +153,7 @@ function renderSettingsModal(
 
   function removeKey() {
     void (async () => {
-      await api(`/ai/key?platform=${currentPlatform}`, { method: 'DELETE' });
+      await api(`/ai/key?platform=${ui.currentPlatform}`, { method: 'DELETE' });
       const newStatus = await api<KeyStatusResponse>('/ai/key-status');
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
@@ -192,127 +163,96 @@ function renderSettingsModal(
   }
 
   function toggleTopic(topic: string) {
-    if (guidedTopics.has(topic)) {
-      guidedTopics.delete(topic);
+    if (ui.guidedTopics.has(topic)) {
+      ui.guidedTopics.delete(topic);
     } else {
-      guidedTopics.add(topic);
+      ui.guidedTopics.add(topic);
       if (topic === 'programming') {
-        const hasAnyLang = [...guidedTopics].some(t => ALL_LANG_KEYS.has(t));
+        const hasAnyLang = [...ui.guidedTopics].some(t => ALL_LANG_KEYS.has(t));
         if (!hasAnyLang) {
-          for (const key of ALL_LANG_KEYS) guidedTopics.add(key);
-          showMoreLangs = true;
+          for (const key of ALL_LANG_KEYS) ui.guidedTopics.add(key);
+          ui.showMoreLangs = true;
         }
       }
     }
     saveConfigDebounced();
   }
 
-  function renderContent() {
-    const modalEl = overlay.querySelector('.modal');
-    if (modalEl === null) return;
-
-    modalEl.innerHTML = renderSettingsShell({
-      activeTab,
-      isTauri,
-      generalContent: renderGeneralTab({ themesData, activeThemeId, appName, isTauri }),
-      profileContent: renderProfileTab({ guidedTopics, showMoreLangs }),
-      experimentalContent: renderExperimentalTab({
-        platforms: modelsData.platforms,
-        currentPlatform,
-        currentModel,
-        platformModels: modelsData.models[currentPlatform] ?? [],
-        keyInfo: getKeyInfo(currentPlatform),
-        keychainAvailable: keyStatus.keychainAvailable,
-        keychainLabel: keyStatus.keychainLabel,
-        guidedEnabled,
-        channelState,
-      }),
-    }).toString();
-
-    bindModalEvents();
-  }
-
-  function bindModalEvents() {
-    // Tab switching
-    overlay.querySelectorAll('.settings-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        activeTab = (tab as HTMLElement).dataset.tab ?? 'experimental';
-        renderContent();
-      });
-    });
-
-    // Close button
-    overlay.querySelector('#settings-close')?.addEventListener('click', closeDialog);
-
-    // Check for Updates button (Tauri only)
-    const checkUpdatesBtn = overlay.querySelector<HTMLButtonElement>('#check-updates-btn');
-    const checkUpdatesStatus = overlay.querySelector<HTMLElement>('#check-updates-status');
-    if (checkUpdatesBtn !== null && checkUpdatesStatus !== null) {
-      checkUpdatesBtn.addEventListener('click', () => { void (async () => {
-        const invoke = getTauriInvoke();
-        if (!invoke) return;
-        checkUpdatesBtn.disabled = true;
-        checkUpdatesBtn.textContent = 'Checking...';
-        checkUpdatesStatus.textContent = '';
-        try {
-          const version = (await invoke('check_for_update')) as string | null;
-          if (version !== null && version !== '') {
-            checkUpdatesStatus.textContent = `Update available: v${version}`;
-            showUpdateBanner(version);
-          } else {
-            checkUpdatesStatus.textContent = 'Your software is up to date.';
-          }
-        } catch {
-          checkUpdatesStatus.textContent = 'Could not check for updates.';
-        }
-        checkUpdatesBtn.textContent = 'Check for Updates';
-        checkUpdatesBtn.disabled = false;
-      })(); });
-    }
-
-    // General tab events
-    bindGeneralTabEvents(overlay, {
+  function buildContext(): TabContext {
+    return {
+      keyStatus,
+      modelsData,
+      themesData,
+      projectSettings,
+      channelState,
+      isTauri: ui.isTauri,
+      currentPlatform: ui.currentPlatform,
+      currentModel: ui.currentModel,
+      guidedEnabled: ui.guidedEnabled,
+      guidedTopics: ui.guidedTopics,
+      showMoreLangs: ui.showMoreLangs,
+      appName: ui.appName,
+      activeThemeId: ui.activeThemeId,
+      setCurrentPlatform: (platform) => {
+        ui.currentPlatform = platform;
+        const models = modelsData.models[platform] ?? [];
+        const defaultModel = models.find(m => m.isDefault);
+        ui.currentModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
+      },
+      setCurrentModel: (model) => { ui.currentModel = model; },
+      setGuidedEnabled: (enabled) => { ui.guidedEnabled = enabled; },
+      setShowMoreLangs: (b) => { ui.showMoreLangs = b; },
+      setAppName: (name) => { ui.appName = name; },
+      setActiveThemeId: (id) => { ui.activeThemeId = id; },
+      setChannelEnabled: (enabled) => { channelState.enabled = enabled; },
+      saveConfig,
+      saveKey,
+      removeKey,
+      toggleTopic,
+      saveAppNameDebounced,
       switchTheme: (id) => void switchTheme(id),
       showThemeManager,
-      saveAppNameDebounced,
       refreshThemes: () => api<ThemesResponse>('/themes').then(updated => {
         themesData.themes = updated.themes;
         themesData.activeId = updated.activeId;
         return updated;
       }),
-      setAppName: (name) => { appName = name; },
-      setActiveThemeId: (id) => { activeThemeId = id; },
       renderContent,
+    };
+  }
+
+  function activeTabs(ctx: TabContext): Tab[] {
+    return TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
+  }
+
+  function renderContent() {
+    const modalEl = overlay.querySelector('.modal');
+    if (modalEl === null) return;
+
+    const ctx = buildContext();
+    const visible = activeTabs(ctx);
+    if (!visible.some(t => t.id === ui.activeTab)) {
+      ui.activeTab = visible[0]?.id ?? 'general';
+    }
+
+    modalEl.innerHTML = renderShell(visible, ui.activeTab, ctx).toString();
+    bindModalEvents(ctx, visible);
+  }
+
+  function bindModalEvents(ctx: TabContext, visible: Tab[]) {
+    overlay.querySelectorAll('.settings-tab').forEach(tabEl => {
+      tabEl.addEventListener('click', () => {
+        ui.activeTab = (tabEl as HTMLElement).dataset.tab ?? visible[0]?.id ?? 'general';
+        renderContent();
+      });
     });
 
-    // Profile tab events
-    bindProfileTabEvents(overlay, {
-      toggleTopic,
-      setShowMoreLangs: (val) => { showMoreLangs = val; },
-      renderContent,
-    });
+    overlay.querySelector('#settings-close')?.addEventListener('click', closeDialog);
 
-    // Experimental tab events
-    bindExperimentalTabEvents(overlay, {
-      switchPlatform: (platform) => {
-        currentPlatform = platform;
-        const models = modelsData.models[currentPlatform] ?? [];
-        const defaultModel = models.find(m => m.isDefault);
-        currentModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
-      },
-      setModel: (model) => { currentModel = model; },
-      saveConfig,
-      saveKey,
-      removeKey,
-      toggleGuided: (enabled) => { guidedEnabled = enabled; },
-      toggleChannel: (enabled) => {
-        channelState.enabled = enabled;
-        void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
-      },
-      renderContent,
-    });
+    for (const tab of visible) {
+      tab.bind(overlay, ctx);
+    }
 
-    // Click outside to close
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) closeDialog();
     });
@@ -324,16 +264,7 @@ function renderSettingsModal(
   renderContent();
 }
 
-interface ShellData {
-  activeTab: string;
-  isTauri: boolean;
-  generalContent: SafeHtml;
-  profileContent: SafeHtml;
-  experimentalContent: SafeHtml;
-}
-
-function renderSettingsShell(data: ShellData): SafeHtml {
-  const { activeTab, isTauri, generalContent, profileContent, experimentalContent } = data;
+function renderShell(visible: Tab[], activeTabId: string, ctx: TabContext): SafeHtml {
   return (
     <>
       <div className="settings-header">
@@ -342,51 +273,20 @@ function renderSettingsShell(data: ShellData): SafeHtml {
       </div>
 
       <div className="settings-tabs">
-        <button className={`settings-tab${activeTab === 'general' ? ' active' : ''}`} data-tab="general">
-          <IconSliders />
-          <span>General</span>
-        </button>
-        <button className={`settings-tab${activeTab === 'profile' ? ' active' : ''}`} data-tab="profile">
-          <IconUser />
-          <span>Profile</span>
-        </button>
-        <button className={`settings-tab${activeTab === 'experimental' ? ' active' : ''}`} data-tab="experimental">
-          <IconFlask />
-          <span>Experimental</span>
-        </button>
-        {isTauri && (
-          <button className={`settings-tab${activeTab === 'updates' ? ' active' : ''}`} data-tab="updates">
-            <IconDownload />
-            <span>Updates</span>
+        {visible.map(tab => (
+          <button className={`settings-tab${tab.id === activeTabId ? ' active' : ''}`} data-tab={tab.id}>
+            {tab.icon}
+            <span>{tab.label}</span>
           </button>
-        )}
+        ))}
       </div>
 
       <div className="settings-body">
-        <div className={`settings-tab-panel${activeTab === 'general' ? ' active' : ''}`} data-panel="general">
-          {generalContent}
-        </div>
-
-        <div className={`settings-tab-panel${activeTab === 'profile' ? ' active' : ''}`} data-panel="profile">
-          {profileContent}
-        </div>
-
-        <div className={`settings-tab-panel${activeTab === 'experimental' ? ' active' : ''}`} data-panel="experimental">
-          {experimentalContent}
-        </div>
-
-        {isTauri && (
-          <div className={`settings-tab-panel${activeTab === 'updates' ? ' active' : ''}`} data-panel="updates">
-            <div className="settings-section">
-              <div className="settings-section-header">
-                <span className="settings-heading">Software Updates</span>
-              </div>
-              <p className="settings-disclaimer">Check for new versions of the Glassbox desktop app.</p>
-              <button className="btn btn-sm" id="check-updates-btn">Check for Updates</button>
-              <p className="settings-hint" id="check-updates-status"></p>
-            </div>
+        {visible.map(tab => (
+          <div className={`settings-tab-panel${tab.id === activeTabId ? ' active' : ''}`} data-panel={tab.id}>
+            {tab.render(ctx)}
           </div>
-        )}
+        ))}
       </div>
     </>
   );

@@ -1,4 +1,5 @@
 import type { ReviewFile } from '../db/queries.js';
+import { parseDiffData } from '../git/diff.js';
 
 interface TreeNode {
   name: string;
@@ -80,7 +81,7 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
         );
       })}
       {node.files.map(f => {
-        const diff = JSON.parse(f.diff_data ?? '{}') as { status?: string };
+        const diff = parseDiffData(f.diff_data);
         const count = annotationCounts[f.id] || 0;
         const stale = staleCounts[f.id] || 0;
         const fileName = f.file_path.split('/').pop() ?? '';
@@ -88,7 +89,7 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
           <div className="file-item" data-file-id={f.id} style={`padding-left:${16 + depth * 12}px`}>
             <span className={`status-dot ${f.status}`}></span>
             <span className="file-name" title={f.file_path}>{fileName}</span>
-            <span className={`file-status ${diff.status ?? ''}`}>{diff.status ?? ''}</span>
+            <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>
             {stale > 0 ? <span className="stale-dot"></span> : null}
             {count > 0 ? <span className="annotation-count">{count}</span> : null}
           </div>

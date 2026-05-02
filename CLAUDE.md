@@ -140,7 +140,7 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `diff/hunkExpander.tsx` — Context expansion
 - `diff/lineClicks.ts` — Diff line click handling
 - `diff/mode.ts` — Diff mode toggle, wrap toggle, scroll sync
-- `diff/imageDiff.ts` — Image comparison: mode switching, metadata loading, slice tool
+- `diff/imageDiff/` — Image comparison split by concern: `index.ts` (orchestration + zoom wiring), `zoom.ts` (zoom state via `WeakMap`, pan, clamp), `sliceTool.ts` (slice geometry + clip-path), `metadata.ts` (metadata diff loading)
 - `diff/dragDrop.ts` — Annotation drag-and-drop
 - `annotations/form.tsx` — Annotation creation form
 - `annotations/render.tsx` — Annotation inline rendering
@@ -235,15 +235,22 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 - Server-rendered HTML for initial page load; client JS for interactivity
 - Client CSS and JS are built separately and served as static files — never inlined in layout
 
-### Work Management
+## Ticket-Driven Work
 
-When the user asks for work directly via the CLI (not via an MCP channel or Hot Sheet), analyze the request and create Hot Sheet tickets before starting implementation — especially for substantial or multi-step work. This helps track progress and keeps the work visible.
+When the user gives you work directly via the CLI (not via MCP channel or Hot Sheet events), analyze the request and create Hot Sheet tickets before starting implementation — especially for substantial or multi-step work. This keeps work visible, trackable, and consistent with the Hot Sheet workflow.
 
-- **Do create tickets** for: feature implementations, bug fixes requiring investigation, refactors, test coverage work, multi-file changes, anything that would take more than a few minutes.
-- **Don't create tickets** for: simple commits, answering questions, quick one-line fixes, running commands the user explicitly dictated.
-- **When in doubt, create the tickets** — the overhead is minimal and the traceability is valuable.
-
-Use the Hot Sheet API to create tickets (see `.hotsheet/worklist.md` for the API format). Mark them as `up_next: true` so they appear in the worklist.
+- **Do create tickets** for: feature implementation, bug fixes, refactoring, multi-step tasks, anything that involves changing code.
+- **Don't create tickets** for: simple questions, git commits, quick lookups, trivial one-line changes.
+- **When in doubt, create the tickets.** The overhead is minimal and the tracking value is high.
+- Use the Hot Sheet API to create tickets, mark them as Up Next, then work through them normally (set status to "started", implement, set to "completed" with notes).
+- **Always create follow-up tickets** for work that isn't completed in the current session: unfinished implementation steps, open design questions needing answers, known gaps discovered during work, features designed but not yet built (e.g., a requirements doc without implementation). Never leave follow-up work undocumented — if it's not in a ticket, it will be forgotten.
+- **Incomplete work checklist** — before marking a ticket as completed, verify:
+  1. **No placeholder text in the UI** (e.g., "coming soon", "coming in a future update") without a corresponding follow-up ticket
+  2. **No TODO/FIXME comments** in the code without a corresponding follow-up ticket
+  3. **No requirements doc items** that were documented but not implemented without follow-up tickets
+  4. **No empty/stub functions** that return mock data or do nothing without follow-up tickets
+  If any of the above exist, create the follow-up tickets BEFORE marking the current ticket as completed.
+- **Use FEEDBACK NEEDED before deferring or asking about follow-up tickets.** When you're about to (a) defer a ticket because it needs more work, (b) ask the user whether to file follow-up tickets, or (c) close a ticket with a question buried in the notes ("let me know if you want X" / "happy to do Y if you want"), DO NOT close it that way. Instead, leave the ticket in `started` status and add a `FEEDBACK NEEDED:` note (per `.hotsheet/worklist.md`), then signal channel done and wait for the user. Closing with an unanswered question buries the question and the user can't easily see it. The FEEDBACK NEEDED mechanism is the only way to reliably get attention on a question.
 
 ### Code Organization
 

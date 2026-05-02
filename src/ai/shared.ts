@@ -1,5 +1,13 @@
 /** Shared utilities for AI analysis modules */
 
+import type { ReviewFile } from '../db/queries.js';
+import { getFileContent } from '../git/diff.js';
+import type { AIMessage } from './client.js';
+import { sendAIRequest } from './client.js';
+import type { AIConfig } from './config.js';
+import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
+import { getModelContextWindow } from './models.js';
+
 export interface NeedContextResponse {
   needContext: string[];
 }
@@ -35,4 +43,79 @@ export function extractJSON(text: string): unknown {
   }
 
   throw new Error(`Could not extract JSON from AI response: ${text.slice(0, 300)}`);
+}
+
+interface AnalysisBatchOptions {
+  /** System prompt to send with every round. */
+  systemPrompt: string;
+  /** Builds the first line of the user prompt (e.g. "Analyze the following 5 file diffs for risk:"). */
+  initialPromptHeader: (fileCount: number) => string;
+  /** Label used in the "Expected an array of …" error message. */
+  resultLabel: string;
+  /** Label for the "Risk/Narrative/Guided analysis did not converge…" error. */
+  analysisName: string;
+}
+
+/**
+ * Multi-turn-context loop shared by `analyze-risk`, `analyze-narrative`, and
+ * `analyze-guided`. Builds the user prompt from the file diffs, then loops up
+ * to 3 rounds: send → `extractJSON` → if `needContext`, attach file contents
+ * and resend; else return the parsed array.
+ *
+ * Each analyze-*.ts module supplies a system prompt plus a couple of label
+ * strings; everything else is identical.
+ */
+export async function runAnalysisBatch<T>(
+  files: ReviewFile[],
+  config: AIConfig,
+  repoRoot: string,
+  options: AnalysisBatchOptions,
+): Promise<T[]> {
+  const contextWindow = getModelContextWindow(config.platform, config.model);
+  // Reserve ~30% of the context window for output and system prompt.
+  // Multiply by 3 for the rough chars-to-tokens ratio.
+  const charBudget = Math.floor(contextWindow * 0.7 * 3);
+
+  const contexts = buildFileContexts(files, charBudget);
+  const validPaths = new Set(files.map(f => f.file_path));
+
+  const initialPrompt = [
+    options.initialPromptHeader(files.length),
+    '',
+    formatContextsForPrompt(contexts),
+  ].join('\n');
+
+  const messages: AIMessage[] = [{ role: 'user', content: initialPrompt }];
+
+  for (let round = 0; round < 3; round++) {
+    const response = await sendAIRequest(config, options.systemPrompt, messages);
+    const parsed = extractJSON(response.content);
+
+    if (isNeedContext(parsed)) {
+      const safePaths = parsed.needContext.filter(p => validPaths.has(p));
+      if (safePaths.length === 0) {
+        throw new Error('AI requested context for files not in the review');
+      }
+
+      const fileContents = safePaths.map(path => ({
+        path,
+        content: getFileContent(path, 'working', repoRoot),
+      }));
+
+      messages.push({ role: 'assistant', content: response.content });
+      messages.push({
+        role: 'user',
+        content: `Here is the full content of the requested files:\n\n${formatAdditionalContext(fileContents)}`,
+      });
+      continue;
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Expected an array of ${options.resultLabel} from AI`);
+    }
+
+    return parsed as T[];
+  }
+
+  throw new Error(`${options.analysisName} did not converge after 3 context rounds`);
 }

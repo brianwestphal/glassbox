@@ -16,6 +16,7 @@ import type { AIPlatform } from '../ai/models.js';
 import { MODELS, PLATFORMS } from '../ai/models.js';
 import { getDemoMode, isAIServiceTest } from '../debug.js';
 import type { AppEnv } from '../types.js';
+import { checkEnum } from '../utils/validate.js';
 
 export const aiConfigRoutes = new Hono<AppEnv>();
 
@@ -40,9 +41,8 @@ aiConfigRoutes.post('/config', async (c) => {
     guidedReview?: { enabled: boolean; topics: string[] };
   }>();
 
-  if (!VALID_PLATFORMS.includes(body.platform as typeof VALID_PLATFORMS[number])) {
-    return c.json({ error: `platform must be one of: ${VALID_PLATFORMS.join(', ')}` }, 400);
-  }
+  const platformCheck = checkEnum(body.platform, 'platform', VALID_PLATFORMS);
+  if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);
   if (typeof body.model !== 'string' || body.model.trim() === '') {
     return c.json({ error: 'model must be a non-empty string' }, 400);
   }
@@ -60,7 +60,7 @@ aiConfigRoutes.post('/config', async (c) => {
     }
   }
 
-  saveAIConfigPreferences(body.platform as AIPlatform, body.model);
+  saveAIConfigPreferences(platformCheck.ok as AIPlatform, body.model);
   if (body.guidedReview !== undefined) {
     saveGuidedReviewConfig(body.guidedReview);
   }
@@ -92,29 +92,26 @@ aiConfigRoutes.get('/key-status', (c) => {
 aiConfigRoutes.post('/key', async (c) => {
   const body = await c.req.json<{ platform: string; key: string; storage: string }>();
 
-  if (!VALID_PLATFORMS.includes(body.platform as typeof VALID_PLATFORMS[number])) {
-    return c.json({ error: `platform must be one of: ${VALID_PLATFORMS.join(', ')}` }, 400);
-  }
+  const platformCheck = checkEnum(body.platform, 'platform', VALID_PLATFORMS);
+  if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);
   if (typeof body.key !== 'string' || body.key.trim() === '') {
     return c.json({ error: 'key must be a non-empty string' }, 400);
   }
-  if (!VALID_KEY_STORAGES.includes(body.storage as typeof VALID_KEY_STORAGES[number])) {
-    return c.json({ error: `storage must be one of: ${VALID_KEY_STORAGES.join(', ')}` }, 400);
-  }
+  const storageCheck = checkEnum(body.storage, 'storage', VALID_KEY_STORAGES);
+  if ('error' in storageCheck) return c.json({ error: storageCheck.error }, 400);
 
   saveAPIKey(
-    body.platform as AIPlatform,
+    platformCheck.ok as AIPlatform,
     body.key,
-    body.storage as 'keychain' | 'config',
+    storageCheck.ok,
   );
   return c.json({ ok: true });
 });
 
 aiConfigRoutes.delete('/key', (c) => {
   const platform = c.req.query('platform') ?? 'anthropic';
-  if (!VALID_PLATFORMS.includes(platform as typeof VALID_PLATFORMS[number])) {
-    return c.json({ error: `platform must be one of: ${VALID_PLATFORMS.join(', ')}` }, 400);
-  }
-  deleteAPIKey(platform as AIPlatform);
+  const platformCheck = checkEnum(platform, 'platform', VALID_PLATFORMS);
+  if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);
+  deleteAPIKey(platformCheck.ok as AIPlatform);
   return c.json({ ok: true });
 });

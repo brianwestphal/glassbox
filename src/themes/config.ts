@@ -4,33 +4,17 @@
  * Custom themes are stored in ~/.glassbox/themes/*.json.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
 import { join } from 'path';
 
+import { GLOBAL_CONFIG_DIR, readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import type { CustomTheme, Theme, ThemeColors } from './built-in.js';
 import { BUILT_IN_THEMES, DEFAULT_THEME_ID, getBuiltInTheme } from './built-in.js';
 
-const CONFIG_DIR = join(homedir(), '.glassbox');
-const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
-const THEMES_DIR = join(CONFIG_DIR, 'themes');
-
-function readConfigFile(): Record<string, unknown> {
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      return JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
-    }
-  } catch { /* corrupt config */ }
-  return {};
-}
-
-function writeConfigFile(config: Record<string, unknown>): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-}
+const THEMES_DIR = join(GLOBAL_CONFIG_DIR, 'themes');
 
 /** Get the active theme ID from config. */
 export function getActiveThemeId(): string {
-  const config = readConfigFile();
+  const config = readGlobalConfig();
   const theme = config.theme as Record<string, unknown> | undefined;
   const active = theme?.active as string | undefined;
   return active ?? DEFAULT_THEME_ID;
@@ -38,10 +22,10 @@ export function getActiveThemeId(): string {
 
 /** Set the active theme ID in config. */
 export function setActiveThemeId(id: string): void {
-  const config = readConfigFile();
-  if (config.theme === undefined) config.theme = {};
-  (config.theme as Record<string, unknown>).active = id;
-  writeConfigFile(config);
+  updateGlobalConfig((config) => {
+    if (config.theme === undefined) config.theme = {};
+    (config.theme as Record<string, unknown>).active = id;
+  });
 }
 
 /** Load all custom themes from ~/.glassbox/themes/. */

@@ -1,30 +1,13 @@
 import { spawnSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { Hono } from 'hono';
-import { homedir } from 'os';
 import { join } from 'path';
 
 import { isChannelAlive, registerChannel, triggerChannel, unregisterChannel } from '../channel-config.js';
+import { readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import type { AppEnv } from '../types.js';
 
 export const channelApiRoutes = new Hono<AppEnv>();
-
-const CONFIG_DIR = join(homedir(), '.glassbox');
-const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
-
-function readGlobalConfig(): Record<string, unknown> {
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      return JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
-    }
-  } catch { /* corrupt */ }
-  return {};
-}
-
-function writeGlobalConfig(config: Record<string, unknown>): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-}
 
 /** GET /channel/status — check if channel is enabled and connected */
 channelApiRoutes.get('/status', async (c) => {
@@ -38,9 +21,7 @@ channelApiRoutes.get('/status', async (c) => {
 
 /** POST /channel/enable — enable channel and register in .mcp.json */
 channelApiRoutes.post('/enable', (c) => {
-  const config = readGlobalConfig();
-  config.channelEnabled = true;
-  writeGlobalConfig(config);
+  updateGlobalConfig((config) => { config.channelEnabled = true; });
 
   const repoRoot = c.get('repoRoot');
   const dataDir = join(repoRoot, '.glassbox');
@@ -52,9 +33,7 @@ channelApiRoutes.post('/enable', (c) => {
 
 /** POST /channel/disable — disable channel and remove from .mcp.json */
 channelApiRoutes.post('/disable', (c) => {
-  const config = readGlobalConfig();
-  config.channelEnabled = false;
-  writeGlobalConfig(config);
+  updateGlobalConfig((config) => { config.channelEnabled = false; });
 
   const repoRoot = c.get('repoRoot');
   const dataDir = join(repoRoot, '.glassbox');

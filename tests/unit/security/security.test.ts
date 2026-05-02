@@ -81,8 +81,8 @@ describe('NFR-8.8.4: XSS prevention via SafeHtml', () => {
 });
 
 describe('FR-14.2: API input validation', () => {
-  it('api.ts validates annotation creation fields', () => {
-    const content = readFileSync(join(SRC_ROOT, 'routes', 'api.ts'), 'utf-8');
+  it('api/annotations.ts validates annotation creation fields', () => {
+    const content = readFileSync(join(SRC_ROOT, 'routes', 'api', 'annotations.ts'), 'utf-8');
     // Should have validation for required fields
     expect(content).toContain('reviewFileId');
     expect(content).toContain('lineNumber');
@@ -107,8 +107,8 @@ describe('FR-14.4.2: Config file key encoding', () => {
     expect(content).toContain("Buffer.from(encoded, 'base64')");
   });
 
-  it('ai/config.ts sets 0600 permissions on config file', () => {
-    const content = readFileSync(join(SRC_ROOT, 'ai', 'config.ts'), 'utf-8');
+  it('global-config.ts sets 0600 permissions on the shared config file', () => {
+    const content = readFileSync(join(SRC_ROOT, 'global-config.ts'), 'utf-8');
     expect(content).toContain('0o600');
   });
 });

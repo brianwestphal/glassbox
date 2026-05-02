@@ -1,4 +1,6 @@
+import { IconUser } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
+import type { Tab, TabContext } from './tabContext.js';
 
 export const TOP_LANGUAGES: Array<[string, string]> = [
   ['javascript', 'JavaScript'], ['python', 'Python'], ['typescript', 'TypeScript'],
@@ -16,24 +18,13 @@ export const MORE_LANGUAGES: Array<[string, string]> = [
 
 export const ALL_LANG_KEYS = new Set([...TOP_LANGUAGES, ...MORE_LANGUAGES].map(([k]) => k));
 
-interface ProfileTabData {
-  guidedTopics: Set<string>;
-  showMoreLangs: boolean;
-}
-
-interface ProfileTabCallbacks {
-  toggleTopic: (topic: string) => void;
-  setShowMoreLangs: (val: boolean) => void;
-  renderContent: () => void;
-}
-
 function renderTag(key: string, label: string, guidedTopics: Set<string>): SafeHtml {
   const active = guidedTopics.has(key);
   return <button className={`settings-tag${active ? ' active' : ''}`} data-topic={key}>{label}</button>;
 }
 
-export function renderProfileTab(data: ProfileTabData): SafeHtml {
-  const { guidedTopics, showMoreLangs } = data;
+function renderProfileTab(ctx: TabContext): SafeHtml {
+  const { guidedTopics, showMoreLangs } = ctx;
 
   const langTags = TOP_LANGUAGES.map(([k, n]) => renderTag(k, n, guidedTopics));
   const moreLangTags = MORE_LANGUAGES.map(([k, n]) => renderTag(k, n, guidedTopics));
@@ -69,24 +60,30 @@ export function renderProfileTab(data: ProfileTabData): SafeHtml {
   );
 }
 
-export function bindProfileTabEvents(overlay: HTMLElement, callbacks: ProfileTabCallbacks): void {
-  // Topic tags — debounced save
+function bindProfileTab(overlay: HTMLElement, ctx: TabContext): void {
   overlay.querySelectorAll('.settings-tag').forEach(tag => {
     tag.addEventListener('click', () => {
       const topic = (tag as HTMLElement).dataset.topic;
       if (topic !== undefined) {
-        callbacks.toggleTopic(topic);
-        callbacks.renderContent();
+        ctx.toggleTopic(topic);
+        ctx.renderContent();
       }
     });
   });
 
-  // More languages toggle
   const moreBtn = overlay.querySelector('#show-more-langs');
   if (moreBtn !== null) {
     moreBtn.addEventListener('click', () => {
-      callbacks.setShowMoreLangs(true);
-      callbacks.renderContent();
+      ctx.setShowMoreLangs(true);
+      ctx.renderContent();
     });
   }
 }
+
+export const profileTab: Tab = {
+  id: 'profile',
+  label: 'Profile',
+  icon: <IconUser />,
+  render: renderProfileTab,
+  bind: bindProfileTab,
+};

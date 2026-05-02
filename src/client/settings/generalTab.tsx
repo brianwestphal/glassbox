@@ -1,31 +1,10 @@
+import { IconSliders } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
 import { triggerShare } from '../share.js';
+import type { Tab, TabContext } from './tabContext.js';
 
-interface ThemeSummary {
-  id: string;
-  name: string;
-  builtIn: boolean;
-}
-
-interface GeneralTabData {
-  themesData: { themes: ThemeSummary[]; activeId: string };
-  activeThemeId: string;
-  appName: string;
-  isTauri: boolean;
-}
-
-interface GeneralTabCallbacks {
-  switchTheme: (id: string) => void;
-  showThemeManager: (onClose: () => void) => void;
-  saveAppNameDebounced: () => void;
-  refreshThemes: () => Promise<{ themes: ThemeSummary[]; activeId: string }>;
-  setAppName: (name: string) => void;
-  setActiveThemeId: (id: string) => void;
-  renderContent: () => void;
-}
-
-export function renderGeneralTab(data: GeneralTabData): SafeHtml {
-  const { themesData, activeThemeId, appName, isTauri } = data;
+function renderGeneralTab(ctx: TabContext): SafeHtml {
+  const { themesData, activeThemeId, appName, isTauri } = ctx;
   return (
     <>
       <div className="settings-section">
@@ -62,39 +41,43 @@ export function renderGeneralTab(data: GeneralTabData): SafeHtml {
   );
 }
 
-export function bindGeneralTabEvents(overlay: HTMLElement, callbacks: GeneralTabCallbacks): void {
-  // Theme selection — save immediately
+function bindGeneralTab(overlay: HTMLElement, ctx: TabContext): void {
   const themeSelect = overlay.querySelector<HTMLSelectElement>('#settings-theme');
   if (themeSelect !== null) {
     themeSelect.addEventListener('change', () => {
-      callbacks.setActiveThemeId(themeSelect.value);
-      callbacks.switchTheme(themeSelect.value);
+      ctx.setActiveThemeId(themeSelect.value);
+      ctx.switchTheme(themeSelect.value);
     });
   }
 
-  // Manage Themes button
   overlay.querySelector('#manage-themes-btn')?.addEventListener('click', () => {
-    callbacks.showThemeManager(() => {
+    ctx.showThemeManager(() => {
       void (async () => {
-        const updated = await callbacks.refreshThemes();
-        callbacks.setActiveThemeId(updated.activeId);
-        callbacks.renderContent();
+        const updated = await ctx.refreshThemes();
+        ctx.setActiveThemeId(updated.activeId);
+        ctx.renderContent();
       })();
     });
   });
 
-  // Share link
   overlay.querySelector('#settings-share-link')?.addEventListener('click', (e) => {
     e.preventDefault();
     void triggerShare();
   });
 
-  // App name input — debounced save
   const appNameInput = overlay.querySelector<HTMLInputElement>('#settings-app-name');
   if (appNameInput !== null) {
     appNameInput.addEventListener('input', () => {
-      callbacks.setAppName(appNameInput.value);
-      callbacks.saveAppNameDebounced();
+      ctx.setAppName(appNameInput.value);
+      ctx.saveAppNameDebounced();
     });
   }
 }
+
+export const generalTab: Tab = {
+  id: 'general',
+  label: 'General',
+  icon: <IconSliders />,
+  render: renderGeneralTab,
+  bind: bindGeneralTab,
+};

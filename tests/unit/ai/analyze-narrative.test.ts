@@ -6,7 +6,7 @@ vi.mock('../../../src/git/diff.js', () => ({
 }));
 
 import { sendAIRequest } from '../../../src/ai/client.js';
-import { runNarrativeAnalysisBatch, runNarrativeAnalysis, mergeNarrativeOrders } from '../../../src/ai/analyze-narrative.js';
+import { runNarrativeAnalysisBatch, mergeNarrativeOrders } from '../../../src/ai/analyze-narrative.js';
 import type { NarrativeFileResult } from '../../../src/ai/analyze-narrative.js';
 import type { ReviewFile } from '../../../src/db/queries.js';
 
@@ -103,10 +103,3 @@ describe('mergeNarrativeOrders', () => {
   });
 });
 
-describe('runNarrativeAnalysis', () => {
-  it('delegates to runNarrativeAnalysisBatch', async () => {
-    vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult) });
-    const results = await runNarrativeAnalysis(makeFiles(2), mockConfig, '/repo');
-    expect(results).toHaveLength(2);
-  });
-});

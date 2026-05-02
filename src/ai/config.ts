@@ -1,7 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-
+import { GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_PATH, readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import { resolveAPIKey as _resolveAPIKey } from './api-keys.js';
 import type { AIPlatform } from './models.js';
 import { getDefaultModel } from './models.js';
@@ -18,8 +15,8 @@ export interface GuidedReviewConfig {
   topics: string[];
 }
 
-export const CONFIG_DIR = join(homedir(), '.glassbox');
-export const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+export const CONFIG_DIR = GLOBAL_CONFIG_DIR;
+export const CONFIG_PATH = GLOBAL_CONFIG_PATH;
 
 export interface ConfigFile {
   ai?: {
@@ -34,20 +31,7 @@ export interface ConfigFile {
 }
 
 export function readConfigFile(): ConfigFile {
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      return JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as ConfigFile;
-    }
-  } catch { /* corrupt config */ }
-  return {};
-}
-
-export function writeConfigFile(config: ConfigFile): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-  try {
-    chmodSync(CONFIG_PATH, 0o600);
-  } catch { /* permissions may not apply on all OS */ }
+  return readGlobalConfig() as ConfigFile;
 }
 
 export function loadAIConfig(): AIConfig {
@@ -61,11 +45,12 @@ export function loadAIConfig(): AIConfig {
 }
 
 export function saveAIConfigPreferences(platform: AIPlatform, model: string): void {
-  const config = readConfigFile();
-  if (config.ai === undefined) config.ai = {};
-  config.ai.platform = platform;
-  config.ai.model = model;
-  writeConfigFile(config);
+  updateGlobalConfig((config) => {
+    const cfg = config as ConfigFile;
+    if (cfg.ai === undefined) cfg.ai = {};
+    cfg.ai.platform = platform;
+    cfg.ai.model = model;
+  });
 }
 
 export function loadGuidedReviewConfig(): GuidedReviewConfig {
@@ -77,9 +62,9 @@ export function loadGuidedReviewConfig(): GuidedReviewConfig {
 }
 
 export function saveGuidedReviewConfig(settings: GuidedReviewConfig): void {
-  const config = readConfigFile();
-  config.guidedReview = { enabled: settings.enabled, topics: settings.topics };
-  writeConfigFile(config);
+  updateGlobalConfig((config) => {
+    (config as ConfigFile).guidedReview = { enabled: settings.enabled, topics: settings.topics };
+  });
 }
 
 // Re-exports for backward compatibility — existing importers continue to work

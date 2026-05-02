@@ -1,12 +1,7 @@
 import type { ReviewFile } from '../db/queries.js';
-import { getFileContent } from '../git/diff.js';
-import type { AIMessage } from './client.js';
-import { sendAIRequest } from './client.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
-import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
 import { buildGuidedReviewSuffix } from './guided-review.js';
-import { getModelContextWindow } from './models.js';
-import { extractJSON, isNeedContext } from './shared.js';
+import { runAnalysisBatch } from './shared.js';
 
 const SYSTEM_PROMPT = `You are a JSON-only API. You output raw JSON with no other text, no markdown fences, no explanation.
 
@@ -47,60 +42,21 @@ export interface NarrativeFileResult {
 }
 
 /** Analyze a single batch of files for narrative reading order. */
-export async function runNarrativeAnalysisBatch(
+export function runNarrativeAnalysisBatch(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,
   guidedReview?: GuidedReviewConfig,
 ): Promise<NarrativeFileResult[]> {
-  const contextWindow = getModelContextWindow(config.platform, config.model);
-  const charBudget = Math.floor(contextWindow * 0.7 * 3);
-
   const systemPrompt = SYSTEM_PROMPT + (guidedReview !== undefined
     ? buildGuidedReviewSuffix(guidedReview, 'narrative') : '');
 
-  const contexts = buildFileContexts(files, charBudget);
-  const validPaths = new Set(files.map(f => f.file_path));
-
-  const initialPrompt = [
-    `Determine the best reading order for reviewing these ${String(files.length)} changed files:`,
-    '',
-    formatContextsForPrompt(contexts),
-  ].join('\n');
-
-  const messages: AIMessage[] = [{ role: 'user', content: initialPrompt }];
-
-  for (let round = 0; round < 3; round++) {
-    const response = await sendAIRequest(config, systemPrompt, messages);
-    const parsed = extractJSON(response.content);
-
-    if (isNeedContext(parsed)) {
-      const safePaths = parsed.needContext.filter(p => validPaths.has(p));
-      if (safePaths.length === 0) {
-        throw new Error('AI requested context for files not in the review');
-      }
-
-      const fileContents = safePaths.map(path => ({
-        path,
-        content: getFileContent(path, 'working', repoRoot),
-      }));
-
-      messages.push({ role: 'assistant', content: response.content });
-      messages.push({
-        role: 'user',
-        content: `Here is the full content of the requested files:\n\n${formatAdditionalContext(fileContents)}`,
-      });
-      continue;
-    }
-
-    if (!Array.isArray(parsed)) {
-      throw new Error('Expected an array of narrative ordering from AI');
-    }
-
-    return parsed as NarrativeFileResult[];
-  }
-
-  throw new Error('Narrative analysis did not converge after 3 context rounds');
+  return runAnalysisBatch<NarrativeFileResult>(files, config, repoRoot, {
+    systemPrompt,
+    initialPromptHeader: (n) => `Determine the best reading order for reviewing these ${String(n)} changed files:`,
+    resultLabel: 'narrative ordering',
+    analysisName: 'Narrative analysis',
+  });
 }
 
 /**
@@ -161,15 +117,3 @@ export function mergeNarrativeOrders(
   return positions;
 }
 
-/**
- * Run narrative analysis across all files (legacy single-batch entry point).
- * Prefer using planBatches + runBatches + runNarrativeAnalysisBatch for large reviews.
- */
-export async function runNarrativeAnalysis(
-  files: ReviewFile[],
-  config: AIConfig,
-  repoRoot: string,
-  guidedReview?: GuidedReviewConfig,
-): Promise<NarrativeFileResult[]> {
-  return runNarrativeAnalysisBatch(files, config, repoRoot, guidedReview);
-}

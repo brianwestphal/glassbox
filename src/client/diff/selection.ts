@@ -7,7 +7,7 @@ import { renderAINotes } from './aiNotes.js';
 import { bindDragDrop } from './dragDrop.js';
 import { applyHighlighting,detectLanguage } from './highlight.js';
 import { bindHunkExpanders } from './hunkExpander.js';
-import { bindImageDiff } from './imageDiff.js';
+import { bindImageDiff } from './imageDiff/index.js';
 import { bindDiffLineClicks } from './lineClicks.js';
 import { navPush } from './navStack.js';
 import { loadOutline } from './outline.js';

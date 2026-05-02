@@ -6,7 +6,7 @@ vi.mock('../../../src/git/diff.js', () => ({
 }));
 
 import { sendAIRequest } from '../../../src/ai/client.js';
-import { runRiskAnalysisBatch, runRiskAnalysis, RISK_DIMENSIONS } from '../../../src/ai/analyze-risk.js';
+import { runRiskAnalysisBatch, RISK_DIMENSIONS } from '../../../src/ai/analyze-risk.js';
 import type { ReviewFile } from '../../../src/db/queries.js';
 
 const mockConfig = { platform: 'anthropic' as const, model: 'claude-sonnet-4-20250514', apiKey: 'test-key' };
@@ -76,10 +76,3 @@ describe('RISK_DIMENSIONS', () => {
   });
 });
 
-describe('runRiskAnalysis', () => {
-  it('delegates to runRiskAnalysisBatch', async () => {
-    vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult) });
-    const results = await runRiskAnalysis(makeFiles(1), mockConfig, '/repo');
-    expect(results).toHaveLength(1);
-  });
-});

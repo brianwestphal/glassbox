@@ -2,11 +2,11 @@ import { serve } from '@hono/node-server';
 import { exec } from 'child_process';
 import { existsSync,readFileSync } from 'fs';
 import { Hono } from 'hono';
-import { homedir } from 'os';
 import { dirname,join } from 'path';
 import { fileURLToPath } from 'url';
 
 import { registerChannel } from './channel-config.js';
+import { readGlobalConfig } from './global-config.js';
 import { aiApiRoutes } from './routes/ai-api.js';
 import { apiRoutes } from './routes/api.js';
 import { channelApiRoutes } from './routes/channel-api.js';
@@ -96,13 +96,10 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
 
   // Ensure .mcp.json is registered for this project if channel is enabled
   try {
-    const homePath = join(homedir(), '.glassbox', 'config.json');
-    if (existsSync(homePath)) {
-      const globalConfig = JSON.parse(readFileSync(homePath, 'utf-8')) as Record<string, unknown>;
-      if (globalConfig.channelEnabled === true) {
-        const dataDir = join(repoRoot, '.glassbox');
-        registerChannel(dataDir);
-      }
+    const globalConfig = readGlobalConfig();
+    if (globalConfig.channelEnabled === true) {
+      const dataDir = join(repoRoot, '.glassbox');
+      registerChannel(dataDir);
     }
   } catch { /* non-critical */ }
 

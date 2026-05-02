@@ -1,6 +1,8 @@
 import { spawnSync } from 'child_process';
 
-import { readConfigFile, writeConfigFile } from './config.js';
+import { updateGlobalConfig } from '../global-config.js';
+import type { ConfigFile } from './config.js';
+import { readConfigFile } from './config.js';
 import { getKeyFromKeychain, saveKeyToKeychain, winCredTarget } from './keychain.js';
 import type { AIPlatform } from './models.js';
 import { ENV_KEY_NAMES } from './models.js';
@@ -41,11 +43,12 @@ export function saveAPIKey(platform: AIPlatform, key: string, storage: 'keychain
   if (storage === 'keychain') {
     saveKeyToKeychain(platform, key);
   } else {
-    const config = readConfigFile();
-    if (config.ai === undefined) config.ai = {};
-    if (config.ai.keys === undefined) config.ai.keys = {};
-    config.ai.keys[platform] = Buffer.from(key).toString('base64');
-    writeConfigFile(config);
+    updateGlobalConfig((raw) => {
+      const cfg = raw as ConfigFile;
+      if (cfg.ai === undefined) cfg.ai = {};
+      if (cfg.ai.keys === undefined) cfg.ai.keys = {};
+      cfg.ai.keys[platform] = Buffer.from(key).toString('base64');
+    });
   }
 }
 
@@ -65,12 +68,14 @@ export function deleteAPIKey(platform: AIPlatform): void {
     }
   } catch { /* may not exist */ }
 
-  // Remove from config file
-  const config = readConfigFile();
-  if (config.ai?.keys !== undefined) {
-    config.ai.keys[platform] = '';
-    writeConfigFile(config);
-  }
+  // Remove from config file (only if there is something to clear)
+  if (readConfigFile().ai?.keys === undefined) return;
+  updateGlobalConfig((raw) => {
+    const cfg = raw as ConfigFile;
+    if (cfg.ai?.keys !== undefined) {
+      cfg.ai.keys[platform] = '';
+    }
+  });
 }
 
 export function detectAvailablePlatforms(): { platform: AIPlatform; source: 'env' | 'keychain' | 'config' }[] {

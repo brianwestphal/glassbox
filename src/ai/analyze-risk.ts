@@ -1,12 +1,7 @@
 import type { ReviewFile } from '../db/queries.js';
-import { getFileContent } from '../git/diff.js';
-import type { AIMessage } from './client.js';
-import { sendAIRequest } from './client.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
-import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
 import { buildGuidedReviewSuffix } from './guided-review.js';
-import { getModelContextWindow } from './models.js';
-import { extractJSON, isNeedContext } from './shared.js';
+import { runAnalysisBatch } from './shared.js';
 
 const SYSTEM_PROMPT = `You are a JSON-only API. You output raw JSON with no other text, no markdown fences, no explanation.
 
@@ -57,74 +52,19 @@ export interface RiskFileResult {
 }
 
 /** Analyze a single batch of files for risk. Used by the batch runner. */
-export async function runRiskAnalysisBatch(
+export function runRiskAnalysisBatch(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,
   guidedReview?: GuidedReviewConfig,
 ): Promise<RiskFileResult[]> {
-  const contextWindow = getModelContextWindow(config.platform, config.model);
-  // Reserve ~30% for output and system prompt
-  const charBudget = Math.floor(contextWindow * 0.7 * 3); // rough chars-to-tokens ratio
-
   const systemPrompt = SYSTEM_PROMPT + (guidedReview !== undefined
     ? buildGuidedReviewSuffix(guidedReview, 'risk') : '');
 
-  const contexts = buildFileContexts(files, charBudget);
-  const validPaths = new Set(files.map(f => f.file_path));
-
-  const initialPrompt = [
-    `Analyze the following ${String(files.length)} file diffs for risk:`,
-    '',
-    formatContextsForPrompt(contexts),
-  ].join('\n');
-
-  const messages: AIMessage[] = [{ role: 'user', content: initialPrompt }];
-
-  for (let round = 0; round < 3; round++) {
-    const response = await sendAIRequest(config, systemPrompt, messages);
-    const parsed = extractJSON(response.content);
-
-    if (isNeedContext(parsed)) {
-      // Validate requested paths against actual review files
-      const safePaths = parsed.needContext.filter(p => validPaths.has(p));
-      if (safePaths.length === 0) {
-        throw new Error('AI requested context for files not in the review');
-      }
-
-      const fileContents = safePaths.map(path => ({
-        path,
-        content: getFileContent(path, 'working', repoRoot),
-      }));
-
-      messages.push({ role: 'assistant', content: response.content });
-      messages.push({
-        role: 'user',
-        content: `Here is the full content of the requested files:\n\n${formatAdditionalContext(fileContents)}`,
-      });
-      continue;
-    }
-
-    // Should be the final result array
-    if (!Array.isArray(parsed)) {
-      throw new Error('Expected an array of risk assessments from AI');
-    }
-
-    return parsed as RiskFileResult[];
-  }
-
-  throw new Error('Risk analysis did not converge after 3 context rounds');
-}
-
-/**
- * Run risk analysis across all files (legacy single-batch entry point).
- * Prefer using planBatches + runBatches + runRiskAnalysisBatch for large reviews.
- */
-export async function runRiskAnalysis(
-  files: ReviewFile[],
-  config: AIConfig,
-  repoRoot: string,
-  guidedReview?: GuidedReviewConfig,
-): Promise<RiskFileResult[]> {
-  return runRiskAnalysisBatch(files, config, repoRoot, guidedReview);
+  return runAnalysisBatch<RiskFileResult>(files, config, repoRoot, {
+    systemPrompt,
+    initialPromptHeader: (n) => `Analyze the following ${String(n)} file diffs for risk:`,
+    resultLabel: 'risk assessments',
+    analysisName: 'Risk analysis',
+  });
 }

@@ -58,13 +58,22 @@ glassbox/
 | `demo.ts` | Pre-configured demo scenarios (invoked via `--demo:N`). Bypasses git + locking. |
 | `update-check.ts` | Daily npm update check against the registry (npm/yarn/pnpm/bun detection). |
 | `review-update.ts` | Refreshes diffs for an existing review when HEAD is the same but the working tree changed. Runs fuzzy annotation migration. |
+| `global-config.ts` | Single source of truth for `~/.glassbox/config.json` and the `~/.glassbox/` dir. Exports `readGlobalConfig()` and `updateGlobalConfig(mutator)` (read-modify-write under one call so concurrent writers can't clobber unrelated keys). All other modules go through this — channel toggle, share prompt, theme selection, AI preferences, API keys. |
 
 ### `src/routes/` — HTTP handlers
 
 | File | Purpose |
 |------|---------|
 | `pages.tsx` | Server-rendered HTML routes (`/`, `/file/:fileId`, `/review/:reviewId`, `/history`). Returns `SafeHtml` via JSX. |
-| `api.ts` | Core JSON API: reviews, files, annotations, gitignore, project settings, context, outline. |
+| `api.ts` | Aggregator that mounts the per-concern sub-routers under `/api/*`. |
+| `api/reviews.ts` | Review CRUD + completion / reopen / refresh / delete-completed / delete-all + gitignore prompt. |
+| `api/files.ts` | Files list, file detail, file status, file reveal in OS file manager. |
+| `api/annotations.ts` | Annotation CRUD, move, keep, stale-handling endpoints. |
+| `api/outline.ts` | `/outline/:fileId` and `/symbol-definition` go-to-definition repo scan. |
+| `api/context.ts` | `/context/:fileId` line-range fetch for hunk expansion. |
+| `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`). |
+| `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side` with SVG rasterization. |
+| `api/share-prompt.ts` | Share prompt state / dismiss / tick (uses `global-config.ts`). |
 | `ai-api.ts` | Router that mounts ai-config + ai-analysis handlers under `/api/ai/*`. |
 | `ai-analysis.ts` | `POST /analyze` dispatch (risk/narrative/guided), progress polling, cancellation. |
 | `ai-config.ts` | `/config`, `/models`, `/key-status`, `/key`, `/preferences`. |
@@ -78,6 +87,7 @@ glassbox/
 | `layout.tsx` | Root HTML document (`<!doctype>`, `<head>`, `<body>`). Injects theme CSS vars. |
 | `diffView.tsx` | Diff rendering (split + unified hunks, syntax highlighting integration). |
 | `fileList.tsx` | Sidebar file list with status + annotation badges. |
+| `reviewShell.tsx` | Shared layout used by both `/` and `/review/:reviewId` — sidebar (header, filter, file list, footer slot), diff toolbar, image toolbar, navigation bar. Routes only differ in the footer (Complete vs. Reopen). |
 | `imageDiff.tsx` | Image diff view (metadata / difference / slice modes). |
 | `reviewHistory.tsx` | Review history page table. |
 
@@ -102,6 +112,7 @@ See §6 for the schema itself.
 | `image.ts` | Image side retrieval from git (old/new), binary detection, format identification. |
 | `image-metadata.ts` | Parse image headers (PNG IHDR, JPEG SOF/JFIF, GIF, WebP VP8/VP8L/VP8X) — no native deps. |
 | `svg-rasterize.ts` | Rasterize SVG → PNG via `@resvg/resvg-wasm` for SVG "Rendered" mode. |
+| `parseDiffData.ts` | Pure helper to parse `review_files.diff_data` JSON into `FileDiff` (or `null` for missing/corrupt). Safe to import from both server and client bundles. |
 
 ### `src/ai/` — AI analysis subsystem
 
@@ -148,6 +159,8 @@ See §6 for the schema itself.
 |------|---------|
 | `charDiff.ts` | Character-level diff highlighting for intra-line changed words. |
 | `escapeHtml.ts` | HTML entity escaping used by the JSX runtime. |
+| `resolveReviewId.ts` | Hono helper: prefers `?reviewId=` query, falls back to middleware-provided current review. |
+| `validate.ts` | `checkEnum<T>()` — string-enum membership check returning `{ ok }` or `{ error }`. Used at all `/api` validation sites. |
 
 ### `src/client/` — browser bundle
 
@@ -169,11 +182,11 @@ See §6 for the schema itself.
 
 | Folder | Files | Purpose |
 |--------|-------|---------|
-| `diff/` | `mode.ts`, `selection.ts`, `toolbar.tsx`, `highlight.ts`, `hunkExpander.tsx`, `lineClicks.ts`, `dragDrop.ts`, `splitSync.ts`, `navStack.ts`, `find.tsx`, `goToDefinition.tsx`, `outline.tsx`, `aiNotes.tsx`, `imageDiff.ts` | Everything in the diff panel: split/unified modes, wrap, whitespace, syntax highlighting, line clicks, drag-and-drop annotations, split-column scroll sync, navigation stack, Cmd+F find, Cmd+click go-to-definition, outline panel, AI inline notes, image diff (metadata / difference / slice). |
+| `diff/` | `mode.ts`, `selection.ts`, `toolbar.tsx`, `highlight.ts`, `hunkExpander.tsx`, `lineClicks.ts`, `dragDrop.ts`, `splitSync.ts`, `navStack.ts`, `find.tsx`, `goToDefinition.tsx`, `outline.tsx`, `aiNotes.tsx`, `imageDiff/` (`index.ts`, `zoom.ts`, `sliceTool.ts`, `metadata.ts`) | Everything in the diff panel: split/unified modes, wrap, whitespace, syntax highlighting, line clicks, drag-and-drop annotations, split-column scroll sync, navigation stack, Cmd+F find, Cmd+click go-to-definition, outline panel, AI inline notes. Image diff is split by concern under `imageDiff/` (orchestration / zoom-pan via `WeakMap` / slice tool / metadata loader). |
 | `sidebar/` | `fileTree.tsx`, `sortMode.tsx`, `riskView.tsx`, `narrativeView.tsx`, `controls.ts` | File tree, sort-mode segmented control, risk-sorted view with badges, narrative-sorted view with positions, filter/resize/keyboard wiring. |
 | `annotations/` | `categories.tsx`, `form.tsx`, `events.tsx`, `render.tsx` | Category badge + picker, create/edit form, event wiring (create/delete/move/reclassify), inline rendering on diff lines. |
 | `review/` | `modal.tsx`, `progress.tsx` | Completion modal (with optional "Send to Claude" when channel is on), gitignore prompt, progress bar. |
-| `settings/` | `dialog.tsx`, `generalTab.tsx`, `profileTab.tsx`, `experimentalTab.tsx`, `themeEditor.tsx`, `themeManager.tsx` | Tabbed settings modal. Auto-save on change; no Save/Cancel. AI config lives under Experimental. |
+| `settings/` | `dialog.tsx`, `tabContext.ts`, `generalTab.tsx`, `profileTab.tsx`, `experimentalTab.tsx`, `updatesTab.tsx`, `themeEditor.tsx`, `themeManager.tsx` | Tabbed settings modal. Each tab is a `Tab` registry entry (`{ id, label, icon, enabled?, render, bind }`) sharing a single `TabContext` defined in `tabContext.ts`. Dialog iterates the registry — adding a new tab is a one-line change. Auto-save on change; no Save/Cancel. AI config lives under Experimental. |
 | `styles/` | `_variables.scss`, `_base.scss`, `_sidebar.scss`, `_diff.scss`, `_annotations.scss`, `_buttons.scss`, `_modal.scss`, `_scrollbar.scss`, `_highlight.scss`, `_history.scss`, `_ai-sort.scss`, `_image-diff.scss`, `_settings.scss`, `_update-banner.scss` | SCSS partials imported by `styles.scss`. |
 
 ### `src-tauri/src/` — Rust desktop shell

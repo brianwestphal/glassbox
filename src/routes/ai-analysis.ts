@@ -27,6 +27,8 @@ import type { ReviewFile } from '../db/queries.js';
 import { getReviewFiles } from '../db/queries.js';
 import { debugLog, isAIServiceTest, isDebug } from '../debug.js';
 import type { AppEnv } from '../types.js';
+import { resolveReviewId } from '../utils/resolveReviewId.js';
+import { checkEnum } from '../utils/validate.js';
 
 export const aiAnalysisRoutes = new Hono<AppEnv>();
 
@@ -44,7 +46,7 @@ const cancelledAnalyses = new Set<string>();
 // --- Analysis ---
 
 aiAnalysisRoutes.post('/analyze', async (c) => {
-  const reviewId = c.req.query('reviewId') ?? '';
+  const reviewId = resolveReviewId(c);
   const repoRoot = c.get('repoRoot');
   const body = await c.req.json<{ type: string; invalidateCache?: boolean }>();
   const analysisType = body.type;
@@ -52,9 +54,8 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
 
   debugLog(`POST /analyze: type=${analysisType}, reviewId=${reviewId}`);
 
-  if (!VALID_ANALYSIS_TYPES.includes(analysisType as typeof VALID_ANALYSIS_TYPES[number])) {
-    return c.json({ error: `type must be one of: ${VALID_ANALYSIS_TYPES.join(', ')}` }, 400);
-  }
+  const typeCheck = checkEnum(analysisType, 'type', VALID_ANALYSIS_TYPES);
+  if ('error' in typeCheck) return c.json({ error: typeCheck.error }, 400);
 
   const testMode = isAIServiceTest();
   const config = loadAIConfig();
@@ -204,12 +205,13 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
       const shouldCancel = () => cancelledAnalyses.has(analysis.id);
       const progressOffset = cachedScores.length + binaryFiles.length;
 
+      const runArgs = [analysis.id, filteredBatches, files.length, totalForProgress, progressOffset] as const;
       if (analysisType === 'risk') {
-        await runBatchedRiskAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel, guidedReview);
+        await runBatchedAnalysis(...runArgs, riskAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysis.id), shouldCancel);
       } else if (analysisType === 'narrative') {
-        await runBatchedNarrativeAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel, guidedReview);
+        await runBatchedAnalysis(...runArgs, narrativeAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysis.id), shouldCancel);
       } else {
-        await runBatchedGuidedAnalysis(analysis.id, filteredBatches, files, config, repoRoot, fileIdMap, totalForProgress, progressOffset, shouldCancel, guidedReview);
+        await runBatchedAnalysis(...runArgs, guidedAnalysisConfig(config, repoRoot, fileIdMap, guidedReview), shouldCancel);
       }
 
       // Check if this analysis was cancelled while running (user switched modes)
@@ -234,41 +236,37 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
   return c.json({ analysisId: analysis.id, status: 'running' });
 });
 
-async function runBatchedRiskAnalysis(
+type ScoreInsert = Parameters<typeof appendFileScores>[1][number];
+type Batch = { files: ReviewFile[]; estimatedTokens: number };
+
+interface BatchedAnalysisConfig<T> {
+  analysisType: 'risk' | 'narrative' | 'guided';
+  runBatch: (files: ReviewFile[]) => Promise<T[]>;
+  /** Optional in-place adjustment per result before mapping (e.g. risk's max-of-dimensions). */
+  postProcessResult?: (result: T) => void;
+  mapResult: (r: T, indexInBatch: number) => ScoreInsert;
+  /** Optional aggregation across all results (e.g. risk sort, narrative merge). */
+  finalize?: (allResults: T[], batchCount: number) => Promise<void>;
+}
+
+async function runBatchedAnalysis<T>(
   analysisId: string,
-  batches: Array<{ files: ReviewFile[]; estimatedTokens: number }>,
-  allFiles: ReviewFile[],
-  config: AIConfig,
-  repoRoot: string,
-  fileIdMap: Map<string, string>,
+  batches: Batch[],
+  totalFiles: number,
   progressTotal: number,
   progressOffset: number,
+  cfg: BatchedAnalysisConfig<T>,
   shouldCancel?: () => boolean,
-  guidedReview?: GuidedReviewConfig,
 ): Promise<void> {
-  const allResults = await runBatches<RiskFileResult>(
+  const allResults = await runBatches<T>(
     batches,
-    allFiles.length,
-    async (batch) => isAIServiceTest()
-      ? mockRiskAnalysisBatch(batch.files)
-      : runRiskAnalysisBatch(batch.files, config, repoRoot, guidedReview),
+    totalFiles,
+    async (batch) => cfg.runBatch(batch.files),
     async (_batchIndex, results) => {
-      // Post-process: aggregate = max of individual dimension scores
-      for (const r of results) {
-        const maxDimension = Math.max(...Object.values(r.scores));
-        r.aggregate = Math.max(r.aggregate, maxDimension);
+      if (cfg.postProcessResult) {
+        for (const r of results) cfg.postProcessResult(r);
       }
-
-      // Save this batch's results incrementally (unsorted — will be re-sorted at end)
-      const scores = results.map((r) => ({
-        reviewFileId: fileIdMap.get(r.filePath) ?? '',
-        filePath: r.filePath,
-        sortOrder: 0, // Placeholder — final sort happens after all batches
-        aggregateScore: r.aggregate,
-        rationale: r.rationale,
-        dimensionScores: r.scores as Record<string, number>,
-        notes: r.notes ?? null,
-      }));
+      const scores = results.map((r, idx) => cfg.mapResult(r, idx));
       await appendFileScores(analysisId, scores);
     },
     async (progress) => {
@@ -276,17 +274,16 @@ async function runBatchedRiskAnalysis(
     },
     1,
     shouldCancel,
-    'risk',
+    cfg.analysisType,
   );
 
-  // Final sort: update sort_order based on aggregate score descending
-  const sorted = allResults.slice().sort((a, b) => b.aggregate - a.aggregate);
-  const sortMap = new Map(sorted.map((r, idx) => [r.filePath, idx]));
+  if (cfg.finalize) await cfg.finalize(allResults, batches.length);
+}
 
-  // Update sort orders in DB
+async function updateSortOrders(analysisId: string, entries: Iterable<[string, number]>): Promise<void> {
   const { getDb } = await import('../db/connection.js');
   const db = await getDb();
-  for (const [filePath, sortOrder] of sortMap) {
+  for (const [filePath, sortOrder] of entries) {
     await db.query(
       'UPDATE ai_file_scores SET sort_order = $1 WHERE analysis_id = $2 AND file_path = $3',
       [sortOrder, analysisId, filePath]
@@ -294,108 +291,104 @@ async function runBatchedRiskAnalysis(
   }
 }
 
-async function runBatchedNarrativeAnalysis(
-  analysisId: string,
-  batches: Array<{ files: ReviewFile[]; estimatedTokens: number }>,
-  allFiles: ReviewFile[],
-  config: AIConfig,
-  repoRoot: string,
-  fileIdMap: Map<string, string>,
-  progressTotal: number,
-  progressOffset: number,
-  shouldCancel?: () => boolean,
-  guidedReview?: GuidedReviewConfig,
-): Promise<void> {
-  const allResults = await runBatches<NarrativeFileResult>(
-    batches,
-    allFiles.length,
-    async (batch) => isAIServiceTest()
-      ? mockNarrativeAnalysisBatch(batch.files)
-      : runNarrativeAnalysisBatch(batch.files, config, repoRoot, guidedReview),
-    async (_batchIndex, results) => {
-      // Save this batch's results incrementally
-      const scores = results.map(r => ({
-        reviewFileId: fileIdMap.get(r.filePath) ?? '',
-        filePath: r.filePath,
-        sortOrder: r.position, // Batch-local position — will be re-sorted after merge
-        aggregateScore: null,
-        rationale: r.rationale,
-        dimensionScores: null,
-        notes: r.notes ?? null,
-      }));
-      await appendFileScores(analysisId, scores);
-    },
-    async (progress) => {
-      await updateAnalysisProgress(analysisId, progressOffset + progress.completedFiles, progressTotal);
-    },
-    1,
-    shouldCancel,
-    'narrative',
-  );
-
-  // Merge batch-local reading orders into a global order
-  if (allResults.length > 0) {
-    const mergedPositions = mergeNarrativeOrders(allResults, batches.length);
-
-    const { getDb } = await import('../db/connection.js');
-    const db = await getDb();
-    for (const [filePath, position] of mergedPositions) {
-      await db.query(
-        'UPDATE ai_file_scores SET sort_order = $1 WHERE analysis_id = $2 AND file_path = $3',
-        [position, analysisId, filePath]
-      );
-    }
-  }
+function pickRunner<R>(real: () => Promise<R[]>, mock: () => Promise<R[]>): Promise<R[]> {
+  return isAIServiceTest() ? mock() : real();
 }
 
-async function runBatchedGuidedAnalysis(
-  analysisId: string,
-  batches: Array<{ files: ReviewFile[]; estimatedTokens: number }>,
-  allFiles: ReviewFile[],
+function riskAnalysisConfig(
   config: AIConfig,
   repoRoot: string,
   fileIdMap: Map<string, string>,
-  progressTotal: number,
-  progressOffset: number,
-  shouldCancel?: () => boolean,
-  guidedReview?: GuidedReviewConfig,
-): Promise<void> {
-  await runBatches<GuidedFileResult>(
-    batches,
-    allFiles.length,
-    async (batch) => {
-      if (isAIServiceTest()) return mockGuidedAnalysisBatch(batch.files);
+  guidedReview: GuidedReviewConfig | undefined,
+  analysisId: string,
+): BatchedAnalysisConfig<RiskFileResult> {
+  return {
+    analysisType: 'risk',
+    runBatch: (files) => pickRunner(
+      () => runRiskAnalysisBatch(files, config, repoRoot, guidedReview),
+      () => mockRiskAnalysisBatch(files),
+    ),
+    postProcessResult: (r) => {
+      const maxDimension = Math.max(...Object.values(r.scores));
+      r.aggregate = Math.max(r.aggregate, maxDimension);
+    },
+    mapResult: (r) => ({
+      reviewFileId: fileIdMap.get(r.filePath) ?? '',
+      filePath: r.filePath,
+      sortOrder: 0, // Placeholder — final sort happens after all batches
+      aggregateScore: r.aggregate,
+      rationale: r.rationale,
+      dimensionScores: r.scores as Record<string, number>,
+      notes: r.notes ?? null,
+    }),
+    finalize: async (allResults) => {
+      const sorted = allResults.slice().sort((a, b) => b.aggregate - a.aggregate);
+      await updateSortOrders(analysisId, sorted.map((r, idx) => [r.filePath, idx]));
+    },
+  };
+}
+
+function narrativeAnalysisConfig(
+  config: AIConfig,
+  repoRoot: string,
+  fileIdMap: Map<string, string>,
+  guidedReview: GuidedReviewConfig | undefined,
+  analysisId: string,
+): BatchedAnalysisConfig<NarrativeFileResult> {
+  return {
+    analysisType: 'narrative',
+    runBatch: (files) => pickRunner(
+      () => runNarrativeAnalysisBatch(files, config, repoRoot, guidedReview),
+      () => mockNarrativeAnalysisBatch(files),
+    ),
+    mapResult: (r) => ({
+      reviewFileId: fileIdMap.get(r.filePath) ?? '',
+      filePath: r.filePath,
+      sortOrder: r.position, // Batch-local position — will be re-sorted after merge
+      aggregateScore: null,
+      rationale: r.rationale,
+      dimensionScores: null,
+      notes: r.notes ?? null,
+    }),
+    finalize: async (allResults, batchCount) => {
+      if (allResults.length === 0) return;
+      const merged = mergeNarrativeOrders(allResults, batchCount);
+      await updateSortOrders(analysisId, merged);
+    },
+  };
+}
+
+function guidedAnalysisConfig(
+  config: AIConfig,
+  repoRoot: string,
+  fileIdMap: Map<string, string>,
+  guidedReview: GuidedReviewConfig | undefined,
+): BatchedAnalysisConfig<GuidedFileResult> {
+  return {
+    analysisType: 'guided',
+    runBatch: (files) => {
+      if (isAIServiceTest()) return mockGuidedAnalysisBatch(files);
       if (guidedReview === undefined) throw new Error('Guided review config required');
-      return runGuidedAnalysisBatch(batch.files, config, repoRoot, guidedReview);
+      return runGuidedAnalysisBatch(files, config, repoRoot, guidedReview);
     },
-    async (_batchIndex, results) => {
-      const scores = results.map((r, idx) => ({
-        reviewFileId: fileIdMap.get(r.filePath) ?? '',
-        filePath: r.filePath,
-        sortOrder: idx,
-        aggregateScore: null,
-        rationale: null,
-        dimensionScores: null,
-        notes: r.notes,
-      }));
-      await appendFileScores(analysisId, scores);
-    },
-    async (progress) => {
-      await updateAnalysisProgress(analysisId, progressOffset + progress.completedFiles, progressTotal);
-    },
-    1,
-    shouldCancel,
-    'guided',
-  );
+    mapResult: (r, idx) => ({
+      reviewFileId: fileIdMap.get(r.filePath) ?? '',
+      filePath: r.filePath,
+      sortOrder: idx,
+      aggregateScore: null,
+      rationale: null,
+      dimensionScores: null,
+      notes: r.notes,
+    }),
+  };
 }
 
 aiAnalysisRoutes.get('/analysis/:type', async (c) => {
-  const reviewId = c.req.query('reviewId') ?? '';
+  const reviewId = resolveReviewId(c);
   const analysisType = c.req.param('type');
 
-  if (!VALID_ANALYSIS_TYPES.includes(analysisType as typeof VALID_ANALYSIS_TYPES[number])) {
-    return c.json({ error: `type must be one of: ${VALID_ANALYSIS_TYPES.join(', ')}` }, 400);
-  }
+  const typeCheck = checkEnum(analysisType, 'type', VALID_ANALYSIS_TYPES);
+  if ('error' in typeCheck) return c.json({ error: typeCheck.error }, 400);
 
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
@@ -432,12 +425,11 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
 });
 
 aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
-  const reviewId = c.req.query('reviewId') ?? '';
+  const reviewId = resolveReviewId(c);
   const analysisType = c.req.param('type');
 
-  if (!VALID_ANALYSIS_TYPES.includes(analysisType as typeof VALID_ANALYSIS_TYPES[number])) {
-    return c.json({ error: `type must be one of: ${VALID_ANALYSIS_TYPES.join(', ')}` }, 400);
-  }
+  const typeCheck = checkEnum(analysisType, 'type', VALID_ANALYSIS_TYPES);
+  if ('error' in typeCheck) return c.json({ error: typeCheck.error }, 400);
 
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
@@ -491,11 +483,13 @@ aiAnalysisRoutes.get('/preferences', async (c) => {
 aiAnalysisRoutes.post('/preferences', async (c) => {
   const body = await c.req.json<{ sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean; ignore_whitespace?: boolean; svg_view_mode?: string; last_image_mode?: string }>();
 
-  if (body.sort_mode !== undefined && !VALID_SORT_MODES.includes(body.sort_mode as typeof VALID_SORT_MODES[number])) {
-    return c.json({ error: `sort_mode must be one of: ${VALID_SORT_MODES.join(', ')}` }, 400);
+  if (body.sort_mode !== undefined) {
+    const v = checkEnum(body.sort_mode, 'sort_mode', VALID_SORT_MODES);
+    if ('error' in v) return c.json({ error: v.error }, 400);
   }
-  if (body.risk_sort_dimension !== undefined && !VALID_RISK_DIMENSIONS.includes(body.risk_sort_dimension as typeof VALID_RISK_DIMENSIONS[number])) {
-    return c.json({ error: `risk_sort_dimension must be one of: ${VALID_RISK_DIMENSIONS.join(', ')}` }, 400);
+  if (body.risk_sort_dimension !== undefined) {
+    const v = checkEnum(body.risk_sort_dimension, 'risk_sort_dimension', VALID_RISK_DIMENSIONS);
+    if ('error' in v) return c.json({ error: v.error }, 400);
   }
   if (body.show_risk_scores !== undefined && typeof body.show_risk_scores !== 'boolean') {
     return c.json({ error: 'show_risk_scores must be a boolean' }, 400);
@@ -503,11 +497,13 @@ aiAnalysisRoutes.post('/preferences', async (c) => {
   if (body.ignore_whitespace !== undefined && typeof body.ignore_whitespace !== 'boolean') {
     return c.json({ error: 'ignore_whitespace must be a boolean' }, 400);
   }
-  if (body.svg_view_mode !== undefined && !VALID_SVG_VIEW_MODES.includes(body.svg_view_mode as typeof VALID_SVG_VIEW_MODES[number])) {
-    return c.json({ error: `svg_view_mode must be one of: ${VALID_SVG_VIEW_MODES.join(', ')}` }, 400);
+  if (body.svg_view_mode !== undefined) {
+    const v = checkEnum(body.svg_view_mode, 'svg_view_mode', VALID_SVG_VIEW_MODES);
+    if ('error' in v) return c.json({ error: v.error }, 400);
   }
-  if (body.last_image_mode !== undefined && !VALID_IMAGE_MODES.includes(body.last_image_mode as typeof VALID_IMAGE_MODES[number])) {
-    return c.json({ error: `last_image_mode must be one of: ${VALID_IMAGE_MODES.join(', ')}` }, 400);
+  if (body.last_image_mode !== undefined) {
+    const v = checkEnum(body.last_image_mode, 'last_image_mode', VALID_IMAGE_MODES);
+    if ('error' in v) return c.json({ error: v.error }, 400);
   }
 
   await saveUserPreferences(body);

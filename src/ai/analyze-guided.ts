@@ -1,11 +1,6 @@
 import type { ReviewFile } from '../db/queries.js';
-import { getFileContent } from '../git/diff.js';
-import type { AIMessage } from './client.js';
-import { sendAIRequest } from './client.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
-import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
-import { getModelContextWindow } from './models.js';
-import { extractJSON, isNeedContext } from './shared.js';
+import { runAnalysisBatch } from './shared.js';
 
 const TOPIC_DISPLAY: Record<string, string> = {
   programming: 'programming in general',
@@ -83,57 +78,16 @@ export interface GuidedFileResult {
 }
 
 /** Analyze a single batch of files for guided review educational content. */
-export async function runGuidedAnalysisBatch(
+export function runGuidedAnalysisBatch(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,
   guidedReview: GuidedReviewConfig,
 ): Promise<GuidedFileResult[]> {
-  const contextWindow = getModelContextWindow(config.platform, config.model);
-  const charBudget = Math.floor(contextWindow * 0.7 * 3);
-
-  const systemPrompt = buildSystemPrompt(guidedReview);
-
-  const contexts = buildFileContexts(files, charBudget);
-  const validPaths = new Set(files.map(f => f.file_path));
-
-  const initialPrompt = [
-    `Provide educational walkthrough notes for these ${String(files.length)} changed files:`,
-    '',
-    formatContextsForPrompt(contexts),
-  ].join('\n');
-
-  const messages: AIMessage[] = [{ role: 'user', content: initialPrompt }];
-
-  for (let round = 0; round < 3; round++) {
-    const response = await sendAIRequest(config, systemPrompt, messages);
-    const parsed = extractJSON(response.content);
-
-    if (isNeedContext(parsed)) {
-      const safePaths = parsed.needContext.filter(p => validPaths.has(p));
-      if (safePaths.length === 0) {
-        throw new Error('AI requested context for files not in the review');
-      }
-
-      const fileContents = safePaths.map(path => ({
-        path,
-        content: getFileContent(path, 'working', repoRoot),
-      }));
-
-      messages.push({ role: 'assistant', content: response.content });
-      messages.push({
-        role: 'user',
-        content: `Here is the full content of the requested files:\n\n${formatAdditionalContext(fileContents)}`,
-      });
-      continue;
-    }
-
-    if (!Array.isArray(parsed)) {
-      throw new Error('Expected an array of guided review notes from AI');
-    }
-
-    return parsed as GuidedFileResult[];
-  }
-
-  throw new Error('Guided analysis did not converge after 3 context rounds');
+  return runAnalysisBatch<GuidedFileResult>(files, config, repoRoot, {
+    systemPrompt: buildSystemPrompt(guidedReview),
+    initialPromptHeader: (n) => `Provide educational walkthrough notes for these ${String(n)} changed files:`,
+    resultLabel: 'guided review notes',
+    analysisName: 'Guided analysis',
+  });
 }
