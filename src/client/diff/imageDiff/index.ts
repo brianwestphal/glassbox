@@ -2,7 +2,7 @@ import { api } from '../../api.js';
 import { state } from '../../state.js';
 import { loadMetadata } from './metadata.js';
 import { initSliceTool } from './sliceTool.js';
-import { applyZoom, clampPan, notifyZoomChange, setZoomState, type ZoomState, zoomAt } from './zoom.js';
+import { applyZoom, clampPan, notifyZoomChange, setZoomState, zoomAt,type ZoomState } from './zoom.js';
 
 export function bindImageDiff(): void {
   const container = document.querySelector('.image-diff');

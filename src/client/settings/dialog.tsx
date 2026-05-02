@@ -242,7 +242,9 @@ function renderSettingsModal(
   function bindModalEvents(ctx: TabContext, visible: Tab[]) {
     overlay.querySelectorAll('.settings-tab').forEach(tabEl => {
       tabEl.addEventListener('click', () => {
-        ui.activeTab = (tabEl as HTMLElement).dataset.tab ?? visible[0]?.id ?? 'general';
+        const dataTab = tabEl.getAttribute('data-tab');
+        const fallback = visible[0]?.id ?? 'general';
+        ui.activeTab = dataTab ?? fallback;
         renderContent();
       });
     });

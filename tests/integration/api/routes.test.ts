@@ -41,6 +41,10 @@ vi.mock('../../../src/git/diff.js', () => ({
   parseModeString: vi.fn(() => ({ type: 'uncommitted' })),
   getHeadCommit: vi.fn(() => 'abc123'),
   getFileDiffs: vi.fn(() => []),
+  parseDiffData: vi.fn((raw: string | null | undefined) => {
+    if (raw === null || raw === undefined || raw === '') return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }),
 }));
 
 // Mock the outline parser to avoid filesystem access

@@ -38,8 +38,8 @@ function writeGlobalConfig(config: GlobalConfig): void {
  * object. Eliminates the read-snapshot / mutate-one-key / write-back race
  * that existed when each caller re-implemented its own pair of helpers.
  */
-export function updateGlobalConfig(mutator: (cfg: GlobalConfig) => GlobalConfig | void): void {
+export function updateGlobalConfig(mutator: (cfg: GlobalConfig) => GlobalConfig | undefined): void {
   const cfg = readGlobalConfig();
-  const next = mutator(cfg) ?? cfg;
-  writeGlobalConfig(next);
+  const result: GlobalConfig | undefined = mutator(cfg);
+  writeGlobalConfig(result ?? cfg);
 }

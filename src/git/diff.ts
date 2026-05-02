@@ -6,8 +6,8 @@ import { getRepoRoot } from './repo.js';
 import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 
 // Re-export types and repo functions so existing importers don't break
-export { getHeadCommit,getRepoName, getRepoRoot, isGitRepo } from './repo.js';
 export { parseDiffData } from './parseDiffData.js';
+export { getHeadCommit,getRepoName, getRepoRoot, isGitRepo } from './repo.js';
 export type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 
 function git(args: string[], cwd: string): string {

@@ -522,16 +522,16 @@ two documents intentionally overlap.
 
 | Task | Start here |
 |------|------------|
-| Add a new API endpoint | `src/routes/api.ts` (or `ai-*.ts`, `theme-api.ts`, `channel-api.ts`). Register in `src/server.ts` if it's a new group. |
+| Add a new API endpoint | Pick the right sub-router under `src/routes/api/` (or add a new one and mount it in `src/routes/api.ts`); for AI/themes/channel use `src/routes/ai-*.ts`, `theme-api.ts`, `channel-api.ts`. Register a brand-new group in `src/server.ts`. |
 | Add a new page/route | `src/routes/pages.tsx`; register in `src/server.ts`. |
 | Change the DB schema | `src/db/schema.ts` (tables/indexes) + a migration in `src/db/connection.ts` (`addColumnIfMissing` pattern). Query code in `src/db/queries.ts` or `ai-queries.ts`. |
-| Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
+| Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api/annotations.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
 | Add a CLI option | `src/cli.ts` `parseArgs()` switch; document in `docs/2-cli-and-server.md`. |
 | Add an AI platform | `src/ai/models.ts` (platform + models + env key), `src/ai/client.ts` (HTTP dispatch), `src/ai/api-keys.ts` (key source mapping), `src/ai/keychain.ts` (if new keychain conventions). Update `docs/7-ai-analysis.md`. |
 | Add a theme | `src/themes/built-in.ts` (built-in), or create `~/.glassbox/themes/*.json` (custom). All vars from `ThemeColors` must be present. |
 | Change export format | `src/export/generate.ts`. Update `docs/6-export.md`. |
 | Add a diff mode/view | `src/client/diff/` (new module), wire into `src/client/diff/mode.ts` and `toolbar.tsx`. Server rendering lives in `src/components/diffView.tsx`. |
-| Add a new image diff mode | `src/components/imageDiff.tsx` + `src/client/diff/imageDiff.ts`. |
+| Add a new image diff mode | `src/components/imageDiff.tsx` + `src/client/diff/imageDiff/` (`index.ts` orchestration, `zoom.ts`, `sliceTool.ts`, `metadata.ts`). |
 | Tweak go-to-definition | `src/outline/parser.ts` (regex rules) and `src/client/diff/goToDefinition.tsx` (wiring). |
 | Add a SCSS partial | Create `src/client/styles/_thing.scss`, `@use` it from `src/client/styles.scss`. |
 | Add client state | `src/client/state.ts` (AppState). |
