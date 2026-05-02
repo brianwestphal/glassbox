@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.2] - 2026-05-03
+
+- Auto-scroll sidebar to keep selected file visible
+- Code cleanup
+
 ## [0.8.1] - 2026-04-08
 
 - Fixes for Claude channel integration
