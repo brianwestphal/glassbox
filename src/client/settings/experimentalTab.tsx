@@ -1,6 +1,7 @@
 import { IconCheck, IconFlask } from '../../icons.js';
 import type { SafeHtml } from '../../jsx-runtime.js';
 import { api } from '../api.js';
+import { TOAST_DURATION_MS } from '../timing.js';
 import type { ChannelState, KeyStatusInfo, Tab, TabContext } from './tabContext.js';
 
 function keyStatusHtml(keyInfo: KeyStatusInfo): SafeHtml {
@@ -200,7 +201,7 @@ function bindExperimentalTab(overlay: HTMLElement, ctx: TabContext): void {
     copyBtn.addEventListener('click', () => {
       void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
       copyBtn.textContent = 'Copied!';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, TOAST_DURATION_MS);
     });
   }
 }

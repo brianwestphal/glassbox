@@ -1,6 +1,7 @@
 import { api, clientLog } from './api.js';
 import { renderFileList } from './sidebar/fileTree.js';
 import { state } from './state.js';
+import { ANALYSIS_POLL_INTERVAL_MS } from './timing.js';
 
 let pollGeneration = 0;
 
@@ -82,7 +83,7 @@ function pollGuidedStatus(gen: number) {
         }
 
         renderFileList();
-        setTimeout(poll, 3000);
+        setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
         return;
       }
 
@@ -109,7 +110,7 @@ function pollGuidedStatus(gen: number) {
     })();
   };
 
-  setTimeout(poll, 3000);
+  setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
 }
 
 async function loadGuidedResults(partial: boolean) {

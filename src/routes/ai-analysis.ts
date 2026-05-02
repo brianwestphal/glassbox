@@ -118,123 +118,153 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
 
   const guidedReview = loadGuidedReviewConfig();
 
-  // Run batched analysis in background
-  void (async () => {
-    try {
-      debugLog('Background analysis starting...');
-      const contextWindow = getModelContextWindow(config.platform, config.model);
-      debugLog(`Context window: ${String(contextWindow)} tokens`);
-      const { batches, binaryFiles } = planBatches(files, contextWindow);
-      const fileIdMap = new Map(files.map(f => [f.file_path, f.id]));
-      const totalAnalyzable = batches.reduce((sum, b) => sum + b.files.length, 0);
-
-      debugLog(`Analysis plan: ${String(totalAnalyzable)} analyzable + ${String(binaryFiles.length)} binary = ${String(totalAnalyzable + binaryFiles.length)} total files in ${String(batches.length)} batch(es)`);
-
-      // --- Cache: carry forward scores from a previous analysis (same review) ---
-      // Skip cache when invalidateCache is true (e.g. guided review settings changed)
-      const prevScores = invalidateCache ? [] : await getPreviousScores(reviewId, analysisType, analysis.id);
-      const binaryPathSet = new Set(binaryFiles.map(f => f.file_path));
-      const unchangedPaths = new Set<string>();
-      const cachedScores = prevScores.filter(s => {
-        // Only carry forward non-binary files that still exist in the review
-        // (binary files are re-saved separately below)
-        if (fileIdMap.has(s.file_path) && !binaryPathSet.has(s.file_path)) {
-          unchangedPaths.add(s.file_path);
-          return true;
-        }
-        return false;
-      });
-
-      debugLog(`Cache: ${String(cachedScores.length)} scores from previous analysis, ${String(totalAnalyzable - cachedScores.length)} files need processing`);
-
-      // Save cached scores immediately with updated review_file_ids
-      if (cachedScores.length > 0) {
-        const cachedForInsert = cachedScores.map(s => ({
-          reviewFileId: fileIdMap.get(s.file_path) ?? s.review_file_id,
-          filePath: s.file_path,
-          sortOrder: s.sort_order,
-          aggregateScore: s.aggregate_score,
-          rationale: s.rationale,
-          dimensionScores: s.dimension_scores !== null ? JSON.parse(s.dimension_scores) as Record<string, number> : null,
-          notes: s.notes !== null ? JSON.parse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } : null,
-        }));
-        await appendFileScores(analysis.id, cachedForInsert);
-      }
-
-      // Filter batches to exclude files with cached scores
-      const filteredBatches = batches
-        .map(batch => {
-          const remaining = batch.files.filter(f => !unchangedPaths.has(f.file_path));
-          return { files: remaining, estimatedTokens: batch.estimatedTokens };
-        })
-        .filter(batch => batch.files.length > 0);
-
-      // Recalculate totals
-      const filteredAnalyzable = filteredBatches.reduce((sum, b) => sum + b.files.length, 0);
-      const totalForProgress = filteredAnalyzable + binaryFiles.length + cachedScores.length;
-
-      debugLog(`After cache: ${String(filteredAnalyzable)} files to analyze in ${String(filteredBatches.length)} batch(es)`);
-
-      // Set total progress
-      await updateAnalysisProgress(analysis.id, cachedScores.length, totalForProgress);
-
-      // Save binary files immediately with score 0
-      if (binaryFiles.length > 0) {
-        debugLog(`Saving ${String(binaryFiles.length)} binary files with score 0`);
-        const binaryScoreEntries = binaryFiles.map((f, idx) => ({
-          reviewFileId: fileIdMap.get(f.file_path) ?? '',
-          filePath: f.file_path,
-          sortOrder: 99999 + idx, // Will be re-sorted later
-          aggregateScore: analysisType === 'risk' ? 0 : null,
-          rationale: 'Binary file — not analyzed',
-          dimensionScores: analysisType === 'risk'
-            ? { security: 0, correctness: 0, 'error-handling': 0, maintainability: 0, architecture: 0, performance: 0 }
-            : null,
-          notes: null,
-        }));
-        await appendFileScores(analysis.id, binaryScoreEntries);
-        await updateAnalysisProgress(analysis.id, cachedScores.length + binaryFiles.length, totalForProgress);
-      }
-
-      if (filteredBatches.length === 0) {
-        debugLog('No batches to process (all files cached or binary), marking completed');
-        await updateAnalysisStatus(analysis.id, 'completed');
-        return;
-      }
-
-      const shouldCancel = () => cancelledAnalyses.has(analysis.id);
-      const progressOffset = cachedScores.length + binaryFiles.length;
-
-      const runArgs = [analysis.id, filteredBatches, files.length, totalForProgress, progressOffset] as const;
-      if (analysisType === 'risk') {
-        await runBatchedAnalysis(...runArgs, riskAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysis.id), shouldCancel);
-      } else if (analysisType === 'narrative') {
-        await runBatchedAnalysis(...runArgs, narrativeAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysis.id), shouldCancel);
-      } else {
-        await runBatchedAnalysis(...runArgs, guidedAnalysisConfig(config, repoRoot, fileIdMap, guidedReview), shouldCancel);
-      }
-
-      // Check if this analysis was cancelled while running (user switched modes)
-      if (cancelledAnalyses.has(analysis.id)) {
-        cancelledAnalyses.delete(analysis.id);
-        debugLog(`Analysis ${analysis.id} was cancelled (user switched modes)`);
-        await updateAnalysisStatus(analysis.id, 'failed', 'Cancelled');
-        return;
-      }
-
-      cancelledAnalyses.delete(analysis.id);
-      debugLog(`Analysis ${analysis.id} completed successfully`);
-      await updateAnalysisStatus(analysis.id, 'completed');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error(`Analysis failed: ${message}`);
-      debugLog(`Analysis ${analysis.id} failed: ${message}`);
-      await updateAnalysisStatus(analysis.id, 'failed', message);
-    }
-  })();
+  // Kick off the long-running work in the background — `void` is intentional
+  // so the HTTP response returns immediately while batches stream results.
+  void executeAnalysis({
+    analysisId: analysis.id,
+    analysisType: typeCheck.ok,
+    reviewId,
+    files,
+    config,
+    repoRoot,
+    guidedReview,
+    invalidateCache,
+  });
 
   return c.json({ analysisId: analysis.id, status: 'running' });
 });
+
+interface ExecuteAnalysisInput {
+  analysisId: string;
+  analysisType: 'risk' | 'narrative' | 'guided';
+  reviewId: string;
+  files: ReviewFile[];
+  config: AIConfig;
+  repoRoot: string;
+  guidedReview: GuidedReviewConfig;
+  invalidateCache: boolean;
+}
+
+/**
+ * Run the full analysis pipeline for a single `analyses` row: cache
+ * carry-forward, binary file scoring, batch dispatch, finalise, and
+ * cancellation handling. Wraps the whole body in a try/catch so
+ * background errors surface in the analysis row's status.
+ */
+async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
+  const { analysisId, analysisType, reviewId, files, config, repoRoot, guidedReview, invalidateCache } = input;
+  try {
+    debugLog('Background analysis starting...');
+    const contextWindow = getModelContextWindow(config.platform, config.model);
+    debugLog(`Context window: ${String(contextWindow)} tokens`);
+    const { batches, binaryFiles } = planBatches(files, contextWindow);
+    const fileIdMap = new Map(files.map(f => [f.file_path, f.id]));
+    const totalAnalyzable = batches.reduce((sum, b) => sum + b.files.length, 0);
+
+    debugLog(`Analysis plan: ${String(totalAnalyzable)} analyzable + ${String(binaryFiles.length)} binary = ${String(totalAnalyzable + binaryFiles.length)} total files in ${String(batches.length)} batch(es)`);
+
+    // --- Cache: carry forward scores from a previous analysis (same review) ---
+    // Skip cache when invalidateCache is true (e.g. guided review settings changed)
+    const prevScores = invalidateCache ? [] : await getPreviousScores(reviewId, analysisType, analysisId);
+    const binaryPathSet = new Set(binaryFiles.map(f => f.file_path));
+    const unchangedPaths = new Set<string>();
+    const cachedScores = prevScores.filter(s => {
+      // Only carry forward non-binary files that still exist in the review
+      // (binary files are re-saved separately below)
+      if (fileIdMap.has(s.file_path) && !binaryPathSet.has(s.file_path)) {
+        unchangedPaths.add(s.file_path);
+        return true;
+      }
+      return false;
+    });
+
+    debugLog(`Cache: ${String(cachedScores.length)} scores from previous analysis, ${String(totalAnalyzable - cachedScores.length)} files need processing`);
+
+    // Save cached scores immediately with updated review_file_ids
+    if (cachedScores.length > 0) {
+      const cachedForInsert = cachedScores.map(s => ({
+        reviewFileId: fileIdMap.get(s.file_path) ?? s.review_file_id,
+        filePath: s.file_path,
+        sortOrder: s.sort_order,
+        aggregateScore: s.aggregate_score,
+        rationale: s.rationale,
+        dimensionScores: s.dimension_scores !== null ? JSON.parse(s.dimension_scores) as Record<string, number> : null,
+        notes: s.notes !== null ? JSON.parse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } : null,
+      }));
+      await appendFileScores(analysisId, cachedForInsert);
+    }
+
+    // Filter batches to exclude files with cached scores
+    const filteredBatches = batches
+      .map(batch => {
+        const remaining = batch.files.filter(f => !unchangedPaths.has(f.file_path));
+        return { files: remaining, estimatedTokens: batch.estimatedTokens };
+      })
+      .filter(batch => batch.files.length > 0);
+
+    // Recalculate totals
+    const filteredAnalyzable = filteredBatches.reduce((sum, b) => sum + b.files.length, 0);
+    const totalForProgress = filteredAnalyzable + binaryFiles.length + cachedScores.length;
+
+    debugLog(`After cache: ${String(filteredAnalyzable)} files to analyze in ${String(filteredBatches.length)} batch(es)`);
+
+    // Set total progress
+    await updateAnalysisProgress(analysisId, cachedScores.length, totalForProgress);
+
+    // Save binary files immediately with score 0
+    if (binaryFiles.length > 0) {
+      debugLog(`Saving ${String(binaryFiles.length)} binary files with score 0`);
+      const binaryScoreEntries = binaryFiles.map((f, idx) => ({
+        reviewFileId: fileIdMap.get(f.file_path) ?? '',
+        filePath: f.file_path,
+        sortOrder: 99999 + idx, // Will be re-sorted later
+        aggregateScore: analysisType === 'risk' ? 0 : null,
+        rationale: 'Binary file — not analyzed',
+        dimensionScores: analysisType === 'risk'
+          ? { security: 0, correctness: 0, 'error-handling': 0, maintainability: 0, architecture: 0, performance: 0 }
+          : null,
+        notes: null,
+      }));
+      await appendFileScores(analysisId, binaryScoreEntries);
+      await updateAnalysisProgress(analysisId, cachedScores.length + binaryFiles.length, totalForProgress);
+    }
+
+    if (filteredBatches.length === 0) {
+      debugLog('No batches to process (all files cached or binary), marking completed');
+      await updateAnalysisStatus(analysisId, 'completed');
+      return;
+    }
+
+    const shouldCancel = () => cancelledAnalyses.has(analysisId);
+    const progressOffset = cachedScores.length + binaryFiles.length;
+
+    const runArgs = [analysisId, filteredBatches, files.length, totalForProgress, progressOffset] as const;
+    if (analysisType === 'risk') {
+      await runBatchedAnalysis(...runArgs, riskAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysisId), shouldCancel);
+    } else if (analysisType === 'narrative') {
+      await runBatchedAnalysis(...runArgs, narrativeAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysisId), shouldCancel);
+    } else {
+      await runBatchedAnalysis(...runArgs, guidedAnalysisConfig(config, repoRoot, fileIdMap, guidedReview), shouldCancel);
+    }
+
+    // Check if this analysis was cancelled while running (user switched modes)
+    if (cancelledAnalyses.has(analysisId)) {
+      cancelledAnalyses.delete(analysisId);
+      debugLog(`Analysis ${analysisId} was cancelled (user switched modes)`);
+      await updateAnalysisStatus(analysisId, 'failed', 'Cancelled');
+      return;
+    }
+
+    cancelledAnalyses.delete(analysisId);
+    debugLog(`Analysis ${analysisId} completed successfully`);
+    await updateAnalysisStatus(analysisId, 'completed');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`Analysis failed: ${message}`);
+    debugLog(`Analysis ${analysisId} failed: ${message}`);
+    await updateAnalysisStatus(analysisId, 'failed', message);
+  }
+}
 
 type ScoreInsert = Parameters<typeof appendFileScores>[1][number];
 type Batch = { files: ReviewFile[]; estimatedTokens: number };

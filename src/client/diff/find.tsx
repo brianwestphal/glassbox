@@ -160,10 +160,7 @@ function runSearch(query: string) {
 
 function highlightRange(range: Range) {
   try {
-    // Range.surroundContents() requires a raw DOM element; toElement() not applicable here
-    const span = document.createElement('mark');
-    span.className = HIGHLIGHT_CLASS;
-    range.surroundContents(span);
+    range.surroundContents(toElement(<mark className={HIGHLIGHT_CLASS}></mark>));
   } catch {
     // surroundContents fails if range crosses element boundaries — skip
   }

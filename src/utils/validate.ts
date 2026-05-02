@@ -12,3 +12,12 @@ export function checkEnum<T extends readonly string[]>(
   }
   return { ok: value as T[number] };
 }
+
+/**
+ * Type guard for a non-empty trimmed string. Rejects non-strings,
+ * empty strings, and whitespace-only strings — the same pattern that
+ * appeared inline at every API validation site.
+ */
+export function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}

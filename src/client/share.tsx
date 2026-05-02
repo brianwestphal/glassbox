@@ -4,6 +4,7 @@
  * and provides a share button in the toolbar.
  */
 import { api } from './api.js';
+import { toElement } from './dom.js';
 
 const SHARE_URL = 'https://www.npmjs.com/package/glassbox';
 const SESSION_THRESHOLD_MS = 60_000;    // 1 minute in current session
@@ -46,9 +47,7 @@ export async function triggerShare(): Promise<void> {
 function showCopyToast() {
   const existing = document.querySelector('.share-toast');
   if (existing) existing.remove();
-  const toast = document.createElement('div');
-  toast.className = 'share-toast';
-  toast.textContent = 'Link copied to clipboard!';
+  const toast = toElement(<div className="share-toast">Link copied to clipboard!</div>);
   document.body.appendChild(toast);
   setTimeout(() => { toast.remove(); }, 2000);
 }
@@ -63,30 +62,24 @@ function showPrompt() {
   if (prompted) return;
   prompted = true;
 
-  const banner = document.createElement('div');
-  banner.className = 'share-prompt';
-  banner.innerHTML = `
-    <span class="share-prompt-text">Enjoying Glassbox? Share it with others!</span>
-    <button class="btn btn-xs btn-primary share-prompt-share">Share</button>
-    <button class="btn btn-xs share-prompt-dismiss">No thanks</button>
-  `;
+  const banner = toElement(
+    <div className="share-prompt">
+      <span className="share-prompt-text">Enjoying Glassbox? Share it with others!</span>
+      <button className="btn btn-xs btn-primary share-prompt-share">Share</button>
+      <button className="btn btn-xs share-prompt-dismiss">No thanks</button>
+    </div>
+  );
 
-  const shareBtn = banner.querySelector('.share-prompt-share');
-  if (shareBtn) {
-    shareBtn.addEventListener('click', () => {
-      void triggerShare();
-      banner.remove();
-      dismissPrompt();
-    });
-  }
+  banner.querySelector('.share-prompt-share')?.addEventListener('click', () => {
+    void triggerShare();
+    banner.remove();
+    dismissPrompt();
+  });
 
-  const dismissBtn = banner.querySelector('.share-prompt-dismiss');
-  if (dismissBtn) {
-    dismissBtn.addEventListener('click', () => {
-      banner.remove();
-      dismissPrompt();
-    });
-  }
+  banner.querySelector('.share-prompt-dismiss')?.addEventListener('click', () => {
+    banner.remove();
+    dismissPrompt();
+  });
 
   // Insert at top of sidebar, after the header
   const sidebar = document.querySelector('.sidebar');

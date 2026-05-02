@@ -38,8 +38,9 @@ function writeGlobalConfig(config: GlobalConfig): void {
  * object. Eliminates the read-snapshot / mutate-one-key / write-back race
  * that existed when each caller re-implemented its own pair of helpers.
  */
-export function updateGlobalConfig(mutator: (cfg: GlobalConfig) => GlobalConfig | undefined): void {
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- mutator may return nothing (in-place) or a replacement
+export function updateGlobalConfig(mutator: (cfg: GlobalConfig) => GlobalConfig | void): void {
   const cfg = readGlobalConfig();
-  const result: GlobalConfig | undefined = mutator(cfg);
-  writeGlobalConfig(result ?? cfg);
+  const result = mutator(cfg);
+  writeGlobalConfig(result === undefined ? cfg : result);
 }

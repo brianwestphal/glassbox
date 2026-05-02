@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
 import { state } from '../state.js';
+import { TOAST_DURATION_MS } from '../timing.js';
 
 interface CompleteResult {
   isCurrent: boolean;
@@ -144,7 +145,7 @@ function showCompleteModal() {
         const copyText = (el as HTMLElement).dataset.copy ?? '';
         void navigator.clipboard.writeText(copyText);
         el.classList.add('copied');
-        setTimeout(() => { el.classList.remove('copied'); }, 1500);
+        setTimeout(() => { el.classList.remove('copied'); }, TOAST_DURATION_MS);
       });
     });
 

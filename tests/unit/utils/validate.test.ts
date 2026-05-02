@@ -1,4 +1,4 @@
-import { checkEnum } from '../../../src/utils/validate.js';
+import { checkEnum, isNonEmptyString } from '../../../src/utils/validate.js';
 
 describe('checkEnum', () => {
   const sides = ['old', 'new'] as const;
@@ -20,5 +20,33 @@ describe('checkEnum', () => {
   it('uses the provided field name in the error', () => {
     expect(checkEnum('bad', 'category', ['bug', 'note'] as const))
       .toEqual({ error: 'category must be one of: bug, note' });
+  });
+});
+
+describe('isNonEmptyString', () => {
+  it('accepts a normal string', () => {
+    expect(isNonEmptyString('hello')).toBe(true);
+  });
+
+  it('accepts a string with surrounding whitespace as long as content is present', () => {
+    expect(isNonEmptyString('  hello  ')).toBe(true);
+  });
+
+  it('rejects empty string', () => {
+    expect(isNonEmptyString('')).toBe(false);
+  });
+
+  it('rejects whitespace-only strings', () => {
+    expect(isNonEmptyString('   ')).toBe(false);
+    expect(isNonEmptyString('\t\n')).toBe(false);
+  });
+
+  it('rejects non-strings', () => {
+    expect(isNonEmptyString(undefined)).toBe(false);
+    expect(isNonEmptyString(null)).toBe(false);
+    expect(isNonEmptyString(0)).toBe(false);
+    expect(isNonEmptyString(123)).toBe(false);
+    expect(isNonEmptyString({})).toBe(false);
+    expect(isNonEmptyString([])).toBe(false);
   });
 });

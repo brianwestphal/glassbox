@@ -6,6 +6,7 @@ import { join } from 'path';
 import { isChannelAlive, registerChannel, triggerChannel, unregisterChannel } from '../channel-config.js';
 import { readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import type { AppEnv } from '../types.js';
+import { isNonEmptyString } from '../utils/validate.js';
 
 export const channelApiRoutes = new Hono<AppEnv>();
 
@@ -45,6 +46,9 @@ channelApiRoutes.post('/disable', (c) => {
 /** POST /channel/trigger — send a message to Claude via the channel */
 channelApiRoutes.post('/trigger', async (c) => {
   const body = await c.req.json<{ message: string }>();
+  if (!isNonEmptyString(body.message)) {
+    return c.json({ error: 'message must be a non-empty string' }, 400);
+  }
   const repoRoot = c.get('repoRoot');
   const dataDir = join(repoRoot, '.glassbox');
   const sent = await triggerChannel(dataDir, body.message);

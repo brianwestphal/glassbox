@@ -16,7 +16,7 @@ import type { AIPlatform } from '../ai/models.js';
 import { MODELS, PLATFORMS } from '../ai/models.js';
 import { getDemoMode, isAIServiceTest } from '../debug.js';
 import type { AppEnv } from '../types.js';
-import { checkEnum } from '../utils/validate.js';
+import { checkEnum, isNonEmptyString } from '../utils/validate.js';
 
 export const aiConfigRoutes = new Hono<AppEnv>();
 
@@ -43,7 +43,7 @@ aiConfigRoutes.post('/config', async (c) => {
 
   const platformCheck = checkEnum(body.platform, 'platform', VALID_PLATFORMS);
   if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);
-  if (typeof body.model !== 'string' || body.model.trim() === '') {
+  if (!isNonEmptyString(body.model)) {
     return c.json({ error: 'model must be a non-empty string' }, 400);
   }
   if (body.guidedReview !== undefined) {
@@ -94,7 +94,7 @@ aiConfigRoutes.post('/key', async (c) => {
 
   const platformCheck = checkEnum(body.platform, 'platform', VALID_PLATFORMS);
   if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);
-  if (typeof body.key !== 'string' || body.key.trim() === '') {
+  if (!isNonEmptyString(body.key)) {
     return c.json({ error: 'key must be a non-empty string' }, 400);
   }
   const storageCheck = checkEnum(body.storage, 'storage', VALID_KEY_STORAGES);

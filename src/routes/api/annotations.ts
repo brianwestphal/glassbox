@@ -4,7 +4,7 @@ import { addAnnotation, deleteAnnotation, deleteStaleAnnotations, getAnnotations
 import { scheduleAutoExport } from '../../export/auto-export.js';
 import type { AppEnv } from '../../types.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
-import { checkEnum } from '../../utils/validate.js';
+import { checkEnum, isNonEmptyString } from '../../utils/validate.js';
 
 export const annotationsRoutes = new Hono<AppEnv>();
 
@@ -25,7 +25,7 @@ annotationsRoutes.post('/annotations', async (c) => {
     content: string;
   }>();
 
-  if (typeof body.reviewFileId !== 'string' || body.reviewFileId === '') {
+  if (!isNonEmptyString(body.reviewFileId)) {
     return c.json({ error: 'reviewFileId must be a non-empty string' }, 400);
   }
   if (typeof body.lineNumber !== 'number' || !Number.isInteger(body.lineNumber) || body.lineNumber < 1) {
@@ -35,7 +35,7 @@ annotationsRoutes.post('/annotations', async (c) => {
   if ('error' in sideCheck) return c.json({ error: sideCheck.error }, 400);
   const categoryCheck = checkEnum(body.category, 'category', VALID_CATEGORIES);
   if ('error' in categoryCheck) return c.json({ error: categoryCheck.error }, 400);
-  if (typeof body.content !== 'string' || body.content.trim() === '') {
+  if (!isNonEmptyString(body.content)) {
     return c.json({ error: 'content must be a non-empty string' }, 400);
   }
 
@@ -49,7 +49,7 @@ annotationsRoutes.post('/annotations', async (c) => {
 annotationsRoutes.patch('/annotations/:id', async (c) => {
   const { content, category } = await c.req.json<{ content: string; category: string }>();
 
-  if (typeof content !== 'string' || content.trim() === '') {
+  if (!isNonEmptyString(content)) {
     return c.json({ error: 'content must be a non-empty string' }, 400);
   }
   const categoryCheck = checkEnum(category, 'category', VALID_CATEGORIES);

@@ -5,6 +5,7 @@ import { invalidateGuidedAnalysis } from '../guided.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { state } from '../state.js';
 import { switchTheme } from '../themes.js';
+import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
@@ -119,7 +120,7 @@ function renderSettingsModal(
 
   function saveConfigDebounced() {
     if (configTimer) clearTimeout(configTimer);
-    configTimer = setTimeout(saveConfig, 300);
+    configTimer = setTimeout(saveConfig, SETTINGS_CONFIG_DEBOUNCE_MS);
   }
 
   function saveAppNameDebounced() {
@@ -130,7 +131,7 @@ function renderSettingsModal(
         void api('/project-settings', { method: 'PATCH', body: { appName: val } });
         projectSettings.appName = val || undefined;
       }
-    }, 500);
+    }, SETTINGS_APP_NAME_DEBOUNCE_MS);
   }
 
   function saveKey() {

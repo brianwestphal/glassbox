@@ -7,6 +7,7 @@ import {
   getAllThemes, resolveTheme, saveCustomTheme, setActiveThemeId,
 } from '../themes/config.js';
 import type { AppEnv } from '../types.js';
+import { isNonEmptyString } from '../utils/validate.js';
 
 export const themeApiRoutes = new Hono<AppEnv>();
 
@@ -52,7 +53,7 @@ themeApiRoutes.get('/active', (c) => {
 /** POST /themes/active — set the active theme */
 themeApiRoutes.post('/active', async (c) => {
   const body = await c.req.json<{ id: string }>();
-  if (typeof body.id !== 'string' || body.id === '') return c.json({ error: 'id must be a non-empty string' }, 400);
+  if (!isNonEmptyString(body.id)) return c.json({ error: 'id must be a non-empty string' }, 400);
 
   const theme = resolveTheme(body.id);
   if (!theme) return c.json({ error: 'Theme not found' }, 404);
@@ -64,8 +65,8 @@ themeApiRoutes.post('/active', async (c) => {
 /** POST /themes — create a new custom theme (duplicate an existing one) */
 themeApiRoutes.post('/', async (c) => {
   const body = await c.req.json<{ sourceId: string; name?: string }>();
-  if (typeof body.sourceId !== 'string' || body.sourceId === '') return c.json({ error: 'sourceId must be a non-empty string' }, 400);
-  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim() === '')) {
+  if (!isNonEmptyString(body.sourceId)) return c.json({ error: 'sourceId must be a non-empty string' }, 400);
+  if (body.name !== undefined && !isNonEmptyString(body.name)) {
     return c.json({ error: 'name must be a non-empty string when provided' }, 400);
   }
 
@@ -92,7 +93,7 @@ themeApiRoutes.post('/:id/edit', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json<{ colors?: Record<string, string>; name?: string }>();
 
-  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim() === '')) {
+  if (body.name !== undefined && !isNonEmptyString(body.name)) {
     return c.json({ error: 'name must be a non-empty string when provided' }, 400);
   }
   if (body.colors !== undefined) {
@@ -144,7 +145,7 @@ themeApiRoutes.patch('/:id', async (c) => {
 
   const body = await c.req.json<{ name?: string; colors?: Partial<typeof existing.colors> }>();
 
-  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim() === '')) {
+  if (body.name !== undefined && !isNonEmptyString(body.name)) {
     return c.json({ error: 'name must be a non-empty string when provided' }, 400);
   }
   if (body.colors !== undefined) {

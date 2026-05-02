@@ -5,6 +5,7 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { state } from '../state.js';
+import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
 import { navPush } from './navStack.js';
 import { selectFile, updateNavFilePath } from './selection.js';
 
@@ -187,6 +188,6 @@ function scrollToLine(lineNumber: number) {
     lineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
     // Brief highlight to show where we jumped to
     lineEl.classList.add('jump-highlight');
-    setTimeout(() => { lineEl.classList.remove('jump-highlight'); }, 1500);
+    setTimeout(() => { lineEl.classList.remove('jump-highlight'); }, JUMP_HIGHLIGHT_DURATION_MS);
   }
 }

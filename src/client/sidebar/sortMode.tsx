@@ -3,6 +3,7 @@ import { api, clientLog } from '../api.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { getAnalysisState, state } from '../state.js';
+import { ANALYSIS_POLL_INTERVAL_MS } from '../timing.js';
 import { renderFileList } from './fileTree.js';
 
 export function renderSortControl(): HTMLElement {
@@ -245,7 +246,7 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
         }
 
         renderFileList();
-        setTimeout(poll, 3000);
+        setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
         return;
       }
 
@@ -283,7 +284,7 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
     })();
   };
 
-  setTimeout(poll, 3000);
+  setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
 }
 
 export function invalidateAnalysisCache() {
