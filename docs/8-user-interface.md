@@ -17,6 +17,7 @@ Requirements for the browser-based UI and user interaction patterns.
 - Users shall be able to filter files by typing in the file filter input.
 - Keyboard navigation shall be supported: `j`/`k` to move between files.
 - Clicking a file shall load its diff in the main content area.
+- When the selected file changes (via keyboard navigation, click, or any other means), the sidebar shall auto-scroll (without animation) the minimum amount needed to keep the selected file visible.
 - The sidebar shall display annotation count badges per file.
 - The sidebar shall display stale annotation count indicators per file.
 

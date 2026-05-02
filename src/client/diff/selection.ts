@@ -18,9 +18,14 @@ export async function selectFile(fileId: string) {
   const file = state.files.find(f => f.id === fileId);
   navPush({ fileId, filePath: file?.file_path ?? null, scrollLine: 1 });
   updateNavFilePath(file?.file_path ?? '');
+  let activeItem: HTMLElement | null = null;
   document.querySelectorAll('.file-item').forEach(el => {
-    (el as HTMLElement).classList.toggle('active', (el as HTMLElement).dataset.fileId === fileId);
+    const item = el as HTMLElement;
+    const isActive = item.dataset.fileId === fileId;
+    item.classList.toggle('active', isActive);
+    if (isActive) activeItem = item;
   });
+  (activeItem as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
 
   const container = document.getElementById('diff-container');
   if (container === null) return;
