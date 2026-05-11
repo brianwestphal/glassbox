@@ -309,7 +309,17 @@ Point the tool at the file. The export includes an "Instructions for AI Tools" s
 
 Data stays local. The only network calls are an optional once-per-day npm update check and AI analysis requests if you opt in.
 
-> **Note:** We're actively developing and testing on macOS. Linux and Windows builds are provided but less tested — if you run into issues on those platforms, please [open an issue](https://github.com/brianwestphal/glassbox/issues).
+## Platform support
+
+Glassbox is developed and **actively tested on macOS** (Apple Silicon and Intel). Linux and Windows builds are produced by the same codebase and are intended to work, but they are **not regularly exercised** by the maintainers, so rough edges are likely.
+
+If you use Glassbox on Linux or Windows, contributions are very welcome:
+
+- **Try it and report back** — even a "works for me on Ubuntu 24.04" / "crashes on Windows 11 with X" comment is useful.
+- **File issues** for anything that breaks or feels off — [open an issue](https://github.com/brianwestphal/glassbox/issues).
+- **Send pull requests** for platform-specific fixes, packaging improvements, or test coverage.
+
+The goal is genuine cross-platform support; we just don't have the cycles to validate every release on every OS without help.
 
 ## Development
 

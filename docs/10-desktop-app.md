@@ -55,6 +55,7 @@ The desktop app shall support three launch flows:
 - The desktop app shall be distributed for: macOS (Apple Silicon + Intel), Linux (x86_64), and Windows (x86_64).
 - macOS builds shall be code-signed and notarized with Apple Developer credentials.
 - CI/CD shall produce all platform artifacts on git tag push via GitHub Actions.
+- **Active testing is performed only on macOS.** Linux and Windows builds are produced by the same pipeline and intended to work, but are not regularly exercised by the maintainers. Documentation (`README.md`) shall make this explicit and invite external contributors to test, file issues, and submit fixes for Linux and Windows.
 
 ### 10.8 CLI Symlink
 

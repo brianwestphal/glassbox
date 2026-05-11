@@ -258,6 +258,12 @@ x86_64. macOS builds are signed and notarized. CI builds all artifacts on
 `v*` tag push. The CLI symlink points into the installed app bundle so
 updates automatically update the CLI with no re-install.
 
+**Active testing is macOS-only.** Linux and Windows builds are produced
+by the same pipeline and intended to work, but are not regularly
+exercised by the maintainers. `README.md` calls this out explicitly and
+invites external contributors to test, file issues, and submit fixes for
+those platforms.
+
 ## 12. Build and distribution (`11-build-and-distribution.md`) — **Shipped**
 
 `npm i -g glassbox` ships a single-file server bundle (`dist/cli.js`)
