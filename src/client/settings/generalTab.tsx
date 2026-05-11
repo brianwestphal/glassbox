@@ -1,5 +1,6 @@
+import type { SafeHtml } from 'kerfjs';
+
 import { IconSliders } from '../../icons.js';
-import type { SafeHtml } from '../../jsx-runtime.js';
 import { triggerShare } from '../share.js';
 import type { Tab, TabContext } from './tabContext.js';
 

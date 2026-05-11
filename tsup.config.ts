@@ -13,17 +13,13 @@ export default defineConfig([
     clean: true,
     sourcemap: true,
     // Bundle everything except node_modules dependencies
-    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg|@modelcontextprotocol)/],
+    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg|@modelcontextprotocol|kerfjs|@preact)/],
     define: {
       'process.env.BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
     },
     esbuildOptions(options) {
       options.jsx = 'automatic';
-      options.jsxImportSource = '#jsx';
-      // Resolve the #jsx import to our local jsx-runtime
-      options.alias = {
-        '#jsx/jsx-runtime': './src/jsx-runtime.ts',
-      };
+      options.jsxImportSource = 'kerfjs';
     },
     banner: {
       js: '#!/usr/bin/env node',
@@ -42,10 +38,7 @@ export default defineConfig([
     minify: true,
     esbuildOptions(options) {
       options.jsx = 'automatic';
-      options.jsxImportSource = '#jsx';
-      options.alias = {
-        '#jsx/jsx-runtime': './src/jsx-runtime.ts',
-      };
+      options.jsxImportSource = 'kerfjs';
     },
     onSuccess: async () => {
       // Build SCSS

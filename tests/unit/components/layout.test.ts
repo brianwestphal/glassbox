@@ -4,7 +4,7 @@ vi.mock('../../../src/themes/config.js', () => ({
 }));
 
 import { Layout } from '../../../src/components/layout.js';
-import { raw } from '../../../src/jsx-runtime.js';
+import { raw } from 'kerfjs';
 
 describe('Layout', () => {
   it('renders an HTML page structure', () => {

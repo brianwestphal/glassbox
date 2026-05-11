@@ -1,4 +1,4 @@
-import type { SafeHtml } from '../../jsx-runtime.js';
+import type { SafeHtml } from 'kerfjs';
 
 export interface ChannelState {
   enabled: boolean;

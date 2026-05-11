@@ -1,7 +1,6 @@
-import type { SafeHtml } from '../jsx-runtime.js';
+import type { SafeHtml } from 'kerfjs';
+import { toElement as kerfToElement } from 'kerfjs';
 
 export function toElement(html: SafeHtml | string): HTMLElement {
-  const tpl = document.createElement('template');
-  tpl.innerHTML = String(html).trim();
-  return tpl.content.firstElementChild as HTMLElement;
+  return kerfToElement(html) as HTMLElement;
 }

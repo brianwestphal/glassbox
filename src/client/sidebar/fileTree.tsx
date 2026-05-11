@@ -1,5 +1,6 @@
+import type { SafeHtml } from 'kerfjs';
+
 import { parseDiffData } from '../../git/parseDiffData.js';
-import type { SafeHtml } from '../../jsx-runtime.js';
 import { api, clientLog } from '../api.js';
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';

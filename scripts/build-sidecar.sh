@@ -92,7 +92,7 @@ cp dist/client/history.global.js "$SERVER_DIR/client/"
 cp dist/client/styles.css "$SERVER_DIR/client/"
 
 # Copy only the external runtime dependencies (PGLite, Hono, @hono, resvg)
-for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm; do
+for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm kerfjs @preact/signals-core; do
   dest="$SERVER_DIR/node_modules/$pkg"
   mkdir -p "$(dirname "$dest")"
   cp -R "node_modules/$pkg" "$dest"

@@ -50,7 +50,7 @@ export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[];
                       <span className={`status-badge ${r.status}`} style="margin-left:8px">{titleCase(r.status)}</span>
                     </h3>
                     <div className="meta">
-                      ID: {r.id} | Created: {r.created_at}
+                      ID: {r.id} | Created: {String(r.created_at)}
                     </div>
                     {!isCurrent ? (
                       <button className="delete-review-btn" data-delete-id={r.id} title="Delete review"><IconTrash16 /></button>

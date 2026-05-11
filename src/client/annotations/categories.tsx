@@ -1,4 +1,5 @@
-import type { SafeHtml } from '../../jsx-runtime.js';
+import type { SafeHtml } from 'kerfjs';
+
 import { toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
 

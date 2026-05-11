@@ -1,6 +1,7 @@
+import type { SafeHtml } from 'kerfjs';
+
 import type { Review, ReviewFile } from '../db/queries.js';
 import { IconActualSize, IconFit, IconZoomIn, IconZoomOut } from '../icons.js';
-import type { SafeHtml } from '../jsx-runtime.js';
 import { FileList } from './fileList.js';
 
 interface ReviewShellProps {

@@ -64,7 +64,7 @@ describe('FR-14.4.3: API keys not exposed in errors', () => {
 
 describe('NFR-8.8.4: XSS prevention via SafeHtml', () => {
   it('jsx runtime auto-escapes string children', async () => {
-    const { jsx } = await import('../../../src/jsx-runtime.js');
+    const { jsx } = await import('kerfjs/jsx-runtime');
     const result = jsx('div', { children: '<script>alert("xss")</script>' });
     const html = result.toString();
     expect(html).not.toContain('<script>');
@@ -72,7 +72,7 @@ describe('NFR-8.8.4: XSS prevention via SafeHtml', () => {
   });
 
   it('jsx runtime escapes attribute values', async () => {
-    const { jsx } = await import('../../../src/jsx-runtime.js');
+    const { jsx } = await import('kerfjs/jsx-runtime');
     const result = jsx('div', { title: '"><script>alert(1)</script>' });
     const html = result.toString();
     expect(html).not.toContain('"><script>');

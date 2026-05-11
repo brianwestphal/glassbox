@@ -1,5 +1,6 @@
+import type { SafeHtml } from 'kerfjs';
+
 import { IconCheck, IconFlask } from '../../icons.js';
-import type { SafeHtml } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { TOAST_DURATION_MS } from '../timing.js';
 import type { ChannelState, KeyStatusInfo, Tab, TabContext } from './tabContext.js';
@@ -78,7 +79,7 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
           <div className="settings-key-input-group">
             <div className="settings-key-row">
               <input type="password" className="settings-input" id="settings-key"
-                placeholder="Enter API key..." autocomplete="off" />
+                placeholder="Enter API key..." autoComplete="off" />
               <button className="btn btn-xs btn-primary" id="save-key-btn">Save Key</button>
             </div>
             {keyStatus.keychainAvailable ? (

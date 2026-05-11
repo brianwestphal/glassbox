@@ -1,8 +1,9 @@
+import type { SafeHtml } from 'kerfjs';
+
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import { IconEdit, IconReveal, IconTrash } from '../icons.js';
-import type { SafeHtml } from '../jsx-runtime.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { ImageDiff } from './imageDiff.js';
 
@@ -330,7 +331,7 @@ function AnnotationRows({ annotations }: { annotations: Annotation[] }) {
       {annotations.map(a => (
         <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
           data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
-          <span className="annotation-drag-handle" draggable="true" title="Drag to move">⠿</span>
+          <span className="annotation-drag-handle" draggable={true} title="Drag to move">⠿</span>
           <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
           <span className="annotation-text">{a.content}</span>
           <div className="annotation-actions">

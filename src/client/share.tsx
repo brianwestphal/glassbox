@@ -31,7 +31,7 @@ export async function triggerShare(): Promise<void> {
       });
       return;
     } catch {
-      // User cancelled or share failed — fall through to clipboard
+      // User canceled or share failed — fall through to clipboard
     }
   }
   // Fallback: copy to clipboard

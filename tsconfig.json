@@ -14,10 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "#jsx",
-    "paths": {
-      "#jsx/jsx-runtime": ["./src/jsx-runtime.ts"]
-    }
+    "jsxImportSource": "kerfjs"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]

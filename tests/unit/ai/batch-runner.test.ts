@@ -74,7 +74,7 @@ describe('runBatches', () => {
     expect(results).toEqual([]);
   });
 
-  it('stops starting new batches when cancelled', async () => {
+  it('stops starting new batches when canceled', async () => {
     let callCount = 0;
     const process = vi.fn().mockImplementation(async () => {
       callCount++;

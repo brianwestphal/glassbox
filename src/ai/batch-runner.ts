@@ -69,10 +69,10 @@ export async function runBatches<T>(
   const running = new Set<Promise<void>>();
 
   while (nextIndex < batches.length || running.size > 0) {
-    // Start new batches up to concurrency limit — but not if cancelled
+    // Start new batches up to concurrency limit — but not if canceled
     while (nextIndex < batches.length && running.size < concurrency) {
       if (shouldCancel !== undefined && shouldCancel()) {
-        debugLog(`${tag}Batch runner cancelled — skipping batch ${String(nextIndex)} and ${String(batches.length - nextIndex - 1)} remaining`);
+        debugLog(`${tag}Batch runner canceled — skipping batch ${String(nextIndex)} and ${String(batches.length - nextIndex - 1)} remaining`);
         // Skip all remaining batches
         nextIndex = batches.length;
         break;

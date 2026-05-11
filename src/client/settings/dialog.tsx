@@ -1,4 +1,5 @@
-import type { SafeHtml } from '../../jsx-runtime.js';
+import type { SafeHtml } from 'kerfjs';
+
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';

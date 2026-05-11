@@ -1,5 +1,6 @@
+import type { SafeHtml } from 'kerfjs';
+
 import { IconUser } from '../../icons.js';
-import type { SafeHtml } from '../../jsx-runtime.js';
 import type { Tab, TabContext } from './tabContext.js';
 
 export const TOP_LANGUAGES: Array<[string, string]> = [

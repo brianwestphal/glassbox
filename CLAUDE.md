@@ -200,7 +200,7 @@ The build produces:
 
 In dev mode (`npm run dev` or `tauri:dev`), external packages resolve from the project's `node_modules/` automatically. In production Tauri builds, the sidecar runs from `src-tauri/server/` with only the explicitly copied packages available. Forgetting step 2 causes "module not found" errors that only appear in production.
 
-Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`
+Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`)
 
 ## Testing
 
@@ -234,6 +234,7 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 - Hono context variables (`reviewId`, `repoRoot`) are typed via `AppEnv` in `src/types.ts`
 - Server-rendered HTML for initial page load; client JS for interactivity
 - Client CSS and JS are built separately and served as static files — never inlined in layout
+- **Always use American-English spelling and grammar** in all source files — code, comments, identifiers, log/error messages, UI strings, documentation, and commit messages. Prefer `color`/`behavior`/`canceled`/`canceling`/`finalize`/`organize`/`customize`/`optimize`/`analyze`/`initialize`/`center`/`gray` over their British variants (`colour`/`behaviour`/`cancelled`/`cancelling`/`finalise`/`organise`/`customise`/`optimise`/`analyse`/`initialise`/`centre`/`grey`). This applies equally to TypeScript, Rust, SCSS, Markdown, and shell scripts.
 
 ## Ticket-Driven Work
 

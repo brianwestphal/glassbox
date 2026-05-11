@@ -1,5 +1,6 @@
+import { raw } from 'kerfjs';
+
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash } from '../../icons.js';
-import { raw } from '../../jsx-runtime.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { applyThemeColors, switchTheme } from '../themes.js';

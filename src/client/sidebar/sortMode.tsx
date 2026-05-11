@@ -267,9 +267,9 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
       if (result.status === 'failed') {
         const raw = result.error ?? 'Analysis failed';
         clientLog(`poll(${mode}): failed — ${raw}`);
-        // If cancelled (user switched modes then came back), auto-retry with caching
-        if (raw === 'Cancelled' && mode === state.sortMode) {
-          clientLog(`poll(${mode}): auto-retrying cancelled analysis`);
+        // If canceled (user switched modes then came back), auto-retry with caching
+        if (raw === 'Canceled' && mode === state.sortMode) {
+          clientLog(`poll(${mode}): auto-retrying canceled analysis`);
           modeState.status = 'idle'; // Reset so triggerAnalysis doesn't skip
           triggerAnalysis(mode);
           return;

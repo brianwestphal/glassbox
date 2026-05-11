@@ -38,10 +38,10 @@ const VALID_SVG_VIEW_MODES = ['code', 'rendered'] as const;
 const VALID_IMAGE_MODES = ['metadata', 'side-by-side', 'difference', 'slice'] as const;
 const VALID_ANALYSIS_TYPES = ['risk', 'narrative', 'guided'] as const;
 
-// Track cancelled analysis IDs — checked by batch runner before starting new batches.
+// Track canceled analysis IDs — checked by batch runner before starting new batches.
 // When a user switches from risk→narrative (or vice versa), the old analysis is added here.
 // Switching to folder mode does NOT cancel anything.
-const cancelledAnalyses = new Set<string>();
+const canceledAnalyses = new Set<string>();
 
 // --- Analysis ---
 
@@ -74,13 +74,13 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
 
   // When invalidating cache, cancel running analyses of all types
   if (invalidateCache) {
-    debugLog('POST /analyze: invalidateCache=true, cancelling all running analyses');
+    debugLog('POST /analyze: invalidateCache=true, canceling all running analyses');
     for (const type of ['risk', 'narrative', 'guided'] as const) {
       const running = await getLatestAnalysis(reviewId, type);
       if (running !== undefined && running.status === 'running') {
-        debugLog(`POST /analyze: cancelling ${type} analysis id=${running.id}`);
-        cancelledAnalyses.add(running.id);
-        await updateAnalysisStatus(running.id, 'failed', 'Cancelled');
+        debugLog(`POST /analyze: canceling ${type} analysis id=${running.id}`);
+        canceledAnalyses.add(running.id);
+        await updateAnalysisStatus(running.id, 'failed', 'Canceled');
       }
     }
   } else if (analysisType === 'risk' || analysisType === 'narrative') {
@@ -88,8 +88,8 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
     const otherType = analysisType === 'risk' ? 'narrative' : 'risk';
     const otherRunning = await getLatestAnalysis(reviewId, otherType);
     if (otherRunning !== undefined && otherRunning.status === 'running') {
-      debugLog(`POST /analyze: cancelling ${otherType} analysis id=${otherRunning.id} (switching to ${analysisType})`);
-      cancelledAnalyses.add(otherRunning.id);
+      debugLog(`POST /analyze: canceling ${otherType} analysis id=${otherRunning.id} (switching to ${analysisType})`);
+      canceledAnalyses.add(otherRunning.id);
     }
   }
 
@@ -147,7 +147,7 @@ interface ExecuteAnalysisInput {
 
 /**
  * Run the full analysis pipeline for a single `analyses` row: cache
- * carry-forward, binary file scoring, batch dispatch, finalise, and
+ * carry-forward, binary file scoring, batch dispatch, finalize, and
  * cancellation handling. Wraps the whole body in a try/catch so
  * background errors surface in the analysis row's status.
  */
@@ -235,7 +235,7 @@ async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
       return;
     }
 
-    const shouldCancel = () => cancelledAnalyses.has(analysisId);
+    const shouldCancel = () => canceledAnalyses.has(analysisId);
     const progressOffset = cachedScores.length + binaryFiles.length;
 
     const runArgs = [analysisId, filteredBatches, files.length, totalForProgress, progressOffset] as const;
@@ -247,15 +247,15 @@ async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
       await runBatchedAnalysis(...runArgs, guidedAnalysisConfig(config, repoRoot, fileIdMap, guidedReview), shouldCancel);
     }
 
-    // Check if this analysis was cancelled while running (user switched modes)
-    if (cancelledAnalyses.has(analysisId)) {
-      cancelledAnalyses.delete(analysisId);
-      debugLog(`Analysis ${analysisId} was cancelled (user switched modes)`);
-      await updateAnalysisStatus(analysisId, 'failed', 'Cancelled');
+    // Check if this analysis was canceled while running (user switched modes)
+    if (canceledAnalyses.has(analysisId)) {
+      canceledAnalyses.delete(analysisId);
+      debugLog(`Analysis ${analysisId} was canceled (user switched modes)`);
+      await updateAnalysisStatus(analysisId, 'failed', 'Canceled');
       return;
     }
 
-    cancelledAnalyses.delete(analysisId);
+    canceledAnalyses.delete(analysisId);
     debugLog(`Analysis ${analysisId} completed successfully`);
     await updateAnalysisStatus(analysisId, 'completed');
   } catch (err: unknown) {

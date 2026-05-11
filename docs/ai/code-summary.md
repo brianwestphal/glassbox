@@ -351,7 +351,7 @@ user triggers /api/ai/analyze
         client.ts.sendAIRequest → Anthropic/OpenAI/Google HTTP
         shared.ts.extractJSON → parse structured response
         write ai_file_scores rows
-  → final status: completed | failed (error_message) | cancelled
+  → final status: completed | failed (error_message) | canceled
 ```
 
 Cancellation is cooperative via `cancelledAnalyses` in `ai-analysis.ts`;

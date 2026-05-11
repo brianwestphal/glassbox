@@ -14,7 +14,7 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
     <div className="annotation-form-container">
       <div className="annotation-form">
         {buildCategoryBadge(defaultCategory)}
-        <textarea placeholder="Enter your annotation..." autofocus></textarea>
+        <textarea placeholder="Enter your annotation..." autoFocus></textarea>
         <div className="annotation-form-actions">
           <button className="btn btn-sm cancel-btn">Cancel</button>
           <button className="btn btn-sm btn-primary annotation-save-btn">Save</button>

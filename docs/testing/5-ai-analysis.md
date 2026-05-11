@@ -22,7 +22,7 @@ All AI tests should use mocked HTTP responses. No real API calls in automated te
 - **Partial failure with retry** — One batch gets a 429 rate limit error, then succeeds on retry. Verify retry occurs with backoff and final result includes all files.
 - **Permanent failure** — A batch fails with a 400 error (no retry). Verify the analysis is marked `failed` with an error message.
 - **Progress tracking** — During a multi-batch run, verify progress updates are recorded (completed_batches / total_batches) at each step.
-- **Cancellation** — Cancel an analysis mid-run. Verify no further batches are executed and the analysis is marked cancelled.
+- **Cancellation** — Cancel an analysis mid-run. Verify no further batches are executed and the analysis is marked canceled.
 - **Concurrency limit** — Verify batches respect the concurrency limit (not all running simultaneously).
 
 ### AI API Client (`client.ts`)
@@ -91,7 +91,7 @@ Keychain tests should mock the shell commands (`security`, `secret-tool`, PowerS
 - **Narrative analysis end-to-end** — Same flow for narrative ordering.
 - **Analysis caching** — Run analysis, verify results are cached. Request again, verify no new AI calls are made.
 - **Cache invalidation** — Invalidate cache, re-run analysis. Verify fresh AI calls are made.
-- **Analysis cancellation** — Start a risk analysis, switch to narrative mode. Verify the risk analysis is cancelled and narrative proceeds.
+- **Analysis cancellation** — Start a risk analysis, switch to narrative mode. Verify the risk analysis is canceled and narrative proceeds.
 - **Settings change invalidation** — Change guided review settings, verify risk/narrative caches are invalidated.
 
 ### Error Recovery
@@ -106,4 +106,4 @@ Keychain tests should mock the shell commands (`security`, `secret-tool`, PowerS
 - **Single-file analysis** — Only one file in the review. Verify narrative ordering produces a single entry.
 - **Very large diffs** — Files with thousands of lines of changes. Verify context summarization kicks in and stays within token budgets.
 - **AI returns non-JSON** — The model outputs natural language instead of JSON. Verify the error is handled and reported.
-- **Rapid re-triggers** — Trigger analysis twice in quick succession. Verify the first is cancelled cleanly before the second starts.
+- **Rapid re-triggers** — Trigger analysis twice in quick succession. Verify the first is canceled cleanly before the second starts.

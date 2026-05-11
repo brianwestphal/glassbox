@@ -179,7 +179,7 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
             .map_err(|e| format!("Failed to run osascript: {e}"))?;
 
         if !status.success() {
-            return Err("Installation cancelled or failed".to_string());
+            return Err("Installation canceled or failed".to_string());
         }
     }
 

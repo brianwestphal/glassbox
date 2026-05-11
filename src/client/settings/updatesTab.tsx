@@ -1,5 +1,6 @@
+import type { SafeHtml } from 'kerfjs';
+
 import { IconDownload } from '../../icons.js';
-import type { SafeHtml } from '../../jsx-runtime.js';
 import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import type { Tab, TabContext } from './tabContext.js';
 
