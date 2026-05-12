@@ -12,6 +12,11 @@ async function openFile(page: import('@playwright/test').Page, fileText?: string
   }
   // Wait for diff content to fully load (fetched via API, then rendered into #diff-container)
   await expect(page.locator('.diff-header .file-path')).toBeVisible({ timeout: 5000 });
+  // The diff loads async, so the first visible `.diff-view` may briefly belong
+  // to an auto-selected initial file before the click-driven fetch resolves.
+  if (fileText) {
+    await expect(page.locator('.diff-view')).toHaveAttribute('data-file-path', new RegExp(fileText), { timeout: 5000 });
+  }
 }
 
 // Helper: open a modified file (session.ts has remove+add pairs for char diff testing)

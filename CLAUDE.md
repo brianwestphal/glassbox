@@ -138,12 +138,10 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `sidebar/sortMode.tsx` — Analysis polling logic: `switchSortMode`, `triggerAnalysis`, `loadAnalysisResults`, `invalidateAnalysisCache`
 - `sidebar/riskPopover.tsx` — Per-file risk dimension popover
 - `sidebar/fileTree.tsx` — `loadFiles()` API call (populates `reviewStore`)
-- `diff/selection.ts` — File selection
-- `diff/hunkExpander.tsx` — Context expansion
-- `diff/lineClicks.ts` — Diff line click handling
-- `diff/mode.ts` — Diff mode toggle, wrap toggle, scroll sync
-- `diff/imageDiff/` — Image comparison split by concern: `index.ts` (orchestration + zoom wiring), `zoom.ts` (zoom state via `WeakMap`, pan, clamp), `sliceTool.ts` (slice geometry + clip-path), `metadata.ts` (metadata diff loading)
-- `diff/dragDrop.ts` — Annotation drag-and-drop
+- `diff/index.tsx` — `initDiffView()` orchestrator: kerf `mount()` onto `#diff-container`, async fetch effect that requests `/file/:id` when `(currentFileId, diffMode, ignoreWhitespace, svgViewMode)` change, post-render effect that runs highlight + outline + annotation binding + AI notes, and `delegate()` handlers for hunk-separator clicks, diff-line clicks → annotation form, and drag-and-drop. The mount renders a single `<div data-key="gen-N" data-morph-skip>{raw(html)}</div>` wrapper — the server-rendered diff HTML lives under `data-morph-skip` so highlight.js, hunk expansion, and image-diff widgets can mutate it freely without kerf undoing them. Bumping the generation forces the whole subtree to be replaced (file/mode/whitespace switch).
+- `diff/selection.ts` — `selectFile()`: updates `currentFileId`, navStack, marks-as-reviewed. All DOM/fetch work flows through the diff mount.
+- `diff/hunkExpander.tsx` — `handleHunkExpand(el)`: surgical `replaceWith()` to splice fetched context lines into the live tree (safe under `data-morph-skip`).
+- `diff/imageDiff/` — Image comparison: `index.ts` (orchestration + zoom wiring), `zoom.ts` (zoom state via `WeakMap`, pan, clamp), `sliceTool.ts` (slice geometry + clip-path), `metadata.ts` (metadata diff loading). Runs imperatively inside the morph-skipped diff content.
 - `annotations/form.tsx` — Annotation creation form
 - `annotations/render.tsx` — Annotation inline rendering
 - `annotations/events.tsx` — Annotation CRUD events, reclassify, edit

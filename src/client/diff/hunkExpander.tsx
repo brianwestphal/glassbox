@@ -1,8 +1,6 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { applyHighlighting } from './highlight.js';
-import { bindDiffLineClicks } from './lineClicks.js';
-import { syncSplitColumnHeights } from './splitSync.js';
+import { postHunkExpand } from './index.js';
 
 function buildUnifiedContextLines(lines: Array<{ num: number; content: string }>): DocumentFragment {
   const fragment = document.createDocumentFragment();
@@ -67,93 +65,84 @@ function replaceSplitSeparators(
   }
 }
 
-export function bindHunkExpanders() {
-  document.querySelectorAll('.hunk-separator:not(.hunk-expander-tail)').forEach(el => {
-    el.addEventListener('click', () => {
-      const fileId = getFileId();
-      if (fileId === undefined || fileId === '') return;
+/** Click handler for a hunk-separator (or tail expander). Surgical: inserts the
+ *  fetched context lines into the live tree in place of the separator. Safe to
+ *  run under `data-morph-skip` because the parent never re-renders that subtree. */
+export function handleHunkExpand(el: HTMLElement): void {
+  const fileId = getFileId();
+  if (fileId === undefined || fileId === '') return;
 
-      const splitCol = el.closest('.split-col');
-      let gapStart: number;
-      let gapEnd: number;
+  if (el.classList.contains('hunk-expander-tail')) {
+    handleTailExpand(el, fileId);
+    return;
+  }
 
-      if (splitCol !== null) {
-        // Split mode: use pre-computed data attributes
-        gapStart = parseInt((el as HTMLElement).dataset.gapStart ?? '0', 10);
-        gapEnd = parseInt((el as HTMLElement).dataset.gapEnd ?? '0', 10);
-      } else {
-        // Unified mode: compute from DOM structure
-        const hunkBlock = el.closest('.hunk-block');
-        const prevBlock = hunkBlock?.previousElementSibling;
-        const newStart = parseInt((el as HTMLElement).dataset.newStart ?? '0', 10);
-        gapStart = 1;
-        if (prevBlock !== undefined && prevBlock !== null) {
-          const prevSep = prevBlock.querySelector<HTMLElement>('.hunk-separator');
-          if (prevSep !== null) {
-            gapStart = parseInt(prevSep.dataset.newStart ?? '0', 10) + parseInt(prevSep.dataset.newCount ?? '0', 10);
-          }
-        }
-        gapEnd = newStart - 1;
+  const splitCol = el.closest('.split-col');
+  let gapStart: number;
+  let gapEnd: number;
+
+  if (splitCol !== null) {
+    gapStart = parseInt(el.dataset.gapStart ?? '0', 10);
+    gapEnd = parseInt(el.dataset.gapEnd ?? '0', 10);
+  } else {
+    const hunkBlock = el.closest('.hunk-block');
+    const prevBlock = hunkBlock?.previousElementSibling;
+    const newStart = parseInt(el.dataset.newStart ?? '0', 10);
+    gapStart = 1;
+    if (prevBlock !== undefined && prevBlock !== null) {
+      const prevSep = prevBlock.querySelector<HTMLElement>('.hunk-separator');
+      if (prevSep !== null) {
+        gapStart = parseInt(prevSep.dataset.newStart ?? '0', 10) + parseInt(prevSep.dataset.newCount ?? '0', 10);
       }
+    }
+    gapEnd = newStart - 1;
+  }
 
-      if (gapEnd < gapStart) return;
+  if (gapEnd < gapStart) return;
 
-      void (async () => {
-        const data = await api<{ lines: Array<{ num: number; content: string }> }>(`/context/${fileId}?start=${String(gapStart)}&end=${String(gapEnd)}`);
-        if (data.lines.length === 0) return;
+  void (async () => {
+    const data = await api<{ lines: Array<{ num: number; content: string }> }>(
+      `/context/${fileId}?start=${String(gapStart)}&end=${String(gapEnd)}`);
+    if (data.lines.length === 0) return;
 
-        if (splitCol !== null) {
-          const otherSep = findOtherSeparator(el, splitCol);
-          replaceSplitSeparators(el, splitCol, otherSep, data.lines);
-        } else {
-          el.replaceWith(buildUnifiedContextLines(data.lines));
-        }
+    if (splitCol !== null) {
+      const otherSep = findOtherSeparator(el, splitCol);
+      replaceSplitSeparators(el, splitCol, otherSep, data.lines);
+    } else {
+      el.replaceWith(buildUnifiedContextLines(data.lines));
+    }
+    postHunkExpand();
+  })();
+}
 
-        applyHighlighting();
-        syncSplitColumnHeights();
-        bindDiffLineClicks();
-      })();
-    });
-  });
+function handleTailExpand(el: HTMLElement, fileId: string): void {
+  const start = parseInt(el.dataset.start ?? '0', 10);
+  if (start <= 0) return;
 
-  document.querySelectorAll('.hunk-expander-tail').forEach(el => {
-    el.addEventListener('click', () => {
-      const fileId = getFileId();
-      if (fileId === undefined || fileId === '') return;
+  const splitCol = el.closest('.split-col');
 
-      const start = parseInt((el as HTMLElement).dataset.start ?? '0', 10);
-      if (start <= 0) return;
+  void (async () => {
+    const data = await api<{ lines: Array<{ num: number; content: string }> }>(
+      `/context/${fileId}?start=${String(start)}&end=999999`);
+    if (data.lines.length === 0) {
+      if (splitCol !== null) {
+        const splitColumns = splitCol.closest('.split-columns');
+        splitColumns?.querySelectorAll('.hunk-expander-tail').forEach(t => { t.remove(); });
+      } else {
+        el.remove();
+      }
+      return;
+    }
 
-      const splitCol = el.closest('.split-col');
-
-      void (async () => {
-        const data = await api<{ lines: Array<{ num: number; content: string }> }>(`/context/${fileId}?start=${String(start)}&end=999999`);
-        if (data.lines.length === 0) {
-          if (splitCol !== null) {
-            // Remove both tail expanders
-            const splitColumns = splitCol.closest('.split-columns');
-            splitColumns?.querySelectorAll('.hunk-expander-tail').forEach(t => { t.remove(); });
-          } else {
-            el.remove();
-          }
-          return;
-        }
-
-        if (splitCol !== null) {
-          // Find matching tail in the other column
-          const splitColumns = splitCol.closest('.split-columns');
-          const isLeft = splitCol.classList.contains('split-col-left');
-          const otherColClass = isLeft ? 'split-col-right' : 'split-col-left';
-          const otherTail = splitColumns?.querySelector<HTMLElement>(`.${otherColClass} .hunk-expander-tail`) ?? null;
-          replaceSplitSeparators(el, splitCol, otherTail, data.lines);
-        } else {
-          el.replaceWith(buildUnifiedContextLines(data.lines));
-        }
-
-        applyHighlighting();
-        syncSplitColumnHeights();
-        bindDiffLineClicks();
-      })();
-    });
-  });
+    if (splitCol !== null) {
+      const splitColumns = splitCol.closest('.split-columns');
+      const isLeft = splitCol.classList.contains('split-col-left');
+      const otherColClass = isLeft ? 'split-col-right' : 'split-col-left';
+      const otherTail = splitColumns?.querySelector<HTMLElement>(`.${otherColClass} .hunk-expander-tail`) ?? null;
+      replaceSplitSeparators(el, splitCol, otherTail, data.lines);
+    } else {
+      el.replaceWith(buildUnifiedContextLines(data.lines));
+    }
+    postHunkExpand();
+  })();
 }

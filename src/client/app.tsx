@@ -2,9 +2,9 @@ import { IconGear, IconRefresh } from "../icons.js";
 import { api, initDebug } from "./api.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
-import { initScrollSync } from "./diff/mode.js";
+import { initDiffView, updateNavFilePath } from "./diff/index.js";
 import { getVisibleScrollLine, navBack, navForward, navUpdateScroll, setNavigating } from "./diff/navStack.js";
-import { selectFile,updateNavFilePath  } from "./diff/selection.js";
+import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
 import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
@@ -223,12 +223,12 @@ async function init() {
     triggerGuidedAnalysis();
   }
 
+  initDiffView();
   bindToolbar();
   bindFind();
   bindGoToDefinition();
   bindCompleteButton();
   bindReopenButton();
-  initScrollSync();
   updateProgress();
   document.addEventListener("dragend", () => {
     dragStore.actions.setAnnotation(null);

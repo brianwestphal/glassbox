@@ -13,6 +13,10 @@ async function openFile(page: import('@playwright/test').Page, nameText: string)
   await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
   await page.locator('.file-item .file-name', { hasText: nameText }).click();
   await expect(page.locator('.diff-view')).toBeVisible();
+  // Wait for the requested file's content to settle — the diff loads async,
+  // so the visible `.diff-view` may briefly belong to a different file
+  // (e.g. an auto-selected initial file) before the click-driven fetch resolves.
+  await expect(page.locator('.diff-view')).toHaveAttribute('data-file-path', new RegExp(nameText), { timeout: 5000 });
 }
 
 test.describe('Pre-existing annotations', () => {
