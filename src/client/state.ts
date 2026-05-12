@@ -46,10 +46,6 @@ export function defaultAnalysisModeState(): AnalysisModeState {
   return { status: 'idle', error: null, progressCompleted: 0, progressTotal: 0 };
 }
 
-export function getAnalysisState(mode: 'risk' | 'narrative'): AnalysisModeState {
-  return mode === 'risk' ? state.riskAnalysis : state.narrativeAnalysis;
-}
-
 export interface FileNotes {
   overview: string;
   lines: Array<{ line: number; content: string }>;
@@ -70,74 +66,6 @@ export interface NarrativeFileOrder {
   position: number;
   rationale: string;
 }
-
-export interface AppState {
-  reviewId: string;
-  currentFileId: string | null;
-  diffMode: 'split' | 'unified';
-  wrapLines: boolean;
-  ignoreWhitespace: boolean;
-  lastImageMode: string;
-  svgViewMode: 'code' | 'rendered';
-  files: ReviewFile[];
-  fileOrder: string[];
-  annotationCounts: Record<string, number>;
-  staleCounts: Record<string, number>;
-  filterText: string;
-  highlightLang: string;
-  highlightAuto: boolean;
-  _detectedLang: string;
-  _dragAnnotation: DragAnnotation | null;
-  collapsedFolders: Set<string>;
-  // AI sorting
-  sortMode: SortMode;
-  riskScores: RiskFileScore[] | null;
-  narrativeOrder: NarrativeFileOrder[] | null;
-  riskAnalysis: AnalysisModeState;
-  narrativeAnalysis: AnalysisModeState;
-  aiConfigured: boolean;
-  guidedReviewEnabled: boolean;
-  riskSortDimension: string;
-  showRiskScores: boolean;
-  // AI notes keyed by reviewFileId
-  fileNotes: Record<string, FileNotes>;
-  // Guided review (separate from risk/narrative)
-  guidedAnalysis: AnalysisModeState;
-  guidedNotes: Record<string, FileNotes>;
-}
-
-export const state: AppState = {
-  reviewId: document.body.dataset.reviewId ?? '',
-  currentFileId: null,
-  diffMode: 'split',
-  wrapLines: false,
-  ignoreWhitespace: false,
-  lastImageMode: 'metadata',
-  svgViewMode: 'code',
-  files: [],
-  fileOrder: [],
-  annotationCounts: {},
-  staleCounts: {},
-  filterText: '',
-  highlightLang: 'plaintext',
-  highlightAuto: true,
-  _detectedLang: 'plaintext',
-  _dragAnnotation: null,
-  collapsedFolders: new Set(),
-  // AI sorting
-  sortMode: 'folder',
-  riskScores: null,
-  narrativeOrder: null,
-  riskAnalysis: defaultAnalysisModeState(),
-  narrativeAnalysis: defaultAnalysisModeState(),
-  aiConfigured: false,
-  guidedReviewEnabled: false,
-  riskSortDimension: 'aggregate',
-  showRiskScores: false,
-  fileNotes: {},
-  guidedAnalysis: defaultAnalysisModeState(),
-  guidedNotes: {},
-};
 
 export const CATEGORIES: Category[] = [
   { value: 'bug', label: 'Bug' },

@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
-import { state } from '../state.js';
+import { reviewStore } from '../stores/index.js';
 import { TOAST_DURATION_MS } from '../timing.js';
 
 interface CompleteResult {
@@ -34,7 +34,8 @@ export function bindReopenButton() {
 
 function showCompleteModal() {
   let totalStale = 0;
-  Object.keys(state.staleCounts).forEach(k => { totalStale += (state.staleCounts[k] ?? 0); });
+  const staleCounts = reviewStore.state.value.staleCounts;
+  Object.keys(staleCounts).forEach(k => { totalStale += (staleCounts[k] ?? 0); });
 
   const overlay = toElement(<div className="modal-overlay"></div>);
 
@@ -56,7 +57,7 @@ function showCompleteModal() {
     overlay.querySelector('[data-stale-action="discard"]')?.addEventListener('click', () => {
       void (async () => {
         await api('/annotations/stale/delete-all', { method: 'POST' });
-        state.staleCounts = {};
+        reviewStore.actions.update({ staleCounts: {} });
         renderFileList();
         overlay.remove();
         showCompleteModal();
@@ -65,7 +66,7 @@ function showCompleteModal() {
     overlay.querySelector('[data-stale-action="keep"]')?.addEventListener('click', () => {
       void (async () => {
         await api('/annotations/stale/keep-all', { method: 'POST' });
-        state.staleCounts = {};
+        reviewStore.actions.update({ staleCounts: {} });
         renderFileList();
         overlay.remove();
         showCompleteModal();

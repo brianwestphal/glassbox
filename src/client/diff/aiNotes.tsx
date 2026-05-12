@@ -1,12 +1,14 @@
 import { toElement } from '../dom.js';
 import type { FileNotes } from '../state.js';
-import { state } from '../state.js';
+import { aiStore } from '../stores/index.js';
 
 export function renderAINotes(container: HTMLElement, fileId: string) {
+  const ai = aiStore.state.value;
+
   // Render sort-mode notes (risk or narrative)
-  const sortNotes = state.fileNotes[fileId] as FileNotes | undefined;
-  if (sortNotes !== undefined && state.sortMode !== 'folder') {
-    const noteType = state.sortMode === 'risk' ? 'risk' : 'narrative';
+  const sortNotes = ai.fileNotes[fileId] as FileNotes | undefined;
+  if (sortNotes !== undefined && ai.sortMode !== 'folder') {
+    const noteType = ai.sortMode === 'risk' ? 'risk' : 'narrative';
     if (sortNotes.overview !== '') {
       renderOverviewNote(container, sortNotes.overview, noteType);
     }
@@ -16,8 +18,8 @@ export function renderAINotes(container: HTMLElement, fileId: string) {
   }
 
   // Render guided review notes (independent of sort mode)
-  const guidedNotes = state.guidedNotes[fileId] as FileNotes | undefined;
-  if (guidedNotes !== undefined && state.guidedReviewEnabled) {
+  const guidedNotes = ai.guidedNotes[fileId] as FileNotes | undefined;
+  if (guidedNotes !== undefined && ai.guidedReviewEnabled) {
     if (guidedNotes.overview !== '') {
       renderOverviewNote(container, guidedNotes.overview, 'guided');
     }

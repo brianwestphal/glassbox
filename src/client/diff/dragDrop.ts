@@ -1,11 +1,11 @@
 import { api } from '../api.js';
-import { state } from '../state.js';
+import { dragStore, reviewStore } from '../stores/index.js';
 import { selectFile } from './selection.js';
 
 export function bindDragDrop() {
   document.querySelectorAll('.diff-line').forEach(el => {
     el.addEventListener('dragover', (e) => {
-      if (state._dragAnnotation === null) return;
+      if (dragStore.state.value.annotation === null) return;
       e.preventDefault();
       const dragEvent = e as DragEvent;
       if (dragEvent.dataTransfer !== null) {
@@ -23,7 +23,8 @@ export function bindDragDrop() {
       e.preventDefault();
       el.classList.remove('drag-over');
       document.querySelectorAll('.diff-line.drag-over').forEach(d => { d.classList.remove('drag-over'); });
-      if (state._dragAnnotation === null) return;
+      const drag = dragStore.state.value.annotation;
+      if (drag === null) return;
 
       const htmlEl = el as HTMLElement;
       let lineNum = parseInt(htmlEl.dataset.line ?? '0', 10);
@@ -39,8 +40,7 @@ export function bindDragDrop() {
         }
       }
 
-      const drag = state._dragAnnotation;
-      state._dragAnnotation = null;
+      dragStore.actions.setAnnotation(null);
 
       void (async () => {
         await api('/annotations/' + drag.id + '/move', {
@@ -48,8 +48,9 @@ export function bindDragDrop() {
           body: { lineNumber: lineNum, side: side },
         });
 
-        if (state.currentFileId !== null) {
-          void selectFile(state.currentFileId);
+        const currentFileId = reviewStore.state.value.currentFileId;
+        if (currentFileId !== null) {
+          void selectFile(currentFileId);
         }
       })();
     });

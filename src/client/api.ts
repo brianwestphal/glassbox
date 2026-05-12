@@ -1,9 +1,9 @@
-import { state } from './state.js';
+import { reviewStore } from './stores/index.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
   const separator = path.includes('?') ? '&' : '?';
-  const url = '/api' + path + separator + 'reviewId=' + encodeURIComponent(state.reviewId);
+  const url = '/api' + path + separator + 'reviewId=' + encodeURIComponent(reviewStore.state.value.reviewId);
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...opts,

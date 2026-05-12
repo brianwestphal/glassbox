@@ -2,7 +2,7 @@ import { bindServerAnnotations } from '../annotations/events.js';
 import { api } from '../api.js';
 import { updateProgress } from '../review/progress.js';
 import { renderFileList } from '../sidebar/fileTree.js';
-import { state } from '../state.js';
+import { aiStore, diffViewStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
 import { bindDragDrop } from './dragDrop.js';
 import { applyHighlighting,detectLanguage } from './highlight.js';
@@ -14,8 +14,8 @@ import { loadOutline } from './outline.js';
 import { syncSplitColumnHeights } from './splitSync.js';
 
 export async function selectFile(fileId: string) {
-  state.currentFileId = fileId;
-  const file = state.files.find(f => f.id === fileId);
+  reviewStore.actions.update({ currentFileId: fileId });
+  const file = reviewStore.state.value.files.find(f => f.id === fileId);
   navPush({ fileId, filePath: file?.file_path ?? null, scrollLine: 1 });
   updateNavFilePath(file?.file_path ?? '');
   let activeItem: HTMLElement | null = null;
@@ -44,15 +44,16 @@ export async function selectFile(fileId: string) {
   // Determine if this is an SVG file (from state, before fetch)
   const filePath = file?.file_path ?? '';
   const isSvg = filePath.toLowerCase().endsWith('.svg');
-  const svgRendered = isSvg && state.svgViewMode === 'rendered';
+  const dv = diffViewStore.state.value;
+  const svgRendered = isSvg && dv.svgViewMode === 'rendered';
 
   // Build fetch URL
-  let params = '?mode=' + state.diffMode + (state.ignoreWhitespace ? '&ignoreWhitespace=1' : '');
+  let params = '?mode=' + dv.diffMode + (dv.ignoreWhitespace ? '&ignoreWhitespace=1' : '');
   if (svgRendered) params += '&view=rendered';
   const res = await fetch('/file/' + fileId + params);
   container.innerHTML = await res.text();
 
-  container.classList.toggle('wrap-lines', state.wrapLines);
+  container.classList.toggle('wrap-lines', dv.wrapLines);
 
   // Bind reveal button
   container.querySelector<HTMLElement>('.reveal-btn')?.addEventListener('click', (e) => {
@@ -72,7 +73,7 @@ export async function selectFile(fileId: string) {
   if (svgToggle) {
     svgToggle.style.display = isSvg ? '' : 'none';
     svgToggle.querySelectorAll('[data-svg-mode]').forEach(btn => {
-      btn.classList.toggle('active', (btn as HTMLElement).dataset.svgMode === state.svgViewMode);
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.svgMode === dv.svgViewMode);
     });
   }
   toolbar?.classList.toggle('svg-file', isSvg);
@@ -101,7 +102,7 @@ export async function selectFile(fileId: string) {
         if (sliceBtn) sliceBtn.style.display = 'none';
         if (imageBtn) imageBtn.style.display = '';
       }
-      let mode = state.lastImageMode;
+      let mode = dv.lastImageMode;
       if (!hasComparison && (mode === 'difference' || mode === 'slice')) mode = 'image';
       if (hasComparison && mode === 'image') mode = 'slice';
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === mode));
@@ -112,8 +113,11 @@ export async function selectFile(fileId: string) {
     // Text/code view: syntax highlighting, outline, annotations
     const diffView = container.querySelector<HTMLElement>('.diff-view');
     const dvPath = diffView?.dataset.filePath ?? '';
-    state._detectedLang = detectLanguage(dvPath);
-    if (state.highlightAuto) state.highlightLang = state._detectedLang;
+    const detectedLang = detectLanguage(dvPath);
+    diffViewStore.actions.update({
+      detectedLang,
+      ...(dv.highlightAuto ? { highlightLang: detectedLang } : {}),
+    });
     applyHighlighting();
     updateToolbarLanguage();
     syncSplitColumnHeights();
@@ -126,8 +130,9 @@ export async function selectFile(fileId: string) {
   }
 
   // Show AI notes if available
-  const hasNotes = (state.sortMode !== 'folder' && fileId in state.fileNotes) ||
-    (state.guidedReviewEnabled && fileId in state.guidedNotes);
+  const ai = aiStore.state.value;
+  const hasNotes = (ai.sortMode !== 'folder' && fileId in ai.fileNotes) ||
+    (ai.guidedReviewEnabled && fileId in ai.guidedNotes);
   if (hasNotes) {
     renderAINotes(container, fileId);
   }
@@ -141,10 +146,11 @@ export function updateNavFilePath(filePath: string) {
 export function updateToolbarLanguage() {
   const btn = document.getElementById('language-btn');
   if (btn === null) return;
-  if (state.highlightAuto) {
-    const detected = state._detectedLang === 'plaintext' ? 'Plain Text' : state._detectedLang;
+  const dv = diffViewStore.state.value;
+  if (dv.highlightAuto) {
+    const detected = dv.detectedLang === 'plaintext' ? 'Plain Text' : dv.detectedLang;
     btn.textContent = 'Auto (' + detected + ')';
   } else {
-    btn.textContent = state.highlightLang === 'plaintext' ? 'Plain Text' : state.highlightLang;
+    btn.textContent = dv.highlightLang === 'plaintext' ? 'Plain Text' : dv.highlightLang;
   }
 }

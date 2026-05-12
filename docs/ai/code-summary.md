@@ -169,7 +169,8 @@ See §6 for the schema itself.
 | File | Purpose |
 |------|---------|
 | `app.tsx` | Bundle entry. Boots debug, AI sorting, sidebar, diff view, annotation events, review controls. |
-| `state.ts` | `AppState` singleton: reviewId, currentFileId, fileOrder, annotationCounts, sort modes, AI analysis state, category constants. |
+| `state.ts` | Shared types, `defaultAnalysisModeState()`, and `CATEGORIES` constants. No runtime state. |
+| `stores/index.ts` | Reactive state via kerfjs `defineStore`: `reviewStore` (reviewId, currentFileId, files, fileOrder, annotationCounts, staleCounts, filterText), `diffViewStore` (diffMode, wrap, whitespace, image mode, svg mode, highlight, collapsedFolders), `aiStore` (sortMode, scores, analysis states, fileNotes, guidedNotes, configured/enabled flags), `dragStore`. Computed `filteredFiles`, `aiEnabled`. `getAnalysisModeState(mode)` helper. |
 | `api.ts` | `api<T>(path, opts)` fetch helper. Auto-appends `reviewId`, auto-serializes body. Never pre-stringify. |
 | `dom.ts` | `toElement(jsx \| string)` — the only way client code should produce DOM nodes. No `document.createElement`. |
 | `tauri.ts` | Tauri `invoke()` wrappers (check/install CLI, update check, install update). |
@@ -534,7 +535,7 @@ two documents intentionally overlap.
 | Add a new image diff mode | `src/components/imageDiff.tsx` + `src/client/diff/imageDiff/` (`index.ts` orchestration, `zoom.ts`, `sliceTool.ts`, `metadata.ts`). |
 | Tweak go-to-definition | `src/outline/parser.ts` (regex rules) and `src/client/diff/goToDefinition.tsx` (wiring). |
 | Add a SCSS partial | Create `src/client/styles/_thing.scss`, `@use` it from `src/client/styles.scss`. |
-| Add client state | `src/client/state.ts` (AppState). |
+| Add client state | `src/client/stores/index.ts` — pick the matching store (`reviewStore` / `diffViewStore` / `aiStore` / `dragStore`) or add a new one. Types in `state.ts`. |
 | Add a Tauri command | `src-tauri/src/lib.rs` (`#[tauri::command]` + `invoke_handler`). Call from `src/client/tauri.ts`. |
 | Change the sidecar build | `scripts/build-sidecar.sh` + `tsup.config.ts` + CLAUDE.md external-deps list. |
 | Add an MCP-channel capability | `src/channel.ts` (MCP handler), `src/channel-config.ts` (if `.mcp.json` shape changes), `src/routes/channel-api.ts` (UI-facing endpoint). Update `docs/17-claude-channel.md`. |

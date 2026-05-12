@@ -57,7 +57,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@resvg/resvg-wasm": "^2.6.2",
     "hono": "^4.12.2",
-    "kerfjs": "^0.5.1"
+    "kerfjs": "^0.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",

@@ -5,7 +5,7 @@ import { api, clientLog } from '../api.js';
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
 import type { AnalysisModeState, ReviewFile, TreeNode } from '../state.js';
-import { state } from '../state.js';
+import { aiStore, diffViewStore, reviewStore } from '../stores/index.js';
 import { renderNarrativeFileList } from './narrativeView.js';
 import { renderRiskFileList } from './riskView.js';
 
@@ -17,9 +17,11 @@ interface FilesResponse {
 
 export async function loadFiles() {
   const data = await api<FilesResponse>('/files');
-  state.files = data.files;
-  state.annotationCounts = data.annotationCounts;
-  state.staleCounts = data.staleCounts ?? {};
+  reviewStore.actions.update({
+    files: data.files,
+    annotationCounts: data.annotationCounts,
+    staleCounts: data.staleCounts ?? {},
+  });
   restoreCollapsedFolders();
   renderFileList();
 }
@@ -51,24 +53,26 @@ export function renderFileList() {
   const list = document.querySelector('.file-list-items');
   if (list === null) return;
   list.innerHTML = '';
-  state.fileOrder = [];
+  reviewStore.actions.update({ fileOrder: [] });
+
+  const ai = aiStore.state.value;
 
   // Show analysis spinner if running
-  if (state.sortMode === 'risk' && state.riskAnalysis.status === 'running') {
-    list.appendChild(toElement(renderProgressBar(state.riskAnalysis, 'Analyzing risk')));
-  } else if (state.sortMode === 'narrative' && state.narrativeAnalysis.status === 'running') {
-    list.appendChild(toElement(renderProgressBar(state.narrativeAnalysis, 'Analyzing reading order')));
+  if (ai.sortMode === 'risk' && ai.riskAnalysis.status === 'running') {
+    list.appendChild(toElement(renderProgressBar(ai.riskAnalysis, 'Analyzing risk')));
+  } else if (ai.sortMode === 'narrative' && ai.narrativeAnalysis.status === 'running') {
+    list.appendChild(toElement(renderProgressBar(ai.narrativeAnalysis, 'Analyzing reading order')));
   }
   // Show guided analysis spinner (independent of sort mode)
-  if (state.guidedReviewEnabled && state.guidedAnalysis.status === 'running') {
-    list.appendChild(toElement(renderProgressBar(state.guidedAnalysis, 'Guided review')));
+  if (ai.guidedReviewEnabled && ai.guidedAnalysis.status === 'running') {
+    list.appendChild(toElement(renderProgressBar(ai.guidedAnalysis, 'Guided review')));
   }
 
   // Show error for AI modes
-  if (state.sortMode === 'risk' && state.riskAnalysis.status === 'failed') {
+  if (ai.sortMode === 'risk' && ai.riskAnalysis.status === 'failed') {
     list.appendChild(toElement(
       <div className="analysis-error">
-        <span>{'Analysis failed: ' + (state.riskAnalysis.error ?? 'Unknown error')}</span>
+        <span>{'Analysis failed: ' + (ai.riskAnalysis.error ?? 'Unknown error')}</span>
         <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
       </div>
     ));
@@ -78,10 +82,10 @@ export function renderFileList() {
         void import('./sortMode.js').then(m => { m.triggerAnalysis('risk'); });
       });
     }
-  } else if (state.sortMode === 'narrative' && state.narrativeAnalysis.status === 'failed') {
+  } else if (ai.sortMode === 'narrative' && ai.narrativeAnalysis.status === 'failed') {
     list.appendChild(toElement(
       <div className="analysis-error">
-        <span>{'Analysis failed: ' + (state.narrativeAnalysis.error ?? 'Unknown error')}</span>
+        <span>{'Analysis failed: ' + (ai.narrativeAnalysis.error ?? 'Unknown error')}</span>
         <button className="btn btn-xs btn-primary" id="retry-analysis">Retry</button>
       </div>
     ));
@@ -94,23 +98,24 @@ export function renderFileList() {
   }
 
   // Dispatch file rendering based on sort mode
-  if (state.sortMode === 'risk') {
-    clientLog(`renderFileList: risk — rendering files (scores: ${String(state.riskScores?.length ?? 0)})`);
+  if (ai.sortMode === 'risk') {
+    clientLog(`renderFileList: risk — rendering files (scores: ${String(ai.riskScores?.length ?? 0)})`);
     renderRiskFileList(list);
     return;
   }
 
-  if (state.sortMode === 'narrative') {
-    clientLog(`renderFileList: narrative — rendering files (order: ${String(state.narrativeOrder?.length ?? 0)})`);
+  if (ai.sortMode === 'narrative') {
+    clientLog(`renderFileList: narrative — rendering files (order: ${String(ai.narrativeOrder?.length ?? 0)})`);
     renderNarrativeFileList(list);
     return;
   }
 
   // Default: folder view
-  let filtered = state.files;
-  if (state.filterText !== '') {
-    const q = state.filterText.toLowerCase();
-    filtered = state.files.filter(f => f.file_path.toLowerCase().indexOf(q) !== -1);
+  const review = reviewStore.state.value;
+  let filtered = review.files;
+  if (review.filterText !== '') {
+    const q = review.filterText.toLowerCase();
+    filtered = review.files.filter(f => f.file_path.toLowerCase().indexOf(q) !== -1);
   }
   const tree = buildFileTree(filtered);
   renderTreeNode(list, tree, 0, '');
@@ -154,8 +159,9 @@ function countTreeFiles(node: TreeNode): number {
 }
 
 function hasStaleInTree(node: TreeNode): boolean {
+  const staleCounts = reviewStore.state.value.staleCounts;
   for (let i = 0; i < node.files.length; i++) {
-    if ((state.staleCounts[node.files[i].id] ?? 0) > 0) return true;
+    if ((staleCounts[node.files[i].id] ?? 0) > 0) return true;
   }
   for (let i = 0; i < node.children.length; i++) {
     if (hasStaleInTree(node.children[i])) return true;
@@ -171,7 +177,7 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
     const folderPath = pathPrefix !== '' ? pathPrefix + '/' + child.name : child.name;
     const total = countTreeFiles(child);
     const isCollapsible = total > 1;
-    const isCollapsed = isCollapsible && state.collapsedFolders.has(folderPath);
+    const isCollapsed = isCollapsible && diffViewStore.state.value.collapsedFolders.has(folderPath);
     const stale = hasStaleInTree(child);
 
     const group = toElement(
@@ -193,9 +199,9 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
         header.addEventListener('click', () => {
           header.classList.toggle('collapsed');
           if (header.classList.contains('collapsed')) {
-            state.collapsedFolders.add(folderPath);
+            diffViewStore.actions.addCollapsedFolder(folderPath);
           } else {
-            state.collapsedFolders.delete(folderPath);
+            diffViewStore.actions.removeCollapsedFolder(folderPath);
           }
           saveCollapsedFolders();
         });
@@ -209,14 +215,15 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
     container.appendChild(group);
   });
 
+  const review = reviewStore.state.value;
   node.files.forEach(f => {
     const diff = parseDiffData(f.diff_data);
-    const count = state.annotationCounts[f.id] ?? 0;
-    const staleCount = state.staleCounts[f.id] ?? 0;
+    const count = review.annotationCounts[f.id] ?? 0;
+    const staleCount = review.staleCounts[f.id] ?? 0;
     const fileName = f.file_path.split('/').pop() ?? '';
 
     const el = toElement(
-      <div className={`file-item${f.id === state.currentFileId ? ' active' : ''}`} data-file-id={f.id} style={pad(depth)}>
+      <div className={`file-item${f.id === review.currentFileId ? ' active' : ''}`} data-file-id={f.id} style={pad(depth)}>
         <span className={`status-dot ${f.status}`}></span>
         <span className="file-name" title={f.file_path}>{fileName}</span>
         <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>
@@ -226,17 +233,17 @@ function renderTreeNode(container: Element, node: TreeNode, depth: number, pathP
     );
     el.addEventListener('click', () => { void selectFile(f.id); });
     container.appendChild(el);
-    state.fileOrder.push(f.id);
+    reviewStore.actions.pushFileOrder(f.id);
   });
 }
 
 function storageKey(): string {
-  return 'glassbox-collapsed-' + state.reviewId;
+  return 'glassbox-collapsed-' + reviewStore.state.value.reviewId;
 }
 
 function saveCollapsedFolders() {
   try {
-    localStorage.setItem(storageKey(), JSON.stringify([...state.collapsedFolders]));
+    localStorage.setItem(storageKey(), JSON.stringify([...diffViewStore.state.value.collapsedFolders]));
   } catch { /* localStorage unavailable */ }
 }
 
@@ -244,7 +251,7 @@ function restoreCollapsedFolders() {
   try {
     const stored = localStorage.getItem(storageKey());
     if (stored !== null) {
-      state.collapsedFolders = new Set(JSON.parse(stored) as string[]);
+      diffViewStore.actions.update({ collapsedFolders: new Set(JSON.parse(stored) as string[]) });
     }
   } catch { /* localStorage unavailable */ }
 }

@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
-import { state } from '../state.js';
+import { aiStore } from '../stores/index.js';
 import { switchTheme } from '../themes.js';
 import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
@@ -105,11 +105,13 @@ function renderSettingsModal(
       });
 
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
-      state.aiConfigured = newConfig.keyConfigured;
-      state.guidedReviewEnabled = ui.guidedEnabled;
+      aiStore.actions.update({
+        aiConfigured: newConfig.keyConfigured,
+        guidedReviewEnabled: ui.guidedEnabled,
+      });
       configData.guidedReview = { enabled: ui.guidedEnabled, topics: newTopics };
 
-      if (guidedChanged && state.aiConfigured) {
+      if (guidedChanged && aiStore.state.value.aiConfigured) {
         invalidateAnalysisCache();
         invalidateGuidedAnalysis();
       }
@@ -148,7 +150,7 @@ function renderSettingsModal(
       const newStatus = await api<KeyStatusResponse>('/ai/key-status');
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
-      state.aiConfigured = newConfig.keyConfigured;
+      aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
       renderContent();
     })();
   }
@@ -159,7 +161,7 @@ function renderSettingsModal(
       const newStatus = await api<KeyStatusResponse>('/ai/key-status');
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
-      state.aiConfigured = newConfig.keyConfigured;
+      aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
       renderContent();
     })();
   }

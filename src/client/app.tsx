@@ -15,7 +15,7 @@ import { bindFileFilter, bindSidebarEvents, bindSidebarResize } from "./sidebar/
 import { loadFiles } from "./sidebar/fileTree.js";
 import { bindSortMode, loadAnalysisResults, renderSortControl, triggerAnalysis } from "./sidebar/sortMode.js";
 import type { SortMode } from "./state.js";
-import { state } from "./state.js";
+import { aiStore, diffViewStore, dragStore, reviewStore } from "./stores/index.js";
 // --- Tauri update notification ---
 import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
 
@@ -25,30 +25,37 @@ async function initAISorting() {
     const prefs = await api<{ sort_mode: string; risk_sort_dimension: string; show_risk_scores: boolean; ignore_whitespace: boolean; svg_view_mode: string; last_image_mode: string }>(
       "/ai/preferences",
     );
-    state.sortMode = prefs.sort_mode as SortMode;
-    state.riskSortDimension = prefs.risk_sort_dimension;
-    state.showRiskScores = prefs.show_risk_scores;
-    state.ignoreWhitespace = prefs.ignore_whitespace;
-    state.svgViewMode = prefs.svg_view_mode as 'code' | 'rendered';
-    state.lastImageMode = prefs.last_image_mode;
+    aiStore.actions.update({
+      sortMode: prefs.sort_mode as SortMode,
+      riskSortDimension: prefs.risk_sort_dimension,
+      showRiskScores: prefs.show_risk_scores,
+    });
+    diffViewStore.actions.update({
+      ignoreWhitespace: prefs.ignore_whitespace,
+      svgViewMode: prefs.svg_view_mode as 'code' | 'rendered',
+      lastImageMode: prefs.last_image_mode,
+    });
 
     // Check if AI is configured
     const config = await api<{ keyConfigured: boolean; guidedReview: { enabled: boolean } }>("/ai/config");
-    state.aiConfigured = config.keyConfigured;
-    state.guidedReviewEnabled = config.guidedReview.enabled;
+    aiStore.actions.update({
+      aiConfigured: config.keyConfigured,
+      guidedReviewEnabled: config.guidedReview.enabled,
+    });
 
     // If in an AI mode, load cached results
-    if (state.sortMode === "risk" || state.sortMode === "narrative") {
-      if (state.aiConfigured) {
-        await loadAnalysisResults(state.sortMode);
+    const aiNow = aiStore.state.value;
+    if (aiNow.sortMode === "risk" || aiNow.sortMode === "narrative") {
+      if (aiNow.aiConfigured) {
+        await loadAnalysisResults(aiNow.sortMode);
       } else {
         // Fall back to folder mode if not configured
-        state.sortMode = "folder";
+        aiStore.actions.update({ sortMode: "folder" });
       }
     }
   } catch {
     // AI features unavailable, fall back to folder
-    state.sortMode = "folder";
+    aiStore.actions.update({ sortMode: "folder" });
   }
 
   // Inject sort control into the sidebar
@@ -74,8 +81,9 @@ async function initAISorting() {
           method: "POST",
         });
         await loadFiles();
-        if (state.currentFileId !== null) {
-          void selectFile(state.currentFileId);
+        const currentFileId = reviewStore.state.value.currentFileId;
+        if (currentFileId !== null) {
+          void selectFile(currentFileId);
         }
         updateProgress();
       } catch {
@@ -140,11 +148,14 @@ async function navigateToEntry(entry: { fileId: string | null; filePath: string 
         container.innerHTML = await res.text();
         container.style.display = "block";
         const { detectLanguage: dl, applyHighlighting: ah } = await import("./diff/highlight.js");
-        state._detectedLang = dl(entry.filePath);
-        if (state.highlightAuto) state.highlightLang = state._detectedLang;
+        const detectedLang = dl(entry.filePath);
+        diffViewStore.actions.update({
+          detectedLang,
+          ...(diffViewStore.state.value.highlightAuto ? { highlightLang: detectedLang } : {}),
+        });
         ah();
         document.querySelectorAll(".file-item.active").forEach((el) => { el.classList.remove("active"); });
-        state.currentFileId = null;
+        reviewStore.actions.update({ currentFileId: null });
         updateNavFilePath(entry.filePath);
       }
     }
@@ -197,22 +208,24 @@ async function init() {
   await loadFiles();
 
   // Auto-select the first file if none is selected
-  if (state.currentFileId === null && state.fileOrder.length > 0) {
-    void selectFile(state.fileOrder[0]);
+  const review = reviewStore.state.value;
+  if (review.currentFileId === null && review.fileOrder.length > 0) {
+    void selectFile(review.fileOrder[0]);
   }
 
   // Auto-start analysis if resuming in an AI mode with no cached results
-  if (state.aiConfigured && (state.sortMode === "risk" || state.sortMode === "narrative")) {
-    const mode = state.sortMode;
-    const hasResults = mode === "risk" ? state.riskScores !== null : state.narrativeOrder !== null;
-    const modeState = mode === "risk" ? state.riskAnalysis : state.narrativeAnalysis;
+  const ai = aiStore.state.value;
+  if (ai.aiConfigured && (ai.sortMode === "risk" || ai.sortMode === "narrative")) {
+    const mode = ai.sortMode;
+    const hasResults = mode === "risk" ? ai.riskScores !== null : ai.narrativeOrder !== null;
+    const modeState = mode === "risk" ? ai.riskAnalysis : ai.narrativeAnalysis;
     if (!hasResults && modeState.status !== "running") {
       triggerAnalysis(mode);
     }
   }
 
   // Auto-start guided analysis when guided review is enabled (independent of sort mode)
-  if (state.guidedReviewEnabled && state.aiConfigured) {
+  if (ai.guidedReviewEnabled && ai.aiConfigured) {
     triggerGuidedAnalysis();
   }
 
@@ -227,7 +240,7 @@ async function init() {
   initScrollSync();
   updateProgress();
   document.addEventListener("dragend", () => {
-    state._dragAnnotation = null;
+    dragStore.actions.setAnnotation(null);
     document.querySelectorAll(".diff-line.drag-over").forEach((d) => {
       d.classList.remove("drag-over");
     });

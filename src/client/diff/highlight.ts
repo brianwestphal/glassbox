@@ -1,6 +1,6 @@
 import hljs from 'highlight.js';
 
-import { state } from '../state.js';
+import { diffViewStore } from '../stores/index.js';
 
 const EXT_TO_LANG: Record<string, string> = {
   '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
@@ -85,7 +85,7 @@ export function getLanguageList(): string[] {
 }
 
 export function applyHighlighting() {
-  const lang = state.highlightLang;
+  const lang = diffViewStore.state.value.highlightLang;
   if (!lang || lang === 'plaintext') {
     clearHighlighting();
     return;

@@ -4,7 +4,7 @@
  */
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { state } from '../state.js';
+import { diffViewStore, reviewStore } from '../stores/index.js';
 import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
 import { navPush } from './navStack.js';
 import { selectFile, updateNavFilePath } from './selection.js';
@@ -97,7 +97,7 @@ const SKIP_WORDS = new Set([
 ]);
 
 async function navigateToDefinition(symbolName: string) {
-  const currentFileId = state.currentFileId ?? '';
+  const currentFileId = reviewStore.state.value.currentFileId ?? '';
   const data = await api<{ definitions: SymbolDef[] }>(
     `/symbol-definition?name=${encodeURIComponent(symbolName)}&currentFileId=${encodeURIComponent(currentFileId)}`
   );
@@ -150,13 +150,16 @@ async function loadRawFile(filePath: string, targetLine: number) {
 
   // Apply syntax highlighting
   const { detectLanguage, applyHighlighting } = await import('./highlight.js');
-  state._detectedLang = detectLanguage(filePath);
-  if (state.highlightAuto) state.highlightLang = state._detectedLang;
+  const detectedLang = detectLanguage(filePath);
+  diffViewStore.actions.update({
+    detectedLang,
+    ...(diffViewStore.state.value.highlightAuto ? { highlightLang: detectedLang } : {}),
+  });
   applyHighlighting();
 
   // Clear sidebar selection (this file isn't in the sidebar)
   document.querySelectorAll('.file-item.active').forEach(el => { el.classList.remove('active'); });
-  state.currentFileId = null;
+  reviewStore.actions.update({ currentFileId: null });
 
   // Show nav bar and update file path
   const navBar = document.getElementById('diff-nav-bar');

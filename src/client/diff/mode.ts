@@ -1,4 +1,4 @@
-import { state } from '../state.js';
+import { diffViewStore } from '../stores/index.js';
 
 export function initScrollSync() {
   const container = document.getElementById('diff-container');
@@ -9,7 +9,8 @@ export function initScrollSync() {
   let syncing = false;
 
   container.addEventListener('scroll', (e) => {
-    if (syncing || state.wrapLines || state.diffMode !== 'split') return;
+    const dv = diffViewStore.state.value;
+    if (syncing || dv.wrapLines || dv.diffMode !== 'split') return;
     const target = e.target as HTMLElement;
     if (!target.classList.contains('code')) return;
     if (!target.closest('.split-row') && !target.closest('.split-columns')) return;

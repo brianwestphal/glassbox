@@ -1,9 +1,10 @@
 import { toElement } from '../dom.js';
-import { state } from '../state.js';
+import { reviewStore } from '../stores/index.js';
 
 export function updateProgress() {
-  const total = state.files.length;
-  const reviewed = state.files.filter(f => f.status === 'reviewed').length;
+  const files = reviewStore.state.value.files;
+  const total = files.length;
+  const reviewed = files.filter(f => f.status === 'reviewed').length;
   const summary = document.getElementById('progress-summary');
   if (summary !== null) summary.textContent = `${String(reviewed)} of ${String(total)} files reviewed`;
 

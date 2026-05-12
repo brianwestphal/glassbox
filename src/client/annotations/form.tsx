@@ -2,7 +2,8 @@ import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
 import type { Annotation } from '../state.js';
-import { CATEGORIES,state  } from '../state.js';
+import { CATEGORIES } from '../state.js';
+import { reviewStore } from '../stores/index.js';
 import { bindCategoryBadgeClick,buildCategoryBadge } from './categories.js';
 import { renderAnnotationInline } from './render.js';
 
@@ -64,7 +65,7 @@ async function saveAnnotation(container: HTMLElement, lineNumber: number, side: 
   const annotation = await api<Annotation>('/annotations', {
     method: 'POST',
     body: {
-      reviewFileId: state.currentFileId,
+      reviewFileId: reviewStore.state.value.currentFileId,
       lineNumber,
       side,
       category,
@@ -75,7 +76,8 @@ async function saveAnnotation(container: HTMLElement, lineNumber: number, side: 
   container.remove();
   renderAnnotationInline(annotation, lineNumber, side);
 
-  const fileId = state.currentFileId ?? '';
-  state.annotationCounts[fileId] = (state.annotationCounts[fileId] ?? 0) + 1;
+  const fileId = reviewStore.state.value.currentFileId ?? '';
+  const prevCount = reviewStore.state.value.annotationCounts[fileId] ?? 0;
+  reviewStore.actions.setAnnotationCount(fileId, prevCount + 1);
   renderFileList();
 }

@@ -1,5 +1,5 @@
 import { api } from '../../api.js';
-import { state } from '../../state.js';
+import { diffViewStore } from '../../stores/index.js';
 import { loadMetadata } from './metadata.js';
 import { initSliceTool } from './sliceTool.js';
 import { applyZoom, clampPan, notifyZoomChange, setZoomState, zoomAt,type ZoomState } from './zoom.js';
@@ -78,7 +78,7 @@ export function bindImageDiff(): void {
   imageToolbar?.querySelectorAll('[data-image-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.imageMode ?? '';
-      state.lastImageMode = mode;
+      diffViewStore.actions.update({ lastImageMode: mode });
       void api('/ai/preferences', { method: 'POST', body: { last_image_mode: mode } });
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p =>

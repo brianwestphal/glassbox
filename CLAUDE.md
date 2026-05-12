@@ -129,7 +129,8 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 **TypeScript** (`src/client/`): Modular files using TSX and SafeHtml for HTML building:
 
 - `app.ts` — Entry point, init
-- `state.ts` — Shared state, types, category constants
+- `state.ts` — Shared types, default factories, and `CATEGORIES` constants (no runtime state — see `stores/`)
+- `stores/index.ts` — Reactive state via kerfjs `defineStore`: `reviewStore`, `diffViewStore`, `aiStore`, `dragStore`. Reads use `store.state.value.X`; writes use `store.actions.update({ X: y })` plus named actions for collection mutations (`pushFileOrder`, `setAnnotationCount`, `setStaleCount`, `addCollapsedFolder`, `removeCollapsedFolder`, `setFileNote`, `setGuidedNote`, `setAnalysisState`). `getAnalysisModeState(mode)` resolves a mode's analysis sub-state. Computed: `filteredFiles`, `aiEnabled`. New per-concern state goes here; pick the matching store or split a new one off when it's clearly a separate domain.
 - `api.ts` — API helper, HTML escaping utility
 - `sidebar/fileTree.tsx` — File tree rendering, sort mode dispatch
 - `sidebar/sortMode.tsx` — Sort mode segmented control (folder/risk/narrative)

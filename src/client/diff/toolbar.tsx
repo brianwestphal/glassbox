@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { state } from '../state.js';
+import { diffViewStore, reviewStore } from '../stores/index.js';
 import { applyHighlighting,getLanguageList } from './highlight.js';
 import { selectFile, updateToolbarLanguage  } from './selection.js';
 import { syncSplitColumnHeights } from './splitSync.js';
@@ -27,11 +27,12 @@ function bindSvgModeToggle() {
   document.querySelectorAll('[data-svg-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.svgMode as 'code' | 'rendered';
-      state.svgViewMode = mode;
+      diffViewStore.actions.update({ svgViewMode: mode });
       void api('/ai/preferences', { method: 'POST', body: { svg_view_mode: mode } });
       document.querySelectorAll('[data-svg-mode]').forEach(b => b.classList.toggle('active', b === btn));
-      if (state.currentFileId !== null) {
-        void selectFile(state.currentFileId);
+      const currentFileId = reviewStore.state.value.currentFileId;
+      if (currentFileId !== null) {
+        void selectFile(currentFileId);
       }
     });
   });
@@ -40,10 +41,12 @@ function bindSvgModeToggle() {
 function bindDiffModeSegments() {
   document.querySelectorAll('[data-diff-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
-      state.diffMode = (btn as HTMLElement).dataset.diffMode as 'split' | 'unified';
+      const mode = (btn as HTMLElement).dataset.diffMode as 'split' | 'unified';
+      diffViewStore.actions.update({ diffMode: mode });
       document.querySelectorAll('[data-diff-mode]').forEach(b => { b.classList.toggle('active', b === btn); });
-      if (state.currentFileId !== null) {
-        void selectFile(state.currentFileId);
+      const currentFileId = reviewStore.state.value.currentFileId;
+      if (currentFileId !== null) {
+        void selectFile(currentFileId);
       }
     });
   });
@@ -53,12 +56,13 @@ function bindWrapToggle() {
   const btn = document.getElementById('wrap-toggle');
   if (btn === null) return;
   btn.addEventListener('click', () => {
-    state.wrapLines = !state.wrapLines;
-    btn.classList.toggle('active', state.wrapLines);
+    const wrapLines = !diffViewStore.state.value.wrapLines;
+    diffViewStore.actions.update({ wrapLines });
+    btn.classList.toggle('active', wrapLines);
     const container = document.getElementById('diff-container');
-    if (container !== null) container.classList.toggle('wrap-lines', state.wrapLines);
+    if (container !== null) container.classList.toggle('wrap-lines', wrapLines);
     syncSplitColumnHeights();
-    if (!state.wrapLines) {
+    if (!wrapLines) {
       document.getElementById('diff-container')?.querySelectorAll('.split-row .code, .split-columns .code').forEach(el => {
         (el as HTMLElement).scrollLeft = 0;
       });
@@ -69,13 +73,15 @@ function bindWrapToggle() {
 function bindWhitespaceToggle() {
   const btn = document.getElementById('whitespace-toggle');
   if (btn === null) return;
-  btn.classList.toggle('active', state.ignoreWhitespace);
+  btn.classList.toggle('active', diffViewStore.state.value.ignoreWhitespace);
   btn.addEventListener('click', () => {
-    state.ignoreWhitespace = !state.ignoreWhitespace;
-    btn.classList.toggle('active', state.ignoreWhitespace);
-    void api('/ai/preferences', { method: 'POST', body: { ignore_whitespace: state.ignoreWhitespace } });
-    if (state.currentFileId !== null) {
-      void selectFile(state.currentFileId);
+    const ignoreWhitespace = !diffViewStore.state.value.ignoreWhitespace;
+    diffViewStore.actions.update({ ignoreWhitespace });
+    btn.classList.toggle('active', ignoreWhitespace);
+    void api('/ai/preferences', { method: 'POST', body: { ignore_whitespace: ignoreWhitespace } });
+    const currentFileId = reviewStore.state.value.currentFileId;
+    if (currentFileId !== null) {
+      void selectFile(currentFileId);
     }
   });
 }
@@ -115,12 +121,10 @@ function showLanguagePicker(btn: HTMLElement) {
   const filterInput = popup.querySelector('.language-filter') as HTMLInputElement;
 
   function selectLang(lang: string, auto: boolean) {
-    state.highlightAuto = auto;
-    if (auto) {
-      state.highlightLang = state._detectedLang;
-    } else {
-      state.highlightLang = lang;
-    }
+    diffViewStore.actions.update({
+      highlightAuto: auto,
+      highlightLang: auto ? diffViewStore.state.value.detectedLang : lang,
+    });
     applyHighlighting();
     updateToolbarLanguage();
     popup.remove();
@@ -132,9 +136,10 @@ function showLanguagePicker(btn: HTMLElement) {
 
     if (q === '') {
       // No filter: show Auto, then popular, then separator, then rest
-      const autoLabel = state._detectedLang === 'plaintext' ? 'Plain Text' : state._detectedLang;
+      const dv = diffViewStore.state.value;
+      const autoLabel = dv.detectedLang === 'plaintext' ? 'Plain Text' : dv.detectedLang;
       const autoItem = toElement(
-        <div className={`language-option${state.highlightAuto ? ' active' : ''}`} data-lang="__auto__">
+        <div className={`language-option${dv.highlightAuto ? ' active' : ''}`} data-lang="__auto__">
           {'Auto (' + autoLabel + ')'}
         </div>
       );
@@ -167,7 +172,8 @@ function showLanguagePicker(btn: HTMLElement) {
   }
 
   function langOption(lang: string): HTMLElement {
-    const isActive = !state.highlightAuto && lang === state.highlightLang;
+    const dv = diffViewStore.state.value;
+    const isActive = !dv.highlightAuto && lang === dv.highlightLang;
     return toElement(
       <div className={`language-option${isActive ? ' active' : ''}`} data-lang={lang}>
         {lang === 'plaintext' ? 'Plain Text' : lang}

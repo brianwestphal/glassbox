@@ -1,6 +1,6 @@
 import { api, clientLog } from './api.js';
 import { renderFileList } from './sidebar/fileTree.js';
-import { state } from './state.js';
+import { aiStore } from './stores/index.js';
 import { ANALYSIS_POLL_INTERVAL_MS } from './timing.js';
 
 let pollGeneration = 0;
@@ -19,19 +19,21 @@ function friendlyError(raw: string): string {
 }
 
 export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
-  if (!state.guidedReviewEnabled || !state.aiConfigured) return;
+  const ai = aiStore.state.value;
+  if (!ai.guidedReviewEnabled || !ai.aiConfigured) return;
 
-  const gs = state.guidedAnalysis;
-  if (gs.status === 'running') {
+  if (ai.guidedAnalysis.status === 'running') {
     clientLog('triggerGuidedAnalysis: already running, skipping');
     return;
   }
 
   clientLog(`triggerGuidedAnalysis: starting${invalidateCache ? ' (cache invalidated)' : ''}`);
-  gs.status = 'running';
-  gs.error = null;
-  gs.progressCompleted = 0;
-  gs.progressTotal = 0;
+  aiStore.actions.setAnalysisState('guided', {
+    status: 'running',
+    error: null,
+    progressCompleted: 0,
+    progressTotal: 0,
+  });
   pollGeneration++;
   const gen = pollGeneration;
   renderFileList();
@@ -47,16 +49,16 @@ export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
       const raw = err instanceof Error ? err.message : 'Failed to start guided analysis';
       console.error('Guided analysis error:', raw);
       clientLog(`triggerGuidedAnalysis: failed — ${raw}`);
-      gs.status = 'failed';
-      gs.error = friendlyError(raw);
+      aiStore.actions.setAnalysisState('guided', {
+        status: 'failed',
+        error: friendlyError(raw),
+      });
       renderFileList();
     }
   })();
 }
 
 function pollGuidedStatus(gen: number) {
-  const gs = state.guidedAnalysis;
-
   const poll = () => {
     if (gen !== pollGeneration) {
       clientLog(`pollGuided: stale gen=${String(gen)}, stopping`);
@@ -74,9 +76,11 @@ function pollGuidedStatus(gen: number) {
 
       if (result.status === 'running') {
         const completed = result.progressCompleted ?? 0;
-        gs.status = 'running';
-        gs.progressCompleted = completed;
-        gs.progressTotal = result.progressTotal ?? 0;
+        aiStore.actions.setAnalysisState('guided', {
+          status: 'running',
+          progressCompleted: completed,
+          progressTotal: result.progressTotal ?? 0,
+        });
 
         if (completed > 0) {
           await loadGuidedResults(true);
@@ -90,9 +94,11 @@ function pollGuidedStatus(gen: number) {
       if (result.status === 'completed') {
         clientLog('pollGuided: completed, loading final results');
         await loadGuidedResults(false);
-        gs.status = 'completed';
-        gs.progressCompleted = 0;
-        gs.progressTotal = 0;
+        aiStore.actions.setAnalysisState('guided', {
+          status: 'completed',
+          progressCompleted: 0,
+          progressTotal: 0,
+        });
         renderFileList();
         return;
       }
@@ -101,10 +107,12 @@ function pollGuidedStatus(gen: number) {
         const raw = result.error ?? 'Guided analysis failed';
         clientLog(`pollGuided: failed — ${raw}`);
         console.error('Guided analysis error:', raw);
-        gs.status = 'failed';
-        gs.error = friendlyError(raw);
-        gs.progressCompleted = 0;
-        gs.progressTotal = 0;
+        aiStore.actions.setAnalysisState('guided', {
+          status: 'failed',
+          error: friendlyError(raw),
+          progressCompleted: 0,
+          progressTotal: 0,
+        });
         renderFileList();
       }
     })();
@@ -126,21 +134,24 @@ async function loadGuidedResults(partial: boolean) {
 
   for (const s of data.scores) {
     if (s.notes !== null) {
-      state.guidedNotes[s.reviewFileId] = s.notes;
+      aiStore.actions.setGuidedNote(s.reviewFileId, s.notes);
     }
   }
 }
 
 export function invalidateGuidedAnalysis() {
-  state.guidedNotes = {};
-  state.guidedAnalysis.status = 'idle';
-  state.guidedAnalysis.error = null;
-  state.guidedAnalysis.progressCompleted = 0;
-  state.guidedAnalysis.progressTotal = 0;
+  aiStore.actions.update({ guidedNotes: {} });
+  aiStore.actions.setAnalysisState('guided', {
+    status: 'idle',
+    error: null,
+    progressCompleted: 0,
+    progressTotal: 0,
+  });
   pollGeneration++;
   clientLog('invalidateGuidedAnalysis: cleared guided notes and stopped polls');
 
-  if (state.guidedReviewEnabled && state.aiConfigured) {
+  const ai = aiStore.state.value;
+  if (ai.guidedReviewEnabled && ai.aiConfigured) {
     triggerGuidedAnalysis(true);
   }
 }

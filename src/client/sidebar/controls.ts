@@ -1,5 +1,5 @@
 import { selectFile } from '../diff/selection.js';
-import { state } from '../state.js';
+import { reviewStore } from '../stores/index.js';
 import { renderFileList } from './fileTree.js';
 
 export function bindFileFilter() {
@@ -9,14 +9,14 @@ export function bindFileFilter() {
   input.addEventListener('input', () => {
     if (timer !== null) clearTimeout(timer);
     timer = setTimeout(() => {
-      state.filterText = input.value;
+      reviewStore.actions.update({ filterText: input.value });
       renderFileList();
     }, 150);
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       input.value = '';
-      state.filterText = '';
+      reviewStore.actions.update({ filterText: '' });
       renderFileList();
       input.blur();
     }
@@ -72,8 +72,9 @@ export function bindSidebarEvents() {
 }
 
 function navigateFile(delta: number) {
-  const order = state.fileOrder;
-  const idx = state.currentFileId !== null ? order.indexOf(state.currentFileId) : -1;
+  const { fileOrder, currentFileId } = reviewStore.state.value;
+  const idx = currentFileId !== null ? fileOrder.indexOf(currentFileId) : -1;
+  const order = fileOrder;
   const next = idx + delta;
   if (next >= 0 && next < order.length) {
     void selectFile(order[next]);

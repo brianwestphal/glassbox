@@ -1,7 +1,7 @@
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
 import type { RiskFileScore } from '../state.js';
-import { state } from '../state.js';
+import { aiStore, reviewStore } from '../stores/index.js';
 
 function riskColor(score: number): string {
   if (score >= 0.7) return 'var(--red)';
@@ -23,9 +23,11 @@ function getScoreForDimension(score: RiskFileScore, dimension: string): number {
 }
 
 export function renderRiskFileList(container: Element) {
-  const scores = state.riskScores;
-  const dimension = state.riskSortDimension;
-  const filterQ = state.filterText.toLowerCase();
+  const ai = aiStore.state.value;
+  const review = reviewStore.state.value;
+  const scores = ai.riskScores;
+  const dimension = ai.riskSortDimension;
+  const filterQ = review.filterText.toLowerCase();
 
   // Build set of scored file IDs
   const scoredFileIds = new Set(scores?.map(s => s.reviewFileId) ?? []);
@@ -36,7 +38,7 @@ export function renderRiskFileList(container: Element) {
     : [];
 
   // Unscored files in original flat order
-  const unscored = state.files.filter(f => !scoredFileIds.has(f.id));
+  const unscored = review.files.filter(f => !scoredFileIds.has(f.id));
 
   // Apply filter
   const filteredScored = filterQ !== ''
@@ -46,22 +48,22 @@ export function renderRiskFileList(container: Element) {
     ? unscored.filter(f => f.file_path.toLowerCase().includes(filterQ))
     : unscored;
 
-  state.fileOrder = [];
+  reviewStore.actions.update({ fileOrder: [] });
 
   // Render scored files first
   for (const score of filteredScored) {
-    const file = state.files.find(f => f.id === score.reviewFileId);
+    const file = review.files.find(f => f.id === score.reviewFileId);
     if (file === undefined) continue;
 
     const displayScore = getScoreForDimension(score, dimension);
     const fileName = score.filePath.split('/').pop() ?? '';
-    const count = state.annotationCounts[score.reviewFileId] ?? 0;
-    const staleCount = state.staleCounts[score.reviewFileId] ?? 0;
+    const count = review.annotationCounts[score.reviewFileId] ?? 0;
+    const staleCount = review.staleCounts[score.reviewFileId] ?? 0;
 
     const el = toElement(
-      <div className={`file-item${score.reviewFileId === state.currentFileId ? ' active' : ''}`}
+      <div className={`file-item${score.reviewFileId === review.currentFileId ? ' active' : ''}`}
         data-file-id={score.reviewFileId} style="padding-left: 16px">
-        {state.showRiskScores && (
+        {ai.showRiskScores && (
           <span className={`risk-badge ${riskClass(displayScore)}`}
             style={`color: ${riskColor(displayScore)}`}
             title={score.rationale}>
@@ -89,17 +91,17 @@ export function renderRiskFileList(container: Element) {
     }
 
     container.appendChild(el);
-    state.fileOrder.push(score.reviewFileId);
+    reviewStore.actions.pushFileOrder(score.reviewFileId);
   }
 
   // Render unscored files in flat original order
   for (const file of filteredUnscored) {
     const fileName = file.file_path.split('/').pop() ?? '';
-    const count = state.annotationCounts[file.id] ?? 0;
-    const staleCount = state.staleCounts[file.id] ?? 0;
+    const count = review.annotationCounts[file.id] ?? 0;
+    const staleCount = review.staleCounts[file.id] ?? 0;
 
     const el = toElement(
-      <div className={`file-item${file.id === state.currentFileId ? ' active' : ''}`}
+      <div className={`file-item${file.id === review.currentFileId ? ' active' : ''}`}
         data-file-id={file.id} style="padding-left: 16px">
         <span className="file-name" title={file.file_path}>{fileName}</span>
         <span className="file-path-dim" title={file.file_path}>
@@ -112,7 +114,7 @@ export function renderRiskFileList(container: Element) {
 
     el.addEventListener('click', () => { void selectFile(file.id); });
     container.appendChild(el);
-    state.fileOrder.push(file.id);
+    reviewStore.actions.pushFileOrder(file.id);
   }
 }
 

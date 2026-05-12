@@ -2,29 +2,30 @@ import { IconBook, IconFolder, IconShield } from '../../icons.js';
 import { api, clientLog } from '../api.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
-import { getAnalysisState, state } from '../state.js';
+import { aiStore, getAnalysisModeState } from '../stores/index.js';
 import { ANALYSIS_POLL_INTERVAL_MS } from '../timing.js';
 import { renderFileList } from './fileTree.js';
 
 export function renderSortControl(): HTMLElement {
+  const ai = aiStore.state.value;
   const control = toElement(
     <div className="sort-mode-bar">
       <div className="segmented-control sort-mode-control">
-        <button className={`segment sort-segment${state.sortMode === 'folder' ? ' active' : ''}`}
+        <button className={`segment sort-segment${ai.sortMode === 'folder' ? ' active' : ''}`}
           data-sort-mode="folder" title="Group by folder">
           <IconFolder />
         </button>
-        <button className={`segment sort-segment${state.sortMode === 'risk' ? ' active' : ''}`}
+        <button className={`segment sort-segment${ai.sortMode === 'risk' ? ' active' : ''}`}
           data-sort-mode="risk" title="Sort by risk">
           <IconShield />
         </button>
-        <button className={`segment sort-segment${state.sortMode === 'narrative' ? ' active' : ''}`}
+        <button className={`segment sort-segment${ai.sortMode === 'narrative' ? ' active' : ''}`}
           data-sort-mode="narrative" title="Reading order">
           <IconBook />
         </button>
       </div>
-      <div className="sort-risk-controls" style={state.sortMode === 'risk' ? '' : 'display:none'}>
-        <button className={`toolbar-btn sort-risk-toggle${state.showRiskScores ? ' active' : ''}`}
+      <div className="sort-risk-controls" style={ai.sortMode === 'risk' ? '' : 'display:none'}>
+        <button className={`toolbar-btn sort-risk-toggle${ai.showRiskScores ? ' active' : ''}`}
           id="toggle-risk-scores" title="Show risk scores">
           Score
         </button>
@@ -44,7 +45,7 @@ export function renderSortControl(): HTMLElement {
   // Set current dimension selection
   const dimensionSelect = control.querySelector<HTMLSelectElement>('#risk-dimension-select');
   if (dimensionSelect !== null) {
-    dimensionSelect.value = state.riskSortDimension;
+    dimensionSelect.value = ai.riskSortDimension;
   }
 
   return control;
@@ -54,9 +55,10 @@ export function bindSortMode() {
   document.querySelectorAll('.sort-segment').forEach(btn => {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.sortMode as SortMode;
-      if (mode === state.sortMode) return;
+      const ai = aiStore.state.value;
+      if (mode === ai.sortMode) return;
 
-      if ((mode === 'risk' || mode === 'narrative') && !state.aiConfigured) {
+      if ((mode === 'risk' || mode === 'narrative') && !ai.aiConfigured) {
         // Import dynamically to avoid circular deps
         void import('../settings/dialog.js').then(m => {
           m.showSettingsDialog(() => {
@@ -73,11 +75,12 @@ export function bindSortMode() {
   const toggleBtn = document.getElementById('toggle-risk-scores');
   if (toggleBtn !== null) {
     toggleBtn.addEventListener('click', () => {
-      state.showRiskScores = !state.showRiskScores;
-      toggleBtn.classList.toggle('active', state.showRiskScores);
+      const next = !aiStore.state.value.showRiskScores;
+      aiStore.actions.update({ showRiskScores: next });
+      toggleBtn.classList.toggle('active', next);
       void api('/ai/preferences', {
         method: 'POST',
-        body: { show_risk_scores: state.showRiskScores },
+        body: { show_risk_scores: next },
       });
       renderFileList();
     });
@@ -86,7 +89,7 @@ export function bindSortMode() {
   const dimensionSelect = document.getElementById('risk-dimension-select') as HTMLSelectElement | null;
   if (dimensionSelect !== null) {
     dimensionSelect.addEventListener('change', () => {
-      state.riskSortDimension = dimensionSelect.value;
+      aiStore.actions.update({ riskSortDimension: dimensionSelect.value });
       void api('/ai/preferences', {
         method: 'POST',
         body: { risk_sort_dimension: dimensionSelect.value },
@@ -97,8 +100,8 @@ export function bindSortMode() {
 }
 
 function switchSortMode(mode: SortMode) {
-  const prevMode = state.sortMode;
-  state.sortMode = mode;
+  const prevMode = aiStore.state.value.sortMode;
+  aiStore.actions.update({ sortMode: mode });
   clientLog(`switchSortMode: ${prevMode} → ${mode}`);
 
   // Stop polls for the previous mode — no need to poll for something not displayed
@@ -126,8 +129,9 @@ function switchSortMode(mode: SortMode) {
     return;
   }
 
-  const modeState = getAnalysisState(mode);
-  const hasResults = mode === 'risk' ? state.riskScores !== null : state.narrativeOrder !== null;
+  const modeState = getAnalysisModeState(mode);
+  const ai = aiStore.state.value;
+  const hasResults = mode === 'risk' ? ai.riskScores !== null : ai.narrativeOrder !== null;
 
   // If analysis completed with results, just show them
   if (hasResults && modeState.status === 'completed') {
@@ -178,7 +182,7 @@ function friendlyError(raw: string): string {
 }
 
 export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boolean = false) {
-  const modeState = getAnalysisState(mode);
+  const modeState = getAnalysisModeState(mode);
 
   // Skip if already running for this mode
   if (modeState.status === 'running') {
@@ -187,10 +191,12 @@ export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boo
   }
 
   clientLog(`triggerAnalysis(${mode}): starting${invalidateCache ? ' (cache invalidated)' : ''}`);
-  modeState.status = 'running';
-  modeState.error = null;
-  modeState.progressCompleted = 0;
-  modeState.progressTotal = 0;
+  aiStore.actions.setAnalysisState(mode, {
+    status: 'running',
+    error: null,
+    progressCompleted: 0,
+    progressTotal: 0,
+  });
   pollGenerations[mode]++;
   const gen = pollGenerations[mode];
   renderFileList(); // Shows loading state
@@ -206,8 +212,10 @@ export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boo
       const raw = err instanceof Error ? err.message : 'Failed to start analysis';
       console.error('Analysis error:', raw);
       clientLog(`triggerAnalysis(${mode}): failed — ${raw}`);
-      modeState.status = 'failed';
-      modeState.error = friendlyError(raw);
+      aiStore.actions.setAnalysisState(mode, {
+        status: 'failed',
+        error: friendlyError(raw),
+      });
       renderFileList();
     }
   })();
@@ -215,7 +223,6 @@ export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boo
 
 function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
   let lastCompleted = -1;
-  const modeState = getAnalysisState(mode);
 
   const poll = () => {
     if (gen !== pollGenerations[mode]) {
@@ -234,9 +241,11 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
 
       if (result.status === 'running') {
         const completed = result.progressCompleted ?? 0;
-        modeState.status = 'running';
-        modeState.progressCompleted = completed;
-        modeState.progressTotal = result.progressTotal ?? 0;
+        aiStore.actions.setAnalysisState(mode, {
+          status: 'running',
+          progressCompleted: completed,
+          progressTotal: result.progressTotal ?? 0,
+        });
 
         // Only fetch partial results when progress has actually advanced
         if (completed > 0 && completed !== lastCompleted) {
@@ -253,12 +262,15 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
       if (result.status === 'completed') {
         clientLog(`poll(${mode}): completed, loading final results`);
         await loadAnalysisResults(mode, false);
-        modeState.status = 'completed';
-        modeState.progressCompleted = 0;
-        modeState.progressTotal = 0;
+        aiStore.actions.setAnalysisState(mode, {
+          status: 'completed',
+          progressCompleted: 0,
+          progressTotal: 0,
+        });
+        const ai = aiStore.state.value;
         const count = mode === 'risk'
-          ? (state.riskScores?.length ?? 0)
-          : (state.narrativeOrder?.length ?? 0);
+          ? (ai.riskScores?.length ?? 0)
+          : (ai.narrativeOrder?.length ?? 0);
         clientLog(`poll(${mode}): done — ${String(count)} files loaded`);
         renderFileList();
         return;
@@ -268,17 +280,19 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
         const raw = result.error ?? 'Analysis failed';
         clientLog(`poll(${mode}): failed — ${raw}`);
         // If canceled (user switched modes then came back), auto-retry with caching
-        if (raw === 'Canceled' && mode === state.sortMode) {
+        if (raw === 'Canceled' && mode === aiStore.state.value.sortMode) {
           clientLog(`poll(${mode}): auto-retrying canceled analysis`);
-          modeState.status = 'idle'; // Reset so triggerAnalysis doesn't skip
+          aiStore.actions.setAnalysisState(mode, { status: 'idle' });
           triggerAnalysis(mode);
           return;
         }
         console.error('Analysis error:', raw);
-        modeState.status = 'failed';
-        modeState.error = friendlyError(raw);
-        modeState.progressCompleted = 0;
-        modeState.progressTotal = 0;
+        aiStore.actions.setAnalysisState(mode, {
+          status: 'failed',
+          error: friendlyError(raw),
+          progressCompleted: 0,
+          progressTotal: 0,
+        });
         renderFileList();
       }
     })();
@@ -289,19 +303,25 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number) {
 
 export function invalidateAnalysisCache() {
   // Clear all cached results
-  state.riskScores = null;
-  state.narrativeOrder = null;
-  state.fileNotes = {};
+  aiStore.actions.update({
+    riskScores: null,
+    narrativeOrder: null,
+    fileNotes: {},
+  });
 
   // Reset analysis states
-  state.riskAnalysis.status = 'idle';
-  state.riskAnalysis.error = null;
-  state.riskAnalysis.progressCompleted = 0;
-  state.riskAnalysis.progressTotal = 0;
-  state.narrativeAnalysis.status = 'idle';
-  state.narrativeAnalysis.error = null;
-  state.narrativeAnalysis.progressCompleted = 0;
-  state.narrativeAnalysis.progressTotal = 0;
+  aiStore.actions.setAnalysisState('risk', {
+    status: 'idle',
+    error: null,
+    progressCompleted: 0,
+    progressTotal: 0,
+  });
+  aiStore.actions.setAnalysisState('narrative', {
+    status: 'idle',
+    error: null,
+    progressCompleted: 0,
+    progressTotal: 0,
+  });
 
   // Invalidate all running polls
   pollGenerations.risk++;
@@ -310,8 +330,9 @@ export function invalidateAnalysisCache() {
   clientLog('invalidateAnalysisCache: cleared all cached results and stopped polls');
 
   // If on an AI sort mode, trigger fresh analysis (skip cache since settings changed)
-  if (state.sortMode === 'risk' || state.sortMode === 'narrative') {
-    triggerAnalysis(state.sortMode, true);
+  const sortMode = aiStore.state.value.sortMode;
+  if (sortMode === 'risk' || sortMode === 'narrative') {
+    triggerAnalysis(sortMode, true);
   } else {
     // Folder mode — re-render to update spinner if guided review is enabled
     renderFileList();
@@ -319,7 +340,6 @@ export function invalidateAnalysisCache() {
 }
 
 export async function loadAnalysisResults(mode: 'risk' | 'narrative', partial: boolean = false) {
-  const modeState = getAnalysisState(mode);
   const data = await api<{
     status: string;
     progressCompleted?: number;
@@ -339,9 +359,11 @@ export async function loadAnalysisResults(mode: 'risk' | 'narrative', partial: b
 
   // If server says a previous analysis is still running and we're not already polling, resume polling
   if (data.status === 'running' && !partial) {
-    modeState.status = 'running';
-    modeState.progressCompleted = data.progressCompleted ?? 0;
-    modeState.progressTotal = data.progressTotal ?? 0;
+    aiStore.actions.setAnalysisState(mode, {
+      status: 'running',
+      progressCompleted: data.progressCompleted ?? 0,
+      progressTotal: data.progressTotal ?? 0,
+    });
     pollGenerations[mode]++;
     clientLog(`loadAnalysisResults(${mode}): server still running, starting poll (gen=${String(pollGenerations[mode])})`);
     pollAnalysisStatus(mode, pollGenerations[mode]);
@@ -353,25 +375,29 @@ export async function loadAnalysisResults(mode: 'risk' | 'narrative', partial: b
   // Store notes keyed by reviewFileId
   for (const s of data.scores) {
     if (s.notes !== null) {
-      state.fileNotes[s.reviewFileId] = s.notes;
+      aiStore.actions.setFileNote(s.reviewFileId, s.notes);
     }
   }
 
   if (mode === 'risk') {
-    state.riskScores = data.scores.map(s => ({
-      reviewFileId: s.reviewFileId,
-      filePath: s.filePath,
-      aggregateScore: s.aggregateScore ?? 0,
-      dimensionScores: s.dimensionScores ?? {},
-      rationale: s.rationale ?? '',
-      sortOrder: s.sortOrder,
-    }));
+    aiStore.actions.update({
+      riskScores: data.scores.map(s => ({
+        reviewFileId: s.reviewFileId,
+        filePath: s.filePath,
+        aggregateScore: s.aggregateScore ?? 0,
+        dimensionScores: s.dimensionScores ?? {},
+        rationale: s.rationale ?? '',
+        sortOrder: s.sortOrder,
+      })),
+    });
   } else {
-    state.narrativeOrder = data.scores.map(s => ({
-      reviewFileId: s.reviewFileId,
-      filePath: s.filePath,
-      position: s.sortOrder,
-      rationale: s.rationale ?? '',
-    }));
+    aiStore.actions.update({
+      narrativeOrder: data.scores.map(s => ({
+        reviewFileId: s.reviewFileId,
+        filePath: s.filePath,
+        position: s.sortOrder,
+        rationale: s.rationale ?? '',
+      })),
+    });
   }
 }

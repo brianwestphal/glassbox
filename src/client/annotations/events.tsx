@@ -2,7 +2,8 @@ import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { renderFileList } from '../sidebar/fileTree.js';
 import type { Annotation } from '../state.js';
-import { CATEGORIES,state } from '../state.js';
+import { CATEGORIES } from '../state.js';
+import { dragStore, reviewStore } from '../stores/index.js';
 import { bindCategoryBadgeClick,buildCategoryBadge } from './categories.js';
 import { buildAnnotationItemHtml } from './render.js';
 
@@ -16,10 +17,12 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
         annotationRow.remove();
         lineEl.classList.remove('has-annotation');
       }
-      const fileId = state.currentFileId ?? '';
-      state.annotationCounts[fileId] = Math.max(0, (state.annotationCounts[fileId] ?? 1) - 1);
+      const fileId = reviewStore.state.value.currentFileId ?? '';
+      const ann = reviewStore.state.value.annotationCounts[fileId] ?? 1;
+      reviewStore.actions.setAnnotationCount(fileId, Math.max(0, ann - 1));
       if (annotation.is_stale) {
-        state.staleCounts[fileId] = Math.max(0, (state.staleCounts[fileId] ?? 1) - 1);
+        const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
+        reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
       }
       renderFileList();
     })();
@@ -50,8 +53,9 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
       delete item.dataset.isStale;
       item.innerHTML = buildAnnotationItemHtml(annotation).toString();
       bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
-      const fileId = state.currentFileId ?? '';
-      state.staleCounts[fileId] = Math.max(0, (state.staleCounts[fileId] ?? 1) - 1);
+      const fileId = reviewStore.state.value.currentFileId ?? '';
+      const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
+      reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
       renderFileList();
     })();
   });
@@ -60,7 +64,7 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
   if (handle !== null) {
     handle.addEventListener('dragstart', (e) => {
       e.stopPropagation();
-      state._dragAnnotation = { id: annotation.id, item: item, annotation: annotation };
+      dragStore.actions.setAnnotation({ id: annotation.id, item: item, annotation: annotation });
       const dragEvent = e as DragEvent;
       if (dragEvent.dataTransfer !== null) {
         dragEvent.dataTransfer.effectAllowed = 'move';
