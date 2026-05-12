@@ -3,12 +3,11 @@ import type { SafeHtml } from 'kerfjs';
 import { IconEdit, IconTrash } from '../../icons.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
-import { bindAnnotationItemEvents } from './events.js';
 
 export function buildAnnotationItemHtml(annotation: Annotation): SafeHtml {
   return (
     <>
-      <span className="annotation-drag-handle" draggable={true} title="Drag to move">{'\u2807'}</span>
+      <span className="annotation-drag-handle" draggable={true} title="Drag to move">{'⠇'}</span>
       <span className={`annotation-category category-${annotation.category}`} data-action="reclassify">{annotation.category}</span>
       <span className="annotation-text">{annotation.content}</span>
       <div className="annotation-actions">
@@ -20,7 +19,7 @@ export function buildAnnotationItemHtml(annotation: Annotation): SafeHtml {
   );
 }
 
-export function renderAnnotationInline(annotation: Annotation, lineNumber: number, side: string) {
+export function renderAnnotationInline(annotation: Annotation, lineNumber: number, side: string): void {
   const lineEl = document.querySelector(`.diff-line[data-line="${String(lineNumber)}"][data-side="${side}"]`);
   if (!lineEl) return;
 
@@ -36,14 +35,17 @@ export function renderAnnotationInline(annotation: Annotation, lineNumber: numbe
     insertTarget.parentNode?.insertBefore(annotationRow, insertTarget.nextSibling);
   }
 
+  // Per-item event handlers are gone — `delegate()` on the diff container
+  // (set up by `bindAnnotationEvents()`) handles every interaction by
+  // matching `data-action` attributes on the rendered buttons.
   const item = toElement(
     <div className={`annotation-item${annotation.is_stale ? ' annotation-stale' : ''}`}
+         data-key={annotation.id}
          data-annotation-id={annotation.id}
          data-is-stale={annotation.is_stale ? 'true' : undefined}>
       {buildAnnotationItemHtml(annotation)}
     </div>
   );
 
-  bindAnnotationItemEvents(item, annotation, lineEl as HTMLElement, annotationRow as HTMLElement);
   annotationRow.appendChild(item);
 }

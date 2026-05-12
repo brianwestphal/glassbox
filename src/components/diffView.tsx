@@ -330,7 +330,7 @@ function AnnotationRows({ annotations }: { annotations: Annotation[] }) {
     <div className="annotation-row">
       {annotations.map(a => (
         <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
-          data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
+          data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
           <span className="annotation-drag-handle" draggable={true} title="Drag to move">⠿</span>
           <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
           <span className="annotation-text">{a.content}</span>

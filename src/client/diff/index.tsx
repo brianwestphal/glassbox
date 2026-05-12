@@ -1,7 +1,7 @@
 import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
 
-import { bindServerAnnotations } from '../annotations/events.js';
-import { showAnnotationForm } from '../annotations/form.js';
+import { bindAnnotationEvents } from '../annotations/events.js';
+import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
 import { api } from '../api.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
@@ -33,6 +33,8 @@ export function initDiffView(): void {
   setupImageModeEffect();
   setupWrapClassEffect(container);
   setupDelegatedHandlers(container);
+  bindAnnotationEvents(container);
+  bindCreateFormEvents(container);
 }
 
 // --- Reactive fetch ---
@@ -138,7 +140,8 @@ function runPostRender(container: HTMLElement, fileId: string, kind: 'text' | 'i
     updateToolbarLanguage();
     syncSplitColumnHeights();
     void loadOutline(fileId);
-    bindServerAnnotations();
+    // Annotation events are registered once via `bindAnnotationEvents()` —
+    // they fire for server-rendered annotation rows by `data-action` match.
   }
 
   // AI notes injection (independent of text/image)

@@ -1,17 +1,60 @@
+import { delegate } from 'kerfjs';
+
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
-import { reviewStore } from '../stores/index.js';
-import { bindCategoryBadgeClick,buildCategoryBadge } from './categories.js';
+import { editFormSignal, reviewStore, setEditForm } from '../stores/index.js';
+import { buildCategoryBadge } from './categories.js';
 import { renderAnnotationInline } from './render.js';
 
-export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, side: string) {
-  document.querySelectorAll('.annotation-form-container').forEach(el => { el.remove(); });
+/** Register the create-form delegates on the diff container. Called once
+ *  from `initDiffView()`. */
+export function bindCreateFormEvents(diffContainer: HTMLElement): void {
+  delegate(diffContainer, 'input', '.annotation-form-container[data-form-key] textarea', (_e, textarea) => {
+    const cur = editFormSignal.value;
+    if (cur === null || cur.formKey === null) return;
+    setEditForm({ ...cur, content: (textarea as HTMLTextAreaElement).value });
+  });
+
+  delegate(diffContainer, 'keydown', '.annotation-form-container[data-form-key] textarea', (e) => {
+    const ke = e as KeyboardEvent;
+    if ((ke.metaKey || ke.ctrlKey) && ke.key === 'Enter') {
+      ke.preventDefault();
+      void saveNewAnnotation();
+    } else if (ke.key === 'Escape') {
+      ke.preventDefault();
+      cancelNewAnnotation();
+    }
+  });
+
+  delegate(diffContainer, 'click', '.annotation-form-container[data-form-key] .cancel-btn', (e) => {
+    e.stopPropagation();
+    cancelNewAnnotation();
+  });
+
+  delegate(diffContainer, 'click', '.annotation-form-container[data-form-key] .annotation-save-btn', (e) => {
+    e.stopPropagation();
+    void saveNewAnnotation();
+  });
+}
+
+export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, side: string): void {
+  // Dismiss any existing create-form (only one open at a time).
+  document.querySelectorAll('.annotation-form-container[data-form-key]').forEach(el => { el.remove(); });
 
   const defaultCategory = CATEGORIES[0].value;
+  const formKey = `${String(lineNumber)}:${side}`;
+
+  setEditForm({
+    annotationId: null,
+    formKey,
+    content: '',
+    category: defaultCategory,
+  });
+
   const container = toElement(
-    <div className="annotation-form-container">
+    <div className="annotation-form-container" data-form-key={formKey} data-line={String(lineNumber)} data-side={side}>
       <div className="annotation-form">
         {buildCategoryBadge(defaultCategory)}
         <textarea placeholder="Enter your annotation..." autoFocus></textarea>
@@ -33,33 +76,24 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
   }
   insertAfter.parentNode?.insertBefore(container, insertAfter.nextSibling);
 
-  bindCategoryBadgeClick(container);
-
-  container.querySelector('.cancel-btn')?.addEventListener('click', () => { container.remove(); });
-
-  const textarea = container.querySelector('textarea');
-  if (textarea !== null) {
-    textarea.focus();
-
-    textarea.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        void saveAnnotation(container, lineNumber, side);
-      }
-      if (e.key === 'Escape') {
-        container.remove();
-      }
-    });
-  }
-
-  container.querySelector('.annotation-save-btn')?.addEventListener('click', () => {
-    void saveAnnotation(container, lineNumber, side);
-  });
+  container.querySelector<HTMLTextAreaElement>('textarea')?.focus();
 }
 
-async function saveAnnotation(container: HTMLElement, lineNumber: number, side: string) {
-  const content = (container.querySelector('textarea') as HTMLTextAreaElement).value.trim();
-  const category = (container.querySelector('.form-category-badge') as HTMLElement).dataset.category ?? '';
+function cancelNewAnnotation(): void {
+  const cur = editFormSignal.value;
+  if (cur?.formKey === null || cur?.formKey === undefined) return;
+  document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${cur.formKey}"]`).forEach(el => { el.remove(); });
+  setEditForm(null);
+}
+
+async function saveNewAnnotation(): Promise<void> {
+  const state = editFormSignal.value;
+  if (state === null || state.formKey === null) return;
+  const content = state.content.trim();
   if (content === '') return;
+  const [lineNumberStr, side] = state.formKey.split(':');
+  const lineNumber = parseInt(lineNumberStr, 10);
+  if (isNaN(lineNumber)) return;
 
   const annotation = await api<Annotation>('/annotations', {
     method: 'POST',
@@ -67,12 +101,13 @@ async function saveAnnotation(container: HTMLElement, lineNumber: number, side: 
       reviewFileId: reviewStore.state.value.currentFileId,
       lineNumber,
       side,
-      category,
+      category: state.category,
       content,
     },
   });
 
-  container.remove();
+  document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${state.formKey}"]`).forEach(el => { el.remove(); });
+  setEditForm(null);
   renderAnnotationInline(annotation, lineNumber, side);
 
   const fileId = reviewStore.state.value.currentFileId ?? '';

@@ -142,10 +142,11 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `diff/selection.ts` — `selectFile()`: updates `currentFileId`, navStack, marks-as-reviewed. All DOM/fetch work flows through the diff mount.
 - `diff/hunkExpander.tsx` — `handleHunkExpand(el)`: surgical `replaceWith()` to splice fetched context lines into the live tree (safe under `data-morph-skip`).
 - `diff/imageDiff/` — Image comparison: `index.ts` (orchestration + zoom wiring), `zoom.ts` (zoom state via `WeakMap`, pan, clamp), `sliceTool.ts` (slice geometry + clip-path), `metadata.ts` (metadata diff loading). Runs imperatively inside the morph-skipped diff content.
-- `annotations/form.tsx` — Annotation creation form
-- `annotations/render.tsx` — Annotation inline rendering
-- `annotations/events.tsx` — Annotation CRUD events, reclassify, edit
-- `annotations/categories.tsx` — Category badge and picker UI
+- `annotations/events.tsx` — `bindAnnotationEvents(diffContainer)` registers `delegate()` handlers for every annotation interaction (delete / edit / dblclick-to-edit / reclassify / keep / dragstart / textarea input / Ctrl+Enter save / Escape cancel). No per-element `addEventListener`.
+- `annotations/form.tsx` — `bindCreateFormEvents(diffContainer)` registers the create-form delegates; `showAnnotationForm()` inserts the form DOM and seeds the edit-form signal.
+- `annotations/render.tsx` — `buildAnnotationItemHtml(annotation)` + `renderAnnotationInline()`. Each annotation row carries `data-key={id}` for kerf morph identity.
+- `annotations/reclassifyPopup.tsx` — Shared category-picker popup used by both the row-level reclassify badge and the edit/create form badge.
+- `annotations/categories.tsx` — `buildCategoryBadge(value)` + re-exports of the picker entry points. The picker open state lives in `categoryPickerSignal` in `stores/index.ts`; mid-edit form content/category lives in `editFormSignal` (not in DOM, so a sibling annotation update doesn't clobber an open form).
 - `review/modal.tsx` — Completion modal, gitignore prompts
 - `review/progress.tsx` — Progress bar
 - `settings/dialog.tsx` — AI settings modal (platform, model, API key configuration)

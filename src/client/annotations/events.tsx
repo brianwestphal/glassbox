@@ -1,136 +1,173 @@
+import { delegate } from 'kerfjs';
+
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
-import { CATEGORIES } from '../state.js';
-import { dragStore, reviewStore } from '../stores/index.js';
-import { bindCategoryBadgeClick,buildCategoryBadge } from './categories.js';
+import {
+  closeCategoryPicker,
+  dragStore,
+  editFormSignal,
+  openCategoryPicker,
+  reviewStore,
+  setEditForm,
+} from '../stores/index.js';
+import { buildCategoryBadge } from './categories.js';
+import { showReclassifyPopup } from './reclassifyPopup.js';
 import { buildAnnotationItemHtml } from './render.js';
 
-export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotation, lineEl: HTMLElement, annotationRow: HTMLElement) {
-  item.querySelector('[data-action="delete"]')?.addEventListener('click', (e) => {
+/** Register all annotation-related delegates on the diff container. Called
+ *  once from `initDiffView()`. Annotations are server-rendered inline in the
+ *  diff HTML (under a `data-morph-skip` wrapper from Phase 4) — these
+ *  delegated handlers fire for every annotation row, current and future,
+ *  without ever needing per-element `addEventListener`. */
+export function bindAnnotationEvents(diffContainer: HTMLElement): void {
+  delegate(diffContainer, 'click', '.annotation-item [data-action="delete"]', (e, btn) => {
     e.stopPropagation();
-    void (async () => {
-      await api('/annotations/' + annotation.id, { method: 'DELETE' });
-      item.remove();
-      if (!annotationRow.querySelector('.annotation-item')) {
-        annotationRow.remove();
-        lineEl.classList.remove('has-annotation');
-      }
-      const fileId = reviewStore.state.value.currentFileId ?? '';
-      const ann = reviewStore.state.value.annotationCounts[fileId] ?? 1;
-      reviewStore.actions.setAnnotationCount(fileId, Math.max(0, ann - 1));
-      if (annotation.is_stale) {
-        const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
-        reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
-      }
-    })();
+    const item = (btn as HTMLElement).closest<HTMLElement>('.annotation-item');
+    if (item === null) return;
+    void handleDelete(item);
   });
 
-  item.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
+  delegate(diffContainer, 'click', '.annotation-item [data-action="edit"]', (e, btn) => {
     e.stopPropagation();
-    editAnnotation(item, annotation);
+    const item = (btn as HTMLElement).closest<HTMLElement>('.annotation-item');
+    if (item === null) return;
+    startEdit(item);
   });
 
-  item.addEventListener('dblclick', (e) => {
+  delegate(diffContainer, 'dblclick', '.annotation-item', (e, item) => {
     e.stopPropagation();
-    if (item.querySelector('.annotation-form') !== null) return;
-    editAnnotation(item, annotation);
+    const el = item as HTMLElement;
+    if (el.querySelector('.annotation-form') !== null) return;
+    if ((e.target as HTMLElement).closest('.annotation-form-container') !== null) return;
+    startEdit(el);
   });
 
-  item.querySelector('[data-action="reclassify"]')?.addEventListener('click', (e) => {
+  delegate(diffContainer, 'click', '.annotation-item [data-action="reclassify"]', (e, badge) => {
     e.stopPropagation();
-    showReclassifyPopup((e.target as HTMLElement).closest('[data-action="reclassify"]') as HTMLElement, item, annotation);
+    const item = (badge as HTMLElement).closest<HTMLElement>('.annotation-item');
+    if (item === null) return;
+    const annotation = readAnnotation(item);
+    if (annotation === null) return;
+    showReclassifyPopup(badge as HTMLElement, item, annotation);
   });
 
-  item.querySelector('[data-action="keep"]')?.addEventListener('click', (e) => {
+  delegate(diffContainer, 'click', '.annotation-item [data-action="keep"]', (e, btn) => {
     e.stopPropagation();
-    void (async () => {
-      await api('/annotations/' + annotation.id + '/keep', { method: 'POST' });
-      annotation.is_stale = false;
-      item.classList.remove('annotation-stale');
-      delete item.dataset.isStale;
-      item.innerHTML = buildAnnotationItemHtml(annotation).toString();
-      bindAnnotationItemEvents(item, annotation, lineEl, annotationRow);
-      const fileId = reviewStore.state.value.currentFileId ?? '';
-      const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
-      reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
-    })();
+    const item = (btn as HTMLElement).closest<HTMLElement>('.annotation-item');
+    if (item === null) return;
+    void handleKeep(item);
   });
 
-  const handle = item.querySelector('.annotation-drag-handle');
-  if (handle !== null) {
-    handle.addEventListener('dragstart', (e) => {
-      e.stopPropagation();
-      dragStore.actions.setAnnotation({ id: annotation.id, item: item, annotation: annotation });
-      const dragEvent = e as DragEvent;
-      if (dragEvent.dataTransfer !== null) {
-        dragEvent.dataTransfer.effectAllowed = 'move';
-        dragEvent.dataTransfer.setData('text/plain', annotation.id);
-      }
-    });
+  delegate(diffContainer, 'dragstart', '.annotation-drag-handle', (e, handle) => {
+    e.stopPropagation();
+    const item = (handle as HTMLElement).closest<HTMLElement>('.annotation-item');
+    if (item === null) return;
+    const annotation = readAnnotation(item);
+    if (annotation === null) return;
+    dragStore.actions.setAnnotation({ id: annotation.id, item, annotation });
+    const de = e as DragEvent;
+    if (de.dataTransfer !== null) {
+      de.dataTransfer.effectAllowed = 'move';
+      de.dataTransfer.setData('text/plain', annotation.id);
+    }
+  });
+
+  // Edit-form delegates
+  delegate(diffContainer, 'click', '.annotation-form .cancel-edit', (e) => {
+    e.stopPropagation();
+    cancelEdit();
+  });
+
+  delegate(diffContainer, 'click', '.annotation-form .save-edit', (e) => {
+    e.stopPropagation();
+    void saveEdit();
+  });
+
+  delegate(diffContainer, 'input', '.annotation-form textarea', (_e, textarea) => {
+    const cur = editFormSignal.value;
+    if (cur === null) return;
+    setEditForm({ ...cur, content: (textarea as HTMLTextAreaElement).value });
+  });
+
+  delegate(diffContainer, 'keydown', '.annotation-form textarea', (e) => {
+    const ke = e as KeyboardEvent;
+    if ((ke.metaKey || ke.ctrlKey) && ke.key === 'Enter') {
+      ke.preventDefault();
+      void saveEdit();
+    } else if (ke.key === 'Escape') {
+      ke.preventDefault();
+      cancelEdit();
+    }
+  });
+
+  // Edit-form category badge → opens the category picker
+  delegate(diffContainer, 'click', '.annotation-form .form-category-badge', (e, badge) => {
+    e.stopPropagation();
+    showReclassifyPopupForEdit(badge as HTMLElement);
+  });
+}
+
+function readAnnotation(item: HTMLElement): Annotation | null {
+  const id = item.dataset.annotationId;
+  if (id === undefined || id === '') return null;
+  const category = item.querySelector('.annotation-category')?.textContent ?? '';
+  const content = item.querySelector('.annotation-text')?.textContent ?? '';
+  const isStale = item.dataset.isStale === 'true';
+  return { id, category, content, is_stale: isStale };
+}
+
+async function handleDelete(item: HTMLElement): Promise<void> {
+  const annotation = readAnnotation(item);
+  if (annotation === null) return;
+  const annotationRow = item.closest<HTMLElement>('.annotation-row');
+  const lineEl = annotationRow?.previousElementSibling as HTMLElement | null;
+
+  await api('/annotations/' + annotation.id, { method: 'DELETE' });
+  item.remove();
+  if (annotationRow !== null && annotationRow.querySelector('.annotation-item') === null) {
+    annotationRow.remove();
+    lineEl?.classList.remove('has-annotation');
+  }
+  const fileId = reviewStore.state.value.currentFileId ?? '';
+  const ann = reviewStore.state.value.annotationCounts[fileId] ?? 1;
+  reviewStore.actions.setAnnotationCount(fileId, Math.max(0, ann - 1));
+  if (annotation.is_stale) {
+    const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
+    reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
   }
 }
 
-export function bindServerAnnotations() {
-  document.querySelectorAll('.annotation-item').forEach(el => {
-    const item = el as HTMLElement;
-    const id = item.dataset.annotationId;
-    if (id === undefined || id === '') return;
-    const isStale = item.dataset.isStale === 'true';
-    const category = item.querySelector('.annotation-category')?.textContent ?? '';
-    const content = item.querySelector('.annotation-text')?.textContent ?? '';
-    const annotation: Annotation = { id, category, content, is_stale: isStale };
-    const row = item.closest('.annotation-row') as HTMLElement;
-    const lineEl = row.previousElementSibling as HTMLElement;
-    bindAnnotationItemEvents(item, annotation, lineEl, row);
-  });
+async function handleKeep(item: HTMLElement): Promise<void> {
+  const annotation = readAnnotation(item);
+  if (annotation === null) return;
+  await api('/annotations/' + annotation.id + '/keep', { method: 'POST' });
+  const updated = { ...annotation, is_stale: false };
+  item.classList.remove('annotation-stale');
+  delete item.dataset.isStale;
+  item.innerHTML = buildAnnotationItemHtml(updated).toString();
+  const fileId = reviewStore.state.value.currentFileId ?? '';
+  const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
+  reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
 }
 
-function showReclassifyPopup(badge: HTMLElement, item: HTMLElement, annotation: Annotation) {
-  document.querySelectorAll('.reclassify-popup').forEach(el => { el.remove(); });
+function startEdit(item: HTMLElement): void {
+  const annotation = readAnnotation(item);
+  if (annotation === null) return;
+  const annotationRow = item.closest<HTMLElement>('.annotation-row');
+  if (annotationRow === null) return;
 
-  const rect = badge.getBoundingClientRect();
-  const popup = toElement(
-    <div className="reclassify-popup" style={`position:fixed;left:${rect.left}px;top:${rect.bottom + 4}px;z-index:1000`}>
-      {CATEGORIES.map(c => (
-        <div className={`reclassify-option${c.value === annotation.category ? ' active' : ''}`} data-value={c.value}>
-          <span className={`annotation-category category-${c.value}`}>{c.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-
-  popup.addEventListener('click', (e) => {
-    const opt = (e.target as HTMLElement).closest<HTMLElement>('.reclassify-option');
-    if (!opt) return;
-    e.stopPropagation();
-    const newCategory = opt.dataset.value ?? '';
-    if (newCategory === annotation.category) { popup.remove(); return; }
-    annotation.category = newCategory;
-    void (async () => {
-      await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content: annotation.content, category: newCategory } });
-      item.innerHTML = buildAnnotationItemHtml(annotation).toString();
-      const row = item.closest('.annotation-row') as HTMLElement;
-      const lineElRef = row.previousElementSibling as HTMLElement;
-      bindAnnotationItemEvents(item, annotation, lineElRef, row);
-      popup.remove();
-    })();
+  // Seed the edit-form signal so any concurrent re-render reads the same
+  // content/category we're about to put in the textarea.
+  setEditForm({
+    annotationId: annotation.id,
+    formKey: null,
+    content: annotation.content,
+    category: annotation.category,
   });
 
-  document.body.appendChild(popup);
-  const closePopup = (e: Event) => {
-    if (!popup.contains(e.target as Node)) {
-      popup.remove();
-      document.removeEventListener('click', closePopup, true);
-    }
-  };
-  setTimeout(() => { document.addEventListener('click', closePopup, true); }, 0);
-}
-
-function editAnnotation(item: HTMLElement, annotation: Annotation) {
-  const annotationRow = item.closest('.annotation-row') as HTMLElement;
   const formContainer = toElement(
-    <div className="annotation-form-container">
+    <div className="annotation-form-container" data-edit-for={annotation.id}>
       <div className="annotation-form">
         {buildCategoryBadge(annotation.category)}
         <textarea>{annotation.content}</textarea>
@@ -145,47 +182,73 @@ function editAnnotation(item: HTMLElement, annotation: Annotation) {
   item.style.display = 'none';
   annotationRow.parentNode?.insertBefore(formContainer, annotationRow.nextSibling);
 
-  bindCategoryBadgeClick(formContainer);
-
-  function cancelEdit() {
-    item.style.display = '';
-    formContainer.remove();
-  }
-
-  formContainer.querySelector('.cancel-edit')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    cancelEdit();
-  });
-
-  formContainer.querySelector('.save-edit')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    void (async () => {
-      const content = (formContainer.querySelector('textarea') as HTMLTextAreaElement).value.trim();
-      const category = (formContainer.querySelector('.form-category-badge') as HTMLElement).dataset.category ?? '';
-      if (content === '') return;
-      annotation.content = content;
-      annotation.category = category;
-      await api('/annotations/' + annotation.id, { method: 'PATCH', body: { content, category } });
-      item.innerHTML = buildAnnotationItemHtml(annotation).toString();
-      const row = item.closest('.annotation-row') as HTMLElement;
-      const lineEl = row.previousElementSibling as HTMLElement;
-      bindAnnotationItemEvents(item, annotation, lineEl, row);
-      item.style.display = '';
-      formContainer.remove();
-    })();
-  });
-
-  const textarea = formContainer.querySelector('textarea');
+  const textarea = formContainer.querySelector<HTMLTextAreaElement>('textarea');
   if (textarea !== null) {
     textarea.focus();
     textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    textarea.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        (formContainer.querySelector('.save-edit') as HTMLElement).click();
-      }
-      if (e.key === 'Escape') {
-        cancelEdit();
-      }
-    });
   }
 }
+
+function cancelEdit(): void {
+  closeEditForm();
+}
+
+async function saveEdit(): Promise<void> {
+  const state = editFormSignal.value;
+  if (state === null || state.annotationId === null) return;
+  const content = state.content.trim();
+  if (content === '') return;
+
+  await api('/annotations/' + state.annotationId, {
+    method: 'PATCH',
+    body: { content, category: state.category },
+  });
+
+  const item = findAnnotationItem(state.annotationId);
+  if (item !== null) {
+    const updated: Annotation = {
+      id: state.annotationId,
+      category: state.category,
+      content,
+      is_stale: item.dataset.isStale === 'true',
+    };
+    item.innerHTML = buildAnnotationItemHtml(updated).toString();
+    item.style.display = '';
+  }
+  closeEditForm();
+}
+
+function closeEditForm(): void {
+  const state = editFormSignal.value;
+  const id = state?.annotationId ?? null;
+  setEditForm(null);
+  if (id !== null) {
+    document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-edit-for="${id}"]`).forEach(el => { el.remove(); });
+    const item = findAnnotationItem(id);
+    if (item !== null) item.style.display = '';
+  }
+}
+
+function findAnnotationItem(id: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.annotation-item[data-annotation-id="${id}"]`);
+}
+
+function showReclassifyPopupForEdit(badge: HTMLElement): void {
+  // The edit-form badge — picker writes the chosen category back into the
+  // form signal AND updates the badge DOM, so a subsequent save reads the
+  // right category.
+  void import('./reclassifyPopup.js').then(({ showCategoryPickerForBadge }) => {
+    showCategoryPickerForBadge(badge);
+  });
+}
+
+// Server-rendered annotations no longer need per-item event binding; the
+// delegates above cover them. Kept as a no-op for compatibility while
+// callers migrate.
+export function bindServerAnnotations(): void {
+  // intentionally empty
+}
+
+// Expose `closeEditForm` so the diff view's outside-click handler (if any)
+// can dismiss the picker without reaching into module internals.
+export { closeCategoryPicker,closeEditForm, openCategoryPicker };

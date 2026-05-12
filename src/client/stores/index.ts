@@ -1,4 +1,4 @@
-import { computed, defineStore } from 'kerfjs';
+import { computed, defineStore, signal } from 'kerfjs';
 
 import type {
   AnalysisModeState,
@@ -145,6 +145,55 @@ export const dragStore = defineStore({
     setAnnotation: (annotation: DragAnnotation | null) => { set({ annotation }); },
   }),
 });
+
+// --- Annotation edit-form state ---
+// Lives in a signal (not in DOM) so the in-flight content / category survives
+// any sibling annotation update (the GB-749 acceptance bullet: "Mid-edit form
+// values survive a sibling annotation update").
+export interface EditFormState {
+  // `null` annotationId means a brand-new annotation form keyed by `formKey`
+  // (line:side) — used by `form.tsx` for create flow. For an in-place edit of
+  // an existing annotation, `annotationId` is the row id and `formKey` is
+  // unused.
+  annotationId: string | null;
+  formKey: string | null;
+  content: string;
+  category: string;
+}
+
+export const editFormSignal = signal<EditFormState | null>(null);
+
+export function setEditForm(state: EditFormState | null): void {
+  editFormSignal.value = state;
+}
+
+export function updateEditFormContent(content: string): void {
+  const cur = editFormSignal.value;
+  if (cur === null) return;
+  editFormSignal.value = { ...cur, content };
+}
+
+export function updateEditFormCategory(category: string): void {
+  const cur = editFormSignal.value;
+  if (cur === null) return;
+  editFormSignal.value = { ...cur, category };
+}
+
+// --- Category picker open state ---
+// Tracks which badge (by a unique opener key) currently owns the picker
+// popup. The popup itself is still a transient DOM element appended to
+// `document.body`; the signal exists so reactivity can drive higlight state
+// or future render() patterns. `null` ⇒ no picker open.
+export const categoryPickerSignal = signal<{ openFor: string | null }>({ openFor: null });
+
+export function openCategoryPicker(key: string): void {
+  categoryPickerSignal.value = { openFor: key };
+}
+
+export function closeCategoryPicker(): void {
+  if (categoryPickerSignal.value.openFor === null) return;
+  categoryPickerSignal.value = { openFor: null };
+}
 
 // --- Computed derivations ---
 
