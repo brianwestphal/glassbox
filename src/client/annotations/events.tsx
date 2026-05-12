@@ -1,6 +1,5 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { renderFileList } from '../sidebar/fileTree.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import { dragStore, reviewStore } from '../stores/index.js';
@@ -24,7 +23,6 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
         const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
         reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
       }
-      renderFileList();
     })();
   });
 
@@ -56,7 +54,6 @@ export function bindAnnotationItemEvents(item: HTMLElement, annotation: Annotati
       const fileId = reviewStore.state.value.currentFileId ?? '';
       const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
       reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
-      renderFileList();
     })();
   });
 

@@ -1,7 +1,6 @@
 import { bindServerAnnotations } from '../annotations/events.js';
 import { api } from '../api.js';
 import { updateProgress } from '../review/progress.js';
-import { renderFileList } from '../sidebar/fileTree.js';
 import { aiStore, diffViewStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
 import { bindDragDrop } from './dragDrop.js';
@@ -64,8 +63,10 @@ export async function selectFile(fileId: string) {
   // Mark as reviewed on first visit
   if (file !== undefined && file.status === 'pending') {
     await api('/files/' + fileId + '/status', { method: 'PATCH', body: { status: 'reviewed' } });
-    file.status = 'reviewed';
-    renderFileList();
+    const files = reviewStore.state.value.files.map(f =>
+      f.id === fileId ? { ...f, status: 'reviewed' } : f,
+    );
+    reviewStore.actions.update({ files });
     updateProgress();
   }
 

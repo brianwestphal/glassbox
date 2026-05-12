@@ -132,11 +132,12 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `state.ts` — Shared types, default factories, and `CATEGORIES` constants (no runtime state — see `stores/`)
 - `stores/index.ts` — Reactive state via kerfjs `defineStore`: `reviewStore`, `diffViewStore`, `aiStore`, `dragStore`. Reads use `store.state.value.X`; writes use `store.actions.update({ X: y })` plus named actions for collection mutations (`pushFileOrder`, `setAnnotationCount`, `setStaleCount`, `addCollapsedFolder`, `removeCollapsedFolder`, `setFileNote`, `setGuidedNote`, `setAnalysisState`). `getAnalysisModeState(mode)` resolves a mode's analysis sub-state. Computed: `filteredFiles`, `aiEnabled`. New per-concern state goes here; pick the matching store or split a new one off when it's clearly a separate domain.
 - `api.ts` — API helper, HTML escaping utility
-- `sidebar/fileTree.tsx` — File tree rendering, sort mode dispatch
-- `sidebar/sortMode.tsx` — Sort mode segmented control (folder/risk/narrative)
-- `sidebar/riskView.tsx` — Risk-sorted file list with score badges and popovers
-- `sidebar/narrativeView.tsx` — Narrative-ordered file list with position numbers
-- `sidebar/controls.ts` — File filter, sidebar resize, keyboard navigation
+- `sidebar/index.tsx` — `initSidebar()` orchestrator: two kerf `mount()` trees (sort control + file list), `delegate()` handlers for every sidebar interaction, `effect()`-driven auto-scroll-to-selected
+- `sidebar/fileListView.tsx` — JSX for folder / risk / narrative file lists (keyed with `data-key`)
+- `sidebar/sortControl.tsx` — JSX for the sort-mode segmented control and risk dimension select
+- `sidebar/sortMode.tsx` — Analysis polling logic: `switchSortMode`, `triggerAnalysis`, `loadAnalysisResults`, `invalidateAnalysisCache`
+- `sidebar/riskPopover.tsx` — Per-file risk dimension popover
+- `sidebar/fileTree.tsx` — `loadFiles()` API call (populates `reviewStore`)
 - `diff/selection.ts` — File selection
 - `diff/hunkExpander.tsx` — Context expansion
 - `diff/lineClicks.ts` — Diff line click handling

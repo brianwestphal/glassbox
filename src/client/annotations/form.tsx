@@ -1,6 +1,5 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { renderFileList } from '../sidebar/fileTree.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import { reviewStore } from '../stores/index.js';
@@ -79,5 +78,4 @@ async function saveAnnotation(container: HTMLElement, lineNumber: number, side: 
   const fileId = reviewStore.state.value.currentFileId ?? '';
   const prevCount = reviewStore.state.value.annotationCounts[fileId] ?? 0;
   reviewStore.actions.setAnnotationCount(fileId, prevCount + 1);
-  renderFileList();
 }

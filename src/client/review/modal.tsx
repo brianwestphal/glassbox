@@ -1,6 +1,5 @@
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { renderFileList } from '../sidebar/fileTree.js';
 import { reviewStore } from '../stores/index.js';
 import { TOAST_DURATION_MS } from '../timing.js';
 
@@ -58,7 +57,6 @@ function showCompleteModal() {
       void (async () => {
         await api('/annotations/stale/delete-all', { method: 'POST' });
         reviewStore.actions.update({ staleCounts: {} });
-        renderFileList();
         overlay.remove();
         showCompleteModal();
       })();
@@ -67,7 +65,6 @@ function showCompleteModal() {
       void (async () => {
         await api('/annotations/stale/keep-all', { method: 'POST' });
         reviewStore.actions.update({ staleCounts: {} });
-        renderFileList();
         overlay.remove();
         showCompleteModal();
       })();

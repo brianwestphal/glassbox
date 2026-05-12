@@ -1,5 +1,4 @@
 import { api, clientLog } from './api.js';
-import { renderFileList } from './sidebar/fileTree.js';
 import { aiStore } from './stores/index.js';
 import { ANALYSIS_POLL_INTERVAL_MS } from './timing.js';
 
@@ -36,7 +35,6 @@ export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
   });
   pollGeneration++;
   const gen = pollGeneration;
-  renderFileList();
 
   void (async () => {
     try {
@@ -53,7 +51,6 @@ export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
         status: 'failed',
         error: friendlyError(raw),
       });
-      renderFileList();
     }
   })();
 }
@@ -86,7 +83,6 @@ function pollGuidedStatus(gen: number) {
           await loadGuidedResults(true);
         }
 
-        renderFileList();
         setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
         return;
       }
@@ -99,7 +95,6 @@ function pollGuidedStatus(gen: number) {
           progressCompleted: 0,
           progressTotal: 0,
         });
-        renderFileList();
         return;
       }
 
@@ -113,7 +108,6 @@ function pollGuidedStatus(gen: number) {
           progressCompleted: 0,
           progressTotal: 0,
         });
-        renderFileList();
       }
     })();
   };

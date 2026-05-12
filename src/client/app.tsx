@@ -11,11 +11,11 @@ import { triggerGuidedAnalysis } from "./guided.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
 import { updateProgress } from "./review/progress.js";
 import { initSharePrompt, triggerShare } from "./share.js";
-import { bindFileFilter, bindSidebarEvents, bindSidebarResize } from "./sidebar/controls.js";
 import { loadFiles } from "./sidebar/fileTree.js";
-import { bindSortMode, loadAnalysisResults, renderSortControl, triggerAnalysis } from "./sidebar/sortMode.js";
+import { initSidebar } from "./sidebar/index.js";
+import { loadAnalysisResults, triggerAnalysis } from "./sidebar/sortMode.js";
 import type { SortMode } from "./state.js";
-import { aiStore, diffViewStore, dragStore, reviewStore } from "./stores/index.js";
+import { aiStore, diffViewStore, dragStore, reviewStore, visibleFileOrder } from "./stores/index.js";
 // --- Tauri update notification ---
 import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
 
@@ -56,14 +56,6 @@ async function initAISorting() {
   } catch {
     // AI features unavailable, fall back to folder
     aiStore.actions.update({ sortMode: "folder" });
-  }
-
-  // Inject sort control into the sidebar
-  const filterEl = document.querySelector(".file-filter");
-  if (filterEl !== null) {
-    const control = renderSortControl();
-    filterEl.after(control);
-    bindSortMode();
   }
 
   // Add refresh and settings buttons to sidebar header
@@ -206,11 +198,13 @@ async function init() {
   await initDebug();
   await initAISorting();
   await loadFiles();
+  initSidebar();
 
   // Auto-select the first file if none is selected
   const review = reviewStore.state.value;
-  if (review.currentFileId === null && review.fileOrder.length > 0) {
-    void selectFile(review.fileOrder[0]);
+  const order = visibleFileOrder.value;
+  if (review.currentFileId === null && order.length > 0) {
+    void selectFile(order[0]);
   }
 
   // Auto-start analysis if resuming in an AI mode with no cached results
@@ -229,12 +223,9 @@ async function init() {
     triggerGuidedAnalysis();
   }
 
-  bindSidebarEvents();
   bindToolbar();
   bindFind();
   bindGoToDefinition();
-  bindFileFilter();
-  bindSidebarResize();
   bindCompleteButton();
   bindReopenButton();
   initScrollSync();
