@@ -280,7 +280,7 @@ command matches the detected package manager (npm/yarn/pnpm/bun).
 
 Build pipeline: server is ESM via tsup (externals listed in
 `code-summary.md` §14); client is an IIFE via esbuild (es2020, minified);
-SCSS compiled separately via sass. Both builds share the `#jsx` alias.
+SCSS compiled separately via sass. Both builds use `jsxImportSource: 'kerfjs'`.
 CI/CD (GitHub Actions on `v*`) signs/notarizes macOS, produces all
 artifacts + `latest.json` for updater, publishes draft Releases.
 

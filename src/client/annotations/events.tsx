@@ -1,4 +1,4 @@
-import { delegate } from 'kerfjs';
+import { delegate, morph } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
@@ -145,7 +145,7 @@ async function handleKeep(item: HTMLElement): Promise<void> {
   const updated = { ...annotation, is_stale: false };
   item.classList.remove('annotation-stale');
   delete item.dataset.isStale;
-  item.innerHTML = buildAnnotationItemHtml(updated).toString();
+  morph(item, buildAnnotationItemHtml(updated));
   const fileId = reviewStore.state.value.currentFileId ?? '';
   const stale = reviewStore.state.value.staleCounts[fileId] ?? 1;
   reviewStore.actions.setStaleCount(fileId, Math.max(0, stale - 1));
@@ -212,7 +212,7 @@ async function saveEdit(): Promise<void> {
       content,
       is_stale: item.dataset.isStale === 'true',
     };
-    item.innerHTML = buildAnnotationItemHtml(updated).toString();
+    morph(item, buildAnnotationItemHtml(updated));
     item.style.display = '';
   }
   closeEditForm();

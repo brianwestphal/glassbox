@@ -1,4 +1,4 @@
-import { delegate } from 'kerfjs';
+import { delegate, morph } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
@@ -74,7 +74,7 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
         body: { content: annotation.content, category: newCategory },
       });
       const updated: Annotation = { ...annotation, category: newCategory };
-      item.innerHTML = buildAnnotationItemHtml(updated).toString();
+      morph(item, buildAnnotationItemHtml(updated));
       popup.remove();
       closeCategoryPicker();
     })();

@@ -88,29 +88,36 @@ Generates `.glassbox/latest-review.md` on review completion — structured markd
 
 ### Client architecture (`src/client/`)
 
-Modular TypeScript files organized by concern:
+Modular TypeScript files organized by concern. Every surface follows the same pattern: state in `defineStore` modules (`stores/index.ts`), re-render via kerf `mount()` rooted at a stable container, events via `delegate(root, …)`, list items keyed with `data-key`.
 
-- `sidebar/` — File tree, sort modes (folder/risk/narrative), risk badges
-- `diff/` — File selection, hunk expansion, line clicks, split/unified mode
-- `annotations/` — Creation form, inline rendering, CRUD events, categories
-- `review/` — Completion modal, progress bar
-- `settings/` — AI settings dialog (platform, model, API key)
-- `dom.ts` — `toElement()` helper converts JSX to DOM elements
+- `stores/index.ts` — `reviewStore`, `diffViewStore`, `aiStore`, `dragStore` (kerf `defineStore`), plus `editFormSignal` and `categoryPickerSignal` for transient UI state. Computed: `filteredFiles`, `visibleFileOrder`, `aiEnabled`. New client state goes here.
+- `sidebar/` — Sort control + file list mounted reactively via kerf; all interactions delegated at the sidebar root.
+- `diff/` — One `mount()` on `#diff-container`; fetched diff HTML lives under `data-morph-skip` so highlight.js, hunk expansion, and image-diff widgets can mutate it imperatively. Delegated events for line clicks, hunk expand, drag-and-drop.
+- `annotations/` — `bindAnnotationEvents()` + `bindCreateFormEvents()` register every annotation interaction via `delegate()`. Edit-form content lives in a `signal` so a sibling annotation update doesn't clobber an open form.
+- `review/` — Completion modal driven by `stage = signal<ModalStage>` + `mount()`; progress bar updates reactively via `effect()` over `reviewStore.state.value.files`.
+- `settings/` — Settings dialog mounted reactively; centralized delegated handlers per tab. Theme editor live-preview is a kerf `effect()` over the in-progress colors signal.
+- `dom.ts` — `toElement()` helper converts JSX to DOM elements at the last moment. Never use `document.createElement` directly.
 
-All HTML building uses the custom JSX runtime (`.tsx` files) with `SafeHtml`. DOM elements are created via `toElement()`, never `document.createElement()`.
+### JSX runtime
 
-### Custom JSX runtime (`src/jsx-runtime.ts`)
+Provided by **kerfjs** (`kerfjs/jsx-runtime`). Shared between server (page rendering via the SSR helpers) and client (`mount()`-driven reactivity and one-shot `toElement` / `morph` calls). Auto-escapes string children; use `raw()` for pre-escaped HTML strings. `tsconfig.json` and `tsup.config.ts` set `jsxImportSource: 'kerfjs'`.
 
-Renders JSX to HTML strings via the `SafeHtml` class. Shared between server (page rendering) and client (DOM building). Auto-escapes string children; use `raw()` for pre-escaped HTML.
+## Client conventions
+
+- **State lives in `defineStore` modules**, not in module-scope mutable objects.
+- **Re-renders happen via `mount()`**, not by manually calling rebuild functions. Manual `renderX()` callsites scattered through the codebase are a smell.
+- **Event handlers use `delegate()` / `delegateCapture()`** from a single stable root per surface. Per-element `addEventListener` inside a `mount()` tree silently disappears on the next re-render. Document-level listeners for drag-lifecycle / popup-dismiss / global keyboard shortcuts are fine.
+- **List items must carry `data-key`** (or a stable `id`). Required for morph identity preservation across re-renders.
+- **`data-morph-skip`** is the escape hatch for library-owned subtrees that kerf must not touch (e.g. the server-rendered diff content with highlight.js, image-diff zoom widgets). Use `data-morph-skip-children` when the host's attributes must keep flowing but the subtree is client-owned. Use `data-morph-preserve` for imperatively-injected children that aren't in the JSX template.
 
 ## Build pipeline
 
 Uses tsup to produce two bundles:
 
-1. **Server** (`dist/cli.js`) — ESM, Node 20 target, shebang. External deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`
-2. **Client** (`dist/client/app.global.js`) — IIFE, es2020, minified. SCSS compiled separately via sass.
+1. **Server** (`dist/cli.js`) — ESM, Node 20 target, shebang. External deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`).
+2. **Client** (`dist/client/app.global.js`) — IIFE, es2020, minified. SCSS compiled separately via sass. Separate entry `dist/client/history.global.js` for the review-history page.
 
-Both bundles share the custom JSX runtime via the `#jsx` import alias.
+Both bundles use the kerfjs JSX runtime via `tsup.config.ts`'s `options.jsxImportSource = 'kerfjs'` setting.
 
 ## Annotation categories
 

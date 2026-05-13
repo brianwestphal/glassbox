@@ -6,9 +6,9 @@ Client tests should use a DOM environment (jsdom or happy-dom via Vitest) for te
 
 ## Unit Tests
 
-### JSX Runtime (`src/jsx-runtime.ts`)
+### JSX Runtime (`kerfjs/jsx-runtime`)
 
-The custom JSX runtime is shared between server and client. It renders JSX to HTML strings via the `SafeHtml` class. This is a high-value, low-effort test target.
+The JSX runtime is provided by **kerfjs** and is shared between server (HTML string rendering via `.toString()`) and client (`mount()`-driven reactivity, plus `toElement()` / `morph()` for one-shot operations). Tests for the SSR-string behavior remain useful even though kerfjs ships its own suite — they pin the contract Glassbox depends on. This is a high-value, low-effort test target.
 
 - **Simple element** — `<div>hello</div>` produces `<div>hello</div>`.
 - **String escaping** — `<p>{"<script>alert(1)</script>"}</p>` escapes the angle brackets and quotes.

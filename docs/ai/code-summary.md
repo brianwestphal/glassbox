@@ -32,9 +32,9 @@ glassbox/
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
 ├── assets/                 # Static assets shipped with the app
 ├── CLAUDE.md               # Project rules for AI sessions
-├── package.json            # npm scripts, deps, imports map (#jsx alias)
+├── package.json            # npm scripts, deps
 ├── tsup.config.ts          # Server + client build config
-├── tsconfig.json           # TS config (jsxImportSource: #jsx)
+├── tsconfig.json           # TS config (jsxImportSource: kerfjs)
 ├── playwright.config.ts    # E2E runner config
 └── vitest.config.ts        # Unit/integration runner config
 ```
@@ -48,7 +48,7 @@ glassbox/
 | `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. |
 | `server.ts` | Hono app bootstrap. Middleware for `reviewId`/`currentReviewId`/`repoRoot`. Static asset routes. Registers route groups. |
 | `types.ts` | `AppEnv` (Hono `Env` with typed Variables). |
-| `jsx-runtime.ts` | Custom JSX → HTML. Exports `SafeHtml`, `jsx`, `jsxs`, `Fragment`, `raw()`. Auto-escapes string children. |
+| (JSX runtime) | Provided by **kerfjs** (`kerfjs/jsx-runtime`). `SafeHtml` / `raw()` / `Fragment` / `each` / `morph` / `mount` / `delegate` / `signal` / `effect` / `computed` / `defineStore` are all imported from `'kerfjs'`. Auto-escapes string children. Shared between server (SSR via `.toString()`) and client (`mount()`-driven reactivity). |
 | `icons.tsx` | SVG icon components used across server-rendered pages and client UI. |
 | `channel.ts` | MCP channel server (stdio transport + local HTTP). Bridges Glassbox UI → Claude Code. Built as `dist/channel.js`. |
 | `channel-config.ts` | Reads/writes `.mcp.json` entry for the channel, port file in `.glassbox/`, health check. |
@@ -305,21 +305,45 @@ Foreign keys cascade-delete. Indexes: `idx_review_files_review`,
 
 ## 7. JSX runtime
 
-`src/jsx-runtime.ts` produces `SafeHtml` (a wrapper around an HTML string).
-Configured via:
+Provided by **kerfjs** (`kerfjs/jsx-runtime`). Configured via:
 
-- `tsconfig.json`: `"jsx": "react-jsx"`, `"jsxImportSource": "#jsx"`
-- `package.json` imports map: `"#jsx/jsx-runtime": "./src/jsx-runtime.ts"`
-- `tsup.config.ts`: esbuild alias resolves `#jsx/jsx-runtime` at build time
-  for **both** server and client
+- `tsconfig.json`: `"jsx": "react-jsx"`, `"jsxImportSource": "kerfjs"`
+- `tsup.config.ts`: esbuild sets `options.jsxImportSource = 'kerfjs'` for
+  both server and client builds
 
 Rules:
 
-- Components return `SafeHtml` (aliased as `JSX.Element`).
-- String children are auto-escaped (via `utils/escapeHtml.ts`).
-- Use `raw(html)` to inject pre-escaped HTML (e.g., highlighted code).
+- Components return `SafeHtml` (aliased as `JSX.Element`). Import the type
+  from `'kerfjs'`.
+- String children are auto-escaped.
+- Use `raw(html)` from `'kerfjs'` to inject pre-escaped HTML (e.g.,
+  highlighted code).
 - In client code, cross into DOM only at the last moment via
-  `toElement(<…/>)` from `src/client/dom.ts`. Never use `document.createElement`.
+  `toElement(<…/>)` from `src/client/dom.ts` (a thin wrapper over kerfjs's
+  `toElement`). Never use `document.createElement`.
+- For in-place reconciliation of an existing DOM subtree against a new
+  template, use `morph(liveRoot, template)` from `'kerfjs'`. For driving
+  a subtree from a signal, use `mount(rootEl, () => renderJsx())`.
+
+## 7.1 Client reactivity model
+
+- **State** lives in `defineStore` instances in `src/client/stores/index.ts`
+  (`reviewStore`, `diffViewStore`, `aiStore`, `dragStore`) plus per-feature
+  `signal()` instances (`editFormSignal`, `categoryPickerSignal`).
+  Computed: `filteredFiles`, `visibleFileOrder`, `aiEnabled`.
+- **Re-renders** happen via `mount(rootEl, () => renderJsx())` — re-runs on
+  signal changes and morphs the live tree against the new template.
+  No manual `renderX()` callsites; the previous `el.innerHTML = jsx.toString()`
+  pattern is forbidden inside a mount tree.
+- **Events** use `delegate(rootEl, 'click', selector, handler)` (or
+  `delegateCapture` for non-bubbling / capture-phase). Per-element
+  `addEventListener` inside a mount tree silently disappears on re-render.
+  Document-level listeners for drag lifecycle / popup-dismiss / global
+  keyboard shortcuts are fine.
+- **List items** carry `data-key={id}` for keyed morph identity.
+- **Escape hatches**: `data-morph-skip` (kerf doesn't touch the subtree),
+  `data-morph-skip-children` (attrs morph, subtree skipped),
+  `data-morph-preserve` (imperatively-injected child survives trailing-removal).
 
 ## 8. Client bundle
 
@@ -329,8 +353,10 @@ Two IIFE bundles from `src/client/`:
 - `dist/client/history.global.js` — history page (from `history.tsx`)
 
 `app.tsx` wires up, in order: debug probe → AI sort state (loads prefs,
-checks config) → sidebar file tree → diff view → annotation events →
-completion modal → share prompt/button → Tauri integration hooks.
+checks config) → load files → init sidebar (mounts sort control + file list
+reactively) → init diff view (mounts the diff pane with an async fetch
+effect) → toolbar / find / go-to-definition / completion / progress
+(reactive) → drag-end / nav buttons / scroll tracking.
 
 All server communication goes through `api()` in `src/client/api.ts`, which
 injects the `reviewId` query param and serializes request bodies. **Never
@@ -450,8 +476,8 @@ Scripts (`package.json`):
 - `dist/client/history.global.js` — IIFE for the history page.
 - `dist/client/styles.css` — compiled + compressed from SCSS.
 
-Shared JSX alias (`#jsx/jsx-runtime`) resolves to `src/jsx-runtime.ts` in
-both builds.
+JSX runtime is `kerfjs/jsx-runtime` (shared by server + client builds via
+`tsconfig.json` and `tsup.config.ts`'s `jsxImportSource: 'kerfjs'`).
 
 **When adding a new external server dep**, update **three** places (see
 CLAUDE.md): `tsup.config.ts` noExternal regex, `scripts/build-sidecar.sh`

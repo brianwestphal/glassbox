@@ -93,19 +93,24 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/routes/theme-api.ts` — Theme REST API: list, get/set active, create/update/delete custom themes
 - `src/client/themes.ts` — Client-side theme switching: applyThemeColors(), switchTheme()
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
-- `src/jsx-runtime.ts` — Custom JSX runtime (server-side HTML string generation)
 - `src/types.ts` — Shared Hono environment types
 - `src-tauri/` — Tauri desktop app (Rust backend, loading screens, CLI wrappers) — see `docs/tauri-architecture.md`
 
 ### JSX Runtime
 
-The project uses a custom JSX runtime (`src/jsx-runtime.ts`) instead of React. It renders JSX to HTML strings via the `SafeHtml` class. This runtime is shared by both the server-side components and client-side modules. Configured via:
+The project uses **kerfjs** (`kerfjs/jsx-runtime`) as its JSX runtime — both for server-side HTML rendering and for client-side `mount()`-driven reactivity. Configured via:
 
-- `tsconfig.json`: `"jsx": "react-jsx"`, `"jsxImportSource": "#jsx"`
-- `package.json` imports map: `"#jsx/jsx-runtime": "./src/jsx-runtime.ts"`
-- `tsup.config.ts`: esbuild alias resolves `#jsx/jsx-runtime` at build time (both server and client configs)
+- `tsconfig.json`: `"jsx": "react-jsx"`, `"jsxImportSource": "kerfjs"`
+- `tsup.config.ts`: esbuild sets `options.jsxImportSource = 'kerfjs'` (both server and client configs)
 
-When writing TSX components, they return `SafeHtml` (which is `JSX.Element`). Use `raw()` to inject pre-escaped HTML strings. All string children are auto-escaped. In client code, convert JSX to string for `innerHTML` with `.toString()`.
+When writing TSX components, they return `SafeHtml` (which is `JSX.Element`). Import `SafeHtml` and helpers from `kerfjs`:
+
+```ts
+import type { SafeHtml } from 'kerfjs';
+import { raw } from 'kerfjs';
+```
+
+Use `raw()` to inject pre-escaped HTML strings. All string children are auto-escaped. In client code, convert JSX to a DOM element with `toElement(jsx)` (from `src/client/dom.ts`); avoid `document.createElement` and `innerHTML = jsx.toString()`. For in-place reconciliation of an existing DOM subtree against a new JSX template, use `morph(liveRoot, template)` from `kerfjs`.
 
 ### Client-Side Code
 
@@ -260,5 +265,17 @@ When the user gives you work directly via the CLI (not via MCP channel or Hot Sh
 - **Files should not be excessively long** — break up large files by concern into smaller, focused modules
 - **Use sub-folders for specialization** — group related modules under descriptive directories (e.g., `sidebar/`, `diff/`, `annotations/`, `review/`)
 - **SCSS uses partials** — split into `_partial.scss` files by concern, imported from a single entry point
-- **Use TSX/SafeHtml for HTML building** — client-side code that builds HTML strings should use the JSX runtime (`.tsx` files) rather than manual string concatenation. Use `raw()` for pre-rendered HTML strings in JSX
+- **Use TSX/SafeHtml for HTML building** — client-side code that builds HTML strings should use the JSX runtime (`.tsx` files) rather than manual string concatenation. Use `raw()` from `kerfjs` for pre-rendered HTML strings in JSX
 - **Use `toElement()` instead of `document.createElement()`** — when creating DOM elements in client code, use the `toElement()` helper from `dom.ts` with JSX: `toElement(<div className="foo">bar</div>)`. Resolve JSX to DOM elements only at the last moment. Never use `document.createElement()` directly
+
+### Client reactivity conventions (kerfjs)
+
+The client uses **kerfjs** for state, render, and event delegation. Follow these patterns when writing new client features:
+
+- **State lives in `defineStore` modules** in `src/client/stores/index.ts` (`reviewStore`, `diffViewStore`, `aiStore`, `dragStore`), plus per-feature `signal()` instances for transient UI state (e.g. `editFormSignal`, `categoryPickerSignal`). Do not introduce module-scope mutable objects.
+- **Re-renders happen via `mount()`**, not by manually calling rebuild functions. `mount(rootEl, () => renderJsx())` re-runs the render fn whenever a signal it reads changes, and morphs the live tree against the new template. If you find yourself writing `el.innerHTML = jsx.toString()` and then a re-bind step, you want `mount()` (or `morph()` for one-shot reconciliation).
+- **Event handlers use `delegate()` / `delegateCapture()`** from a single stable root per surface (`sidebar`, `#diff-container`, modal overlay, etc.). Inside a `mount()` tree, per-element `addEventListener` silently disappears on the next re-render. The exceptions — same precedent across every phase — are `document`-level listeners for drag lifecycle, popup outside-click dismiss, and global keyboard shortcuts.
+- **List items must carry `data-key`** (or a stable `id`). Required for kerf's keyed reconciler to preserve identity across re-renders. Without a key, items match positionally by tag name — fine for static lists, broken for anything that reorders.
+- **`data-morph-skip`** is the escape hatch for library-owned subtrees (the diff content where highlight.js / hunk expansion / image-diff zoom mutate the DOM imperatively). `data-morph-skip-children` keeps the element's attributes morphing but leaves the subtree alone (for server-rendered shells whose loading-state classes still need to flow). `data-morph-preserve` keeps an imperatively-injected child surviving the trailing-removal pass when the new template doesn't emit it. See `docs/4-render.md` in the kerfjs repo for the full taxonomy.
+
+When a feature touches DOM state that should survive re-renders (input focus + value, contenteditable cursor, `<details open>` state), kerf preserves these automatically during morph — you don't need to manage them imperatively. See kerfjs §4.4.

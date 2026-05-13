@@ -65,7 +65,7 @@ Focus coverage on code that is hard to verify manually or has caused regressions
 | `src/outline/parser.ts` | 87% | 93% | All languages + template literals |
 | `src/review-update.ts` | 99% | 100% | Annotation migration + fuzzy matching |
 | `src/utils/escapeHtml.ts` | 100% | 100% | Full coverage |
-| `src/jsx-runtime.ts` | 92% | 89% | Elements, attributes, fragments, raw() |
+| (JSX runtime: `kerfjs`) | — | — | Provided by kerfjs; ships its own test suite. Glassbox tests in `tests/jsx-runtime.test.ts` (if present) pin the contract we depend on. |
 | `src/ai/batch-planner.ts` | 94% | 100% | All batch planning scenarios |
 | `src/lock.ts` | 69% | 87% | Lock lifecycle + stale cleanup |
 

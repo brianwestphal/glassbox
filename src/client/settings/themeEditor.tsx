@@ -1,4 +1,5 @@
-import { effect, signal } from 'kerfjs';
+import type { SafeHtml } from 'kerfjs';
+import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
@@ -53,52 +54,70 @@ const COLOR_GROUPS: Array<{ label: string; vars: Array<[string, string]> }> = [
   ]},
 ];
 
+function toHex(color: string): string {
+  if (color.startsWith('#') && (color.length === 7 || color.length === 4)) return color;
+  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (m) {
+    const r = parseInt(m[1]).toString(16).padStart(2, '0');
+    const g = parseInt(m[2]).toString(16).padStart(2, '0');
+    const b = parseInt(m[3]).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
+  }
+  return '#888888';
+}
+
 /**
  * Show the theme color editor for a given theme.
  * For built-in themes, auto-copies to a "(Customized)" version on first edit.
  */
-export function showThemeEditor(themeId: string, onDone?: () => void) {
+export function showThemeEditor(themeId: string, onDone?: () => void): void {
   void (async () => {
     const listData = await api<{ themes: ThemeData[]; activeId: string }>('/themes');
     let theme = listData.themes.find(t => t.id === themeId);
-    if (!theme) return;
+    if (theme === undefined) return;
+    const isBuiltIn = theme.builtIn;
 
     // Resolve base theme colors for Reset functionality
     const baseThemeId = theme.builtIn ? theme.id : (theme.baseTheme ?? 'dark');
     const baseTheme = listData.themes.find(t => t.id === baseThemeId);
     const baseColors = baseTheme ? { ...baseTheme.colors } : { ...theme.colors };
 
-    // Live edit state lives in a signal so the live-preview is a reactive
-    // `effect()` instead of an imperative `applyLive()` call at every update
-    // site. Any signal write triggers the effect, which pushes CSS custom
-    // properties to `document.documentElement` (via `applyThemeColors`).
+    // Live edit state lives in signals. The `editColorsSignal` drives both
+    // the live preview (an `effect()` that pushes CSS custom properties to
+    // `document.documentElement`) AND the `mount()` render of the form
+    // below — every color change reactively updates both.
     const editColorsSignal = signal<Record<string, string>>({ ...theme.colors });
-    let editName = theme.name;
+    const editNameSignal = signal(theme.name);
     let dirty = false;
     let currentThemeId = themeId;
+    const originalName = theme.name;
 
-    const overlay = toElement(<div className="modal-overlay"></div>);
+    const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog theme-editor-dialog"></div></div>);
+    const modalEl = overlay.querySelector<HTMLElement>('.modal');
+    if (modalEl === null) return;
+
     const disposeLivePreview = effect(() => {
       applyThemeColors(editColorsSignal.value);
     });
 
-    function close() {
+    let disposeMount: (() => void) | null = null;
+    function close(): void {
       document.removeEventListener('keydown', handleEscape);
       disposeLivePreview();
+      if (disposeMount !== null) disposeMount();
       if (dirty) void save();
       overlay.remove();
-      if (onDone) onDone();
+      if (onDone !== undefined) onDone();
     }
 
-    function handleEscape(e: KeyboardEvent) {
+    function handleEscape(e: KeyboardEvent): void {
       if (e.key === 'Escape') close();
     }
 
-    async function save() {
+    async function save(): Promise<void> {
       if (!dirty) return;
       const body: Record<string, unknown> = { colors: editColorsSignal.value };
-      // Include name if it changed from the original
-      if (theme !== undefined && editName !== theme.name) body.name = editName;
+      if (editNameSignal.value !== originalName) body.name = editNameSignal.value;
       const result = await api<{ theme: ThemeData; copied: boolean }>(`/themes/${currentThemeId}/edit`, {
         method: 'POST',
         body,
@@ -110,130 +129,91 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
       dirty = false;
     }
 
-    function toHex(color: string): string {
-      if (color.startsWith('#') && (color.length === 7 || color.length === 4)) return color;
-      const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-      if (m) {
-        const r = parseInt(m[1]).toString(16).padStart(2, '0');
-        const g = parseInt(m[2]).toString(16).padStart(2, '0');
-        const b = parseInt(m[3]).toString(16).padStart(2, '0');
-        return `#${r}${g}${b}`;
-      }
-      return '#888888';
+    function updateColor(varName: string, value: string): void {
+      editColorsSignal.value = { ...editColorsSignal.value, [varName]: value };
+      dirty = true;
     }
 
-    function render() {
-      const modalEl = overlay.querySelector('.modal');
-      if (!modalEl) return;
+    disposeMount = mount(modalEl, () => renderEditor(isBuiltIn, editNameSignal.value, editColorsSignal.value));
 
-      const isBuiltIn = theme?.builtIn === true;
-      const headerText = isBuiltIn ? 'Edit Theme (will create a copy)' : 'Edit Theme';
-      const editColors = editColorsSignal.value;
+    // Delegated event handlers. Per-row inputs (`.theme-editor-picker`,
+    // `.theme-editor-hex`) all match a single delegate selector — kerf
+    // morph preserves the focused input's value and cursor across renders
+    // (docs §4.4), so the picker keeps focus while another color updates.
 
-      modalEl.innerHTML = (
-        <>
-          <div className="settings-header">
-            <h3>{headerText}</h3>
-            <button className="settings-close" id="te-close">&times;</button>
+    delegate(overlay, 'click', '#te-close', close);
+
+    delegate(overlay, 'input', '#te-name', (_e, input) => {
+      editNameSignal.value = (input as HTMLInputElement).value;
+      dirty = true;
+    });
+
+    delegate(overlay, 'input', '.theme-editor-picker', (_e, picker) => {
+      const varName = (picker as HTMLElement).dataset.var ?? '';
+      if (varName !== '') updateColor(varName, (picker as HTMLInputElement).value);
+    });
+
+    delegate(overlay, 'change', '.theme-editor-hex', (_e, input) => {
+      const varName = (input as HTMLElement).dataset.var ?? '';
+      const value = (input as HTMLInputElement).value.trim();
+      if (varName !== '' && value !== '') updateColor(varName, value);
+    });
+
+    delegate(overlay, 'click', '.theme-editor-reset', (_e, btn) => {
+      const varName = (btn as HTMLElement).dataset.var ?? '';
+      const baseValue = baseColors[varName];
+      if (varName !== '' && baseValue !== '') updateColor(varName, baseValue);
+    });
+
+    delegate(overlay, 'click', '#te-reset-all', () => {
+      editColorsSignal.value = { ...baseColors };
+      dirty = true;
+    });
+
+    // Click-outside-to-close — direct listener on the overlay (overlay
+    // isn't inside any mount() tree, same precedent as every other modal).
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    document.addEventListener('keydown', handleEscape);
+    document.body.appendChild(overlay);
+  })();
+}
+
+function renderEditor(isBuiltIn: boolean, editName: string, editColors: Record<string, string>): SafeHtml {
+  const headerText = isBuiltIn ? 'Edit Theme (will create a copy)' : 'Edit Theme';
+  return (
+    <>
+      <div className="settings-header">
+        <h3>{headerText}</h3>
+        <button className="settings-close" id="te-close">&times;</button>
+      </div>
+      <div className="theme-editor-body">
+        {!isBuiltIn && (
+          <div className="theme-editor-name-section">
+            <label className="settings-label">Name</label>
+            <input type="text" className="settings-input" id="te-name" value={editName} />
           </div>
-          <div className="theme-editor-body">
-            {!isBuiltIn && (
-              <div className="theme-editor-name-section">
-                <label className="settings-label">Name</label>
-                <input type="text" className="settings-input" id="te-name" value={editName} />
-              </div>
-            )}
-            <div className="theme-editor-toolbar">
-              <button className="btn btn-sm" id="te-reset-all">Reset All to Base</button>
-            </div>
-            {COLOR_GROUPS.map(group => (
-              <div className="theme-editor-group">
-                <h4 className="theme-editor-group-label">{group.label}</h4>
-                {group.vars.map(([varName, label]) => (
-                  <div className="theme-editor-row" data-var={varName}>
-                    <span className="theme-editor-label">{label}</span>
-                    <span className="theme-editor-swatch" style={`background:${editColors[varName] ?? '#888'}`}></span>
-                    <input type="color" className="theme-editor-picker" value={toHex(editColors[varName] ?? '#888888')} data-var={varName} />
-                    <input type="text" className="theme-editor-hex" value={editColors[varName] ?? ''} data-var={varName} />
-                    <button className="btn btn-xs theme-editor-reset" data-var={varName} title="Reset to base">&#x21ba;</button>
-                  </div>
-                ))}
+        )}
+        <div className="theme-editor-toolbar">
+          <button className="btn btn-sm" id="te-reset-all">Reset All to Base</button>
+        </div>
+        {COLOR_GROUPS.map(group => (
+          <div className="theme-editor-group">
+            <h4 className="theme-editor-group-label">{group.label}</h4>
+            {group.vars.map(([varName, label]) => (
+              <div data-key={`row-${varName}`} className="theme-editor-row" data-var={varName}>
+                <span className="theme-editor-label">{label}</span>
+                <span className="theme-editor-swatch" style={`background:${editColors[varName] ?? '#888'}`}></span>
+                <input type="color" className="theme-editor-picker" value={toHex(editColors[varName] ?? '#888888')} data-var={varName} />
+                <input type="text" className="theme-editor-hex" value={editColors[varName] ?? ''} data-var={varName} />
+                <button className="btn btn-xs theme-editor-reset" data-var={varName} title="Reset to base">&#x21ba;</button>
               </div>
             ))}
           </div>
-        </>
-      ).toString();
-
-      bindEvents();
-    }
-
-    function updateColor(varName: string, value: string) {
-      editColorsSignal.value = { ...editColorsSignal.value, [varName]: value };
-      dirty = true;
-      const row = overlay.querySelector(`[data-var="${varName}"].theme-editor-row`);
-      if (row) {
-        const swatch = row.querySelector<HTMLElement>('.theme-editor-swatch');
-        if (swatch) swatch.style.background = value;
-        const picker = row.querySelector<HTMLInputElement>('.theme-editor-picker');
-        if (picker && document.activeElement !== picker) picker.value = toHex(value);
-        const hex = row.querySelector<HTMLInputElement>('.theme-editor-hex');
-        if (hex && document.activeElement !== hex) hex.value = value;
-      }
-    }
-
-    function bindEvents() {
-      overlay.querySelector('#te-close')?.addEventListener('click', close);
-
-      // Name input
-      const nameInput = overlay.querySelector<HTMLInputElement>('#te-name');
-      if (nameInput) {
-        nameInput.addEventListener('input', () => {
-          editName = nameInput.value;
-          dirty = true;
-        });
-      }
-
-      // Color pickers
-      overlay.querySelectorAll('.theme-editor-picker').forEach(picker => {
-        picker.addEventListener('input', () => {
-          const varName = (picker as HTMLElement).dataset.var ?? '';
-          updateColor(varName, (picker as HTMLInputElement).value);
-        });
-      });
-
-      // Hex text inputs
-      overlay.querySelectorAll('.theme-editor-hex').forEach(input => {
-        input.addEventListener('change', () => {
-          const varName = (input as HTMLElement).dataset.var ?? '';
-          const value = (input as HTMLInputElement).value.trim();
-          if (value !== '') updateColor(varName, value);
-        });
-      });
-
-      // Per-color reset
-      overlay.querySelectorAll('.theme-editor-reset').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const varName = (btn as HTMLElement).dataset.var ?? '';
-          const baseValue = baseColors[varName];
-          if (baseValue !== '') updateColor(varName, baseValue);
-        });
-      });
-
-      // Reset All
-      overlay.querySelector('#te-reset-all')?.addEventListener('click', () => {
-        editColorsSignal.value = { ...baseColors };
-        dirty = true;
-        render();
-      });
-
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-      });
-    }
-
-    document.addEventListener('keydown', handleEscape);
-    overlay.innerHTML = (<div className="modal settings-dialog theme-editor-dialog"></div>).toString();
-    document.body.appendChild(overlay);
-    render();
-  })();
+        ))}
+      </div>
+    </>
+  );
 }
