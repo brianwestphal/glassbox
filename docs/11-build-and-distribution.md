@@ -40,6 +40,7 @@ Requirements for building, packaging, and distributing the application.
   - run lint, type check, unit tests, E2E tests, and `npm pack --dry-run` validation
   - publish to npm with `--tag beta` (so `npm install glassbox@beta` resolves to the latest beta and stable users on `latest` are unaffected)
   - build Tauri bundles for every platform and attach them to a GitHub Release flagged `prerelease: true`
+- Windows prerelease (RC and beta) builds shall skip the MSI bundle and ship the NSIS `.exe` installer only. The Tauri MSI bundler requires the optional pre-release identifier to be numeric-only (e.g. `0.9.0-1`), which conflicts with the semver-standard `-rc.N` / `-beta.N` form. Stable releases produce both NSIS and MSI because the version has no pre-release identifier.
 - There shall be no auto-promotion from beta to stable. Users opt in via `npm install glassbox@beta` or by downloading from the GitHub Release page.
 - The Tauri auto-updater (which reads `releases/latest/download/latest.json`) and the in-CLI upgrade nudge (which reads `registry.npmjs.org/glassbox/latest`) shall continue to point at the prior stable release because both surfaces skip prereleases automatically.
 - The stable desktop release workflow shall exclude `v*-beta.*` tags from its trigger to avoid racing with the beta workflow on tag push.

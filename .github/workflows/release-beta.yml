@@ -279,6 +279,15 @@ jobs:
         run: bash scripts/build-sidecar.sh ${{ matrix.target }}
         shell: bash
 
+      # Windows MSI bundler requires the optional pre-release identifier in
+      # the app version to be numeric-only (e.g. `0.9.0-1`). Beta tags use
+      # the semver-standard `0.9.0-beta.N` form, which fails the MSI version
+      # check with: "optional pre-release identifier in app version must be
+      # numeric-only and cannot be greater than 65535 for msi target". So we
+      # skip MSI on Windows betas and ship the NSIS `.exe` installer only.
+      # NSIS has no such version-format restriction. Stable releases (built
+      # by release-desktop.yml on `v[0-9]*` tags) still produce both NSIS
+      # and MSI because the version has no pre-release identifier.
       - name: Build Tauri app and upload to release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -294,4 +303,4 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }}${{ matrix.target == 'x86_64-pc-windows-msvc' && ' --bundles nsis' || '' }}

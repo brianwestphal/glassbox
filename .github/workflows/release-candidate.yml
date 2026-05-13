@@ -127,6 +127,13 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
       - run: npm ci
       - run: bash scripts/build-sidecar.sh ${{ matrix.target }}
+      # RC tags use the semver-standard `0.9.0-rc.N` form, which fails the
+      # Windows MSI bundler's version check ("optional pre-release
+      # identifier in app version must be numeric-only and cannot be
+      # greater than 65535 for msi target"). Skip MSI on Windows RC builds
+      # — NSIS is sufficient to validate the Windows bundle pipeline. The
+      # final stable build (release-desktop.yml on `v[0-9]*` tags) produces
+      # both NSIS and MSI because the version has no pre-release identifier.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -140,7 +147,7 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }}${{ matrix.target == 'x86_64-pc-windows-msvc' && ' --bundles nsis' || '' }}
       - name: Upload Tauri artifacts
         uses: actions/upload-artifact@v4
         with:
