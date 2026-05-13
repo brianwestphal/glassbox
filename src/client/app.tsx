@@ -2,7 +2,7 @@ import { IconGear, IconRefresh } from "../icons.js";
 import { api, initDebug } from "./api.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
-import { initDiffView, updateNavFilePath } from "./diff/index.js";
+import { initDiffView, invalidateDiffCache, updateNavFilePath } from "./diff/index.js";
 import { getVisibleScrollLine, navBack, navForward, navUpdateScroll, setNavigating } from "./diff/navStack.js";
 import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
@@ -73,6 +73,9 @@ async function initAISorting() {
           method: "POST",
         });
         await loadFiles();
+        // Server-side diff content changed; same fileId so the fetch
+        // effect's dedupe would skip the refetch otherwise.
+        invalidateDiffCache();
         const currentFileId = reviewStore.state.value.currentFileId;
         if (currentFileId !== null) {
           void selectFile(currentFileId);

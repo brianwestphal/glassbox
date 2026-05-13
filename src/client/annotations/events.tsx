@@ -73,24 +73,26 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
     }
   });
 
-  // Edit-form delegates
-  delegate(diffContainer, 'click', '.annotation-form .cancel-edit', (e) => {
+  // Edit-form delegates. Scoped to `[data-edit-for]` so the equivalent
+  // create-form delegates in `form.tsx` (which target `[data-form-key]`)
+  // don't double-fire — both forms reuse the `.annotation-form` shell.
+  delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .cancel-edit', (e) => {
     e.stopPropagation();
     cancelEdit();
   });
 
-  delegate(diffContainer, 'click', '.annotation-form .save-edit', (e) => {
+  delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .save-edit', (e) => {
     e.stopPropagation();
     void saveEdit();
   });
 
-  delegate(diffContainer, 'input', '.annotation-form textarea', (_e, textarea) => {
+  delegate(diffContainer, 'input', '.annotation-form-container[data-edit-for] textarea', (_e, textarea) => {
     const cur = editFormSignal.value;
     if (cur === null) return;
     setEditForm({ ...cur, content: (textarea as HTMLTextAreaElement).value });
   });
 
-  delegate(diffContainer, 'keydown', '.annotation-form textarea', (e) => {
+  delegate(diffContainer, 'keydown', '.annotation-form-container[data-edit-for] textarea', (e) => {
     const ke = e as KeyboardEvent;
     if ((ke.metaKey || ke.ctrlKey) && ke.key === 'Enter') {
       ke.preventDefault();
@@ -102,7 +104,7 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
   });
 
   // Edit-form category badge → opens the category picker
-  delegate(diffContainer, 'click', '.annotation-form .form-category-badge', (e, badge) => {
+  delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .form-category-badge', (e, badge) => {
     e.stopPropagation();
     showReclassifyPopupForEdit(badge as HTMLElement);
   });

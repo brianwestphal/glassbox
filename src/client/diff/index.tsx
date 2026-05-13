@@ -39,10 +39,19 @@ export function initDiffView(): void {
 
 // --- Reactive fetch ---
 
+let lastFetchKey = '';
+// Incremented by `invalidateDiffCache()` to force the next fetch-effect run
+// to actually fetch, even if the dedupe key is unchanged. The effect reads
+// this signal so the read counts as a subscription.
+const refetchTrigger = signal(0);
+
 function setupFetchEffect(): void {
   effect(() => {
+    void refetchTrigger.value; // subscribe so `invalidateDiffCache()` fires this effect
     const fileId = reviewStore.state.value.currentFileId;
     if (fileId === null) {
+      if (lastFetchKey === '') return;
+      lastFetchKey = '';
       diffContentSignal.value = { generation: ++fetchGen, fileId: null, html: '', kind: 'empty' };
       return;
     }
@@ -50,6 +59,20 @@ function setupFetchEffect(): void {
     const file = reviewStore.state.value.files.find(f => f.id === fileId);
     const isSvg = file?.file_path.toLowerCase().endsWith('.svg') ?? false;
     const svgRendered = isSvg && svgViewMode === 'rendered';
+
+    // Dedupe against the LAST set of fetch params. The fetch effect
+    // subscribes to `diffViewStore` and `reviewStore` (it reads multiple
+    // fields off each), so writes to unrelated fields — `detectedLang` /
+    // `highlightLang` from `runPostRender`, `annotationCounts` from
+    // annotation actions, etc. — fire the effect even though no fetch
+    // dep actually changed. Without this guard the effect re-fetched on
+    // every store write, replaced the mount tree on every fetch result,
+    // and clobbered any DOM the user had imperatively inserted (open
+    // annotation forms, the language picker popup). Net result: visible
+    // flicker + click-through impossible.
+    const key = fileId + '|' + diffMode + '|' + String(ignoreWhitespace) + '|' + String(svgRendered);
+    if (key === lastFetchKey) return;
+    lastFetchKey = key;
 
     let params = '?mode=' + diffMode + (ignoreWhitespace ? '&ignoreWhitespace=1' : '');
     if (svgRendered) params += '&view=rendered';
@@ -280,6 +303,10 @@ function setupDelegatedHandlers(container: HTMLElement): void {
         method: 'PATCH',
         body: { lineNumber: dropTarget.line, side: dropTarget.side },
       });
+      // The server's diff HTML for this file now reflects the new
+      // annotation position; the file ID hasn't changed, so the fetch
+      // effect's dedupe would skip the refetch without this nudge.
+      invalidateDiffCache();
       const currentFileId = reviewStore.state.value.currentFileId;
       if (currentFileId !== null) void selectFile(currentFileId);
     })();
@@ -332,6 +359,16 @@ export function updateToolbarLanguage(): void {
 export function updateNavFilePath(filePath: string): void {
   const el = document.getElementById('nav-file-path');
   if (el) el.textContent = filePath;
+}
+
+/** Force the next fetch-effect run to actually fetch, even if the
+ *  `(fileId, diffMode, ignoreWhitespace, svgViewMode)` dedupe key is
+ *  unchanged. Use after a server-side mutation that affects the diff —
+ *  the refresh button (`/review/refresh`), an annotation drag-drop move,
+ *  etc. */
+export function invalidateDiffCache(): void {
+  lastFetchKey = '';
+  refetchTrigger.value = refetchTrigger.value + 1;
 }
 
 // Used by hunkExpander to trigger re-highlight/sync after surgical mutations.
