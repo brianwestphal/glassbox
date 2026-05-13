@@ -9,7 +9,7 @@ import { bindToolbar } from "./diff/toolbar.js";
 import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
-import { updateProgress } from "./review/progress.js";
+import { initProgress } from "./review/progress.js";
 import { initSharePrompt, triggerShare } from "./share.js";
 import { loadFiles } from "./sidebar/fileTree.js";
 import { initSidebar } from "./sidebar/index.js";
@@ -77,7 +77,6 @@ async function initAISorting() {
         if (currentFileId !== null) {
           void selectFile(currentFileId);
         }
-        updateProgress();
       } catch {
         /* ignore */
       }
@@ -229,7 +228,7 @@ async function init() {
   bindGoToDefinition();
   bindCompleteButton();
   bindReopenButton();
-  updateProgress();
+  initProgress();
   document.addEventListener("dragend", () => {
     dragStore.actions.setAnnotation(null);
     document.querySelectorAll(".diff-line.drag-over").forEach((d) => {

@@ -1,4 +1,5 @@
-import { raw } from 'kerfjs';
+import type { SafeHtml } from 'kerfjs';
+import { delegate, mount, signal } from 'kerfjs';
 
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash } from '../../icons.js';
 import { api } from '../api.js';
@@ -18,7 +19,9 @@ interface ThemesResponse {
   activeId: string;
 }
 
-function showDeleteConfirm(themeName: string, onConfirm: () => void) {
+const SWATCH_KEYS = ['bg', 'text', 'accent', 'green', 'red'];
+
+function showDeleteConfirm(themeName: string, onConfirm: () => void): void {
   const confirmOverlay = toElement(<div className="modal-overlay"></div>);
   confirmOverlay.innerHTML = (
     <div className="modal" style="max-width:360px">
@@ -43,19 +46,34 @@ function showDeleteConfirm(themeName: string, onConfirm: () => void) {
   document.body.appendChild(confirmOverlay);
 }
 
-export function showThemeManager(onThemeChanged?: () => void) {
+export function showThemeManager(onThemeChanged?: () => void): void {
   void (async () => {
-    let data = await api<ThemesResponse>('/themes');
-    const overlay = toElement(<div className="modal-overlay"></div>);
+    const initial = await api<ThemesResponse>('/themes');
+    const themesSignal = signal<ThemesResponse>(initial);
 
-    function close() {
+    const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog theme-manager-dialog"></div></div>);
+    const modalEl = overlay.querySelector<HTMLElement>('.modal');
+    if (modalEl === null) return;
+
+    let contextMenuEl: HTMLElement | null = null;
+    let disposeMount: (() => void) | null = null;
+
+    function removeContextMenu(): void {
+      if (contextMenuEl !== null) {
+        contextMenuEl.remove();
+        contextMenuEl = null;
+      }
+    }
+
+    function close(): void {
       document.removeEventListener('keydown', handleEscape);
       removeContextMenu();
+      if (disposeMount !== null) disposeMount();
       overlay.remove();
     }
 
-    function handleEscape(e: KeyboardEvent) {
-      if (contextMenuEl) {
+    function handleEscape(e: KeyboardEvent): void {
+      if (contextMenuEl !== null) {
         removeContextMenu();
         e.stopPropagation();
         return;
@@ -63,220 +81,172 @@ export function showThemeManager(onThemeChanged?: () => void) {
       if (e.key === 'Escape') close();
     }
 
-    // Context menu is rendered into document.body (not inside the modal) to avoid clipping
-    let contextMenuEl: HTMLElement | null = null;
-
-    function removeContextMenu() {
-      if (contextMenuEl) {
-        contextMenuEl.remove();
-        contextMenuEl = null;
-      }
+    async function refresh(): Promise<void> {
+      themesSignal.value = await api<ThemesResponse>('/themes');
     }
 
-    async function refresh() {
-      data = await api<ThemesResponse>('/themes');
-      render();
-    }
-
-    async function useTheme(id: string) {
+    async function useTheme(id: string): Promise<void> {
       await switchTheme(id);
-      data.activeId = id;
-      render();
-      if (onThemeChanged) onThemeChanged();
+      themesSignal.value = { ...themesSignal.value, activeId: id };
+      if (onThemeChanged !== undefined) onThemeChanged();
     }
 
-    function swatchHtml(colors: Record<string, string>): string {
-      const keys = ['bg', 'text', 'accent', 'green', 'red'];
-      return keys.map(k =>
-        `<span class="theme-swatch" style="background:${colors[k] ?? '#888'}"></span>`
-      ).join('');
+    function openEditor(themeId: string): void {
+      showThemeEditor(themeId, () => {
+        void (async () => {
+          await refresh();
+          if (onThemeChanged !== undefined) onThemeChanged();
+        })();
+      });
     }
 
-    function renderItem(t: ThemeSummary) {
-      const isActive = t.id === data.activeId;
-      return (
-        <div className={`theme-manager-item${isActive ? ' active' : ''}`} data-theme-id={t.id}>
-          <div className="theme-manager-info" data-click-use={t.id}>
-            <div className="theme-manager-swatches" data-swatches={t.id}></div>
-            <span className="theme-manager-name">{t.name}</span>
-            {isActive && <span className="theme-manager-badge active">Active</span>}
-          </div>
-          <button className="btn btn-xs btn-icon tm-menu-btn" data-menu-id={t.id} title="Actions">
-            {raw(IconMoreHorizontal().toString())}
-          </button>
-        </div>
-      );
-    }
-
-    function render() {
-      const builtIn = data.themes.filter(t => t.builtIn);
-      const custom = data.themes.filter(t => !t.builtIn);
-
-      const modalEl = overlay.querySelector('.modal');
-      if (!modalEl) return;
-
-      modalEl.innerHTML = (
-        <>
-          <div className="settings-header">
-            <h3>Manage Themes</h3>
-            <button className="settings-close" id="tm-close">&times;</button>
-          </div>
-          <div className="theme-manager-body">
-            <div className="theme-manager-list">
-              {builtIn.map(t => renderItem(t))}
-              {custom.length > 0 && (
-                <>
-                  <div className="theme-manager-section-label">User Themes</div>
-                  {custom.map(t => renderItem(t))}
-                </>
-              )}
-            </div>
-          </div>
-        </>
-      ).toString();
-
-      // Inject swatches (raw HTML)
-      for (const t of data.themes) {
-        const el = modalEl.querySelector(`[data-swatches="${t.id}"]`);
-        if (el) el.innerHTML = swatchHtml(t.colors);
-      }
-
-      bindEvents();
-    }
-
-    function showContextMenu(themeId: string, anchorEl: HTMLElement) {
+    function showContextMenu(themeId: string, anchorEl: HTMLElement): void {
       removeContextMenu();
+      const data = themesSignal.value;
       const theme = data.themes.find(t => t.id === themeId);
-      if (!theme) return;
+      if (theme === undefined) return;
 
-      // HS-431: "Edit" not "Edit Colors" since the editor also allows renaming
       const menu = toElement(
-        <div className="tm-context-menu">
+        <div className="tm-context-menu" data-theme-id={themeId}>
           <button className="tm-menu-item" data-ctx="edit">
-            {raw(IconEdit().toString())}
+            <IconEdit />
             <span>Edit</span>
           </button>
           <button className="tm-menu-item" data-ctx="duplicate">
-            {raw(IconCopy().toString())}
+            <IconCopy />
             <span>Duplicate</span>
           </button>
           {!theme.builtIn && (
             <button className="tm-menu-item tm-menu-danger" data-ctx="delete">
-              {raw(IconTrash().toString())}
+              <IconTrash />
               <span>Delete</span>
             </button>
           )}
         </div>
       );
 
-      // HS-432: Render into document.body, not inside the modal, to avoid clipping
+      // Render into document.body (not the modal) to avoid clipping.
       const rect = anchorEl.getBoundingClientRect();
       menu.style.position = 'fixed';
       menu.style.zIndex = '10000';
+      menu.style.top = `${String(rect.bottom + 4)}px`;
+      menu.style.right = `${String(window.innerWidth - rect.right)}px`;
 
-      // Position below the anchor, right-aligned
-      menu.style.top = `${rect.bottom + 4}px`;
-      menu.style.right = `${window.innerWidth - rect.right}px`;
-
-      // Check if menu would go off-screen bottom, if so show above
       document.body.appendChild(menu);
       const menuRect = menu.getBoundingClientRect();
       if (menuRect.bottom > window.innerHeight) {
-        menu.style.top = `${rect.top - menuRect.height - 4}px`;
+        menu.style.top = `${String(rect.top - menuRect.height - 4)}px`;
       }
-
       contextMenuEl = menu;
 
-      // HS-430: Use stopPropagation on menu items so document click handler doesn't interfere
+      // Delegate clicks within the transient menu — and stop propagation so the
+      // outside-click handler below doesn't immediately dismiss it.
       menu.addEventListener('click', (e) => { e.stopPropagation(); });
-
-      menu.querySelector('[data-ctx="edit"]')?.addEventListener('click', () => {
+      delegate(menu, 'click', '[data-ctx="edit"]', () => {
         removeContextMenu();
-        showThemeEditor(themeId, () => {
-          void (async () => {
-            await refresh();
-            if (onThemeChanged) onThemeChanged();
-          })();
-        });
+        openEditor(themeId);
       });
-
-      menu.querySelector('[data-ctx="duplicate"]')?.addEventListener('click', () => {
+      delegate(menu, 'click', '[data-ctx="duplicate"]', () => {
         void (async () => {
           removeContextMenu();
           await api('/themes', { method: 'POST', body: { sourceId: themeId } });
           await refresh();
-          if (onThemeChanged) onThemeChanged();
+          if (onThemeChanged !== undefined) onThemeChanged();
         })();
       });
-
-      menu.querySelector('[data-ctx="delete"]')?.addEventListener('click', () => {
+      delegate(menu, 'click', '[data-ctx="delete"]', () => {
         removeContextMenu();
         showDeleteConfirm(theme.name, () => {
           void (async () => {
-            const wasActive = themeId === data.activeId;
+            const wasActive = themeId === themesSignal.value.activeId;
             await api(`/themes/${themeId}`, { method: 'DELETE' });
             if (wasActive) {
               const active = await api<{ id: string; colors: Record<string, string> }>('/themes/active');
               applyThemeColors(active.colors);
               document.documentElement.setAttribute('data-theme', active.id);
-              data.activeId = active.id;
             }
             await refresh();
-            if (onThemeChanged) onThemeChanged();
+            if (onThemeChanged !== undefined) onThemeChanged();
           })();
         });
       });
 
-      // Close menu on next click anywhere else
+      // Outside-click dismiss — same precedent as GB-748 / GB-749 popups.
       const closeOnClick = (e: MouseEvent) => {
-        if (!menu.contains(e.target as Node)) {
-          removeContextMenu();
-        }
+        if (!menu.contains(e.target as Node)) removeContextMenu();
       };
       setTimeout(() => { document.addEventListener('click', closeOnClick, { once: true }); }, 0);
     }
 
-    function bindEvents() {
-      overlay.querySelector('#tm-close')?.addEventListener('click', close);
+    disposeMount = mount(modalEl, () => renderManager(themesSignal.value));
 
-      // Click theme name/info to switch
-      overlay.querySelectorAll('[data-click-use]').forEach(el => {
-        el.addEventListener('click', () => {
-          const id = (el as HTMLElement).dataset.clickUse ?? '';
-          void useTheme(id);
-        });
-      });
+    // Delegated handlers
+    delegate(overlay, 'click', '#tm-close', close);
+    delegate(overlay, 'click', '[data-click-use]', (_e, el) => {
+      const id = (el as HTMLElement).dataset.clickUse ?? '';
+      if (id !== '') void useTheme(id);
+    });
+    delegate(overlay, 'dblclick', '.theme-manager-item', (_e, el) => {
+      const id = (el as HTMLElement).dataset.themeId ?? '';
+      if (id !== '') openEditor(id);
+    });
+    delegate(overlay, 'click', '.tm-menu-btn', (e, btn) => {
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.menuId ?? '';
+      if (id !== '') showContextMenu(id, btn as HTMLElement);
+    });
 
-      // Double-click theme item to open editor
-      overlay.querySelectorAll('.theme-manager-item').forEach(el => {
-        el.addEventListener('dblclick', () => {
-          const id = (el as HTMLElement).dataset.themeId ?? '';
-          showThemeEditor(id, () => {
-            void (async () => {
-              await refresh();
-              if (onThemeChanged) onThemeChanged();
-            })();
-          });
-        });
-      });
-
-      // "..." menu buttons
-      overlay.querySelectorAll('.tm-menu-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const id = (btn as HTMLElement).dataset.menuId ?? '';
-          showContextMenu(id, btn as HTMLElement);
-        });
-      });
-
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-      });
-    }
+    // Click outside the modal closes — direct listener on the overlay
+    // (overlay isn't inside a mount() tree).
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
 
     document.addEventListener('keydown', handleEscape);
-    overlay.innerHTML = (<div className="modal settings-dialog theme-manager-dialog"></div>).toString();
     document.body.appendChild(overlay);
-    render();
   })();
+}
+
+function renderItem(t: ThemeSummary, activeId: string): SafeHtml {
+  const isActive = t.id === activeId;
+  return (
+    <div data-key={t.id} className={`theme-manager-item${isActive ? ' active' : ''}`} data-theme-id={t.id}>
+      <div className="theme-manager-info" data-click-use={t.id}>
+        <div className="theme-manager-swatches">
+          {SWATCH_KEYS.map(k => (
+            <span className="theme-swatch" style={`background:${t.colors[k] ?? '#888'}`}></span>
+          ))}
+        </div>
+        <span className="theme-manager-name">{t.name}</span>
+        {isActive && <span className="theme-manager-badge active">Active</span>}
+      </div>
+      <button className="btn btn-xs btn-icon tm-menu-btn" data-menu-id={t.id} title="Actions">
+        <IconMoreHorizontal />
+      </button>
+    </div>
+  );
+}
+
+function renderManager(data: ThemesResponse): SafeHtml {
+  const builtIn = data.themes.filter(t => t.builtIn);
+  const custom = data.themes.filter(t => !t.builtIn);
+  return (
+    <>
+      <div className="settings-header">
+        <h3>Manage Themes</h3>
+        <button className="settings-close" id="tm-close">&times;</button>
+      </div>
+      <div className="theme-manager-body">
+        <div className="theme-manager-list">
+          {builtIn.map(t => renderItem(t, data.activeId))}
+          {custom.length > 0 && (
+            <>
+              <div className="theme-manager-section-label">User Themes</div>
+              {custom.map(t => renderItem(t, data.activeId))}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
 }

@@ -3,6 +3,8 @@
  * Tracks cumulative open time, shows a prompt after 5 min total + 1 min session,
  * and provides a share button in the toolbar.
  */
+import { delegate } from 'kerfjs';
+
 import { api } from './api.js';
 import { toElement } from './dom.js';
 
@@ -70,13 +72,13 @@ function showPrompt() {
     </div>
   );
 
-  banner.querySelector('.share-prompt-share')?.addEventListener('click', () => {
+  delegate(banner, 'click', '.share-prompt-share', () => {
     void triggerShare();
     banner.remove();
     dismissPrompt();
   });
 
-  banner.querySelector('.share-prompt-dismiss')?.addEventListener('click', () => {
+  delegate(banner, 'click', '.share-prompt-dismiss', () => {
     banner.remove();
     dismissPrompt();
   });

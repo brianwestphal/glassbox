@@ -1,5 +1,4 @@
 import { api } from '../api.js';
-import { updateProgress } from '../review/progress.js';
 import { reviewStore } from '../stores/index.js';
 import { updateNavFilePath } from './index.js';
 import { navPush } from './navStack.js';
@@ -20,7 +19,8 @@ export async function selectFile(fileId: string): Promise<void> {
       f.id === fileId ? { ...f, status: 'reviewed' } : f,
     );
     reviewStore.actions.update({ files });
-    updateProgress();
+    // Progress bar is reactive — the effect in `review/progress.tsx` fires
+    // automatically on the store update above.
   }
 }
 

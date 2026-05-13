@@ -1,3 +1,5 @@
+import { delegate } from 'kerfjs';
+
 export function getTauriInvoke(): ((cmd: string) => Promise<unknown>) | null {
   const tauri = (window as unknown as Record<string, unknown>).__TAURI__ as
     | { core?: { invoke: (cmd: string) => Promise<unknown> } }
@@ -5,7 +7,9 @@ export function getTauriInvoke(): ((cmd: string) => Promise<unknown>) | null {
   return tauri?.core?.invoke ?? null;
 }
 
-export function showUpdateBanner(version: string) {
+let bannerDelegatesBound = false;
+
+export function showUpdateBanner(version: string): void {
   const banner = document.getElementById('update-banner');
   if (!banner) return;
 
@@ -14,25 +18,27 @@ export function showUpdateBanner(version: string) {
 
   banner.style.display = 'flex';
 
-  const installBtn = document.getElementById('update-install-btn') as HTMLButtonElement | null;
-  installBtn?.addEventListener('click', () => {
+  if (bannerDelegatesBound) return;
+  bannerDelegatesBound = true;
+
+  delegate(banner, 'click', '#update-install-btn', (_e, btn) => {
+    const installBtn = btn as HTMLButtonElement;
     void (async () => {
-    installBtn.textContent = 'Installing...';
-    installBtn.disabled = true;
-    try {
-      const invoke = getTauriInvoke();
-      await invoke?.('install_update');
-      if (label) label.textContent = 'Update installed! Restart the app to apply.';
-      installBtn.style.display = 'none';
-    } catch {
-      installBtn.textContent = 'Install Failed';
-      installBtn.disabled = false;
-    }
+      installBtn.textContent = 'Installing...';
+      installBtn.disabled = true;
+      try {
+        const invoke = getTauriInvoke();
+        await invoke?.('install_update');
+        if (label) label.textContent = 'Update installed! Restart the app to apply.';
+        installBtn.style.display = 'none';
+      } catch {
+        installBtn.textContent = 'Install Failed';
+        installBtn.disabled = false;
+      }
     })();
   });
 
-  const dismissBtn = document.getElementById('update-banner-dismiss');
-  dismissBtn?.addEventListener('click', () => {
+  delegate(banner, 'click', '#update-banner-dismiss', () => {
     banner.style.display = 'none';
   });
 }

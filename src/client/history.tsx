@@ -1,14 +1,16 @@
 /** Client script for the review history page. Built separately from app.ts. */
+import { delegate } from 'kerfjs';
+
 import { toElement } from './dom.js';
 
-function updateBulkVisibility() {
+function updateBulkVisibility(): void {
   const bulk = document.querySelector('.bulk-actions');
   if (bulk && !document.querySelector('.delete-review-btn')) {
     bulk.remove();
   }
 }
 
-function showConfirm(message: string, onConfirm: () => void) {
+function showConfirm(message: string, onConfirm: () => void): void {
   const overlay = toElement(
     <div className="modal-overlay">
       <div className="modal">
@@ -21,31 +23,34 @@ function showConfirm(message: string, onConfirm: () => void) {
       </div>
     </div>
   );
-  overlay.querySelector('.modal-cancel')?.addEventListener('click', () => { overlay.remove(); });
-  overlay.querySelector('.modal-confirm')?.addEventListener('click', () => { overlay.remove(); onConfirm(); });
+  delegate(overlay, 'click', '.modal-cancel', () => { overlay.remove(); });
+  delegate(overlay, 'click', '.modal-confirm', () => { overlay.remove(); onConfirm(); });
+  // Click-outside-to-close. The overlay isn't inside a mount() tree, so a
+  // direct listener is stable (same precedent as the other transient
+  // confirmation modals across the app).
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
 }
 
-// Single review delete
-document.querySelectorAll<HTMLElement>('.delete-review-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const id = btn.dataset.deleteId ?? '';
-    showConfirm('Delete this review? This cannot be undone.', () => {
-      void fetch('/api/review/' + encodeURIComponent(id), { method: 'DELETE' })
-        .then(r => r.json())
-        .then(() => {
-          btn.closest('.history-item-link')?.parentElement?.remove();
-          updateBulkVisibility();
-        });
-    });
+// Delegate all history-page button clicks at document.body. Server-rendered
+// rows + persistent bulk-action buttons all live there; no per-element
+// listeners needed.
+
+delegate(document.body, 'click', '.delete-review-btn', (e, btn) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const id = (btn as HTMLElement).dataset.deleteId ?? '';
+  showConfirm('Delete this review? This cannot be undone.', () => {
+    void fetch('/api/review/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(r => r.json())
+      .then(() => {
+        (btn as HTMLElement).closest('.history-item-link')?.parentElement?.remove();
+        updateBulkVisibility();
+      });
   });
 });
 
-// Bulk delete completed
-document.getElementById('delete-completed-btn')?.addEventListener('click', () => {
+delegate(document.body, 'click', '#delete-completed-btn', () => {
   showConfirm('Delete all completed reviews (except current)? This cannot be undone.', () => {
     void fetch('/api/reviews/delete-completed', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
@@ -53,8 +58,7 @@ document.getElementById('delete-completed-btn')?.addEventListener('click', () =>
   });
 });
 
-// Bulk delete all
-document.getElementById('delete-all-btn')?.addEventListener('click', () => {
+delegate(document.body, 'click', '#delete-all-btn', () => {
   showConfirm('Delete ALL reviews except the current one? This cannot be undone.', () => {
     void fetch('/api/reviews/delete-all', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
