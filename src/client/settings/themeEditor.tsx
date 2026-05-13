@@ -1,3 +1,5 @@
+import { effect, signal } from 'kerfjs';
+
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
@@ -66,15 +68,23 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
     const baseTheme = listData.themes.find(t => t.id === baseThemeId);
     const baseColors = baseTheme ? { ...baseTheme.colors } : { ...theme.colors };
 
-    const editColors = { ...theme.colors };
+    // Live edit state lives in a signal so the live-preview is a reactive
+    // `effect()` instead of an imperative `applyLive()` call at every update
+    // site. Any signal write triggers the effect, which pushes CSS custom
+    // properties to `document.documentElement` (via `applyThemeColors`).
+    const editColorsSignal = signal<Record<string, string>>({ ...theme.colors });
     let editName = theme.name;
     let dirty = false;
     let currentThemeId = themeId;
 
     const overlay = toElement(<div className="modal-overlay"></div>);
+    const disposeLivePreview = effect(() => {
+      applyThemeColors(editColorsSignal.value);
+    });
 
     function close() {
       document.removeEventListener('keydown', handleEscape);
+      disposeLivePreview();
       if (dirty) void save();
       overlay.remove();
       if (onDone) onDone();
@@ -86,7 +96,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
 
     async function save() {
       if (!dirty) return;
-      const body: Record<string, unknown> = { colors: editColors };
+      const body: Record<string, unknown> = { colors: editColorsSignal.value };
       // Include name if it changed from the original
       if (theme !== undefined && editName !== theme.name) body.name = editName;
       const result = await api<{ theme: ThemeData; copied: boolean }>(`/themes/${currentThemeId}/edit`, {
@@ -98,10 +108,6 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
         theme = result.theme;
       }
       dirty = false;
-    }
-
-    function applyLive() {
-      applyThemeColors(editColors);
     }
 
     function toHex(color: string): string {
@@ -122,6 +128,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
 
       const isBuiltIn = theme?.builtIn === true;
       const headerText = isBuiltIn ? 'Edit Theme (will create a copy)' : 'Edit Theme';
+      const editColors = editColorsSignal.value;
 
       modalEl.innerHTML = (
         <>
@@ -161,9 +168,8 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
     }
 
     function updateColor(varName: string, value: string) {
-      editColors[varName] = value;
+      editColorsSignal.value = { ...editColorsSignal.value, [varName]: value };
       dirty = true;
-      applyLive();
       const row = overlay.querySelector(`[data-var="${varName}"].theme-editor-row`);
       if (row) {
         const swatch = row.querySelector<HTMLElement>('.theme-editor-swatch');
@@ -215,11 +221,8 @@ export function showThemeEditor(themeId: string, onDone?: () => void) {
 
       // Reset All
       overlay.querySelector('#te-reset-all')?.addEventListener('click', () => {
-        for (const [key, value] of Object.entries(baseColors)) {
-          editColors[key] = value;
-        }
+        editColorsSignal.value = { ...baseColors };
         dirty = true;
-        applyLive();
         render();
       });
 

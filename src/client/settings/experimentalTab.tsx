@@ -1,8 +1,6 @@
 import type { SafeHtml } from 'kerfjs';
 
 import { IconCheck, IconFlask } from '../../icons.js';
-import { api } from '../api.js';
-import { TOAST_DURATION_MS } from '../timing.js';
 import type { ChannelState, KeyStatusInfo, Tab, TabContext } from './tabContext.js';
 
 function keyStatusHtml(keyInfo: KeyStatusInfo): SafeHtml {
@@ -148,69 +146,9 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
   );
 }
 
-function bindExperimentalTab(overlay: HTMLElement, ctx: TabContext): void {
-  overlay.querySelectorAll('.settings-platform-control .segment').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const platform = (btn as HTMLElement).dataset.platform;
-      if (platform !== undefined) {
-        ctx.setCurrentPlatform(platform);
-        ctx.saveConfig();
-        ctx.renderContent();
-      }
-    });
-  });
-
-  const modelSelect = overlay.querySelector<HTMLSelectElement>('#settings-model');
-  if (modelSelect !== null) {
-    modelSelect.addEventListener('change', () => {
-      ctx.setCurrentModel(modelSelect.value);
-      ctx.saveConfig();
-    });
-  }
-
-  overlay.querySelector('#remove-key')?.addEventListener('click', ctx.removeKey);
-  overlay.querySelector('#save-key-btn')?.addEventListener('click', ctx.saveKey);
-
-  const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
-  if (keyInput !== null) {
-    keyInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); ctx.saveKey(); }
-    });
-  }
-
-  const guidedCheckbox = overlay.querySelector<HTMLInputElement>('#settings-guided-enabled');
-  if (guidedCheckbox !== null) {
-    guidedCheckbox.addEventListener('change', () => {
-      ctx.setGuidedEnabled(guidedCheckbox.checked);
-      ctx.saveConfig();
-      ctx.renderContent();
-    });
-  }
-
-  const channelCheckbox = overlay.querySelector<HTMLInputElement>('#settings-channel-enabled');
-  if (channelCheckbox !== null) {
-    channelCheckbox.addEventListener('change', () => {
-      const enabled = channelCheckbox.checked;
-      ctx.setChannelEnabled(enabled);
-      void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
-      ctx.renderContent();
-    });
-  }
-
-  const copyBtn = overlay.querySelector('#channel-copy-btn');
-  if (copyBtn !== null) {
-    copyBtn.addEventListener('click', () => {
-      void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, TOAST_DURATION_MS);
-    });
-  }
-}
-
 export const experimentalTab: Tab = {
   id: 'experimental',
   label: 'Experimental',
   icon: <IconFlask />,
   render: renderExperimentalTab,
-  bind: bindExperimentalTab,
 };

@@ -1,12 +1,15 @@
 import type { SafeHtml } from 'kerfjs';
+import { delegate, mount, signal } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
+import { triggerShare } from '../share.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { aiStore } from '../stores/index.js';
+import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
-import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS } from '../timing.js';
+import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
@@ -24,7 +27,18 @@ interface ConfigResponse {
   guidedReview: { enabled: boolean; topics: string[] };
 }
 
-export function showSettingsDialog(onClose?: () => void) {
+interface SettingsUIState {
+  activeTab: string;
+  currentPlatform: string;
+  currentModel: string;
+  guidedEnabled: boolean;
+  guidedTopics: Set<string>;
+  showMoreLangs: boolean;
+  appName: string;
+  activeThemeId: string;
+}
+
+export function showSettingsDialog(onClose?: () => void): void {
   void (async () => {
     const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus] = await Promise.all([
       api<KeyStatusResponse>('/ai/key-status'),
@@ -55,13 +69,15 @@ function renderSettingsModal(
   themesData: ThemesResponse,
   channelState: ChannelState,
   onClose?: () => void,
-) {
-  const overlay = toElement(<div className="modal-overlay"></div>);
+): void {
+  const isTauri = (window as unknown as Record<string, unknown>).__TAURI__ !== undefined;
 
-  // Mutable per-dialog state lives here; tabs touch it via the TabContext mutators.
-  const ui = {
+  // Per-dialog reactive state. Bumps to this signal drive the mount()
+  // re-render. The signal lives in this closure (not in the global
+  // `stores/index.ts`) because it represents a transient modal — opening the
+  // dialog a second time should fetch fresh server data and reset live UI.
+  const ui = signal<SettingsUIState>({
     activeTab: 'general',
-    isTauri: (window as unknown as Record<string, unknown>).__TAURI__ !== undefined,
     currentPlatform: configData.platform,
     currentModel: configData.model,
     guidedEnabled: configData.guidedReview.enabled,
@@ -69,67 +85,78 @@ function renderSettingsModal(
     showMoreLangs: false,
     appName: projectSettings.appName ?? '',
     activeThemeId: themesData.activeId,
-    lastSavedGuidedEnabled: configData.guidedReview.enabled,
-    lastSavedGuidedTopics: new Set(configData.guidedReview.topics),
-  };
+  });
+  let lastSavedGuidedEnabled = configData.guidedReview.enabled;
+  let lastSavedGuidedTopics = new Set(configData.guidedReview.topics);
+
+  const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog"></div></div>);
+  const modalEl = overlay.querySelector<HTMLElement>('.modal');
+  if (modalEl === null) return;
+
+  function setUi(partial: Partial<SettingsUIState>): void {
+    ui.value = { ...ui.value, ...partial };
+  }
 
   let configTimer: ReturnType<typeof setTimeout> | null = null;
   let appNameTimer: ReturnType<typeof setTimeout> | null = null;
+  let disposeMount: (() => void) | null = null;
 
-  function closeDialog() {
+  function closeDialog(): void {
     if (configTimer) clearTimeout(configTimer);
     if (appNameTimer) clearTimeout(appNameTimer);
     document.removeEventListener('keydown', handleEscape);
+    if (disposeMount !== null) disposeMount();
     overlay.remove();
     if (onClose !== undefined) onClose();
   }
 
-  function handleEscape(e: KeyboardEvent) {
+  function handleEscape(e: KeyboardEvent): void {
     if (e.key === 'Escape') closeDialog();
   }
 
-  function saveConfig() {
-    const newTopics = Array.from(ui.guidedTopics);
-    const guidedChanged = ui.guidedEnabled !== ui.lastSavedGuidedEnabled ||
-      newTopics.length !== ui.lastSavedGuidedTopics.size ||
-      newTopics.some(t => !ui.lastSavedGuidedTopics.has(t));
+  function saveConfig(): void {
+    const cur = ui.value;
+    const newTopics = Array.from(cur.guidedTopics);
+    const guidedChanged = cur.guidedEnabled !== lastSavedGuidedEnabled
+      || newTopics.length !== lastSavedGuidedTopics.size
+      || newTopics.some(t => !lastSavedGuidedTopics.has(t));
 
     void (async () => {
       await api('/ai/config', {
         method: 'POST',
         body: {
-          platform: ui.currentPlatform,
-          model: ui.currentModel,
-          guidedReview: { enabled: ui.guidedEnabled, topics: newTopics },
+          platform: cur.currentPlatform,
+          model: cur.currentModel,
+          guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
         },
       });
 
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
       aiStore.actions.update({
         aiConfigured: newConfig.keyConfigured,
-        guidedReviewEnabled: ui.guidedEnabled,
+        guidedReviewEnabled: cur.guidedEnabled,
       });
-      configData.guidedReview = { enabled: ui.guidedEnabled, topics: newTopics };
+      configData.guidedReview = { enabled: cur.guidedEnabled, topics: newTopics };
 
       if (guidedChanged && aiStore.state.value.aiConfigured) {
         invalidateAnalysisCache();
         invalidateGuidedAnalysis();
       }
 
-      ui.lastSavedGuidedEnabled = ui.guidedEnabled;
-      ui.lastSavedGuidedTopics = new Set(ui.guidedTopics);
+      lastSavedGuidedEnabled = cur.guidedEnabled;
+      lastSavedGuidedTopics = new Set(cur.guidedTopics);
     })();
   }
 
-  function saveConfigDebounced() {
+  function saveConfigDebounced(): void {
     if (configTimer) clearTimeout(configTimer);
     configTimer = setTimeout(saveConfig, SETTINGS_CONFIG_DEBOUNCE_MS);
   }
 
-  function saveAppNameDebounced() {
+  function saveAppNameDebounced(): void {
     if (appNameTimer) clearTimeout(appNameTimer);
     appNameTimer = setTimeout(() => {
-      const val = ui.appName.trim();
+      const val = ui.value.appName.trim();
       if (val !== (projectSettings.appName ?? '')) {
         void api('/project-settings', { method: 'PATCH', body: { appName: val } });
         projectSettings.appName = val || undefined;
@@ -137,7 +164,7 @@ function renderSettingsModal(
     }, SETTINGS_APP_NAME_DEBOUNCE_MS);
   }
 
-  function saveKey() {
+  function saveKey(): void {
     const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
     if (keyInput === null || keyInput.value.trim() === '') return;
     const storageRadio = overlay.querySelector<HTMLInputElement>('input[name="key-storage"]:checked');
@@ -145,129 +172,210 @@ function renderSettingsModal(
     void (async () => {
       await api('/ai/key', {
         method: 'POST',
-        body: { platform: ui.currentPlatform, key: keyInput.value.trim(), storage },
+        body: { platform: ui.value.currentPlatform, key: keyInput.value.trim(), storage },
       });
       const newStatus = await api<KeyStatusResponse>('/ai/key-status');
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
       aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
-      renderContent();
+      ui.value = { ...ui.value }; // force re-render (server data mutated)
     })();
   }
 
-  function removeKey() {
+  function removeKey(): void {
     void (async () => {
-      await api(`/ai/key?platform=${ui.currentPlatform}`, { method: 'DELETE' });
+      await api(`/ai/key?platform=${ui.value.currentPlatform}`, { method: 'DELETE' });
       const newStatus = await api<KeyStatusResponse>('/ai/key-status');
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
       aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
-      renderContent();
+      ui.value = { ...ui.value };
     })();
   }
 
-  function toggleTopic(topic: string) {
-    if (ui.guidedTopics.has(topic)) {
-      ui.guidedTopics.delete(topic);
+  function toggleTopic(topic: string): void {
+    const cur = ui.value;
+    const next = new Set(cur.guidedTopics);
+    let showMoreLangs = cur.showMoreLangs;
+    if (next.has(topic)) {
+      next.delete(topic);
     } else {
-      ui.guidedTopics.add(topic);
+      next.add(topic);
       if (topic === 'programming') {
-        const hasAnyLang = [...ui.guidedTopics].some(t => ALL_LANG_KEYS.has(t));
+        const hasAnyLang = [...next].some(t => ALL_LANG_KEYS.has(t));
         if (!hasAnyLang) {
-          for (const key of ALL_LANG_KEYS) ui.guidedTopics.add(key);
-          ui.showMoreLangs = true;
+          for (const key of ALL_LANG_KEYS) next.add(key);
+          showMoreLangs = true;
         }
       }
     }
+    setUi({ guidedTopics: next, showMoreLangs });
     saveConfigDebounced();
   }
 
   function buildContext(): TabContext {
+    const cur = ui.value;
     return {
-      keyStatus,
-      modelsData,
-      themesData,
-      projectSettings,
-      channelState,
-      isTauri: ui.isTauri,
-      currentPlatform: ui.currentPlatform,
-      currentModel: ui.currentModel,
-      guidedEnabled: ui.guidedEnabled,
-      guidedTopics: ui.guidedTopics,
-      showMoreLangs: ui.showMoreLangs,
-      appName: ui.appName,
-      activeThemeId: ui.activeThemeId,
-      setCurrentPlatform: (platform) => {
-        ui.currentPlatform = platform;
-        const models = modelsData.models[platform] ?? [];
-        const defaultModel = models.find(m => m.isDefault);
-        ui.currentModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
-      },
-      setCurrentModel: (model) => { ui.currentModel = model; },
-      setGuidedEnabled: (enabled) => { ui.guidedEnabled = enabled; },
-      setShowMoreLangs: (b) => { ui.showMoreLangs = b; },
-      setAppName: (name) => { ui.appName = name; },
-      setActiveThemeId: (id) => { ui.activeThemeId = id; },
-      setChannelEnabled: (enabled) => { channelState.enabled = enabled; },
-      saveConfig,
-      saveKey,
-      removeKey,
-      toggleTopic,
-      saveAppNameDebounced,
-      switchTheme: (id) => void switchTheme(id),
+      keyStatus, modelsData, themesData, projectSettings, channelState,
+      isTauri,
+      currentPlatform: cur.currentPlatform,
+      currentModel: cur.currentModel,
+      guidedEnabled: cur.guidedEnabled,
+      guidedTopics: cur.guidedTopics,
+      showMoreLangs: cur.showMoreLangs,
+      appName: cur.appName,
+      activeThemeId: cur.activeThemeId,
+      // No-op mutators kept on TabContext for backwards-compat with the Tab
+      // interface; all interactions now flow through the delegated handlers
+      // registered below, which call setUi() directly.
+      setCurrentPlatform: () => { /* unused — see [data-platform] delegate */ },
+      setCurrentModel: () => { /* unused */ },
+      setGuidedEnabled: () => { /* unused */ },
+      setShowMoreLangs: () => { /* unused */ },
+      setAppName: () => { /* unused */ },
+      setActiveThemeId: () => { /* unused */ },
+      setChannelEnabled: () => { /* unused */ },
+      saveConfig, saveKey, removeKey, toggleTopic, saveAppNameDebounced,
+      switchTheme: (id: string) => void switchTheme(id),
       showThemeManager,
       refreshThemes: () => api<ThemesResponse>('/themes').then(updated => {
         themesData.themes = updated.themes;
         themesData.activeId = updated.activeId;
         return updated;
       }),
-      renderContent,
+      renderContent: () => { ui.value = { ...ui.value }; },
     };
   }
 
-  function activeTabs(ctx: TabContext): Tab[] {
-    return TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
-  }
-
-  function renderContent() {
-    const modalEl = overlay.querySelector('.modal');
-    if (modalEl === null) return;
-
+  // Mount the reactive shell.
+  disposeMount = mount(modalEl, () => {
     const ctx = buildContext();
-    const visible = activeTabs(ctx);
-    if (!visible.some(t => t.id === ui.activeTab)) {
-      ui.activeTab = visible[0]?.id ?? 'general';
+    const visible = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
+    const cur = ui.value;
+    let activeId = cur.activeTab;
+    if (!visible.some(t => t.id === activeId)) {
+      activeId = visible[0]?.id ?? 'general';
+      // Defer the state correction so we don't write during a render.
+      queueMicrotask(() => { setUi({ activeTab: activeId }); });
     }
+    return renderShell(visible, activeId, ctx);
+  });
 
-    modalEl.innerHTML = renderShell(visible, ui.activeTab, ctx).toString();
-    bindModalEvents(ctx, visible);
-  }
+  // Delegated handlers — single registration per concern, fires for every
+  // re-render automatically.
 
-  function bindModalEvents(ctx: TabContext, visible: Tab[]) {
-    overlay.querySelectorAll('.settings-tab').forEach(tabEl => {
-      tabEl.addEventListener('click', () => {
-        const dataTab = tabEl.getAttribute('data-tab');
-        const fallback = visible[0]?.id ?? 'general';
-        ui.activeTab = dataTab ?? fallback;
-        renderContent();
-      });
+  delegate(overlay, 'click', '#settings-close', closeDialog);
+  delegate(overlay, 'click', '[data-tab]', (_e, btn) => {
+    const t = (btn as HTMLElement).dataset.tab;
+    if (t !== undefined) setUi({ activeTab: t });
+  });
+
+  // General tab
+  delegate(overlay, 'change', '#settings-theme', (_e, sel) => {
+    const id = (sel as HTMLSelectElement).value;
+    setUi({ activeThemeId: id });
+    void switchTheme(id);
+  });
+  delegate(overlay, 'click', '#manage-themes-btn', () => {
+    showThemeManager(() => {
+      void (async () => {
+        const updated = await api<ThemesResponse>('/themes');
+        themesData.themes = updated.themes;
+        themesData.activeId = updated.activeId;
+        setUi({ activeThemeId: updated.activeId });
+      })();
     });
+  });
+  delegate(overlay, 'click', '#settings-share-link', (e) => {
+    e.preventDefault();
+    void triggerShare();
+  });
+  delegate(overlay, 'input', '#settings-app-name', (_e, input) => {
+    setUi({ appName: (input as HTMLInputElement).value });
+    saveAppNameDebounced();
+  });
 
-    overlay.querySelector('#settings-close')?.addEventListener('click', closeDialog);
+  // Profile tab
+  delegate(overlay, 'click', '.settings-tag', (_e, tag) => {
+    const topic = (tag as HTMLElement).dataset.topic;
+    if (topic !== undefined) toggleTopic(topic);
+  });
+  delegate(overlay, 'click', '#show-more-langs', () => { setUi({ showMoreLangs: true }); });
 
-    for (const tab of visible) {
-      tab.bind(overlay, ctx);
-    }
+  // Experimental tab
+  delegate(overlay, 'click', '.settings-platform-control [data-platform]', (_e, btn) => {
+    const platform = (btn as HTMLElement).dataset.platform;
+    if (platform === undefined) return;
+    const models = modelsData.models[platform] ?? [];
+    const defaultModel = models.find(m => m.isDefault);
+    const newModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
+    setUi({ currentPlatform: platform, currentModel: newModel });
+    saveConfig();
+  });
+  delegate(overlay, 'change', '#settings-model', (_e, sel) => {
+    setUi({ currentModel: (sel as HTMLSelectElement).value });
+    saveConfig();
+  });
+  delegate(overlay, 'click', '#remove-key', removeKey);
+  delegate(overlay, 'click', '#save-key-btn', saveKey);
+  delegate(overlay, 'keydown', '#settings-key', (e) => {
+    const ke = e as KeyboardEvent;
+    if (ke.key === 'Enter') { ke.preventDefault(); saveKey(); }
+  });
+  delegate(overlay, 'change', '#settings-guided-enabled', (_e, cb) => {
+    setUi({ guidedEnabled: (cb as HTMLInputElement).checked });
+    saveConfig();
+  });
+  delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
+    const enabled = (cb as HTMLInputElement).checked;
+    channelState.enabled = enabled;
+    void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
+    ui.value = { ...ui.value }; // re-render reflects channelState change
+  });
+  delegate(overlay, 'click', '#channel-copy-btn', (_e, btn) => {
+    void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
+    const el = btn as HTMLElement;
+    el.textContent = 'Copied!';
+    setTimeout(() => { el.textContent = 'Copy'; }, TOAST_DURATION_MS);
+  });
 
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeDialog();
-    });
-  }
+  // Updates tab
+  delegate(overlay, 'click', '#check-updates-btn', (_e, btn) => {
+    void handleCheckUpdates(btn as HTMLButtonElement, overlay);
+  });
+
+  // Click outside (on the dimmed overlay background) closes the dialog. Bound
+  // directly on the overlay element — it's the modal root, not inside a
+  // mount() tree, so a direct listener survives.
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeDialog();
+  });
 
   document.addEventListener('keydown', handleEscape);
-  overlay.innerHTML = (<div className="modal settings-dialog"></div>).toString();
   document.body.appendChild(overlay);
-  renderContent();
+}
+
+async function handleCheckUpdates(btn: HTMLButtonElement, overlay: HTMLElement): Promise<void> {
+  const status = overlay.querySelector<HTMLElement>('#check-updates-status');
+  if (status === null) return;
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  status.textContent = '';
+  try {
+    const version = (await invoke('check_for_update')) as string | null;
+    if (version !== null && version !== '') {
+      status.textContent = `Update available: v${version}`;
+      showUpdateBanner(version);
+    } else {
+      status.textContent = 'Your software is up to date.';
+    }
+  } catch {
+    status.textContent = 'Could not check for updates.';
+  }
+  btn.textContent = 'Check for Updates';
+  btn.disabled = false;
 }
 
 function renderShell(visible: Tab[], activeTabId: string, ctx: TabContext): SafeHtml {

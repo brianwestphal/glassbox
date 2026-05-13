@@ -149,7 +149,7 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `annotations/categories.tsx` — `buildCategoryBadge(value)` + re-exports of the picker entry points. The picker open state lives in `categoryPickerSignal` in `stores/index.ts`; mid-edit form content/category lives in `editFormSignal` (not in DOM, so a sibling annotation update doesn't clobber an open form).
 - `review/modal.tsx` — Completion modal, gitignore prompts
 - `review/progress.tsx` — Progress bar
-- `settings/dialog.tsx` — AI settings modal (platform, model, API key configuration)
+- `settings/dialog.tsx` — Settings modal driven by a single kerf `mount()`. Per-dialog `ui = signal<SettingsUIState>` holds the live form state; centralized `delegate()` handlers cover every tab interaction (tab switch, theme select, platform/model picker, API key save/remove, guided/channel checkboxes, profile tags, share link, app-name input, updates check). Auto-save uses debounced timers. Each tab is a pure JSX-returning `render(ctx)`; `bind()` is no longer used. Theme editor (`themeEditor.tsx`) uses `signal<Record<string,string>>` for the in-progress colors plus an `effect()` that pushes CSS custom properties to `document.documentElement` for live preview.
 - `dom.ts` — `toElement()` helper for converting JSX to DOM elements
 
 Both are served as static files via `/static/styles.css` and `/static/app.js` routes in `src/server.ts`. The JSX runtime is shared between server and client builds.

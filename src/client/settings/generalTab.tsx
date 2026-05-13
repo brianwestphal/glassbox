@@ -1,7 +1,6 @@
 import type { SafeHtml } from 'kerfjs';
 
 import { IconSliders } from '../../icons.js';
-import { triggerShare } from '../share.js';
 import type { Tab, TabContext } from './tabContext.js';
 
 function renderGeneralTab(ctx: TabContext): SafeHtml {
@@ -42,43 +41,9 @@ function renderGeneralTab(ctx: TabContext): SafeHtml {
   );
 }
 
-function bindGeneralTab(overlay: HTMLElement, ctx: TabContext): void {
-  const themeSelect = overlay.querySelector<HTMLSelectElement>('#settings-theme');
-  if (themeSelect !== null) {
-    themeSelect.addEventListener('change', () => {
-      ctx.setActiveThemeId(themeSelect.value);
-      ctx.switchTheme(themeSelect.value);
-    });
-  }
-
-  overlay.querySelector('#manage-themes-btn')?.addEventListener('click', () => {
-    ctx.showThemeManager(() => {
-      void (async () => {
-        const updated = await ctx.refreshThemes();
-        ctx.setActiveThemeId(updated.activeId);
-        ctx.renderContent();
-      })();
-    });
-  });
-
-  overlay.querySelector('#settings-share-link')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    void triggerShare();
-  });
-
-  const appNameInput = overlay.querySelector<HTMLInputElement>('#settings-app-name');
-  if (appNameInput !== null) {
-    appNameInput.addEventListener('input', () => {
-      ctx.setAppName(appNameInput.value);
-      ctx.saveAppNameDebounced();
-    });
-  }
-}
-
 export const generalTab: Tab = {
   id: 'general',
   label: 'General',
   icon: <IconSliders />,
   render: renderGeneralTab,
-  bind: bindGeneralTab,
 };

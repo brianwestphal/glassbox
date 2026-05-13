@@ -88,5 +88,7 @@ export interface Tab {
   icon: SafeHtml;
   enabled?: (ctx: TabContext) => boolean;
   render: (ctx: TabContext) => SafeHtml;
-  bind: (overlay: HTMLElement, ctx: TabContext) => void;
+  // Optional — kept for compatibility while tabs migrate from per-tab
+  // bindings to the centralized `delegate()` handlers in `dialog.tsx`.
+  bind?: (overlay: HTMLElement, ctx: TabContext) => void;
 }

@@ -61,30 +61,9 @@ function renderProfileTab(ctx: TabContext): SafeHtml {
   );
 }
 
-function bindProfileTab(overlay: HTMLElement, ctx: TabContext): void {
-  overlay.querySelectorAll('.settings-tag').forEach(tag => {
-    tag.addEventListener('click', () => {
-      const topic = (tag as HTMLElement).dataset.topic;
-      if (topic !== undefined) {
-        ctx.toggleTopic(topic);
-        ctx.renderContent();
-      }
-    });
-  });
-
-  const moreBtn = overlay.querySelector('#show-more-langs');
-  if (moreBtn !== null) {
-    moreBtn.addEventListener('click', () => {
-      ctx.setShowMoreLangs(true);
-      ctx.renderContent();
-    });
-  }
-}
-
 export const profileTab: Tab = {
   id: 'profile',
   label: 'Profile',
   icon: <IconUser />,
   render: renderProfileTab,
-  bind: bindProfileTab,
 };
