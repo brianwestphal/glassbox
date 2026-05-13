@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0] - 2026-05-14
+
+- Migrate JSX runtime to kerfjs and normalize spelling to American English
+
 ## [0.8.2] - 2026-05-03
 
 - Auto-scroll sidebar to keep selected file visible
