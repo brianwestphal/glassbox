@@ -78,7 +78,7 @@ Requirements for the browser-based UI and user interaction patterns.
 ### 8.8 Rendering
 
 - Pages shall be server-rendered HTML with client-side JavaScript for interactivity.
-- The custom JSX runtime (SafeHtml) shall be used for all HTML generation, both server-side and client-side.
+- The kerfjs JSX runtime (returning `SafeHtml`) shall be used for all HTML generation, both server-side and client-side. Client-side reactivity (re-renders, event delegation) is also kerfjs-driven (`mount()`, `delegate()`, `signal()`, `defineStore`).
 - Client-side DOM elements shall be created via `toElement()`, never `document.createElement()`.
 - All string content shall be auto-escaped to prevent XSS. Pre-escaped HTML shall use `raw()`.
 

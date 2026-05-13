@@ -29,8 +29,9 @@ Foundational decisions (see `ARCHITECTURE.md`, `CLAUDE.md`):
 - **127.0.0.1 only.** The server binds exclusively to loopback. No auth
   (threat model: the local machine is trusted).
 - **Embedded Postgres.** PGLite WASM, raw SQL, no ORM.
-- **Custom JSX runtime**, not React. HTML is rendered server-side for
-  initial load; client JS adds interactivity.
+- **kerfjs JSX runtime**, not React. HTML is rendered server-side for
+  initial load; client-side reactivity via `mount()` / `delegate()` /
+  `signal()` / `defineStore`.
 - **Distribution:** npm (`npm i -g glassbox`) and native desktop via Tauri.
 
 ## 2. Review workflow (`1-review-workflow.md`) — **Shipped**
@@ -204,7 +205,7 @@ closes modals/forms; `j`/`k` navigates files; `Cmd/Ctrl+F` opens find;
 
 Completion modal confirms Complete Review and offers gitignore add.
 
-Rendering NFRs: server-rendered HTML + client JS; custom JSX runtime for
+Rendering NFRs: server-rendered HTML + client JS; kerfjs JSX runtime for
 all HTML generation (server and client); client DOM via `toElement()`,
 never `document.createElement()`; auto-escape strings (`raw()` for
 pre-escaped). Light + dark color schemes via the theme system. Minimum

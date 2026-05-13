@@ -11,7 +11,7 @@ A locally-running web application for reviewing AI-generated code. Launched from
 - **Server**: Hono framework with `@hono/node-server`
 - **Desktop**: Tauri v2 (Rust) — wraps the Node.js server in a native window
 - **Database**: PGLite (embedded PostgreSQL) — data stored in `~/.glassbox/data/`
-- **Rendering**: Custom server-side JSX runtime (no React) — produces HTML strings via `SafeHtml` class
+- **Rendering**: kerfjs JSX runtime (no React) — produces HTML strings server-side via `SafeHtml`; client-side reactivity via `mount()` / `delegate()` / `signal()` / `defineStore`
 - **Build**: tsup (server CLI + client JS bundles) + sass (SCSS → CSS)
 - **Dev**: tsx for direct TypeScript execution (client assets pre-built)
 
@@ -128,12 +128,15 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `_modal.scss` — Modal dialogs
 - `_scrollbar.scss` — Custom scrollbar
 - `_ai-sort.scss` — Sort mode control, risk badges, score bars, analysis loading
-- `_settings.scss` — AI settings dialog styles
+- `_highlight.scss` — Syntax highlight token colors
+- `_image-diff.scss` — Image diff modes (metadata, difference, slice) + zoom/pan
+- `_settings.scss` — Settings dialog (tabs, theme manager/editor, profile, experimental)
+- `_update-banner.scss` — Tauri update notification banner
 - `styles.scss` — Entry point, imports all partials
 
 **TypeScript** (`src/client/`): Modular files using TSX and SafeHtml for HTML building:
 
-- `app.ts` — Entry point, init
+- `app.tsx` — Entry point, init
 - `state.ts` — Shared types, default factories, and `CATEGORIES` constants (no runtime state — see `stores/`)
 - `stores/index.ts` — Reactive state via kerfjs `defineStore`: `reviewStore`, `diffViewStore`, `aiStore`, `dragStore`. Reads use `store.state.value.X`; writes use `store.actions.update({ X: y })` plus named actions for collection mutations (`pushFileOrder`, `setAnnotationCount`, `setStaleCount`, `addCollapsedFolder`, `removeCollapsedFolder`, `setFileNote`, `setGuidedNote`, `setAnalysisState`). `getAnalysisModeState(mode)` resolves a mode's analysis sub-state. Computed: `filteredFiles`, `aiEnabled`. New per-concern state goes here; pick the matching store or split a new one off when it's clearly a separate domain.
 - `api.ts` — API helper, HTML escaping utility
@@ -192,7 +195,7 @@ npm run tauri:build    # Build sidecar + package native desktop app
 
 The build produces:
 
-- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`) are kept external.
+- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs`) are kept external.
 - `dist/client/app.global.js` — Client JS bundle (IIFE, minified, es2020 target)
 - `dist/client/styles.css` — Compiled and compressed CSS from SCSS
 

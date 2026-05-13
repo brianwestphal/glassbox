@@ -148,7 +148,7 @@ The server shall expose three route groups:
 ### 2.14 Response Format
 
 - **API format** — API routes shall return JSON responses.
-- **Page format** — Page routes shall return server-rendered HTML using the custom JSX runtime.
+- **Page format** — Page routes shall return server-rendered HTML using the kerfjs JSX runtime.
 
 ### 2.15 Error Handling
 

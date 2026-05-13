@@ -14,7 +14,7 @@ specific files only when you need detail beyond what is here.
 - **Language**: TypeScript (strict, ESM, `.js` extensions in imports)
 - **HTTP server**: Hono + `@hono/node-server`, bound to `127.0.0.1`
 - **Database**: PGLite (embedded Postgres, WASM), stored in `~/.glassbox/data/`
-- **Rendering**: Custom server-side JSX runtime → HTML strings. No React.
+- **Rendering**: kerfjs JSX runtime (no React). Server-side → HTML strings via `SafeHtml`; client-side reactivity via `mount()` / `delegate()` / `signal()` / `defineStore`.
 - **Desktop shell**: Tauri v2 (Rust) wraps the Node server as a sidecar
 - **Build**: tsup (server + client IIFE bundles) + sass (SCSS → CSS)
 - **Dev**: tsx for direct TS execution; client assets pre-built
