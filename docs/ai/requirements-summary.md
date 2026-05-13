@@ -285,6 +285,15 @@ SCSS compiled separately via sass. Both builds use `jsxImportSource: 'kerfjs'`.
 CI/CD (GitHub Actions on `v*`) signs/notarizes macOS, produces all
 artifacts + `latest.json` for updater, publishes draft Releases.
 
+Three tag-driven workflows: `release-candidate.yml` (v*-rc.* → full
+validate → npm@beta → smoke → promote → desktop), `release-beta.yml`
+(v*-beta.* → opt-in pre-release; npm `--tag beta` + GH prerelease; no
+auto-promote — `npm run release:beta` triggers this), and
+`release-desktop.yml` (stable `v[0-9]*` tags excluding rc/beta). Beta
+releases stay invisible to the Tauri updater and the in-CLI upgrade nudge
+because both consult `releases/latest` / npm `latest`, which skip
+prereleases.
+
 Dev: `npm run dev` (tsx), `npm run tauri:dev` (both). A sidecar stub
 script is created so Tauri's build system doesn't require the real Node
 binary in dev.

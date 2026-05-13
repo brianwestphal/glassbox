@@ -1,0 +1,297 @@
+name: Release Beta
+
+# Triggered by `v*-beta.*` tags created via `bash scripts/release.sh --beta`
+# (or `npm run release:beta`). Publishes a pre-release:
+#   - npm with `--tag beta` (so `npm install glassbox@beta` works)
+#   - GitHub Release flagged `prerelease: true` (so the Tauri updater and
+#     the in-CLI upgrade-nudge keep pointing at the prior stable, since
+#     GitHub's `releases/latest` and npm's `latest` dist-tag both skip
+#     prereleases automatically).
+#
+# Differences from release-candidate.yml:
+# - No smoke-fresh / smoke-upgrade phases (betas are opt-in; users testing
+#   them are expected to surface issues themselves).
+# - No promote phase, no workflow_dispatch to release-desktop.yml.
+# - Tauri bundles are uploaded directly to the GH Release inside this
+#   workflow, not via the separate release-desktop.yml flow (which hardcodes
+#   `prerelease: false`).
+
+permissions:
+  contents: write
+  id-token: write  # Required for npm OIDC provenance
+
+on:
+  push:
+    tags:
+      - 'v*-beta.*'
+
+concurrency:
+  group: release-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # Phase 1: Validation (parallel)
+  # ══════════════════════════════════════════════════════════════
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  test-e2e:
+    name: E2E Tests
+    needs: [lint, typecheck, test-unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:client
+      - run: npx playwright install chromium
+      - run: npm run test:e2e
+
+  npm-pack:
+    name: npm Pack (Dry Run)
+    needs: [lint, typecheck, test-unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm pack --dry-run
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 2: Extract version + create the prerelease shell
+  # ══════════════════════════════════════════════════════════════
+
+  create-release:
+    name: Create Prerelease
+    needs: [test-e2e, npm-pack]
+    runs-on: ubuntu-latest
+    outputs:
+      beta_version: ${{ steps.version.outputs.beta_version }}
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract beta version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          BETA_VERSION="${TAG#v}"
+          echo "beta_version=$BETA_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Beta version: $BETA_VERSION"
+
+      - name: Build release notes body
+        id: notes
+        env:
+          TAG: ${{ github.ref_name }}
+          BETA_VERSION: ${{ steps.version.outputs.beta_version }}
+        run: |
+          NOTES=$(git tag -l --format='%(contents)' "$TAG" | sed '/^$/d')
+
+          {
+            echo "> **Beta / pre-release.** This build is opt-in. The Tauri auto-updater and the in-CLI upgrade nudge will continue to point at the prior stable release."
+            echo ""
+            if [ -n "$NOTES" ]; then
+              echo "$NOTES"
+              echo ""
+            fi
+            echo "## Try it out"
+            echo ""
+            echo "**npm:** \`npm install -g glassbox@${BETA_VERSION}\` (or \`glassbox@beta\` for the latest beta)"
+            echo ""
+            echo "**Desktop bundles:** see Assets below."
+          } > /tmp/beta-notes.md
+
+          echo "body<<ENDOFNOTES" >> "$GITHUB_OUTPUT"
+          cat /tmp/beta-notes.md >> "$GITHUB_OUTPUT"
+          echo "ENDOFNOTES" >> "$GITHUB_OUTPUT"
+
+      - name: Create prerelease
+        id: create
+        uses: actions/github-script@v7
+        env:
+          RELEASE_BODY: ${{ steps.notes.outputs.body }}
+        with:
+          script: |
+            const tag = '${{ github.ref_name }}';
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Glassbox ${tag} (beta)`,
+              body: process.env.RELEASE_BODY,
+              draft: false,
+              prerelease: true,
+              make_latest: 'false',
+            });
+            return data.id;
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 3: Publish npm with --tag beta
+  # ══════════════════════════════════════════════════════════════
+
+  publish-beta:
+    name: Publish npm Beta
+    needs: create-release
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ github.ref }}' }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      - name: Set version and publish beta
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm version "${{ needs.create-release.outputs.beta_version }}" --no-git-tag-version --allow-same-version
+          npm run build
+          npm publish --tag beta --provenance --access public
+
+  # ══════════════════════════════════════════════════════════════
+  # Phase 4: Build Tauri bundles + upload to the prerelease
+  # ══════════════════════════════════════════════════════════════
+
+  build-tauri:
+    name: Build Tauri (${{ matrix.friendly }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            friendly: macOS-Apple-Silicon
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            friendly: macOS-Intel
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            friendly: Linux-x64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            friendly: Windows-x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+
+      - run: npm ci
+
+      # Match release.sh's beta path: bump the in-tree version to
+      # {ver}-beta.{N} BEFORE building so the Tauri bundles carry the right
+      # version string. The repo's package.json stays at the prior stable;
+      # we bump ephemerally inside CI only.
+      - name: Set version for bundle build
+        shell: bash
+        run: |
+          VER="${{ needs.create-release.outputs.beta_version }}"
+          npm version "$VER" --no-git-tag-version --allow-same-version
+
+          if [ -f src-tauri/tauri.conf.json ]; then
+            node -e "
+              const fs = require('fs');
+              const f = 'src-tauri/tauri.conf.json';
+              const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+              c.version = process.argv[1];
+              fs.writeFileSync(f, JSON.stringify(c, null, 2) + '\n');
+            " "$VER"
+          fi
+
+          if [ -f src-tauri/Cargo.toml ]; then
+            # Portable: works on both BSD (mac) and GNU (linux/win) runners.
+            node -e "
+              const fs = require('fs');
+              const p = 'src-tauri/Cargo.toml';
+              const t = fs.readFileSync(p, 'utf8').replace(/^version = \".*\"/m, 'version = \"' + process.argv[1] + '\"');
+              fs.writeFileSync(p, t);
+            " "$VER"
+          fi
+
+      - name: Build sidecar
+        run: bash scripts/build-sidecar.sh ${{ matrix.target }}
+        shell: bash
+
+      - name: Build Tauri app and upload to release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: --target ${{ matrix.target }}

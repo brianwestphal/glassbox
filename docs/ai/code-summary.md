@@ -464,7 +464,8 @@ Scripts (`package.json`):
 - `dev:server` — dev with `--no-open --strict-port`
 - `tauri:dev` / `tauri:build` — desktop dev / full desktop build
 - `test`, `test:watch`, `test:all`, `test:e2e`, `test:smoke`, `lint`
-- `release` — version bump + publish (see `scripts/release.sh`)
+- `release` — version bump + publish stable (see `scripts/release.sh`)
+- `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
 
 `tsup.config.ts` produces:
 
@@ -521,9 +522,17 @@ CLI install locations: `/usr/local/bin/glassbox` (macOS symlink),
 `%LOCALAPPDATA%\Programs\glassbox\glassbox.cmd` (Windows copy + user PATH).
 
 Updates: `tauri-plugin-updater` reads `latest.json` from GitHub Releases
-on every launch. Opt-in install only. Public key embedded in
-`tauri.conf.json`. CI (`.github/workflows/release-desktop.yml`) builds
-signed/notarized artifacts on `v*` tags.
+on every launch (via `releases/latest/...`, which skips prereleases).
+Opt-in install only. Public key embedded in `tauri.conf.json`.
+
+CI workflows:
+- `release-candidate.yml` — `v*-rc.*` tags → validate → npm@beta → smoke →
+  promote to npm@latest → dispatch `release-desktop.yml`.
+- `release-beta.yml` — `v*-beta.*` tags → validate → npm@beta → prerelease
+  GH Release with Tauri bundles. No auto-promote; users opt in via
+  `npm install glassbox@beta` or the GH Release page.
+- `release-desktop.yml` — `v[0-9]*` tags excluding `-rc.*` and `-beta.*` →
+  signed/notarized stable desktop bundles.
 
 ## 17. Maintenance rules
 

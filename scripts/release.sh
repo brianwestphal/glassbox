@@ -440,6 +440,53 @@ step_rc_tag() {
   success "Created tag ${rc_tag}"
 }
 
+# Beta tag-and-push: like the RC path but creates v{ver}-beta.{N} tags off
+# HEAD without first committing version-file bumps. The CI workflow
+# (release-beta.yml) extracts the version from the tag, publishes npm with
+# `--tag beta`, and creates a GitHub Release flagged `prerelease: true` so
+# `releases/latest` (Tauri updater + npm `latest` upgrade-nudge) keeps
+# pointing at the prior stable. There is no auto-promote — betas stay opt-in
+# via `npm install glassbox@beta` or by downloading the GH Release page.
+step_beta_tag_and_push() {
+  local version
+  version=$(get_state "version")
+  local notes
+  notes=$(get_state "release_notes")
+
+  # Auto-increment beta number: find existing v{version}-beta.N tags
+  local beta_num=1
+  while git rev-parse "v${version}-beta.${beta_num}" >/dev/null 2>&1; do
+    beta_num=$((beta_num + 1))
+  done
+  local beta_tag="v${version}-beta.${beta_num}"
+
+  info "Creating beta tag ${BOLD}${beta_tag}${RESET}..."
+
+  # Annotated tag with release notes
+  echo -e "$notes" | git tag -a "$beta_tag" -F -
+
+  info "Pushing beta tag to origin..."
+  git push origin "$beta_tag"
+
+  echo ""
+  success "Beta tag ${beta_tag} pushed!"
+  echo ""
+  echo -e "  ${DIM}CI will now:${RESET}"
+  echo -e "    1. Run tests, lint, and build verification"
+  echo -e "    2. Publish beta to npm (glassbox@${version}-beta.${beta_num}) with --tag beta"
+  echo -e "    3. Build Tauri bundles for every platform"
+  echo -e "    4. Create a GitHub Release flagged ${BOLD}prerelease: true${RESET}"
+  echo ""
+  echo -e "  ${DIM}This is a beta — there is no auto-promote.${RESET}"
+  echo -e "  ${DIM}Users get it via:${RESET}  npm install glassbox@beta"
+  echo -e "  ${DIM}Or by downloading from the GitHub Release page.${RESET}"
+  echo -e "  ${DIM}The Tauri updater + npm upgrade-nudge keep pointing at the prior${RESET}"
+  echo -e "  ${DIM}stable because GitHub's releases/latest and npm's latest dist-tag${RESET}"
+  echo -e "  ${DIM}both skip prereleases automatically.${RESET}"
+  echo ""
+  echo -e "  ${DIM}Monitor progress:${RESET} https://github.com/brianwestphal/glassbox/actions"
+}
+
 step_push_rc() {
   local version
   version=$(get_state "version")
@@ -473,8 +520,24 @@ step_push_rc() {
 
 # --- Main ---
 main() {
+  # --beta switches the flow into pre-release mode: no version-file bumps,
+  # no CHANGELOG entry, no release commit; just a v{ver}-beta.{N} tag pushed
+  # off HEAD. CI publishes npm with --tag beta and creates a GH Release
+  # flagged prerelease: true so the Tauri updater + npm upgrade-nudge skip it.
+  BETA_MODE=false
+  for arg in "$@"; do
+    case "$arg" in
+      --beta) BETA_MODE=true ;;
+    esac
+  done
+
   echo ""
-  echo -e "${BOLD}  Glassbox Release${RESET}"
+  if [[ "$BETA_MODE" == "true" ]]; then
+    echo -e "${BOLD}  Glassbox Beta Release${RESET}"
+    echo -e "  ${DIM}--beta mode: tag-only, no version-file bump, no auto-promote.${RESET}"
+  else
+    echo -e "${BOLD}  Glassbox Release${RESET}"
+  fi
   echo ""
 
   init_state
@@ -518,11 +581,51 @@ main() {
   # Step 4: Review
   if ! past_step 4; then
     step_review
-    if ! confirm "Proceed with this release?"; then
-      warn "Aborted. State saved — run again to resume or edit."
-      exit 0
+    if [[ "$BETA_MODE" == "true" ]]; then
+      if ! confirm "Proceed with this BETA release?"; then
+        warn "Aborted. State saved — run again to resume or edit."
+        exit 0
+      fi
+    else
+      if ! confirm "Proceed with this release?"; then
+        warn "Aborted. State saved — run again to resume or edit."
+        exit 0
+      fi
     fi
     set_step 4
+  fi
+
+  if [[ "$BETA_MODE" == "true" ]]; then
+    # Beta path: skip version-file bump, CHANGELOG, and commit steps. The
+    # user-entered version is the upcoming target (e.g. 0.9.0); package.json
+    # stays at the current stable until the actual final release runs. CI
+    # bumps the version ephemerally at publish time via
+    # `npm version ... --no-git-tag-version`.
+
+    # Step 5: Local validation (lint, typecheck, unit tests) — betas should pass too
+    if ! past_step 5; then
+      echo ""
+      step_validate
+      set_step 5
+    fi
+
+    # Step 8: Build (skip 6 + 7 — no version-file bump, no changelog edit)
+    if ! past_step 8; then
+      echo ""
+      step_build
+      set_step 8
+    fi
+
+    # Step 10: Beta tag + push (no commit, no separate push step — combined)
+    if ! past_step 10; then
+      step_beta_tag_and_push
+      set_step 10
+    fi
+
+    echo ""
+    success "Beta submitted! CI will publish npm@beta and prerelease bundles."
+    cleanup_state
+    return
   fi
 
   # Step 5: Local validation (lint, typecheck, unit tests)

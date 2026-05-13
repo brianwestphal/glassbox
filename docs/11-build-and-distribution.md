@@ -27,9 +27,22 @@ Requirements for building, packaging, and distributing the application.
 
 ### 11.4 Update Checking (npm)
 
-- For npm installs, the system shall check for newer versions once per day by querying the npm registry.
+- For npm installs, the system shall check for newer versions once per day by querying the npm registry's `latest` dist-tag.
 - The update check shall detect the user's package manager (npm, yarn, pnpm, bun) and suggest the appropriate upgrade command.
 - The update check shall time out after 5 seconds to avoid blocking startup.
+- The update check shall not surface beta releases to stable users (beta releases live under the `beta` dist-tag, not `latest`).
+
+### 11.8 Beta Releases
+
+- The release script shall support a `--beta` mode (`npm run release:beta`) for shipping opt-in pre-release builds.
+- Beta mode shall skip version-file bumps, CHANGELOG edits, and the release commit; instead it shall create and push a `v{ver}-beta.{N}` annotated tag off HEAD.
+- The beta CI workflow (`.github/workflows/release-beta.yml`) shall:
+  - run lint, type check, unit tests, E2E tests, and `npm pack --dry-run` validation
+  - publish to npm with `--tag beta` (so `npm install glassbox@beta` resolves to the latest beta and stable users on `latest` are unaffected)
+  - build Tauri bundles for every platform and attach them to a GitHub Release flagged `prerelease: true`
+- There shall be no auto-promotion from beta to stable. Users opt in via `npm install glassbox@beta` or by downloading from the GitHub Release page.
+- The Tauri auto-updater (which reads `releases/latest/download/latest.json`) and the in-CLI upgrade nudge (which reads `registry.npmjs.org/glassbox/latest`) shall continue to point at the prior stable release because both surfaces skip prereleases automatically.
+- The stable desktop release workflow shall exclude `v*-beta.*` tags from its trigger to avoid racing with the beta workflow on tag push.
 
 ## Non-Functional Requirements
 
@@ -46,6 +59,10 @@ Requirements for building, packaging, and distributing the application.
 - macOS builds shall be code-signed and notarized.
 - All builds shall include updater signature artifacts (`latest.json`).
 - Release artifacts shall be published as draft GitHub Releases for manual promotion.
+- Three workflows handle the tag-driven release pipeline:
+  - `release-candidate.yml` (triggered by `v*-rc.*`) — full validate → npm beta → smoke → promote → desktop dispatch
+  - `release-beta.yml` (triggered by `v*-beta.*`) — opt-in pre-release; npm `--tag beta` + GH Release `prerelease: true`; no auto-promote
+  - `release-desktop.yml` (triggered by `v[0-9]*` excluding `-rc.*` and `-beta.*`) — final desktop bundles for stable releases
 
 ### 11.7 Development Mode
 

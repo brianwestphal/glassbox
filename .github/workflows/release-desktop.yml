@@ -8,6 +8,7 @@ on:
     tags:
       - 'v[0-9]*'
       - '!v*-rc.*'
+      - '!v*-beta.*'
 
   workflow_dispatch:
     inputs:
