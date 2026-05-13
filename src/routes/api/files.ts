@@ -1,9 +1,9 @@
-import { execFileSync } from 'child_process';
 import { Hono } from 'hono';
 import { resolve } from 'path';
 
-import { getAnnotationsForFile, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
+import { getAnnotationCountsForReview, getAnnotationsForFile, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
 import type { AppEnv } from '../../types.js';
+import { openOS } from '../../utils/openOS.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 import { checkEnum } from '../../utils/validate.js';
 
@@ -13,13 +13,11 @@ const VALID_FILE_STATUSES = ['pending', 'reviewed'] as const;
 
 filesRoutes.get('/files', async (c) => {
   const reviewId = resolveReviewId(c);
-  const files = await getReviewFiles(reviewId);
-  const annotationCounts: Record<string, number> = {};
-  for (const file of files) {
-    const annotations = await getAnnotationsForFile(file.id);
-    annotationCounts[file.id] = annotations.length;
-  }
-  const staleCounts = await getStaleCountsForReview(reviewId);
+  const [files, annotationCounts, staleCounts] = await Promise.all([
+    getReviewFiles(reviewId),
+    getAnnotationCountsForReview(reviewId),
+    getStaleCountsForReview(reviewId),
+  ]);
   return c.json({ files, annotationCounts, staleCounts });
 });
 
@@ -45,14 +43,7 @@ filesRoutes.post('/files/:fileId/reveal', async (c) => {
   const repoRoot = c.get('repoRoot');
   const fullPath = resolve(repoRoot, file.file_path);
   try {
-    if (process.platform === 'darwin') {
-      execFileSync('open', ['-R', fullPath]);
-    } else if (process.platform === 'win32') {
-      execFileSync('explorer', ['/select,' + fullPath]);
-    } else {
-      // Linux: open the containing directory
-      execFileSync('xdg-open', [resolve(fullPath, '..')]);
-    }
+    openOS(fullPath, 'reveal');
   } catch { /* ignore errors (e.g. file doesn't exist yet for added files) */ }
   return c.json({ ok: true });
 });

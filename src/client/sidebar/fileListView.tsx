@@ -5,14 +5,13 @@ import { parseDiffData } from '../../git/parseDiffData.js';
 import type { AnalysisModeState, NarrativeFileOrder, RiskFileScore } from '../state.js';
 import {
   aiStore,
-  buildFolderTree,
   diffViewStore,
   reviewStore,
   sortedNarrativeOrder,
   sortedRiskScores,
-  type TreeNode,
   unscoredFiles,
 } from '../stores/index.js';
+import { buildFolderTree, type TreeNode } from './folderTree.js';
 
 export function fileListJsx(): SafeHtml {
   const ai = aiStore.state.value;

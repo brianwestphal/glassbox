@@ -22,13 +22,21 @@ sharePromptRoutes.post('/share-prompt/dismiss', (c) => {
 });
 
 sharePromptRoutes.post('/share-prompt/tick', async (c) => {
-  const body = await c.req.json<{ sessionMs: number }>();
+  const raw = await c.req.json<unknown>();
+  if (typeof raw !== 'object' || raw === null) {
+    return c.json({ error: 'body must be a JSON object' }, 400);
+  }
+  const body = raw as { sessionMs?: unknown };
+  if (typeof body.sessionMs !== 'number' || !Number.isFinite(body.sessionMs)) {
+    return c.json({ error: 'sessionMs must be a finite number' }, 400);
+  }
+  const sessionMs = body.sessionMs;
   let totalOpenMs = 0;
   updateGlobalConfig((config) => {
     if (config.sharePrompt === undefined) config.sharePrompt = {};
     const sp = config.sharePrompt as Record<string, unknown>;
     const current = typeof sp.totalOpenMs === 'number' ? sp.totalOpenMs : 0;
-    const next = current + (body.sessionMs > 0 ? body.sessionMs : 0);
+    const next = current + (sessionMs > 0 ? sessionMs : 0);
     sp.totalOpenMs = next;
     totalOpenMs = next;
   });

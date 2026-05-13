@@ -4,6 +4,7 @@
  * highlights matches, and allows navigation between them.
  */
 import { toElement } from '../dom.js';
+import { getTauriGlobal } from '../tauri.js';
 
 let findBar: HTMLElement | null = null;
 let findInput: HTMLInputElement | null = null;
@@ -17,8 +18,8 @@ const ACTIVE_HIGHLIGHT_CLASS = 'find-highlight-active';
 
 export function bindFind() {
   // Only activate in Tauri — browsers have their own find
-  const isTauri = (window as unknown as Record<string, unknown>).__TAURI__ !== undefined;
-  if (!isTauri) return;
+  const tauri = getTauriGlobal();
+  if (tauri === undefined) return;
 
   document.addEventListener('keydown', (e) => {
     // Cmd/Ctrl+F: open find bar
@@ -45,10 +46,7 @@ export function bindFind() {
   });
 
   // Listen for Tauri menu event (Edit > Find)
-  const tauriObj = (window as unknown as Record<string, unknown>).__TAURI__ as
-    | { event?: { listen: (name: string, cb: () => void) => void } }
-    | undefined;
-  tauriObj?.event?.listen('menu-find', () => {
+  tauri.event?.listen('menu-find', () => {
     showFindBar();
   });
 }

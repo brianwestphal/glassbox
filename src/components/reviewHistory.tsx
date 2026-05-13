@@ -50,7 +50,12 @@ export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[];
                       <span className={`status-badge ${r.status}`} style="margin-left:8px">{titleCase(r.status)}</span>
                     </h3>
                     <div className="meta">
-                      ID: {r.id} | Created: {String(r.created_at)}
+                      ID: {r.id} | Created: {/* The `Review` type says `created_at: string`, but PGLite
+                        actually returns a `Date` from `timestamp` columns at
+                        runtime, which the kerf JSX runtime rejects. The
+                        explicit String() coercion is intentional. */
+                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion
+                        String(r.created_at)}
                     </div>
                     {!isCurrent ? (
                       <button className="delete-review-btn" data-delete-id={r.id} title="Delete review"><IconTrash16 /></button>

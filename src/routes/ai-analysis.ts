@@ -23,6 +23,7 @@ import {
   updateAnalysisProgress,
   updateAnalysisStatus,
 } from '../db/ai-queries.js';
+import { getDb } from '../db/connection.js';
 import type { ReviewFile } from '../db/queries.js';
 import { getReviewFiles } from '../db/queries.js';
 import { debugLog, isAIServiceTest, isDebug } from '../debug.js';
@@ -159,75 +160,20 @@ async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
     debugLog(`Context window: ${String(contextWindow)} tokens`);
     const { batches, binaryFiles } = planBatches(files, contextWindow);
     const fileIdMap = new Map(files.map(f => [f.file_path, f.id]));
-    const totalAnalyzable = batches.reduce((sum, b) => sum + b.files.length, 0);
 
-    debugLog(`Analysis plan: ${String(totalAnalyzable)} analyzable + ${String(binaryFiles.length)} binary = ${String(totalAnalyzable + binaryFiles.length)} total files in ${String(batches.length)} batch(es)`);
+    debugLog(`Analysis plan: ${String(batches.reduce((s, b) => s + b.files.length, 0))} analyzable + ${String(binaryFiles.length)} binary in ${String(batches.length)} batch(es)`);
 
-    // --- Cache: carry forward scores from a previous analysis (same review) ---
-    // Skip cache when invalidateCache is true (e.g. guided review settings changed)
-    const prevScores = invalidateCache ? [] : await getPreviousScores(reviewId, analysisType, analysisId);
-    const binaryPathSet = new Set(binaryFiles.map(f => f.file_path));
-    const unchangedPaths = new Set<string>();
-    const cachedScores = prevScores.filter(s => {
-      // Only carry forward non-binary files that still exist in the review
-      // (binary files are re-saved separately below)
-      if (fileIdMap.has(s.file_path) && !binaryPathSet.has(s.file_path)) {
-        unchangedPaths.add(s.file_path);
-        return true;
-      }
-      return false;
+    const { cachedCount, filteredBatches } = await applyCachedScores({
+      analysisId, analysisType, reviewId, fileIdMap, batches, binaryFiles, invalidateCache,
     });
 
-    debugLog(`Cache: ${String(cachedScores.length)} scores from previous analysis, ${String(totalAnalyzable - cachedScores.length)} files need processing`);
-
-    // Save cached scores immediately with updated review_file_ids
-    if (cachedScores.length > 0) {
-      const cachedForInsert = cachedScores.map(s => ({
-        reviewFileId: fileIdMap.get(s.file_path) ?? s.review_file_id,
-        filePath: s.file_path,
-        sortOrder: s.sort_order,
-        aggregateScore: s.aggregate_score,
-        rationale: s.rationale,
-        dimensionScores: s.dimension_scores !== null ? JSON.parse(s.dimension_scores) as Record<string, number> : null,
-        notes: s.notes !== null ? JSON.parse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } : null,
-      }));
-      await appendFileScores(analysisId, cachedForInsert);
-    }
-
-    // Filter batches to exclude files with cached scores
-    const filteredBatches = batches
-      .map(batch => {
-        const remaining = batch.files.filter(f => !unchangedPaths.has(f.file_path));
-        return { files: remaining, estimatedTokens: batch.estimatedTokens };
-      })
-      .filter(batch => batch.files.length > 0);
-
-    // Recalculate totals
     const filteredAnalyzable = filteredBatches.reduce((sum, b) => sum + b.files.length, 0);
-    const totalForProgress = filteredAnalyzable + binaryFiles.length + cachedScores.length;
-
+    const totalForProgress = filteredAnalyzable + binaryFiles.length + cachedCount;
     debugLog(`After cache: ${String(filteredAnalyzable)} files to analyze in ${String(filteredBatches.length)} batch(es)`);
 
-    // Set total progress
-    await updateAnalysisProgress(analysisId, cachedScores.length, totalForProgress);
+    await updateAnalysisProgress(analysisId, cachedCount, totalForProgress);
 
-    // Save binary files immediately with score 0
-    if (binaryFiles.length > 0) {
-      debugLog(`Saving ${String(binaryFiles.length)} binary files with score 0`);
-      const binaryScoreEntries = binaryFiles.map((f, idx) => ({
-        reviewFileId: fileIdMap.get(f.file_path) ?? '',
-        filePath: f.file_path,
-        sortOrder: 99999 + idx, // Will be re-sorted later
-        aggregateScore: analysisType === 'risk' ? 0 : null,
-        rationale: 'Binary file — not analyzed',
-        dimensionScores: analysisType === 'risk'
-          ? { security: 0, correctness: 0, 'error-handling': 0, maintainability: 0, architecture: 0, performance: 0 }
-          : null,
-        notes: null,
-      }));
-      await appendFileScores(analysisId, binaryScoreEntries);
-      await updateAnalysisProgress(analysisId, cachedScores.length + binaryFiles.length, totalForProgress);
-    }
+    await saveBinaryFiles({ analysisId, analysisType, fileIdMap, binaryFiles, cachedCount, totalForProgress });
 
     if (filteredBatches.length === 0) {
       debugLog('No batches to process (all files cached or binary), marking completed');
@@ -235,17 +181,11 @@ async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
       return;
     }
 
-    const shouldCancel = () => canceledAnalyses.has(analysisId);
-    const progressOffset = cachedScores.length + binaryFiles.length;
-
-    const runArgs = [analysisId, filteredBatches, files.length, totalForProgress, progressOffset] as const;
-    if (analysisType === 'risk') {
-      await runBatchedAnalysis(...runArgs, riskAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysisId), shouldCancel);
-    } else if (analysisType === 'narrative') {
-      await runBatchedAnalysis(...runArgs, narrativeAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysisId), shouldCancel);
-    } else {
-      await runBatchedAnalysis(...runArgs, guidedAnalysisConfig(config, repoRoot, fileIdMap, guidedReview), shouldCancel);
-    }
+    const progressOffset = cachedCount + binaryFiles.length;
+    await dispatchByType({
+      analysisType, analysisId, filteredBatches, files, totalForProgress, progressOffset,
+      config, repoRoot, fileIdMap, guidedReview,
+    });
 
     // Check if this analysis was canceled while running (user switched modes)
     if (canceledAnalyses.has(analysisId)) {
@@ -263,6 +203,111 @@ async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
     console.error(`Analysis failed: ${message}`);
     debugLog(`Analysis ${analysisId} failed: ${message}`);
     await updateAnalysisStatus(analysisId, 'failed', message);
+  }
+}
+
+/** Carry forward scores from a previous analysis of the same review.
+ *  Returns the cached count + the batches with already-cached files removed. */
+async function applyCachedScores(args: {
+  analysisId: string;
+  analysisType: 'risk' | 'narrative' | 'guided';
+  reviewId: string;
+  fileIdMap: Map<string, string>;
+  batches: Array<{ files: ReviewFile[]; estimatedTokens: number }>;
+  binaryFiles: ReviewFile[];
+  invalidateCache: boolean;
+}): Promise<{ cachedCount: number; filteredBatches: Array<{ files: ReviewFile[]; estimatedTokens: number }> }> {
+  const { analysisId, analysisType, reviewId, fileIdMap, batches, binaryFiles, invalidateCache } = args;
+  const prevScores = invalidateCache ? [] : await getPreviousScores(reviewId, analysisType, analysisId);
+  const binaryPathSet = new Set(binaryFiles.map(f => f.file_path));
+  const unchangedPaths = new Set<string>();
+  const cachedScores = prevScores.filter(s => {
+    // Only carry forward non-binary files that still exist in the review
+    // (binary files are re-saved separately by `saveBinaryFiles`).
+    if (fileIdMap.has(s.file_path) && !binaryPathSet.has(s.file_path)) {
+      unchangedPaths.add(s.file_path);
+      return true;
+    }
+    return false;
+  });
+
+  debugLog(`Cache: ${String(cachedScores.length)} scores carried forward from previous analysis`);
+
+  if (cachedScores.length > 0) {
+    const cachedForInsert = cachedScores.map(s => ({
+      reviewFileId: fileIdMap.get(s.file_path) ?? s.review_file_id,
+      filePath: s.file_path,
+      sortOrder: s.sort_order,
+      aggregateScore: s.aggregate_score,
+      rationale: s.rationale,
+      dimensionScores: safeJsonParse(s.dimension_scores) as Record<string, number> | null,
+      notes: safeJsonParse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } | null,
+    }));
+    await appendFileScores(analysisId, cachedForInsert);
+  }
+
+  const filteredBatches = batches
+    .map(batch => ({
+      files: batch.files.filter(f => !unchangedPaths.has(f.file_path)),
+      estimatedTokens: batch.estimatedTokens,
+    }))
+    .filter(batch => batch.files.length > 0);
+
+  return { cachedCount: cachedScores.length, filteredBatches };
+}
+
+/** Save binary (image/blob) files with a sentinel score so they appear in
+ *  the sidebar but aren't sent to the model. */
+async function saveBinaryFiles(args: {
+  analysisId: string;
+  analysisType: 'risk' | 'narrative' | 'guided';
+  fileIdMap: Map<string, string>;
+  binaryFiles: ReviewFile[];
+  cachedCount: number;
+  totalForProgress: number;
+}): Promise<void> {
+  const { analysisId, analysisType, fileIdMap, binaryFiles, cachedCount, totalForProgress } = args;
+  if (binaryFiles.length === 0) return;
+  debugLog(`Saving ${String(binaryFiles.length)} binary files with score 0`);
+  const binaryScoreEntries = binaryFiles.map((f, idx) => ({
+    reviewFileId: fileIdMap.get(f.file_path) ?? '',
+    filePath: f.file_path,
+    sortOrder: 99999 + idx, // re-sorted by `updateSortOrders` later
+    aggregateScore: analysisType === 'risk' ? 0 : null,
+    rationale: 'Binary file — not analyzed',
+    dimensionScores: analysisType === 'risk'
+      ? { security: 0, correctness: 0, 'error-handling': 0, maintainability: 0, architecture: 0, performance: 0 }
+      : null,
+    notes: null,
+  }));
+  await appendFileScores(analysisId, binaryScoreEntries);
+  await updateAnalysisProgress(analysisId, cachedCount + binaryFiles.length, totalForProgress);
+}
+
+/** Pick the right `*AnalysisConfig` for the analysis type and run the
+ *  batched analysis with it. */
+async function dispatchByType(args: {
+  analysisType: 'risk' | 'narrative' | 'guided';
+  analysisId: string;
+  filteredBatches: Array<{ files: ReviewFile[]; estimatedTokens: number }>;
+  files: ReviewFile[];
+  totalForProgress: number;
+  progressOffset: number;
+  config: AIConfig;
+  repoRoot: string;
+  fileIdMap: Map<string, string>;
+  guidedReview: GuidedReviewConfig;
+}): Promise<void> {
+  const { analysisType, analysisId, filteredBatches, files, totalForProgress, progressOffset, config, repoRoot, fileIdMap, guidedReview } = args;
+  const shouldCancel = () => canceledAnalyses.has(analysisId);
+  const runArgs = [analysisId, filteredBatches, files.length, totalForProgress, progressOffset] as const;
+
+  if (analysisType === 'risk') {
+    await runBatchedAnalysis(...runArgs, riskAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysisId), shouldCancel);
+  } else if (analysisType === 'narrative') {
+    await runBatchedAnalysis(...runArgs, narrativeAnalysisConfig(config, repoRoot, fileIdMap, guidedReview, analysisId), shouldCancel);
+  } else {
+    await runBatchedAnalysis(...runArgs, guidedAnalysisConfig(config, repoRoot, fileIdMap, guidedReview), shouldCancel);
   }
 }
 
@@ -311,7 +356,6 @@ async function runBatchedAnalysis<T>(
 }
 
 async function updateSortOrders(analysisId: string, entries: Iterable<[string, number]>): Promise<void> {
-  const { getDb } = await import('../db/connection.js');
   const db = await getDb();
   for (const [filePath, sortOrder] of entries) {
     await db.query(
@@ -448,11 +492,25 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
       sortOrder: s.sort_order,
       aggregateScore: s.aggregate_score,
       rationale: s.rationale,
-      dimensionScores: s.dimension_scores !== null ? JSON.parse(s.dimension_scores) as Record<string, number> : null,
-      notes: s.notes !== null ? JSON.parse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } : null,
+      dimensionScores: safeJsonParse(s.dimension_scores) as Record<string, number> | null,
+      notes: safeJsonParse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } | null,
     })),
   });
 });
+
+/** Defensive wrapper around `JSON.parse` for stored DB strings. Returns
+ *  `null` if the input is null/undefined or unparseable, so a corrupt row
+ *  never 500s the request. The caller asserts the shape via the local
+ *  `as T` site rather than here, to keep this helper generic. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function safeJsonParse(raw: string | null | undefined): any {
+  if (raw === null || raw === undefined) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
   const reviewId = resolveReviewId(c);
@@ -511,7 +569,11 @@ aiAnalysisRoutes.get('/preferences', async (c) => {
 });
 
 aiAnalysisRoutes.post('/preferences', async (c) => {
-  const body = await c.req.json<{ sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean; ignore_whitespace?: boolean; svg_view_mode?: string; last_image_mode?: string }>();
+  const raw = await c.req.json<unknown>();
+  if (typeof raw !== 'object' || raw === null) {
+    return c.json({ error: 'body must be a JSON object' }, 400);
+  }
+  const body = raw as { sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean; ignore_whitespace?: boolean; svg_view_mode?: string; last_image_mode?: string };
 
   if (body.sort_mode !== undefined) {
     const v = checkEnum(body.sort_mode, 'sort_mode', VALID_SORT_MODES);
@@ -536,6 +598,17 @@ aiAnalysisRoutes.post('/preferences', async (c) => {
     if ('error' in v) return c.json({ error: v.error }, 400);
   }
 
-  await saveUserPreferences(body);
+  // Project to a known allowlist before persisting — drops any unknown
+  // keys the client may have sent. Only include keys actually set in the
+  // body; including `undefined` for absent keys would let the spread in
+  // `saveUserPreferences` overwrite existing values with NULL.
+  const allowed: Record<string, unknown> = {};
+  if (body.sort_mode !== undefined) allowed.sort_mode = body.sort_mode;
+  if (body.risk_sort_dimension !== undefined) allowed.risk_sort_dimension = body.risk_sort_dimension;
+  if (body.show_risk_scores !== undefined) allowed.show_risk_scores = body.show_risk_scores;
+  if (body.ignore_whitespace !== undefined) allowed.ignore_whitespace = body.ignore_whitespace;
+  if (body.svg_view_mode !== undefined) allowed.svg_view_mode = body.svg_view_mode;
+  if (body.last_image_mode !== undefined) allowed.last_image_mode = body.last_image_mode;
+  await saveUserPreferences(allowed);
   return c.json({ ok: true });
 });

@@ -242,13 +242,6 @@ function showReclassifyPopupForEdit(badge: HTMLElement): void {
   });
 }
 
-// Server-rendered annotations no longer need per-item event binding; the
-// delegates above cover them. Kept as a no-op for compatibility while
-// callers migrate.
-export function bindServerAnnotations(): void {
-  // intentionally empty
-}
-
 // Expose `closeEditForm` so the diff view's outside-click handler (if any)
 // can dismiss the picker without reaching into module internals.
 export { closeCategoryPicker,closeEditForm, openCategoryPicker };

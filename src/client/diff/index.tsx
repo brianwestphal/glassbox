@@ -205,6 +205,22 @@ function setupWrapClassEffect(container: HTMLElement): void {
 
 // --- Delegated event handlers (on the diff container root) ---
 
+/** Read the line number + side from a `.diff-line` element, applying the
+ *  old → new side fallback (clicks/drops on an old-side row that has a
+ *  paired new-side line should annotate against the new file). Returns
+ *  `null` when the line number is missing or unparseable. */
+function readLineAndSide(el: HTMLElement): { line: number; side: string } | null {
+  const num = parseInt(el.dataset.line ?? '0', 10);
+  if (isNaN(num) || num === 0) return null;
+  let side = el.dataset.side ?? 'new';
+  let line = num;
+  if (side === 'old' && el.dataset.newLine !== undefined && el.dataset.newLine !== '') {
+    const newLine = parseInt(el.dataset.newLine, 10);
+    if (!isNaN(newLine)) { line = newLine; side = 'new'; }
+  }
+  return { line, side };
+}
+
 function setupDelegatedHandlers(container: HTMLElement): void {
   // Reveal button (server-rendered for image-not-found etc.)
   delegate(container, 'click', '.reveal-btn', (_e, btn) => {
@@ -233,13 +249,8 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const dy = Math.abs(me.clientY - clickStart.y);
     if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) return;
     const el = line as HTMLElement;
-    let num = parseInt(el.dataset.line ?? '0', 10);
-    let side = el.dataset.side ?? 'new';
-    if (side === 'old' && el.dataset.newLine !== undefined && el.dataset.newLine !== '') {
-      const newLine = parseInt(el.dataset.newLine, 10);
-      if (!isNaN(newLine)) { num = newLine; side = 'new'; }
-    }
-    if (!isNaN(num)) showAnnotationForm(el, num, side);
+    const target_ = readLineAndSide(el);
+    if (target_ !== null) showAnnotationForm(el, target_.line, target_.side);
   });
 
   // Drag-and-drop annotation onto a different line
@@ -260,20 +271,14 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const drag = dragStore.state.value.annotation;
     if (drag === null) return;
 
-    const el = line as HTMLElement;
-    let num = parseInt(el.dataset.line ?? '0', 10);
-    let side = el.dataset.side ?? 'new';
-    if (isNaN(num)) return;
-    if (side === 'old' && el.dataset.newLine !== undefined && el.dataset.newLine !== '') {
-      const newLine = parseInt(el.dataset.newLine, 10);
-      if (!isNaN(newLine)) { num = newLine; side = 'new'; }
-    }
+    const dropTarget = readLineAndSide(line as HTMLElement);
+    if (dropTarget === null) return;
 
     dragStore.actions.setAnnotation(null);
     void (async () => {
       await api('/annotations/' + drag.id + '/move', {
         method: 'PATCH',
-        body: { lineNumber: num, side: side },
+        body: { lineNumber: dropTarget.line, side: dropTarget.side },
       });
       const currentFileId = reviewStore.state.value.currentFileId;
       if (currentFileId !== null) void selectFile(currentFileId);

@@ -16,10 +16,4 @@ export default defineConfig({
       ],
     },
   },
-  resolve: {
-    alias: {
-      '#jsx/jsx-runtime': './src/jsx-runtime.ts',
-      '#jsx/jsx-dev-runtime': './src/jsx-runtime.ts',
-    },
-  },
 });

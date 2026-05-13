@@ -13,6 +13,9 @@ contextRoutes.get('/context/:fileId', async (c) => {
 
   const startLine = parseInt(c.req.query('start') ?? '1', 10);
   const endLine = parseInt(c.req.query('end') ?? '20', 10);
+  if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) {
+    return c.json({ error: 'start and end must be integers' }, 400);
+  }
 
   const content = getFileContent(file.file_path, 'working', repoRoot);
   const allLines = content.split('\n');

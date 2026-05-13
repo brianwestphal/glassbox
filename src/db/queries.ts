@@ -1,8 +1,5 @@
 import { getDb } from './connection.js';
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-}
+import { generateId } from './ids.js';
 
 // --- Reviews ---
 
@@ -239,6 +236,22 @@ export async function getStaleCountsForReview(reviewId: string): Promise<Record<
     `SELECT a.review_file_id, COUNT(*)::text as count FROM annotations a
      JOIN review_files rf ON a.review_file_id = rf.id
      WHERE rf.review_id = $1 AND a.is_stale = TRUE
+     GROUP BY a.review_file_id`,
+    [reviewId]
+  );
+  const counts: Record<string, number> = {};
+  for (const row of result.rows) {
+    counts[row.review_file_id] = parseInt(row.count, 10);
+  }
+  return counts;
+}
+
+export async function getAnnotationCountsForReview(reviewId: string): Promise<Record<string, number>> {
+  const db = await getDb();
+  const result = await db.query<{ review_file_id: string; count: string }>(
+    `SELECT a.review_file_id, COUNT(*)::text as count FROM annotations a
+     JOIN review_files rf ON a.review_file_id = rf.id
+     WHERE rf.review_id = $1
      GROUP BY a.review_file_id`,
     [reviewId]
   );

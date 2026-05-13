@@ -61,16 +61,10 @@ export interface TabContext {
   appName: string;
   activeThemeId: string;
 
-  // Mutators — let tabs change state without owning the dialog's closure.
-  setCurrentPlatform: (platform: string) => void;
-  setCurrentModel: (model: string) => void;
-  setGuidedEnabled: (enabled: boolean) => void;
-  setShowMoreLangs: (b: boolean) => void;
-  setAppName: (name: string) => void;
-  setActiveThemeId: (id: string) => void;
-  setChannelEnabled: (enabled: boolean) => void;
-
-  // Cross-tab actions.
+  // Cross-tab actions kept for the small number of tabs whose render fn
+  // emits inline event handlers (e.g. updates-tab status text). Most tab
+  // interactions flow through the centralized `delegate(overlay, …)` calls
+  // in `dialog.tsx`, not through this context.
   saveConfig: () => void;
   saveKey: () => void;
   removeKey: () => void;
@@ -79,7 +73,6 @@ export interface TabContext {
   switchTheme: (id: string) => void;
   showThemeManager: (onClose: () => void) => void;
   refreshThemes: () => Promise<ThemesResponse>;
-  renderContent: () => void;
 }
 
 export interface Tab {

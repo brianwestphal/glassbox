@@ -1,4 +1,4 @@
-import type { SafeHtml } from 'kerfjs';
+import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
 import { api } from '../api.js';
@@ -7,7 +7,7 @@ import { invalidateGuidedAnalysis } from '../guided.js';
 import { triggerShare } from '../share.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { aiStore } from '../stores/index.js';
-import { getTauriInvoke, showUpdateBanner } from '../tauri.js';
+import { getTauriGlobal, getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
 import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
@@ -70,7 +70,7 @@ function renderSettingsModal(
   channelState: ChannelState,
   onClose?: () => void,
 ): void {
-  const isTauri = (window as unknown as Record<string, unknown>).__TAURI__ !== undefined;
+  const isTauri = getTauriGlobal() !== undefined;
 
   // Per-dialog reactive state. Bumps to this signal drive the mount()
   // re-render. The signal lives in this closure (not in the global
@@ -86,8 +86,6 @@ function renderSettingsModal(
     appName: projectSettings.appName ?? '',
     activeThemeId: themesData.activeId,
   });
-  let lastSavedGuidedEnabled = configData.guidedReview.enabled;
-  let lastSavedGuidedTopics = new Set(configData.guidedReview.topics);
 
   const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog"></div></div>);
   const modalEl = overlay.querySelector<HTMLElement>('.modal');
@@ -96,14 +94,15 @@ function renderSettingsModal(
   function setUi(partial: Partial<SettingsUIState>): void {
     ui.value = { ...ui.value, ...partial };
   }
+  function forceRerender(): void {
+    ui.value = { ...ui.value };
+  }
 
-  let configTimer: ReturnType<typeof setTimeout> | null = null;
-  let appNameTimer: ReturnType<typeof setTimeout> | null = null;
+  const actions = createActions({ ui, setUi, forceRerender, keyStatus, projectSettings, configData, channelState, overlay, modelsData, themesData });
+
   let disposeMount: (() => void) | null = null;
-
   function closeDialog(): void {
-    if (configTimer) clearTimeout(configTimer);
-    if (appNameTimer) clearTimeout(appNameTimer);
+    actions.dispose();
     document.removeEventListener('keydown', handleEscape);
     if (disposeMount !== null) disposeMount();
     overlay.remove();
@@ -113,6 +112,60 @@ function renderSettingsModal(
   function handleEscape(e: KeyboardEvent): void {
     if (e.key === 'Escape') closeDialog();
   }
+
+  // Mount the reactive shell.
+  disposeMount = mount(modalEl, () => {
+    const ctx = buildContext({ ui, isTauri, keyStatus, modelsData, themesData, projectSettings, channelState, actions });
+    const visible = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
+    const cur = ui.value;
+    let activeId = cur.activeTab;
+    if (!visible.some(t => t.id === activeId)) {
+      activeId = visible[0]?.id ?? 'general';
+      // Defer the state correction so we don't write during a render.
+      queueMicrotask(() => { setUi({ activeTab: activeId }); });
+    }
+    return renderShell(visible, activeId, ctx);
+  });
+
+  setupDelegates({ overlay, setUi, forceRerender, actions, modelsData, themesData, channelState, closeDialog });
+
+  document.addEventListener('keydown', handleEscape);
+  document.body.appendChild(overlay);
+}
+
+// --- Action handlers (closure-bound, returned as an object so they can be
+//     passed to TabContext + the delegate setup without duplicating closure
+//     wiring).
+
+interface ActionDeps {
+  ui: Signal<SettingsUIState>;
+  setUi: (p: Partial<SettingsUIState>) => void;
+  forceRerender: () => void;
+  keyStatus: KeyStatusResponse;
+  projectSettings: ProjectSettings;
+  configData: ConfigResponse;
+  channelState: ChannelState;
+  overlay: HTMLElement;
+  modelsData: ModelsResponse;
+  themesData: ThemesResponse;
+}
+
+interface Actions {
+  saveConfig: () => void;
+  saveConfigDebounced: () => void;
+  saveAppNameDebounced: () => void;
+  saveKey: () => void;
+  removeKey: () => void;
+  toggleTopic: (topic: string) => void;
+  dispose: () => void;
+}
+
+function createActions(deps: ActionDeps): Actions {
+  const { ui, setUi, forceRerender, keyStatus, projectSettings, configData, overlay } = deps;
+  let lastSavedGuidedEnabled = configData.guidedReview.enabled;
+  let lastSavedGuidedTopics = new Set(configData.guidedReview.topics);
+  let configTimer: ReturnType<typeof setTimeout> | null = null;
+  let appNameTimer: ReturnType<typeof setTimeout> | null = null;
 
   function saveConfig(): void {
     const cur = ui.value;
@@ -178,7 +231,7 @@ function renderSettingsModal(
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
       aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
-      ui.value = { ...ui.value }; // force re-render (server data mutated)
+      forceRerender();
     })();
   }
 
@@ -189,7 +242,7 @@ function renderSettingsModal(
       keyStatus.status = newStatus.status;
       const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
       aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
-      ui.value = { ...ui.value };
+      forceRerender();
     })();
   }
 
@@ -213,56 +266,68 @@ function renderSettingsModal(
     saveConfigDebounced();
   }
 
-  function buildContext(): TabContext {
-    const cur = ui.value;
-    return {
-      keyStatus, modelsData, themesData, projectSettings, channelState,
-      isTauri,
-      currentPlatform: cur.currentPlatform,
-      currentModel: cur.currentModel,
-      guidedEnabled: cur.guidedEnabled,
-      guidedTopics: cur.guidedTopics,
-      showMoreLangs: cur.showMoreLangs,
-      appName: cur.appName,
-      activeThemeId: cur.activeThemeId,
-      // No-op mutators kept on TabContext for backwards-compat with the Tab
-      // interface; all interactions now flow through the delegated handlers
-      // registered below, which call setUi() directly.
-      setCurrentPlatform: () => { /* unused — see [data-platform] delegate */ },
-      setCurrentModel: () => { /* unused */ },
-      setGuidedEnabled: () => { /* unused */ },
-      setShowMoreLangs: () => { /* unused */ },
-      setAppName: () => { /* unused */ },
-      setActiveThemeId: () => { /* unused */ },
-      setChannelEnabled: () => { /* unused */ },
-      saveConfig, saveKey, removeKey, toggleTopic, saveAppNameDebounced,
-      switchTheme: (id: string) => void switchTheme(id),
-      showThemeManager,
-      refreshThemes: () => api<ThemesResponse>('/themes').then(updated => {
-        themesData.themes = updated.themes;
-        themesData.activeId = updated.activeId;
-        return updated;
-      }),
-      renderContent: () => { ui.value = { ...ui.value }; },
-    };
+  function dispose(): void {
+    if (configTimer) clearTimeout(configTimer);
+    if (appNameTimer) clearTimeout(appNameTimer);
   }
 
-  // Mount the reactive shell.
-  disposeMount = mount(modalEl, () => {
-    const ctx = buildContext();
-    const visible = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
-    const cur = ui.value;
-    let activeId = cur.activeTab;
-    if (!visible.some(t => t.id === activeId)) {
-      activeId = visible[0]?.id ?? 'general';
-      // Defer the state correction so we don't write during a render.
-      queueMicrotask(() => { setUi({ activeTab: activeId }); });
-    }
-    return renderShell(visible, activeId, ctx);
-  });
+  return { saveConfig, saveConfigDebounced, saveAppNameDebounced, saveKey, removeKey, toggleTopic, dispose };
+}
 
-  // Delegated handlers — single registration per concern, fires for every
-  // re-render automatically.
+// --- TabContext construction ---
+
+function buildContext(args: {
+  ui: Signal<SettingsUIState>;
+  isTauri: boolean;
+  keyStatus: KeyStatusResponse;
+  modelsData: ModelsResponse;
+  themesData: ThemesResponse;
+  projectSettings: ProjectSettings;
+  channelState: ChannelState;
+  actions: Actions;
+}): TabContext {
+  const cur = args.ui.value;
+  return {
+    keyStatus: args.keyStatus, modelsData: args.modelsData, themesData: args.themesData,
+    projectSettings: args.projectSettings, channelState: args.channelState,
+    isTauri: args.isTauri,
+    currentPlatform: cur.currentPlatform,
+    currentModel: cur.currentModel,
+    guidedEnabled: cur.guidedEnabled,
+    guidedTopics: cur.guidedTopics,
+    showMoreLangs: cur.showMoreLangs,
+    appName: cur.appName,
+    activeThemeId: cur.activeThemeId,
+    saveConfig: args.actions.saveConfig,
+    saveKey: args.actions.saveKey,
+    removeKey: args.actions.removeKey,
+    toggleTopic: args.actions.toggleTopic,
+    saveAppNameDebounced: args.actions.saveAppNameDebounced,
+    switchTheme: (id: string) => void switchTheme(id),
+    showThemeManager,
+    refreshThemes: () => api<ThemesResponse>('/themes').then(updated => {
+      args.themesData.themes = updated.themes;
+      args.themesData.activeId = updated.activeId;
+      return updated;
+    }),
+  };
+}
+
+// --- Delegated event handlers ---
+// One `delegate(overlay, …)` per concern; fires for every re-render
+// automatically. Grouped by tab for readability.
+
+function setupDelegates(args: {
+  overlay: HTMLElement;
+  setUi: (p: Partial<SettingsUIState>) => void;
+  forceRerender: () => void;
+  actions: Actions;
+  modelsData: ModelsResponse;
+  themesData: ThemesResponse;
+  channelState: ChannelState;
+  closeDialog: () => void;
+}): void {
+  const { overlay, setUi, forceRerender, actions, modelsData, themesData, channelState, closeDialog } = args;
 
   delegate(overlay, 'click', '#settings-close', closeDialog);
   delegate(overlay, 'click', '[data-tab]', (_e, btn) => {
@@ -292,13 +357,13 @@ function renderSettingsModal(
   });
   delegate(overlay, 'input', '#settings-app-name', (_e, input) => {
     setUi({ appName: (input as HTMLInputElement).value });
-    saveAppNameDebounced();
+    actions.saveAppNameDebounced();
   });
 
   // Profile tab
   delegate(overlay, 'click', '.settings-tag', (_e, tag) => {
     const topic = (tag as HTMLElement).dataset.topic;
-    if (topic !== undefined) toggleTopic(topic);
+    if (topic !== undefined) actions.toggleTopic(topic);
   });
   delegate(overlay, 'click', '#show-more-langs', () => { setUi({ showMoreLangs: true }); });
 
@@ -310,27 +375,27 @@ function renderSettingsModal(
     const defaultModel = models.find(m => m.isDefault);
     const newModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
     setUi({ currentPlatform: platform, currentModel: newModel });
-    saveConfig();
+    actions.saveConfig();
   });
   delegate(overlay, 'change', '#settings-model', (_e, sel) => {
     setUi({ currentModel: (sel as HTMLSelectElement).value });
-    saveConfig();
+    actions.saveConfig();
   });
-  delegate(overlay, 'click', '#remove-key', removeKey);
-  delegate(overlay, 'click', '#save-key-btn', saveKey);
+  delegate(overlay, 'click', '#remove-key', actions.removeKey);
+  delegate(overlay, 'click', '#save-key-btn', actions.saveKey);
   delegate(overlay, 'keydown', '#settings-key', (e) => {
     const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter') { ke.preventDefault(); saveKey(); }
+    if (ke.key === 'Enter') { ke.preventDefault(); actions.saveKey(); }
   });
   delegate(overlay, 'change', '#settings-guided-enabled', (_e, cb) => {
     setUi({ guidedEnabled: (cb as HTMLInputElement).checked });
-    saveConfig();
+    actions.saveConfig();
   });
   delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
     const enabled = (cb as HTMLInputElement).checked;
     channelState.enabled = enabled;
     void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
-    ui.value = { ...ui.value }; // re-render reflects channelState change
+    forceRerender();
   });
   delegate(overlay, 'click', '#channel-copy-btn', (_e, btn) => {
     void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
@@ -350,9 +415,6 @@ function renderSettingsModal(
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeDialog();
   });
-
-  document.addEventListener('keydown', handleEscape);
-  document.body.appendChild(overlay);
 }
 
 async function handleCheckUpdates(btn: HTMLButtonElement, overlay: HTMLElement): Promise<void> {

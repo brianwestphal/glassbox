@@ -1,10 +1,20 @@
 import { delegate } from 'kerfjs';
 
+interface TauriGlobal {
+  core?: { invoke: (cmd: string) => Promise<unknown> };
+  event?: { listen: (name: string, cb: () => void) => void };
+}
+
+/** Read the `window.__TAURI__` global (defined when running inside the
+ *  Tauri shell, undefined in a plain browser). Centralized here so every
+ *  caller doesn't repeat the cast-through-unknown pattern. */
+export function getTauriGlobal(): TauriGlobal | undefined {
+  return (window as unknown as Record<string, unknown>).__TAURI__ as TauriGlobal | undefined;
+}
+
+/** Convenience: returns the Tauri `invoke()` if available, otherwise `null`. */
 export function getTauriInvoke(): ((cmd: string) => Promise<unknown>) | null {
-  const tauri = (window as unknown as Record<string, unknown>).__TAURI__ as
-    | { core?: { invoke: (cmd: string) => Promise<unknown> } }
-    | undefined;
-  return tauri?.core?.invoke ?? null;
+  return getTauriGlobal()?.core?.invoke ?? null;
 }
 
 let bannerDelegatesBound = false;

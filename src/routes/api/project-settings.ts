@@ -33,7 +33,11 @@ projectSettingsRoutes.get('/project-settings', (c) => {
 
 projectSettingsRoutes.patch('/project-settings', async (c) => {
   const repoRoot = c.get('repoRoot');
-  const body = await c.req.json<Partial<ProjectSettings>>();
+  const raw = await c.req.json<unknown>();
+  if (typeof raw !== 'object' || raw === null) {
+    return c.json({ error: 'body must be a JSON object' }, 400);
+  }
+  const body = raw as Partial<ProjectSettings>;
 
   if (body.appName !== undefined && typeof body.appName !== 'string') {
     return c.json({ error: 'appName must be a string' }, 400);

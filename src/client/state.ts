@@ -23,13 +23,8 @@ export interface Category {
   label: string;
 }
 
-interface TreeNode {
-  name: string;
-  children: TreeNode[];
-  files: ReviewFile[];
-}
-
-export type { TreeNode };
+// TreeNode lives in `client/sidebar/folderTree.ts` — import from there
+// (it used to live here back when the file held a runtime state object too).
 
 export type SortMode = 'folder' | 'risk' | 'narrative';
 

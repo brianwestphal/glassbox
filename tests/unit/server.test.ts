@@ -13,9 +13,9 @@ vi.mock('@hono/node-server', () => ({
   serve: vi.fn(() => mockServer),
 }));
 
-// Mock child_process to prevent browser opening
-vi.mock('child_process', () => ({
-  exec: vi.fn(),
+// Mock openOS to prevent browser opening
+vi.mock('../../src/utils/openOS.js', () => ({
+  openOS: vi.fn(),
 }));
 
 // Mock fs for static file serving
@@ -57,8 +57,9 @@ vi.mock('../../src/routes/pages.js', () => {
 
 import { startServer } from '../../src/server.js';
 import { serve } from '@hono/node-server';
-import { exec } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
+
+import { openOS } from '../../src/utils/openOS.js';
 
 describe('startServer', () => {
   beforeEach(() => {
@@ -85,13 +86,13 @@ describe('startServer', () => {
   it('opens the browser by default', async () => {
     await startServer(4183, 'review-123', '/tmp/repo');
 
-    expect(exec).toHaveBeenCalledWith(expect.stringContaining('http://localhost:4183'));
+    expect(openOS).toHaveBeenCalledWith(expect.stringContaining('http://localhost:4183'), 'url');
   });
 
   it('does not open the browser when noOpen is true', async () => {
     await startServer(4183, 'review-123', '/tmp/repo', { noOpen: true });
 
-    expect(exec).not.toHaveBeenCalled();
+    expect(openOS).not.toHaveBeenCalled();
   });
 
   it('serves styles.css with correct content type', async () => {

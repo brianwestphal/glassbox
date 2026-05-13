@@ -8,7 +8,7 @@ import { Layout } from '../components/layout.js';
 import { ReviewHistory } from '../components/reviewHistory.js';
 import { ReviewShell } from '../components/reviewShell.js';
 import type { ReviewFile } from '../db/queries.js';
-import { getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../db/queries.js';
+import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../db/queries.js';
 import type { FileDiff } from '../git/diff.js';
 import { getSingleFileDiff, parseDiffData, parseModeString } from '../git/diff.js';
 import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
@@ -23,12 +23,10 @@ pageRoutes.get('/', async (c) => {
   const review = await getReview(reviewId);
   if (!review) return c.text('Review not found', 404);
 
-  const files = await getReviewFiles(reviewId);
-  const annotationCounts: Record<string, number> = {};
-  for (const f of files) {
-    const anns = await getAnnotationsForFile(f.id);
-    annotationCounts[f.id] = anns.length;
-  }
+  const [files, annotationCounts] = await Promise.all([
+    getReviewFiles(reviewId),
+    getAnnotationCountsForReview(reviewId),
+  ]);
 
   const footer = (
     <>
@@ -165,12 +163,10 @@ pageRoutes.get('/review/:reviewId', async (c) => {
   const review = await getReview(reviewId);
   if (!review) return c.text('Review not found', 404);
 
-  const files = await getReviewFiles(reviewId);
-  const annotationCounts: Record<string, number> = {};
-  for (const f of files) {
-    const anns = await getAnnotationsForFile(f.id);
-    annotationCounts[f.id] = anns.length;
-  }
+  const [files, annotationCounts] = await Promise.all([
+    getReviewFiles(reviewId),
+    getAnnotationCountsForReview(reviewId),
+  ]);
 
   const footer = (
     <>

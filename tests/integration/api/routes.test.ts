@@ -7,6 +7,7 @@
  */
 import { PGlite } from '@electric-sql/pglite';
 import { Hono } from 'hono';
+import { tmpdir } from 'os';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AppEnv } from '../../../src/types.js';
@@ -17,7 +18,11 @@ import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../../src/db/schema.js';
 let testDb: PGlite;
 const TEST_REVIEW_ID = 'test-review-001';
 const TEST_REVIEW_ID_2 = 'test-review-002';
-const TEST_REPO_ROOT = '/tmp/test-repo';
+// Use `os.tmpdir()` rather than a hardcoded `/tmp/test-repo`. macOS sandbox
+// profiles (and the harness sandbox we run under) restrict writes to the
+// returned directory; a hardcoded path outside that fails with EPERM and
+// breaks the project-settings integration tests.
+const TEST_REPO_ROOT = `${tmpdir()}/glassbox-test-repo`;
 const TEST_FILE_ID = 'test-file-001';
 const TEST_FILE_ID_2 = 'test-file-002';
 
@@ -28,7 +33,7 @@ vi.mock('../../../src/db/connection.js', () => ({
 
 // Mock the export module to avoid filesystem/git side effects
 vi.mock('../../../src/export/generate.js', () => ({
-  generateReviewExport: vi.fn(async () => '/tmp/test-repo/.glassbox/latest-review.md'),
+  generateReviewExport: vi.fn(async () => `${tmpdir()}/glassbox-test-repo/.glassbox/latest-review.md`),
   shouldPromptGitignore: vi.fn(() => false),
   addGlassboxToGitignore: vi.fn(),
   dismissGitignorePrompt: vi.fn(),

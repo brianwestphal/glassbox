@@ -8,6 +8,7 @@ vi.mock('../../../src/db/queries.js', () => ({
   getReviewFiles: vi.fn(),
   getReviewFile: vi.fn(),
   getAnnotationsForFile: vi.fn(),
+  getAnnotationCountsForReview: vi.fn(),
   listReviews: vi.fn(),
 }));
 
@@ -21,7 +22,7 @@ vi.mock('../../../src/git/image.js', async (importOriginal) => {
   return { ...actual, getOldImage: vi.fn(), getNewImage: vi.fn() };
 });
 
-import { getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../../../src/db/queries.js';
+import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../../../src/db/queries.js';
 import { pageRoutes } from '../../../src/routes/pages.js';
 
 function createApp() {
@@ -58,6 +59,7 @@ describe('pageRoutes', () => {
     vi.mocked(getReview).mockResolvedValue(mockReview as any);
     vi.mocked(getReviewFiles).mockResolvedValue([mockFile] as any);
     vi.mocked(getAnnotationsForFile).mockResolvedValue([]);
+    vi.mocked(getAnnotationCountsForReview).mockResolvedValue({});
     vi.mocked(getReviewFile).mockResolvedValue(mockFile as any);
     vi.mocked(listReviews).mockResolvedValue([]);
   });

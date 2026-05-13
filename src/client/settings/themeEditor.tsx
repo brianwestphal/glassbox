@@ -58,9 +58,9 @@ function toHex(color: string): string {
   if (color.startsWith('#') && (color.length === 7 || color.length === 4)) return color;
   const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (m) {
-    const r = parseInt(m[1]).toString(16).padStart(2, '0');
-    const g = parseInt(m[2]).toString(16).padStart(2, '0');
-    const b = parseInt(m[3]).toString(16).padStart(2, '0');
+    const r = parseInt(m[1], 10).toString(16).padStart(2, '0');
+    const g = parseInt(m[2], 10).toString(16).padStart(2, '0');
+    const b = parseInt(m[3], 10).toString(16).padStart(2, '0');
     return `#${r}${g}${b}`;
   }
   return '#888888';

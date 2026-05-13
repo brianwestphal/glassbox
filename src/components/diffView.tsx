@@ -129,70 +129,66 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
         return (
           <div className="split-columns">
             <div className="split-col split-col-left">
-              {group.items.map(item => {
-                if (item.kind === 'separator') {
-                  const { hunk, hunkIdx, gapStart, gapEnd } = item;
-                  return (
-                    <div className="hunk-separator" data-hunk-idx={hunkIdx}
-                      data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
-                      data-new-start={hunk.newStart} data-new-count={hunk.newCount}
-                      data-gap-start={gapStart} data-gap-end={gapEnd}>
-                      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
-                    </div>
-                  );
-                }
-                if (item.kind === 'tail') {
-                  return (
-                    <div className="hunk-separator hunk-expander-tail" data-start={item.start}>
-                      ↕ Show remaining lines
-                    </div>
-                  );
-                }
-                const { pair } = item;
-                return (
-                  <div className={`diff-line split-left ${pair.left?.type || 'empty'}`}
-                    data-line={pair.left?.oldNum ?? ''} data-side="old"
-                    data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
-                    <span className="gutter" data-line-number={pair.left?.oldNum ?? ''}></span>
-                    <span className="code">{renderPairContent(pair, 'left')}</span>
-                  </div>
-                );
-              })}
+              {renderSplitColumn(group.items, 'left')}
             </div>
             <div className="split-col split-col-right">
-              {group.items.map(item => {
-                if (item.kind === 'separator') {
-                  const { hunk, hunkIdx, gapStart, gapEnd } = item;
-                  return (
-                    <div className="hunk-separator" data-hunk-idx={hunkIdx}
-                      data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
-                      data-new-start={hunk.newStart} data-new-count={hunk.newCount}
-                      data-gap-start={gapStart} data-gap-end={gapEnd}>
-                      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
-                    </div>
-                  );
-                }
-                if (item.kind === 'tail') {
-                  return (
-                    <div className="hunk-separator hunk-expander-tail" data-start={item.start}>
-                      ↕ Show remaining lines
-                    </div>
-                  );
-                }
-                const { pair } = item;
-                return (
-                  <div className={`diff-line split-right ${pair.right?.type || 'empty'}`}
-                    data-line={pair.right?.newNum ?? ''} data-side="new">
-                    <span className="gutter" data-line-number={pair.right?.newNum ?? ''}></span>
-                    <span className="code">{renderPairContent(pair, 'right')}</span>
-                  </div>
-                );
-              })}
+              {renderSplitColumn(group.items, 'right')}
             </div>
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** Render the per-side body of a `.split-col`. Hunk separators and tail
+ *  expanders look identical on both sides; only the diff-line rendering
+ *  differs by `side`. */
+function renderSplitColumn(
+  items: Exclude<SplitItem, { kind: 'annotated' }>[],
+  side: 'left' | 'right',
+): SafeHtml {
+  return (
+    <>
+      {items.map(item => {
+        if (item.kind === 'separator') {
+          const { hunk, hunkIdx, gapStart, gapEnd } = item;
+          return (
+            <div className="hunk-separator" data-hunk-idx={hunkIdx}
+              data-old-start={hunk.oldStart} data-old-count={hunk.oldCount}
+              data-new-start={hunk.newStart} data-new-count={hunk.newCount}
+              data-gap-start={gapStart} data-gap-end={gapEnd}>
+              @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+            </div>
+          );
+        }
+        if (item.kind === 'tail') {
+          return (
+            <div className="hunk-separator hunk-expander-tail" data-start={item.start}>
+              ↕ Show remaining lines
+            </div>
+          );
+        }
+        const { pair } = item;
+        if (side === 'left') {
+          return (
+            <div className={`diff-line split-left ${pair.left?.type || 'empty'}`}
+              data-line={pair.left?.oldNum ?? ''} data-side="old"
+              data-new-line={pair.left?.newNum ?? pair.right?.newNum ?? ''}>
+              <span className="gutter" data-line-number={pair.left?.oldNum ?? ''}></span>
+              <span className="code">{renderPairContent(pair, 'left')}</span>
+            </div>
+          );
+        }
+        return (
+          <div className={`diff-line split-right ${pair.right?.type || 'empty'}`}
+            data-line={pair.right?.newNum ?? ''} data-side="new">
+            <span className="gutter" data-line-number={pair.right?.newNum ?? ''}></span>
+            <span className="code">{renderPairContent(pair, 'right')}</span>
+          </div>
+        );
+      })}
+    </>
   );
 }
 

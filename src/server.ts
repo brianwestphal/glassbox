@@ -1,5 +1,4 @@
 import { serve } from '@hono/node-server';
-import { exec } from 'child_process';
 import { existsSync,readFileSync } from 'fs';
 import { Hono } from 'hono';
 import { dirname,join } from 'path';
@@ -13,6 +12,7 @@ import { channelApiRoutes } from './routes/channel-api.js';
 import { pageRoutes } from './routes/pages.js';
 import { themeApiRoutes } from './routes/theme-api.js';
 import type { AppEnv } from './types.js';
+import { openOS } from './utils/openOS.js';
 
 function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -105,9 +105,6 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
 
   // Open browser (unless --no-open was passed)
   if (options?.noOpen !== true) {
-    const openCmd = process.platform === 'darwin' ? 'open'
-      : process.platform === 'win32' ? 'start'
-      : 'xdg-open';
-    exec(`${openCmd} ${url}`);
+    try { openOS(url, 'url'); } catch { /* best-effort */ }
   }
 }
