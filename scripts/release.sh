@@ -269,9 +269,12 @@ step_version() {
 step_release_notes() {
   echo ""
 
-  # Build initial content from commits since last tag
+  # Build initial content from commits since the last STABLE tag. Excluding
+  # `*-beta.*` and `*-rc.*` keeps prerelease tags out of the comparison
+  # base, so the stable release notes always cover everything shipped since
+  # the last stable — including changes that previously rode out in betas.
   local last_tag
-  last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+  last_tag=$(git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*' 2>/dev/null || echo "")
   local log_range="${last_tag:+${last_tag}..HEAD}"
   local initial
   initial=$(git log ${log_range:-"-10"} --format="- %s" --no-decorate)
