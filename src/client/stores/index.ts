@@ -148,9 +148,9 @@ export const dragStore = defineStore({
 });
 
 // --- Annotation edit-form state ---
-// Lives in a signal (not in DOM) so the in-flight content / category survives
-// any sibling annotation update (the GB-749 acceptance bullet: "Mid-edit form
-// values survive a sibling annotation update").
+// Lives in a signal (not in DOM) so mid-edit form values (content + category)
+// survive a sibling annotation update — without this, an unrelated re-render
+// of the surrounding list would clobber whatever the user was typing.
 export interface EditFormState {
   // `null` annotationId means a brand-new annotation form keyed by `formKey`
   // (line:side) — used by `form.tsx` for create flow. For an in-place edit of

@@ -247,6 +247,17 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 
 ## Ticket-Driven Work
 
+> **Hot Sheet tickets are local-only.** The `.hotsheet/` directory is gitignored and lives only on the project maintainer's machine. Ticket IDs (e.g. `GB-774`) are meaningless to anyone else and there is no shared issue tracker to look them up in.
+>
+> This has two consequences for everything you write:
+>
+> 1. **Never tell a reader to "see `.hotsheet/`", "check the worklist", or "look up GB-N"** in committed files — code comments, requirements docs, architecture docs, AI summaries, commit messages, PR descriptions, etc. Those references go nowhere for any other reader.
+> 2. **A bare ticket number is not context.** If a code comment or doc needs to reference past work, write the reasoning inline. If a ticket ID is included at all, it must be accompanied by a short, self-contained summary of what the ticket was about — written so a reader who can't open the ticket still understands the point. Prefer dropping the ID entirely when the summary already conveys the why.
+>
+> Both rules apply to **committed files** (code, docs, commit messages, PR descriptions). They do **not** apply when writing inside Hot Sheet itself — ticket notes, ticket details, and other Hot-Sheet-only surfaces can reference sibling tickets by bare ID freely, since any reader who is seeing a ticket already has Hot Sheet available to look the reference up.
+>
+> This section itself, and any other guidance about how *you* should interact with the local Hot Sheet workflow, is the exception — it is addressed to the AI assistant running against the maintainer's machine.
+
 When the user gives you work directly via the CLI (not via MCP channel or Hot Sheet events), analyze the request and create Hot Sheet tickets before starting implementation — especially for substantial or multi-step work. This keeps work visible, trackable, and consistent with the Hot Sheet workflow.
 
 - **Do create tickets** for: feature implementation, bug fixes, refactoring, multi-step tasks, anything that involves changing code.

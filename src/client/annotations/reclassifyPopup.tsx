@@ -37,10 +37,11 @@ function dismissExistingPopups(): void {
 }
 
 function registerOutsideClickDismiss(popup: HTMLElement): void {
-  // Same precedent as the GB-748 language picker — a transient document-body
-  // overlay needs a one-shot outside-click handler. The popup itself never
-  // lives inside a mount() tree, so a direct `document.addEventListener` is
-  // stable and removed when the popup closes.
+  // The popup is a transient document-body overlay and never lives inside a
+  // mount() tree, so a direct `document.addEventListener` is stable here (and
+  // is removed when the popup closes). Inside a mount() tree we'd use
+  // delegate() instead, because re-renders would silently drop per-element
+  // listeners.
   const close = (e: Event) => {
     if (!popup.contains(e.target as Node)) {
       popup.remove();

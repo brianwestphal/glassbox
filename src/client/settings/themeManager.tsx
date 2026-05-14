@@ -171,7 +171,9 @@ export function showThemeManager(onThemeChanged?: () => void): void {
         });
       });
 
-      // Outside-click dismiss — same precedent as GB-748 / GB-749 popups.
+      // Outside-click dismiss for a transient document-body overlay: register a
+      // one-shot document-level listener (popups that live outside any mount()
+      // tree need a direct addEventListener, not a delegate()).
       const closeOnClick = (e: MouseEvent) => {
         if (!menu.contains(e.target as Node)) removeContextMenu();
       };
