@@ -2,6 +2,10 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.1] - 2026-05-18
+
+- Upgrade kerfjs ^0.6.0 -> ^0.8.0
+
 ## [0.9.0] - 2026-05-14
 
 - Migrate JSX runtime to kerfjs and normalize spelling to American English
