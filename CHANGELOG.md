@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.2] - 2026-05-19
+
+
+- Upgrade kerfjs to ^0.8.2 and adopt eslint-plugin-kerfjs for lint coverage of kerf patterns
+
 ## [0.9.1] - 2026-05-18
 
 - Upgrade kerfjs ^0.6.0 -> ^0.8.0
