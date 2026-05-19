@@ -211,6 +211,17 @@ preflight() {
       exit 1
     fi
   fi
+
+  # Sync tags with origin so downstream steps see the real latest. The
+  # release-notes comparison base (`git describe --tags --abbrev=0 ...`) and
+  # the RC / beta tag auto-increment loops both depend on knowing every
+  # existing tag — a stale local tag list would make us reuse a tag number
+  # that already exists upstream (push rejected) or anchor the commit log at
+  # an out-of-date base (notes include changes already shipped).
+  info "Fetching tags from origin..."
+  if ! git fetch --tags --prune --prune-tags origin 2>/dev/null; then
+    warn "git fetch failed — proceeding with the local tag list. Check network."
+  fi
 }
 
 # --- Steps ---

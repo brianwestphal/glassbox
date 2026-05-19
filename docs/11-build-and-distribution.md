@@ -27,6 +27,7 @@ Requirements for building, packaging, and distributing the application.
 
 ### 11.3.1 Release Notes Generation
 
+- The release script's preflight shall `git fetch --tags --prune --prune-tags origin` so the comparison-base lookup and the RC / beta tag auto-increment loops see the real upstream tag list — a stale local tag list would either anchor the commit log at an out-of-date base (notes include changes already shipped) or reuse a tag number that already exists upstream (push rejected). A fetch failure shall warn but not abort, so offline runs still proceed against the local tag list.
 - The release script shall draft release notes automatically when the `claude` CLI (Claude Code) is available on the user's PATH, then open the draft in the user's editor for review and edits.
 - The comparison base for the commit log shall depend on the release mode:
   - **Stable** releases shall diff against the last **production** tag (`vX.Y.Z` with no `-rc.N` / `-beta.N` suffix), via `git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*'`, so the notes cover every change since the previous stable — including changes that previously shipped in betas.
