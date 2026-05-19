@@ -104,8 +104,8 @@ ask_multiline() {
     info "${prompt} ${DIM}(opening ${editor##*/})${RESET}"
     $editor "$tmpfile"
 
-    # Read back, strip trailing blank lines
-    REPLY=$(sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$tmpfile")
+    # Read back: strip lines starting with '#' (guidance/comments), then strip trailing blank lines
+    REPLY=$(grep -v '^#' "$tmpfile" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
 
     if [[ -z "$REPLY" ]]; then
       warn "Release notes are empty."
@@ -269,15 +269,114 @@ step_version() {
 step_release_notes() {
   echo ""
 
-  # Build initial content from commits since the last STABLE tag. Excluding
-  # `*-beta.*` and `*-rc.*` keeps prerelease tags out of the comparison
-  # base, so the stable release notes always cover everything shipped since
-  # the last stable — including changes that previously rode out in betas.
+  # If we have saved notes from a prior run of this same release, ask_multiline
+  # will pick them up via get_state — skip the AI draft entirely so we don't
+  # waste a model call on resume.
+  local prev
+  prev=$(get_state "release_notes")
+  if [[ -n "$prev" ]]; then
+    ask_multiline "release_notes" "Release notes" ""
+    return
+  fi
+
+  # Stable releases anchor at the last PRODUCTION tag (`vX.Y.Z` with no
+  # `-beta.N` / `-rc.N` suffix) so the release notes summarize every change
+  # since the previous stable, not just since the most recent beta. Beta
+  # releases anchor at whatever the previous tag was (beta or stable) —
+  # they're incremental and shouldn't repeat bullets that already appeared
+  # in an earlier beta's notes.
   local last_tag
-  last_tag=$(git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*' 2>/dev/null || echo "")
+  if [[ "${BETA_MODE:-false}" == "true" ]]; then
+    last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+  else
+    last_tag=$(git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*' 2>/dev/null || echo "")
+  fi
   local log_range="${last_tag:+${last_tag}..HEAD}"
+  local commit_log
+  commit_log=$(git log ${log_range:-"-30"} --format="%s" --no-decorate)
+  local commit_count
+  commit_count=$(echo "$commit_log" | grep -c '^' || echo "0")
+
+  # Branch the prompt body on BETA_MODE. A beta cycle diffs against the
+  # immediately-previous tag (5–20 commits typically) and wants a tight
+  # 5–10-bullet summary so each beta's notes don't repeat the prior one's.
+  # A stable cut diffs against the last PRODUCTION tag, which over a v0.X
+  # → v0.X+1 cycle can be 100+ commits totalling many KB of subject text;
+  # the tight beta budget instructs the model to drop ~95% of the content,
+  # so the stable prompt asks for a wider, section-grouped summary plus
+  # tells the model how many commits it's summarizing so it self-paces.
+  local generated=""
+  if command -v claude &>/dev/null; then
+    info "Drafting release notes with Claude (${commit_count} commits since ${last_tag:-last 30})..."
+    local prompt
+    local beta_rules
+    beta_rules="Rules:
+- Output ONLY markdown bullets — no heading, no preamble, no closing remarks.
+- Each bullet is ONE short line (~80 chars max), user-facing.
+- Group related changes into single bullets.
+- INCLUDE: new features, UX improvements, bug fixes, breaking changes — anything a user upgrading would notice.
+- EXCLUDE: ticket IDs (GB-NNNN), internal refactors, test additions, doc-only changes, implementation rationale, build/CI tweaks.
+- Aim for 5–10 bullets total. Fewer is better."
+    local stable_rules
+    stable_rules="This is a STABLE release summarizing ${commit_count} commits since the last production release ${last_tag:-HEAD~30}. Be thorough — these notes will land in CHANGELOG.md.
+
+Rules:
+- Group bullets under H2 markdown headings: \"## New features\", \"## UX improvements\", \"## Bug fixes\", \"## Performance\", \"## Developer-facing\". Omit any heading whose section is empty.
+- Each bullet is ONE short line (~80 chars max), user-facing.
+- Group several related commits into single bullets when they cover the same feature area.
+- INCLUDE: new features, UX improvements, bug fixes, breaking changes, performance improvements, notable refactors that change user-observable behavior.
+- EXCLUDE: ticket IDs (GB-NNNN), pure internal refactors, test-only additions, doc-only changes, implementation rationale, build/CI tweaks.
+- For a ${commit_count}-commit release cycle aim for 15–40 total bullets, scaled to the volume of user-visible work. Don't pad — if a section has nothing user-facing, drop it. Don't under-deliver either — a stable release of this size shouldn't summarize down to 5 bullets."
+    local body
+    if [[ "${BETA_MODE:-false}" == "true" ]]; then
+      body="$beta_rules"
+    else
+      body="$stable_rules"
+    fi
+    prompt="Draft release notes for Glassbox (a local code review tool for AI-generated code) from the commit subjects below.
+
+${body}
+
+Commits:
+${commit_log}"
+    # Pipe the prompt via stdin instead of \"claude -p \$prompt\" so we don't
+    # blow past ARG_MAX (1 MB on macOS — a stable cycle's commit-subject
+    # volume can put the positional-arg form right at the kernel's E2BIG
+    # cliff with silent truncation).
+    generated=$(printf '%s' "$prompt" | claude -p 2>/dev/null || true)
+    # Strip leading/trailing blank lines + any stray code-fence wrappers
+    generated=$(echo "$generated" | sed -e '/^```/d' -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
+    # `claude -p` can return 200 OK with an auth/network error printed to
+    # stdout (e.g. "Failed to authenticate. API Error: 403 ..."). Without
+    # this guard, that text would pass the empty-stdout check below and
+    # become the CHANGELOG entry / annotated tag body. Treat known error
+    # signatures as empty so the placeholder fallback fires instead.
+    if echo "$generated" | head -1 | grep -qE '^(Failed to authenticate|API Error:|Error:)'; then
+      warn "Claude draft looks like an auth/network error — opening blank editor."
+      warn "  First line: $(echo "$generated" | head -1)"
+      generated=""
+    fi
+  fi
+
   local initial
-  initial=$(git log ${log_range:-"-10"} --format="- %s" --no-decorate)
+  if [[ -n "$generated" ]]; then
+    success "Draft ready — review and edit in the editor."
+    initial="# Release notes — Claude draft below. Edit freely.
+# Lines starting with '#' are removed on save.
+
+${generated}"
+  else
+    if command -v claude &>/dev/null; then
+      warn "Claude draft was empty — opening blank editor."
+    else
+      warn "'claude' CLI not found — opening blank editor. Install Claude Code for AI drafts."
+    fi
+    initial="# Release notes — keep it SHORT and USER-FACING.
+# Bullets only. Skip ticket IDs, refactors, tests, docs, internals.
+# Lines starting with '#' are removed on save.
+
+- "
+  fi
 
   ask_multiline "release_notes" "Release notes" "$initial"
 }
@@ -297,31 +396,6 @@ step_review() {
   echo ""
   echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo ""
-}
-
-step_validate() {
-  info "Running local checks..."
-
-  echo -e "  ${DIM}Lint...${RESET}"
-  if ! npm run lint --silent 2>&1; then
-    error "Lint failed. Fix errors and try again."
-    exit 1
-  fi
-  success "Lint passed"
-
-  echo -e "  ${DIM}Type check...${RESET}"
-  if ! npx tsc --noEmit 2>&1; then
-    error "Type check failed. Fix errors and try again."
-    exit 1
-  fi
-  success "Type check passed"
-
-  echo -e "  ${DIM}Unit tests...${RESET}"
-  if ! npm test --silent 2>&1; then
-    error "Unit tests failed. Fix errors and try again."
-    exit 1
-  fi
-  success "All local checks passed"
 }
 
 step_build() {
@@ -363,7 +437,7 @@ step_update_version() {
   success "All version files updated to ${version}"
 }
 
-step_changelog() {
+step_update_changelog() {
   local version
   version=$(get_state "version")
   local notes
@@ -373,38 +447,28 @@ step_changelog() {
 
   info "Updating CHANGELOG.md..."
 
-  # Build the new entry
+  # Format the release notes as a changelog entry. The AI draft / editor
+  # template already produces well-formed markdown (H2-grouped bullets
+  # for stable, flat bullets for beta), so no further normalization here.
   local entry
-  entry="## [${version}] - ${date}"$'\n\n'
-  # Convert notes to markdown list items (if not already)
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    if [[ "$line" == -* ]]; then
-      entry+="${line}"$'\n'
-    else
-      entry+="- ${line}"$'\n'
-    fi
-  done <<< "$(echo -e "$notes")"
+  entry="## [${version}] - ${date}\n\n${notes}"
 
-  if [[ -f "CHANGELOG.md" ]]; then
-    # Insert after the header line (line starting with "# Changelog" + blank + description + blank)
-    node -e "
-      const fs = require('fs');
-      const content = fs.readFileSync('CHANGELOG.md', 'utf8');
-      const entry = process.argv[1];
-      // Find the first ## heading and insert before it
-      const idx = content.indexOf('\n## ');
-      if (idx !== -1) {
-        const updated = content.slice(0, idx) + '\n' + entry + '\n' + content.slice(idx + 1);
-        fs.writeFileSync('CHANGELOG.md', updated);
-      } else {
-        // No existing entries, append
-        fs.writeFileSync('CHANGELOG.md', content + '\n' + entry);
-      }
-    " "$entry"
-  else
-    echo -e "# Changelog\n\nAll notable changes to Glassbox are documented here.\n\n${entry}" > CHANGELOG.md
-  fi
+  # Insert before the first existing entry, or append after the header.
+  node -e "
+    const fs = require('fs');
+    const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+    const marker = changelog.indexOf('\n## [');
+    if (marker === -1) {
+      // No existing entries — append after the header
+      const headerEnd = changelog.lastIndexOf('\n\n') + 2;
+      const updated = changelog.slice(0, headerEnd) + process.argv[1] + '\n\n';
+      fs.writeFileSync('CHANGELOG.md', updated);
+    } else {
+      // Insert before the first existing entry
+      const updated = changelog.slice(0, marker) + '\n' + process.argv[1] + '\n' + changelog.slice(marker);
+      fs.writeFileSync('CHANGELOG.md', updated);
+    }
+  " "$(echo -e "$entry")"
 
   success "CHANGELOG.md updated"
 }
@@ -418,29 +482,42 @@ step_git_commit() {
   git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md 2>/dev/null || git add package.json CHANGELOG.md
   git commit -m "release: v${version}" --allow-empty
 
-  success "Committed release changes"
+  success "Created release commit"
 }
 
-step_rc_tag() {
+step_rc_tag_and_push() {
   local version
   version=$(get_state "version")
   local notes
   notes=$(get_state "release_notes")
 
-  # Find the next RC number for this version
+  # Auto-increment RC number: find existing v{version}-rc.N tags
   local rc_num=1
-  while git tag -l "v${version}-rc.${rc_num}" | grep -q .; do
+  while git rev-parse "v${version}-rc.${rc_num}" >/dev/null 2>&1; do
     rc_num=$((rc_num + 1))
   done
-
   local rc_tag="v${version}-rc.${rc_num}"
-  info "Creating release candidate tag ${BOLD}${rc_tag}${RESET}..."
 
-  # Create annotated RC tag with release notes
+  info "Creating RC tag ${BOLD}${rc_tag}${RESET}..."
+
+  # Create annotated tag with release notes
   echo -e "$notes" | git tag -a "$rc_tag" -F -
 
-  set_state "rc_tag" "$rc_tag"
-  success "Created tag ${rc_tag}"
+  info "Pushing commit and RC tag to origin..."
+  git push
+  git push origin "$rc_tag"
+
+  echo ""
+  success "RC tag ${rc_tag} pushed!"
+  echo ""
+  echo -e "  ${DIM}CI will now:${RESET}"
+  echo -e "    1. Run tests, lint, and build verification"
+  echo -e "    2. Publish beta to npm (glassbox@${version}-rc.${rc_num})"
+  echo -e "    3. Run smoke tests (fresh install + upgrade)"
+  echo -e "    4. Auto-promote to glassbox@${version} on npm"
+  echo -e "    5. Create final v${version} tag → desktop release"
+  echo ""
+  echo -e "  ${DIM}Monitor progress:${RESET} https://github.com/brianwestphal/glassbox/actions"
 }
 
 # Beta tag-and-push: like the RC path but creates v{ver}-beta.{N} tags off
@@ -490,37 +567,6 @@ step_beta_tag_and_push() {
   echo -e "  ${DIM}Monitor progress:${RESET} https://github.com/brianwestphal/glassbox/actions"
 }
 
-step_push_rc() {
-  local version
-  version=$(get_state "version")
-  local rc_tag
-  rc_tag=$(get_state "rc_tag")
-
-  info "Pushing to remote to trigger CI pipeline..."
-  echo ""
-  echo -e "  ${DIM}This will push the commit and RC tag to GitHub.${RESET}"
-  echo -e "  ${DIM}GitHub Actions will then:${RESET}"
-  echo -e "  ${DIM}  1. Run all tests, lint, and type checks${RESET}"
-  echo -e "  ${DIM}  2. Build Tauri for all platforms${RESET}"
-  echo -e "  ${DIM}  3. Publish a beta to npm${RESET}"
-  echo -e "  ${DIM}  4. Run install/upgrade smoke tests${RESET}"
-  echo -e "  ${DIM}  5. If all passes: publish final release${RESET}"
-  echo ""
-
-  if confirm "Push ${rc_tag} to trigger the release pipeline?"; then
-    git push
-    git push origin "$rc_tag"
-    success "Pushed ${rc_tag} — CI pipeline started"
-    echo ""
-    echo -e "  ${DIM}Monitor progress at:${RESET}"
-    echo -e "  ${CYAN}https://github.com/brianwestphal/glassbox/actions${RESET}"
-  else
-    warn "Skipped push. Run manually:"
-    echo "    git push && git push origin ${rc_tag}"
-  fi
-}
-
-
 # --- Main ---
 main() {
   # --beta switches the flow into pre-release mode: no version-file bumps,
@@ -548,7 +594,7 @@ main() {
   local resume_step
   resume_step=$(get_step)
   if [[ -n "$resume_step" && "$resume_step" -gt 0 ]]; then
-    warn "Found saved progress (step ${resume_step}/11). Steps: preflight → notes → version → review → validate → update-version → changelog → build → commit → rc-tag → push"
+    warn "Found saved progress (step ${resume_step}/8)."
     if confirm "Resume from where you left off?"; then
       echo ""
     else
@@ -568,7 +614,7 @@ main() {
     set_step 1
   fi
 
-  # Step 2: Release notes (before version so you see what changed first)
+  # Step 2: Release notes (before version, so you see what changed)
   if ! past_step 2; then
     step_release_notes
     set_step 2
@@ -599,30 +645,34 @@ main() {
   fi
 
   if [[ "$BETA_MODE" == "true" ]]; then
-    # Beta path: skip version-file bump, CHANGELOG, and commit steps. The
-    # user-entered version is the upcoming target (e.g. 0.9.0); package.json
-    # stays at the current stable until the actual final release runs. CI
-    # bumps the version ephemerally at publish time via
-    # `npm version ... --no-git-tag-version`.
+    # Beta path: skip version/changelog/commit steps. The user-entered version
+    # is the upcoming target (e.g. 0.9.0); package.json stays at the current
+    # stable until the actual final release runs. CI bumps the version
+    # ephemerally at publish time via `npm version ... --no-git-tag-version`.
 
-    # Step 5: Local validation (lint, typecheck, unit tests) — betas should pass too
-    if ! past_step 5; then
-      echo ""
-      step_validate
-      set_step 5
-    fi
-
-    # Step 8: Build (skip 6 + 7 — no version-file bump, no changelog edit)
-    if ! past_step 8; then
+    # Step 7: Build + local checks (still run them — beta should pass too)
+    if ! past_step 7; then
       echo ""
       step_build
-      set_step 8
+
+      info "Running local checks..."
+      echo ""
+      info "Unit tests..."
+      npm test
+      echo ""
+      info "Linting..."
+      npm run lint
+      echo ""
+      info "Type checking..."
+      npx tsc --noEmit
+      success "All local checks passed"
+      set_step 7
     fi
 
-    # Step 10: Beta tag + push (no commit, no separate push step — combined)
-    if ! past_step 10; then
+    # Step 8: Beta tag + push (no commit)
+    if ! past_step 8; then
       step_beta_tag_and_push
-      set_step 10
+      set_step 8
     fi
 
     echo ""
@@ -631,49 +681,46 @@ main() {
     return
   fi
 
-  # Step 5: Local validation (lint, typecheck, unit tests)
+  # Stable path: full version-bump + changelog + commit + RC tag flow.
+
+  # Step 5: Update version in package.json
   if ! past_step 5; then
     echo ""
-    step_validate
+    step_update_version
     set_step 5
   fi
 
-  # Step 6: Update version in package.json + Cargo.toml + tauri.conf.json
+  # Step 6: Update CHANGELOG.md
   if ! past_step 6; then
-    echo ""
-    step_update_version
+    step_update_changelog
     set_step 6
   fi
 
-  # Step 7: Update CHANGELOG.md
+  # Step 7: Build + local checks
   if ! past_step 7; then
     echo ""
-    step_changelog
+    step_build
+
+    info "Running local checks..."
+    echo ""
+    info "Unit tests..."
+    npm test
+    echo ""
+    info "Linting..."
+    npm run lint
+    echo ""
+    info "Type checking..."
+    npx tsc --noEmit
+    success "All local checks passed"
     set_step 7
   fi
 
-  # Step 8: Build
+  # Step 8: Git commit + RC tag + push
   if ! past_step 8; then
-    echo ""
-    step_build
+    step_git_commit
+    step_rc_tag_and_push
     set_step 8
   fi
-
-  # Step 9: Git commit
-  if ! past_step 9; then
-    step_git_commit
-    set_step 9
-  fi
-
-  # Step 10: Create RC tag
-  if ! past_step 10; then
-    step_rc_tag
-    set_step 10
-  fi
-
-  # Step 11: Push RC tag to trigger CI pipeline
-  echo ""
-  step_push_rc
 
   # Done — clean up
   echo ""

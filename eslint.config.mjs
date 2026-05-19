@@ -1,5 +1,6 @@
 import eslint from "@eslint/js";
 import importX from "eslint-plugin-import-x";
+import kerfjs from "eslint-plugin-kerfjs";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
 import tsdoc from "eslint-plugin-tsdoc";
 import tseslint from "typescript-eslint";
@@ -35,4 +36,5 @@ export default tseslint.config(
       "tsdoc/syntax": "warn",
     },
   },
+  kerfjs.configs.recommended,
 );

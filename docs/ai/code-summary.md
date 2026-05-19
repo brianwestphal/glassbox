@@ -345,6 +345,22 @@ Rules:
   `data-morph-skip-children` (attrs morph, subtree skipped),
   `data-morph-preserve` (imperatively-injected child survives trailing-removal).
 
+## 7.2 Lint enforcement (`eslint-plugin-kerfjs`)
+
+`eslint.config.mjs` extends `kerfjs.configs.recommended`, which turns on
+four AST-level error rules that catch kerf antipatterns at edit time:
+
+- `kerfjs/no-inline-jsx-event-handlers` — disallow `onClick`-style attrs;
+  use `data-action` + `delegate()`.
+- `kerfjs/require-data-key-in-each` — `each()` row roots must carry
+  `data-key` (or `id`).
+- `kerfjs/no-nested-mount` — one `mount()` per root.
+- `kerfjs/prefer-module-jsx-augmentation` — augment `kerfjs/jsx-runtime`
+  rather than the global `JSX` namespace.
+
+These complement the reactivity rules in §7.1; running `npm run lint`
+covers the antipatterns that don't need flow / type info.
+
 ## 8. Client bundle
 
 Two IIFE bundles from `src/client/`:

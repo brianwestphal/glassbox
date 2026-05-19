@@ -279,6 +279,17 @@ Versions are synchronized across `package.json`, `tauri.conf.json`, and
 per day against the registry with 5s timeout; the suggested upgrade
 command matches the detected package manager (npm/yarn/pnpm/bun).
 
+Release notes are AI-drafted by `scripts/release.sh` when the `claude`
+CLI is on PATH: the script pipes the commit log via stdin to `claude -p`
+(stdin avoids `ARG_MAX` on stable cycles), then opens the draft in
+`$EDITOR` for review. Stable diffs against the last **production** tag
+(excluding `*-rc.*` / `*-beta.*`) and asks for 15–40 H2-grouped bullets;
+beta diffs against the immediately-previous tag and asks for 5–10 flat
+bullets. Editor guidance lines prefixed with `#` are stripped on save;
+auth/network errors from `claude -p` are detected and replaced with a
+blank-editor fallback so they never reach `CHANGELOG.md` or annotated
+tag bodies; resumed runs reuse saved notes instead of redrafting.
+
 Build pipeline: server is ESM via tsup (externals listed in
 `code-summary.md` §14); client is an IIFE via esbuild (es2020, minified);
 SCSS compiled separately via sass. Both builds use `jsxImportSource: 'kerfjs'`.

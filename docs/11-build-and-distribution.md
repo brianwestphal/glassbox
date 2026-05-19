@@ -25,6 +25,22 @@ Requirements for building, packaging, and distributing the application.
 - Versions shall be synchronized across `package.json`, `tauri.conf.json`, and `Cargo.toml`.
 - The release script shall handle version bumping across all manifests.
 
+### 11.3.1 Release Notes Generation
+
+- The release script shall draft release notes automatically when the `claude` CLI (Claude Code) is available on the user's PATH, then open the draft in the user's editor for review and edits.
+- The comparison base for the commit log shall depend on the release mode:
+  - **Stable** releases shall diff against the last **production** tag (`vX.Y.Z` with no `-rc.N` / `-beta.N` suffix), via `git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*'`, so the notes cover every change since the previous stable — including changes that previously shipped in betas.
+  - **Beta** releases shall diff against whatever the immediately-previous tag was (beta or stable), so each beta's notes don't repeat bullets that already appeared in an earlier beta's notes.
+- The prompt body shall branch on release mode:
+  - **Beta**: ask for 5–10 short user-facing markdown bullets only (no heading, no preamble), explicitly excluding ticket IDs, refactors, tests, docs, and build/CI tweaks.
+  - **Stable**: ask for 15–40 bullets grouped under H2 headings (`## New features`, `## UX improvements`, `## Bug fixes`, `## Performance`, `## Developer-facing`), scaled to the commit-count volume; omit empty sections.
+- The prompt shall be piped to `claude -p` via **stdin** (not as a positional argument) so the script doesn't hit `ARG_MAX` on stable cycles with hundreds of commit subjects.
+- The script shall strip stray code-fence wrappers (`` ``` ``) and trim leading/trailing blank lines from the AI output.
+- The script shall guard against `claude -p` returning an auth/network error message as content. When the first line matches `^(Failed to authenticate|API Error:|Error:)`, the script shall treat the output as empty, warn the user, and fall back to a blank editor with guidance comments — never silently embed the error string in the CHANGELOG or annotated tag body.
+- The editor shall be seeded with guidance lines prefixed with `#`. The `ask_multiline` helper shall strip every `#`-prefixed line from the saved content on read-back, so the comments never reach `CHANGELOG.md` or the annotated tag body.
+- On a resumed release run, the script shall skip the AI draft entirely if saved release notes already exist in the state file and re-open the editor with the saved content — so a re-run never wastes a model call or overwrites in-progress edits.
+- When the `claude` CLI is not installed, the script shall fall back to a blank editor with the same `#`-prefixed guidance comments.
+
 ### 11.4 Update Checking (npm)
 
 - For npm installs, the system shall check for newer versions once per day by querying the npm registry's `latest` dist-tag.
