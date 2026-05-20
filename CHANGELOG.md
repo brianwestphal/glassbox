@@ -2,6 +2,14 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.3] - 2026-05-20
+
+
+
+- Unified beta and release-candidate publish workflows into a single GitHub Actions pipeline.
+- Switched npm publishing to OIDC trusted publishing (no long-lived npm tokens).
+- GitHub Release publication is now atomic: draft → upload all assets → flip to published, so partial/broken releases are no longer visible to users.
+
 ## [0.9.2] - 2026-05-19
 
 
