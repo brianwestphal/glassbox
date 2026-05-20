@@ -5,10 +5,7 @@ import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import {
-  categoryPickerSignal,
-  closeCategoryPicker,
   editFormSignal,
-  openCategoryPicker,
   setEditForm,
 } from '../stores/index.js';
 import { buildAnnotationItemHtml } from './render.js';
@@ -45,7 +42,6 @@ function registerOutsideClickDismiss(popup: HTMLElement): void {
   const close = (e: Event) => {
     if (!popup.contains(e.target as Node)) {
       popup.remove();
-      closeCategoryPicker();
       document.removeEventListener('click', close, true);
     }
   };
@@ -59,14 +55,12 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
   const popup = renderPopup(annotation.category);
   positionPopup(popup, anchor);
   document.body.appendChild(popup);
-  openCategoryPicker(`row:${annotation.id}`);
 
   delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
     const newCategory = (opt as HTMLElement).dataset.value ?? '';
     if (newCategory === annotation.category) {
       popup.remove();
-      closeCategoryPicker();
       return;
     }
     void (async () => {
@@ -77,7 +71,6 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
       const updated: Annotation = { ...annotation, category: newCategory };
       morph(item, buildAnnotationItemHtml(updated));
       popup.remove();
-      closeCategoryPicker();
     })();
   });
 
@@ -94,9 +87,6 @@ export function showCategoryPickerForBadge(badge: HTMLElement): void {
   positionPopup(popup, badge);
   document.body.appendChild(popup);
 
-  const opener = badge.dataset.formKey ?? badge.dataset.annotationId ?? 'form';
-  openCategoryPicker(`form:${opener}`);
-
   delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
     const value = (opt as HTMLElement).dataset.value ?? '';
@@ -108,12 +98,7 @@ export function showCategoryPickerForBadge(badge: HTMLElement): void {
       setEditForm({ ...editFormSignal.value, category: value });
     }
     popup.remove();
-    closeCategoryPicker();
   });
 
   registerOutsideClickDismiss(popup);
 }
-
-// Re-exported so other modules can read the picker state without importing
-// the store directly.
-export { categoryPickerSignal };

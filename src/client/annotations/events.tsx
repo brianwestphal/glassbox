@@ -4,10 +4,8 @@ import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import {
-  closeCategoryPicker,
   dragStore,
   editFormSignal,
-  openCategoryPicker,
   reviewStore,
   setEditForm,
 } from '../stores/index.js';
@@ -246,4 +244,4 @@ function showReclassifyPopupForEdit(badge: HTMLElement): void {
 
 // Expose `closeEditForm` so the diff view's outside-click handler (if any)
 // can dismiss the picker without reaching into module internals.
-export { closeCategoryPicker,closeEditForm, openCategoryPicker };
+export { closeEditForm };

@@ -110,12 +110,29 @@ function setupMount(container: HTMLElement): void {
   // Post-render: highlight, outline, AI notes, server-annotation event
   // binding, etc. The mount effect runs synchronously before this one (it was
   // registered first), so by the time we get here the DOM is up-to-date.
+  //
+  // The effect intentionally subscribes only to `diffContentSignal` —
+  // `runPostRender` reads `reviewStore`, `diffViewStore`, and `aiStore`
+  // internally (and transitively via `renderAINotes`, `applyHighlighting`,
+  // `loadOutline`, etc.), and kerf's reactivity tracker traverses signal
+  // reads through function calls during effect execution. Calling
+  // `runPostRender` synchronously here would silently subscribe this effect
+  // to every read inside that whole subtree, which means it'd re-fire on
+  // every annotation count update, sort-mode flip, file-note write, etc.
+  // Today the `generation === lastGeneration` guard short-circuits before
+  // any of that work runs, so it's a cheap no-op — but the dependency is
+  // invisible from this call site and would break if a future edit moved a
+  // side-effect above the guard. `queueMicrotask` defers `runPostRender` to
+  // a fresh execution context outside the effect's tracking scope, so the
+  // reads inside it never enter the dependency graph. The DOM is already
+  // up-to-date when the microtask runs — same flush burst as the rest of
+  // mount's effect cycle, just one tick later.
   effect(() => {
     const { generation, fileId, kind } = diffContentSignal.value;
     if (kind === 'empty' || fileId === null) return;
     if (generation === lastGeneration) return;
     lastGeneration = generation;
-    runPostRender(container, fileId, kind);
+    queueMicrotask(() => { runPostRender(container, fileId, kind); });
   });
 }
 

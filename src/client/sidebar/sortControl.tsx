@@ -38,7 +38,7 @@ export function sortControlJsx(): SafeHtml {
         </button>
         <select className="sort-dimension-select" data-action="set-risk-dimension">
           {RISK_DIMENSIONS.map(([value, label]) => (
-            <option value={value}>{label}</option>
+            <option value={value} selected={value === ai.riskSortDimension}>{label}</option>
           ))}
         </select>
       </div>

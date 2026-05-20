@@ -180,22 +180,6 @@ export function updateEditFormCategory(category: string): void {
   editFormSignal.value = { ...cur, category };
 }
 
-// --- Category picker open state ---
-// Tracks which badge (by a unique opener key) currently owns the picker
-// popup. The popup itself is still a transient DOM element appended to
-// `document.body`; the signal exists so reactivity can drive higlight state
-// or future render() patterns. `null` ⇒ no picker open.
-export const categoryPickerSignal = signal<{ openFor: string | null }>({ openFor: null });
-
-export function openCategoryPicker(key: string): void {
-  categoryPickerSignal.value = { openFor: key };
-}
-
-export function closeCategoryPicker(): void {
-  if (categoryPickerSignal.value.openFor === null) return;
-  categoryPickerSignal.value = { openFor: null };
-}
-
 // --- Computed derivations ---
 
 export const filteredFiles = computed(() => {

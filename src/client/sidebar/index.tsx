@@ -27,8 +27,13 @@ export function initSidebar(): void {
 }
 
 function bindSelectSync(): void {
-  // <select>.value can't be set via the `selected` attribute alone after the
-  // element is mounted, so keep the dimension select in sync imperatively.
+  // <select>.value can't always be set via the `selected` attribute alone
+  // after the element is mounted, so keep the dimension select in sync
+  // imperatively. The JSX in `sortControl.tsx` now also emits
+  // `<option selected={value === ai.riskSortDimension}>`, which should
+  // cover this; this effect stays as a belt-and-braces safety net until
+  // GB-785 is verified in a browser. If verification confirms the JSX
+  // attribute is sufficient, this whole function can be removed.
   effect(() => {
     const dim = aiStore.state.value.riskSortDimension;
     const sel = document.querySelector<HTMLSelectElement>('.sort-dimension-select');
