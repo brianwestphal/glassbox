@@ -37,20 +37,32 @@ jobs:
           echo "$NOTES" >> "$GITHUB_OUTPUT"
           echo "ENDOFNOTES" >> "$GITHUB_OUTPUT"
 
-      - name: Create release
+      # GB-779 — always create as a draft. A non-draft release is immediately
+      # visible to the public AND immediately flips GitHub's `releases/latest`
+      # pointer, but the platform `build` matrix below takes 10–30 minutes to
+      # upload bundles + rename DMGs to their friendly names. The Tauri
+      # updater (`src-tauri/tauri.conf.json` endpoint
+      # `/releases/latest/download/latest.json`) resolves via that flipped
+      # pointer and starts serving the half-published release to real users
+      # mid-build. GitHub skips drafts for both the public Releases page AND
+      # the `latest` pointer, so keeping the release as a draft until the
+      # very end holds the entire publication atomic — the prior stable
+      # release remains the user-visible "latest" right up until the final
+      # `publish-release` job flips `draft:false`. Maintainers can still see
+      # the in-progress draft at /releases while logged in.
+      - name: Create release (as draft — flipped by publish-release at end)
         id: create
         uses: actions/github-script@v7
         with:
           script: |
             const tag = '${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}';
-            const isDraft = ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }};
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
               name: `Glassbox ${tag}`,
               body: `${{ steps.tag_notes.outputs.body }}`.replace(/`/g, ''),
-              draft: isDraft,
+              draft: true,
               prerelease: false,
             });
             return data.id;
@@ -159,3 +171,36 @@ jobs:
                 }
               }
             }
+
+  # GB-779 — atomic flip of the release from draft → published.
+  #
+  # Final job in the pipeline. Runs only after every platform build has
+  # uploaded its bundles AND the in-matrix `Rename user-facing download
+  # assets to friendly names` step has finished on every shard. At this
+  # point the draft release has all of its assets in place, so flipping
+  # `draft:false` is the single atomic moment when:
+  #   - The release page becomes publicly visible at /releases/tag/<tag>.
+  #   - GitHub's `releases/latest` pointer moves to this release.
+  #   - The Tauri updater starts seeing the new `latest.json`
+  #     (`src-tauri/tauri.conf.json` endpoint).
+  #
+  # `make_latest: 'true'` is the API equivalent of GitHub's "Set as the
+  # latest release" checkbox — explicit so the flip can't be silently
+  # downgraded by repo-level settings.
+  publish-release:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flip release from draft → published
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releaseId = ${{ needs.create-release.outputs.release_id }};
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: releaseId,
+              draft: false,
+              make_latest: 'true',
+            });
+            console.log(`Release ${releaseId} flipped from draft → published`);
