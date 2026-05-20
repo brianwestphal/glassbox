@@ -2,6 +2,15 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.4] - 2026-05-20
+
+
+- Upgraded kerfjs and eslint-plugin-kerfjs to 0.10.0 (from 0.8.2).
+- Completed kerf audit cleanup pass across sidebar, theme manager, and related views.
+- Replaced manual `each()` loops with `.map()` in sidebar risk and narrative file lists.
+- Rebuilt the theme manager's delete-confirm modal as a single `toElement()` call.
+- Removed the legacy `bindSelectSync()` helper; coverage backed by a new e2e spec.
+
 ## [0.9.3] - 2026-05-20
 
 
