@@ -22,17 +22,18 @@ interface ThemesResponse {
 const SWATCH_KEYS = ['bg', 'text', 'accent', 'green', 'red'];
 
 function showDeleteConfirm(themeName: string, onConfirm: () => void): void {
-  const confirmOverlay = toElement(<div className="modal-overlay"></div>);
-  confirmOverlay.innerHTML = (
-    <div className="modal" style="max-width:360px">
-      <h3>Delete Theme</h3>
-      <p>{'Delete "' + themeName + '"? This cannot be undone.'}</p>
-      <div className="modal-actions">
-        <button className="btn btn-sm" id="del-cancel">Cancel</button>
-        <button className="btn btn-sm btn-danger" id="del-confirm">Delete</button>
+  const confirmOverlay = toElement(
+    <div className="modal-overlay">
+      <div className="modal" style="max-width:360px">
+        <h3>Delete Theme</h3>
+        <p>{`Delete "${themeName}"? This cannot be undone.`}</p>
+        <div className="modal-actions">
+          <button className="btn btn-sm" id="del-cancel">Cancel</button>
+          <button className="btn btn-sm btn-danger" id="del-confirm">Delete</button>
+        </div>
       </div>
     </div>
-  ).toString();
+  );
 
   confirmOverlay.querySelector('#del-cancel')?.addEventListener('click', () => { confirmOverlay.remove(); });
   confirmOverlay.querySelector('#del-confirm')?.addEventListener('click', () => {

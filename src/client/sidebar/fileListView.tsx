@@ -1,5 +1,5 @@
 import type { SafeHtml } from 'kerfjs';
-import { each, raw } from 'kerfjs';
+import { raw } from 'kerfjs';
 
 import { parseDiffData } from '../../git/parseDiffData.js';
 import type { AnalysisModeState, NarrativeFileOrder, RiskFileScore } from '../state.js';
@@ -102,10 +102,19 @@ function riskListJsx(): SafeHtml {
   const scoredIds = new Set((ai.riskScores ?? []).map(s => s.reviewFileId));
   const tail = unscoredFiles(scoredIds);
 
+  // `.map()`, not `each()` — kerf Hard Rule 13. The `RiskFileScore` /
+  // `ReviewFile` items keep stable object identity across mount re-runs (they
+  // come from a store array that only changes wholesale on analysis reload),
+  // so `each()` here would memoize the row HTML by identity and never
+  // re-invoke the row render when `riskSortDimension` / `showRiskScores` /
+  // `currentFileId` / annotation counts change. `.map()` re-renders every
+  // row on every mount pass — same shape kerf SKILL.md recommends for
+  // "STATIC_ARRAY.map(...)" cases. Lists here are at most a few dozen rows;
+  // the per-row memoization isn't worth the bug surface.
   return (
     <>
-      {each(scored, (score) => riskRowJsx(score, ai, review))}
-      {each(tail, (file) => flatRowJsx(file, review))}
+      {scored.map(score => riskRowJsx(score, ai, review))}
+      {tail.map(file => flatRowJsx(file, review))}
     </>
   );
 }
@@ -149,10 +158,11 @@ function narrativeListJsx(): SafeHtml {
   const orderedIds = new Set((ai.narrativeOrder ?? []).map(o => o.reviewFileId));
   const tail = unscoredFiles(orderedIds);
 
+  // `.map()`, not `each()`. See note on `riskListJsx` for Rule 13 rationale.
   return (
     <>
-      {each(ordered, (item) => narrativeRowJsx(item, review))}
-      {each(tail, (file) => flatRowJsx(file, review))}
+      {ordered.map(item => narrativeRowJsx(item, review))}
+      {tail.map(file => flatRowJsx(file, review))}
     </>
   );
 }
