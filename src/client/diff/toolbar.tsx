@@ -1,4 +1,5 @@
-import { delegate, effect } from 'kerfjs';
+import type { SafeHtml } from 'kerfjs';
+import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
@@ -91,6 +92,11 @@ function showLanguagePicker(btn: HTMLElement): void {
   const rest = allLangs.filter(l => !POPULAR_LANGS.has(l)).sort();
   const rect = btn.getBoundingClientRect();
 
+  // Per-modal-session signal for the filter input — same precedent as the
+  // theme manager / settings dialog openers. The render fn below reads it,
+  // so any input event re-runs the list mount automatically.
+  const filterSignal = signal('');
+
   const popup = toElement(
     <div className="language-popup">
       <input type="text" className="language-filter" placeholder="Filter languages..." />
@@ -101,10 +107,9 @@ function showLanguagePicker(btn: HTMLElement): void {
   popup.style.position = 'fixed';
   popup.style.bottom = String(window.innerHeight - rect.top + 4) + 'px';
 
-  const listQuery = popup.querySelector('.language-list');
-  if (listQuery === null) return;
-  const listEl = listQuery as HTMLElement;
-  const filterInput = popup.querySelector('.language-filter') as HTMLInputElement;
+  const listEl = popup.querySelector<HTMLElement>('.language-list');
+  const filterInput = popup.querySelector<HTMLInputElement>('.language-filter');
+  if (listEl === null || filterInput === null) return;
 
   function selectLang(lang: string, auto: boolean) {
     diffViewStore.actions.update({
@@ -113,60 +118,63 @@ function showLanguagePicker(btn: HTMLElement): void {
     });
     applyHighlighting();
     updateToolbarLanguage();
-    popup.remove();
+    close();
   }
 
-  function renderList(filter: string) {
+  function renderPickerList(filter: string): SafeHtml {
     const q = filter.toLowerCase();
-    listEl.innerHTML = '';
-
+    const dv = diffViewStore.state.value;
     if (q === '') {
-      const dv = diffViewStore.state.value;
       const autoLabel = dv.detectedLang === 'plaintext' ? 'Plain Text' : dv.detectedLang;
-      const autoItem = toElement(
-        <div className={`language-option${dv.highlightAuto ? ' active' : ''}`} data-lang="__auto__">
-          {'Auto (' + autoLabel + ')'}
-        </div>
+      return (
+        <>
+          <div
+            className={`language-option${dv.highlightAuto ? ' active' : ''}`}
+            data-lang="__auto__"
+            data-key="__auto__"
+          >
+            {'Auto (' + autoLabel + ')'}
+          </div>
+          <div className="language-separator" data-key="__sep-popular__"></div>
+          {popular.map(lang => langOption(lang, dv))}
+          {rest.length > 0 ? <div className="language-separator" data-key="__sep-rest__"></div> : null}
+          {rest.map(lang => langOption(lang, dv))}
+        </>
       );
-      listEl.appendChild(autoItem);
-
-      const sep = toElement(<div className="language-separator"></div>);
-      listEl.appendChild(sep);
-
-      popular.forEach(lang => { listEl.appendChild(langOption(lang)); });
-
-      if (rest.length > 0) {
-        listEl.appendChild(toElement(<div className="language-separator"></div>));
-        rest.forEach(lang => { listEl.appendChild(langOption(lang)); });
-      }
-    } else {
-      const filtered = allLangs.filter(l => l.toLowerCase().includes(q));
-      if (filtered.length === 0) {
-        listEl.appendChild(toElement(<div className="language-option disabled">No matches</div>));
-        return;
-      }
-      filtered.forEach(lang => { listEl.appendChild(langOption(lang)); });
     }
+    const filtered = allLangs.filter(l => l.toLowerCase().includes(q));
+    if (filtered.length === 0) {
+      return <div className="language-option disabled" data-key="__no-matches__">No matches</div>;
+    }
+    return <>{filtered.map(lang => langOption(lang, dv))}</>;
   }
 
-  function langOption(lang: string): HTMLElement {
-    const dv = diffViewStore.state.value;
+  function langOption(lang: string, dv: typeof diffViewStore.state.value): SafeHtml {
     const isActive = !dv.highlightAuto && lang === dv.highlightLang;
-    return toElement(
-      <div className={`language-option${isActive ? ' active' : ''}`} data-lang={lang}>
+    return (
+      <div
+        className={`language-option${isActive ? ' active' : ''}`}
+        data-lang={lang}
+        data-key={lang}
+      >
         {lang === 'plaintext' ? 'Plain Text' : lang}
       </div>
     );
   }
 
-  renderList('');
+  // The mount keeps the list reconciled against `filterSignal` (and any
+  // `diffViewStore` reads inside the render fn, e.g. for highlighting the
+  // currently active language). Re-runs are automatic.
+  const disposeMount = mount(listEl, () => renderPickerList(filterSignal.value));
 
-  // The popup is a transient overlay (added to document.body, removed on
-  // outside click) — it never lives inside a mount() tree, so direct
-  // listeners on it are stable.
-  filterInput.addEventListener('input', () => { renderList(filterInput.value); });
+  // Filter input: route through the signal, not a direct addEventListener.
+  delegate(popup, 'input', '.language-filter', (e) => {
+    filterSignal.value = (e.target as HTMLInputElement).value;
+  });
 
-  delegate(listEl, 'click', '.language-option:not(.disabled)', (_e, opt) => {
+  // Click selection: list options live inside the mount tree, so we delegate
+  // from the popup root to survive every re-render.
+  delegate(popup, 'click', '.language-option:not(.disabled)', (_e, opt) => {
     const lang = (opt as HTMLElement).dataset.lang ?? '';
     if (lang === '__auto__') selectLang('', true);
     else selectLang(lang, false);
@@ -182,11 +190,15 @@ function showLanguagePicker(btn: HTMLElement): void {
 
   filterInput.focus();
 
-  const closePopup = (e: Event) => {
-    if (!popup.contains(e.target as Node)) {
-      popup.remove();
-      document.removeEventListener('click', closePopup, true);
-    }
-  };
-  setTimeout(() => { document.addEventListener('click', closePopup, true); }, 0);
+  function close(): void {
+    disposeMount();
+    document.removeEventListener('click', handleOutsideClick, true);
+    popup.remove();
+  }
+
+  function handleOutsideClick(e: Event): void {
+    if (!popup.contains(e.target as Node)) close();
+  }
+
+  setTimeout(() => { document.addEventListener('click', handleOutsideClick, true); }, 0);
 }

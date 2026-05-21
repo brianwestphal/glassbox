@@ -4,8 +4,9 @@
  */
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
-import { diffViewStore, reviewStore } from '../stores/index.js';
+import { reviewStore } from '../stores/index.js';
 import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
+import { setRawDiffContent } from './index.js';
 import { navPush } from './navStack.js';
 import { selectFile, updateNavFilePath } from './selection.js';
 
@@ -123,53 +124,23 @@ async function navigateToDefinition(symbolName: string) {
 }
 
 async function loadRawFile(filePath: string, targetLine: number) {
-  const container = document.getElementById('diff-container');
-  if (!container) return;
-
   const res = await fetch('/file-raw?path=' + encodeURIComponent(filePath));
   if (!res.ok) {
     showToast(`Could not open ${filePath}`);
     return;
   }
-  container.innerHTML = await res.text();
 
-  // Show the container and hide the welcome message
-  container.style.display = 'block';
-  const welcome = document.querySelector<HTMLElement>('.welcome-message');
-  if (welcome) welcome.style.display = 'none';
-
-  // Show text toolbar (hide image toolbar)
-  const toolbar = document.getElementById('diff-toolbar');
-  if (toolbar) toolbar.style.display = '';
-  const textToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-text');
-  const imageToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-image');
-  const svgToggle = toolbar?.querySelector<HTMLElement>('.diff-toolbar-svg-toggle');
-  if (textToolbar) textToolbar.style.display = '';
-  if (imageToolbar) imageToolbar.style.display = 'none';
-  if (svgToggle) svgToggle.style.display = 'none';
-
-  // Apply syntax highlighting
-  const { detectLanguage, applyHighlighting } = await import('./highlight.js');
-  const detectedLang = detectLanguage(filePath);
-  diffViewStore.actions.update({
-    detectedLang,
-    ...(diffViewStore.state.value.highlightAuto ? { highlightLang: detectedLang } : {}),
-  });
-  applyHighlighting();
-
-  // Clear sidebar selection (this file isn't in the sidebar)
+  // Clear sidebar selection (this file isn't in the sidebar) and route the
+  // raw HTML through the diff mount's signal — `setRawDiffContent()` handles
+  // toolbar visibility + syntax highlighting via the post-render effect.
   document.querySelectorAll('.file-item.active').forEach(el => { el.classList.remove('active'); });
   reviewStore.actions.update({ currentFileId: null });
+  setRawDiffContent(filePath, await res.text());
 
-  // Show nav bar and update file path
-  const navBar = document.getElementById('diff-nav-bar');
-  if (navBar) navBar.style.display = '';
   updateNavFilePath(filePath);
-
-  // Push to nav stack
   navPush({ fileId: null, filePath, scrollLine: targetLine });
 
-  // Scroll to the target line
+  // Scroll to the target line (wait a frame for the mount + post-render to flush).
   requestAnimationFrame(() => { scrollToLine(targetLine); });
 }
 

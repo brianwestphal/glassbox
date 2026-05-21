@@ -17,11 +17,12 @@ const DRAG_THRESHOLD = 5; // pixels — movement beyond this is a text selection
 interface DiffContent {
   generation: number;
   fileId: string | null;
+  filePath: string | null;
   html: string;
-  kind: 'text' | 'image' | 'empty';
+  kind: 'text' | 'image' | 'empty' | 'raw';
 }
 
-const diffContentSignal = signal<DiffContent>({ generation: 0, fileId: null, html: '', kind: 'empty' });
+const diffContentSignal = signal<DiffContent>({ generation: 0, fileId: null, filePath: null, html: '', kind: 'empty' });
 let fetchGen = 0;
 
 export function initDiffView(): void {
@@ -52,7 +53,7 @@ function setupFetchEffect(): void {
     if (fileId === null) {
       if (lastFetchKey === '') return;
       lastFetchKey = '';
-      diffContentSignal.value = { generation: ++fetchGen, fileId: null, html: '', kind: 'empty' };
+      diffContentSignal.value = { generation: ++fetchGen, fileId: null, filePath: null, html: '', kind: 'empty' };
       return;
     }
     const { diffMode, ignoreWhitespace, svgViewMode } = diffViewStore.state.value;
@@ -83,7 +84,7 @@ function setupFetchEffect(): void {
       const html = await res.text();
       if (myGen !== fetchGen) return; // newer fetch in flight
       const kind: DiffContent['kind'] = html.includes('class="image-diff"') ? 'image' : 'text';
-      diffContentSignal.value = { generation: myGen, fileId, html, kind };
+      diffContentSignal.value = { generation: myGen, fileId, filePath: null, html, kind };
     })();
   });
 }
@@ -102,7 +103,7 @@ function setupMount(container: HTMLElement): void {
     // is how a file/mode/whitespace switch replaces the tree.
     return (
       <div className="diff-content" data-key={`gen-${String(generation)}`} data-morph-skip>
-        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- server-rendered diff HTML from /file/:id; trusted source */}
+        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- server-rendered HTML from /file/:id or /file-raw; trusted source */}
         {raw(html)}
       </div>
     );
@@ -129,15 +130,18 @@ function setupMount(container: HTMLElement): void {
   // up-to-date when the microtask runs — same flush burst as the rest of
   // mount's effect cycle, just one tick later.
   effect(() => {
-    const { generation, fileId, kind } = diffContentSignal.value;
-    if (kind === 'empty' || fileId === null) return;
-    if (generation === lastGeneration) return;
-    lastGeneration = generation;
-    queueMicrotask(() => { runPostRender(container, fileId, kind); });
+    const content = diffContentSignal.value;
+    if (content.kind === 'empty') return;
+    if (content.kind !== 'raw' && content.fileId === null) return;
+    if (content.generation === lastGeneration) return;
+    lastGeneration = content.generation;
+    queueMicrotask(() => { runPostRender(container, content); });
   });
 }
 
-function runPostRender(container: HTMLElement, fileId: string, kind: 'text' | 'image'): void {
+function runPostRender(container: HTMLElement, content: DiffContent): void {
+  const { fileId, filePath, kind } = content;
+  if (kind === 'empty') return;
   // Header/toolbar visibility
   const welcome = document.querySelector<HTMLElement>('.welcome-message');
   if (welcome !== null) welcome.style.display = 'none';
@@ -151,9 +155,10 @@ function runPostRender(container: HTMLElement, fileId: string, kind: 'text' | 'i
   const imageToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-image');
   const svgToggle = toolbar?.querySelector<HTMLElement>('.diff-toolbar-svg-toggle');
 
-  const file = reviewStore.state.value.files.find(f => f.id === fileId);
-  const filePath = file?.file_path ?? '';
-  const isSvg = filePath.toLowerCase().endsWith('.svg');
+  const file = fileId !== null ? reviewStore.state.value.files.find(f => f.id === fileId) : undefined;
+  const effectiveFilePath = file?.file_path ?? filePath ?? '';
+  // SVG toggle only applies to in-review files (raw views don't have a paired SVG diff).
+  const isSvg = kind !== 'raw' && effectiveFilePath.toLowerCase().endsWith('.svg');
   if (svgToggle) {
     svgToggle.style.display = isSvg ? '' : 'none';
     const svgMode = diffViewStore.state.value.svgViewMode;
@@ -171,7 +176,7 @@ function runPostRender(container: HTMLElement, fileId: string, kind: 'text' | 'i
     bindImageDiff();
   } else {
     const diffView = container.querySelector<HTMLElement>('.diff-view');
-    const dvPath = diffView?.dataset.filePath ?? '';
+    const dvPath = diffView?.dataset.filePath ?? effectiveFilePath;
     const detectedLang = detectLanguage(dvPath);
     diffViewStore.actions.update({
       detectedLang,
@@ -180,16 +185,37 @@ function runPostRender(container: HTMLElement, fileId: string, kind: 'text' | 'i
     applyHighlighting();
     updateToolbarLanguage();
     syncSplitColumnHeights();
-    void loadOutline(fileId);
+    // Outline + AI notes both key off a real review file; skip for raw views.
+    if (kind === 'text' && fileId !== null) void loadOutline(fileId);
     // Annotation events are registered once via `bindAnnotationEvents()` —
     // they fire for server-rendered annotation rows by `data-action` match.
   }
 
-  // AI notes injection (independent of text/image)
-  const ai = aiStore.state.value;
-  const hasNotes = (ai.sortMode !== 'folder' && fileId in ai.fileNotes)
-    || (ai.guidedReviewEnabled && fileId in ai.guidedNotes);
-  if (hasNotes) renderAINotes(container, fileId);
+  // AI notes injection (independent of text/image, but only for in-review files)
+  if (fileId !== null) {
+    const ai = aiStore.state.value;
+    const hasNotes = (ai.sortMode !== 'folder' && fileId in ai.fileNotes)
+      || (ai.guidedReviewEnabled && fileId in ai.guidedNotes);
+    if (hasNotes) renderAINotes(container, fileId);
+  }
+}
+
+/** Imperatively render a raw repo file (used by go-to-definition for files
+ *  not in the review). Keeps the mount-as-source-of-truth invariant intact —
+ *  no callsite touches `#diff-container.innerHTML` directly. */
+export function setRawDiffContent(filePath: string, html: string): void {
+  // The fetch effect's early-return path (`fileId === null && lastFetchKey === ''`)
+  // is what keeps it from clobbering us. Pre-set the key so when the caller
+  // updates `currentFileId` to null (which fires the fetch effect), it returns
+  // without writing `empty` over our raw content.
+  lastFetchKey = '';
+  diffContentSignal.value = {
+    generation: ++fetchGen,
+    fileId: null,
+    filePath,
+    html,
+    kind: 'raw',
+  };
 }
 
 function adaptImageToolbar(container: HTMLElement, imageToolbar: HTMLElement | null | undefined): void {

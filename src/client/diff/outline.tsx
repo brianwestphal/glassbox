@@ -1,4 +1,5 @@
 import type { SafeHtml } from 'kerfjs';
+import { delegate, mount, signal } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
@@ -15,24 +16,37 @@ interface OutlineContainer extends HTMLElement {
   _outlineScrollHandler?: () => void;
 }
 
-let currentSymbols: OutlineSymbol[] = [];
+// Reactive sources for the breadcrumb: the file's symbol tree and the
+// currently top-most visible line. The mount() in `loadOutline()` reads both
+// and re-renders automatically — no manual `updateBreadcrumb()` calls.
+const symbolsSignal = signal<OutlineSymbol[]>([]);
+const topLineSignal = signal<number | null>(null);
 let scrollRafId = 0;
+// Disposer for the current outline-bar mount. Held so a file switch (which
+// removes the bar element + creates a fresh one) can release the previous
+// mount's signal subscriptions instead of leaking them.
+let disposeOutlineMount: (() => void) | null = null;
 
 export async function loadOutline(fileId: string) {
-  currentSymbols = [];
+  symbolsSignal.value = [];
+  topLineSignal.value = null;
 
-  // Remove any existing outline bar
+  // Tear down the previous mount before removing its root element.
+  if (disposeOutlineMount !== null) {
+    disposeOutlineMount();
+    disposeOutlineMount = null;
+  }
   document.querySelectorAll('.outline-bar').forEach(el => { el.remove(); });
 
   try {
     const data = await api<{ symbols: OutlineSymbol[] }>('/outline/' + fileId);
     if (data.symbols.length === 0) return;
-    currentSymbols = data.symbols;
+    symbolsSignal.value = data.symbols;
   } catch {
     return;
   }
 
-  // Inject outline bar after the diff-header inside diff-container
+  // Inject outline bar after the diff-header inside diff-container.
   const container = document.getElementById('diff-container');
   const header = container?.querySelector('.diff-header');
   if (header === undefined || header === null) return;
@@ -40,7 +54,22 @@ export async function loadOutline(fileId: string) {
   const bar = toElement(<div className="outline-bar" id="outline-bar"></div>);
   header.after(bar);
 
-  updateBreadcrumb();
+  // Single mount drives the breadcrumb against `symbolsSignal` + `topLineSignal`.
+  // The mount root is the bar itself (not inside any `data-morph-skip` region),
+  // so kerf owns the subtree end-to-end. The dropdown is a transient overlay
+  // appended to `bar` outside the mount tree (see `showDropdown` below) — kerf
+  // treats out-of-tree children as foreign and leaves them alone.
+  disposeOutlineMount = mount(bar, () => renderBreadcrumb(symbolsSignal.value, topLineSignal.value));
+
+  // Delegate clicks on the breadcrumb (inside the mount tree) up to the bar
+  // root so the handler survives every mount re-render.
+  delegate(bar, 'click', '.outline-breadcrumb', (e) => {
+    e.stopPropagation();
+    toggleDropdown();
+  });
+
+  // Initial top-line snapshot + scroll tracker.
+  topLineSignal.value = getTopVisibleLine();
   bindScrollTracking();
 }
 
@@ -76,37 +105,22 @@ function getTopVisibleLine(): number | null {
   return null;
 }
 
-function updateBreadcrumb() {
-  const bar = document.getElementById('outline-bar');
-  if (bar === null || currentSymbols.length === 0) return;
-
-  const line = getTopVisibleLine();
-  const path = line !== null ? findSymbolPath(currentSymbols, line) : [];
-
-  bar.innerHTML = '';
-
-  const breadcrumb = toElement(
+function renderBreadcrumb(symbols: OutlineSymbol[], line: number | null): SafeHtml {
+  if (symbols.length === 0) return <></>;
+  const path = line !== null ? findSymbolPath(symbols, line) : [];
+  return (
     <div className="outline-breadcrumb">
       <span className="outline-icon">&#9776;</span>
-      {path.length > 0 ? (
-        path.map((s, i) => (
-          <span>
-            {i > 0 ? <span className="outline-separator">&rsaquo;</span> : null}
-            <span className={`outline-crumb outline-kind-${s.kind}`}>{s.name}</span>
-          </span>
-        ))
-      ) : (
-        <span className="outline-crumb outline-crumb-empty">Top level</span>
-      )}
+      {path.length > 0
+        ? path.map((s, i) => (
+            <span data-key={`crumb-${String(s.line)}`}>
+              {i > 0 ? <span className="outline-separator">&rsaquo;</span> : null}
+              <span className={`outline-crumb outline-kind-${s.kind}`}>{s.name}</span>
+            </span>
+          ))
+        : <span className="outline-crumb outline-crumb-empty">Top level</span>}
     </div>
   );
-
-  breadcrumb.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleDropdown();
-  });
-
-  bar.appendChild(breadcrumb);
 }
 
 function toggleDropdown() {
@@ -122,18 +136,20 @@ function showDropdown() {
   document.querySelectorAll('.outline-dropdown').forEach(el => { el.remove(); });
 
   const bar = document.getElementById('outline-bar');
-  if (bar === null || currentSymbols.length === 0) return;
+  const symbols = symbolsSignal.value;
+  if (bar === null || symbols.length === 0) return;
 
   const dropdown = toElement(
     <div className="outline-dropdown">
-      {renderSymbolList(currentSymbols, 0)}
+      {renderSymbolList(symbols, 0)}
     </div>
   );
 
-  dropdown.addEventListener('click', (e) => {
-    const item = (e.target as HTMLElement).closest<HTMLElement>('.outline-item');
-    if (item === null) return;
-    const line = parseInt(item.dataset.line ?? '0', 10);
+  // Dropdown sits outside the breadcrumb mount tree (appended to `bar` after
+  // the mount-managed children), so a single delegated listener on the
+  // dropdown root is stable. Item clicks navigate + close.
+  delegate(dropdown, 'click', '.outline-item', (_e, el) => {
+    const line = parseInt((el as HTMLElement).dataset.line ?? '0', 10);
     if (line > 0) {
       scrollToLine(line);
       dropdown.remove();
@@ -155,7 +171,7 @@ function renderSymbolList(symbols: OutlineSymbol[], depth: number): SafeHtml {
   return (
     <div>
       {symbols.map(s => (
-        <div>
+        <div data-key={`sym-${String(s.line)}`}>
           <div className={`outline-item outline-kind-${s.kind}`} data-line={String(s.line)} style={`padding-left: ${String(12 + depth * 16)}px`}>
             <span className="outline-item-icon">{s.kind === 'class' ? 'C' : 'f'}</span>
             {s.name}
@@ -200,7 +216,7 @@ function bindScrollTracking() {
     if (scrollRafId !== 0) return;
     scrollRafId = requestAnimationFrame(() => {
       scrollRafId = 0;
-      updateBreadcrumb();
+      topLineSignal.value = getTopVisibleLine();
     });
   };
 

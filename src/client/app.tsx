@@ -2,7 +2,7 @@ import { IconGear, IconRefresh } from "../icons.js";
 import { api, initDebug } from "./api.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
-import { initDiffView, invalidateDiffCache, updateNavFilePath } from "./diff/index.js";
+import { initDiffView, invalidateDiffCache, setRawDiffContent, updateNavFilePath } from "./diff/index.js";
 import { getVisibleScrollLine, navBack, navForward, navUpdateScroll, setNavigating } from "./diff/navStack.js";
 import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
@@ -134,22 +134,16 @@ async function navigateToEntry(entry: { fileId: string | null; filePath: string 
     if (entry.fileId !== null && entry.fileId !== '') {
       await selectFile(entry.fileId);
     } else if (entry.filePath !== null && entry.filePath !== '') {
-      // Raw file — fetch and display
-      const container = document.getElementById("diff-container");
-      if (!container) return;
+      // Raw file — fetch and route through the diff mount's signal (so the
+      // mount stays the single source of truth for `#diff-container`).
+      // `setRawDiffContent()` handles highlighting + toolbar visibility via
+      // the post-render effect; we just need to clear sidebar selection and
+      // update the nav path label.
       const res = await fetch("/file-raw?path=" + encodeURIComponent(entry.filePath));
       if (res.ok) {
-        container.innerHTML = await res.text();
-        container.style.display = "block";
-        const { detectLanguage: dl, applyHighlighting: ah } = await import("./diff/highlight.js");
-        const detectedLang = dl(entry.filePath);
-        diffViewStore.actions.update({
-          detectedLang,
-          ...(diffViewStore.state.value.highlightAuto ? { highlightLang: detectedLang } : {}),
-        });
-        ah();
         document.querySelectorAll(".file-item.active").forEach((el) => { el.classList.remove("active"); });
         reviewStore.actions.update({ currentFileId: null });
+        setRawDiffContent(entry.filePath, await res.text());
         updateNavFilePath(entry.filePath);
       }
     }
