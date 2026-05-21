@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.7] - 2026-05-22
+
+
+- Prevent server out-of-memory when selecting files with very long lines (source maps, minified bundles) by capping char-diff work per line.
+- Fix category badge in the new-annotation form so clicking it opens the reclassify popup and the chosen category sticks on save.
+
 ## [0.9.6] - 2026-05-21
 
 
