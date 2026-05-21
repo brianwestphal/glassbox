@@ -1,11 +1,17 @@
 import type { SafeHtml } from 'kerfjs';
-import { delegate, mount, signal } from 'kerfjs';
+import { attr, delegate, mount, signal } from 'kerfjs';
 
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash } from '../../icons.js';
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { applyThemeColors, switchTheme } from '../themes.js';
 import { showThemeEditor } from './themeEditor.js';
+
+const CTX = {
+  edit: attr('data-ctx', 'edit'),
+  duplicate: attr('data-ctx', 'duplicate'),
+  delete: attr('data-ctx', 'delete'),
+} as const;
 
 interface ThemeSummary {
   id: string;
@@ -109,16 +115,16 @@ export function showThemeManager(onThemeChanged?: () => void): void {
 
       const menu = toElement(
         <div className="tm-context-menu" data-theme-id={themeId}>
-          <button className="tm-menu-item" data-ctx="edit">
+          <button className="tm-menu-item" {...CTX.edit.attrs}>
             <IconEdit />
             <span>Edit</span>
           </button>
-          <button className="tm-menu-item" data-ctx="duplicate">
+          <button className="tm-menu-item" {...CTX.duplicate.attrs}>
             <IconCopy />
             <span>Duplicate</span>
           </button>
           {!theme.builtIn && (
-            <button className="tm-menu-item tm-menu-danger" data-ctx="delete">
+            <button className="tm-menu-item tm-menu-danger" {...CTX.delete.attrs}>
               <IconTrash />
               <span>Delete</span>
             </button>
@@ -143,11 +149,11 @@ export function showThemeManager(onThemeChanged?: () => void): void {
       // Delegate clicks within the transient menu — and stop propagation so the
       // outside-click handler below doesn't immediately dismiss it.
       menu.addEventListener('click', (e) => { e.stopPropagation(); });
-      delegate(menu, 'click', '[data-ctx="edit"]', () => {
+      delegate(menu, 'click', CTX.edit.selector, () => {
         removeContextMenu();
         openEditor(themeId);
       });
-      delegate(menu, 'click', '[data-ctx="duplicate"]', () => {
+      delegate(menu, 'click', CTX.duplicate.selector, () => {
         void (async () => {
           removeContextMenu();
           await api('/themes', { method: 'POST', body: { sourceId: themeId } });
@@ -155,7 +161,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
           if (onThemeChanged !== undefined) onThemeChanged();
         })();
       });
-      delegate(menu, 'click', '[data-ctx="delete"]', () => {
+      delegate(menu, 'click', CTX.delete.selector, () => {
         removeContextMenu();
         showDeleteConfirm(theme.name, () => {
           void (async () => {

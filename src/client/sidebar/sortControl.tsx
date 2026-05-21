@@ -2,6 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 
 import { IconBook, IconFolder, IconShield } from '../../icons.js';
 import { aiStore } from '../stores/index.js';
+import { ACTIONS } from './actions.js';
 
 const RISK_DIMENSIONS: Array<[string, string]> = [
   ['aggregate', 'Aggregate'],
@@ -33,10 +34,10 @@ export function sortControlJsx(): SafeHtml {
       </div>
       <div className="sort-risk-controls" style={ai.sortMode === 'risk' ? '' : 'display:none'}>
         <button className={`toolbar-btn sort-risk-toggle${ai.showRiskScores ? ' active' : ''}`}
-          data-action="toggle-risk-scores" title="Show risk scores">
+          {...ACTIONS.toggleRiskScores.attrs} title="Show risk scores">
           Score
         </button>
-        <select className="sort-dimension-select" data-action="set-risk-dimension">
+        <select className="sort-dimension-select" {...ACTIONS.setRiskDimension.attrs}>
           {RISK_DIMENSIONS.map(([value, label]) => (
             <option value={value} selected={value === ai.riskSortDimension}>{label}</option>
           ))}

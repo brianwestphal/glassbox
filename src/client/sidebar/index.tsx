@@ -5,6 +5,7 @@ import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { aiStore, diffViewStore, reviewStore, visibleFileOrder } from '../stores/index.js';
+import { ACTIONS } from './actions.js';
 import { fileListJsx } from './fileListView.js';
 import { showRiskPopover } from './riskPopover.js';
 import { sortControlJsx } from './sortControl.js';
@@ -52,13 +53,13 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
     switchSortMode(mode);
   });
 
-  delegate(sidebar, 'click', '[data-action="toggle-risk-scores"]', () => {
+  delegate(sidebar, 'click', ACTIONS.toggleRiskScores.selector, () => {
     const next = !aiStore.state.value.showRiskScores;
     aiStore.actions.update({ showRiskScores: next });
     void api('/ai/preferences', { method: 'POST', body: { show_risk_scores: next } });
   });
 
-  delegate(sidebar, 'change', '[data-action="set-risk-dimension"]', (_e, sel) => {
+  delegate(sidebar, 'change', ACTIONS.setRiskDimension.selector, (_e, sel) => {
     const value = (sel as HTMLSelectElement).value;
     aiStore.actions.update({ riskSortDimension: value });
     void api('/ai/preferences', { method: 'POST', body: { risk_sort_dimension: value } });
@@ -81,12 +82,12 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
     }
   });
 
-  delegate(sidebar, 'click', '[data-action="select-file"]', (_e, el) => {
+  delegate(sidebar, 'click', ACTIONS.selectFile.selector, (_e, el) => {
     const fileId = (el as HTMLElement).dataset.fileId;
     if (fileId !== undefined && fileId !== '') void selectFile(fileId);
   });
 
-  delegate(sidebar, 'click', '[data-action="toggle-folder"]', (_e, header) => {
+  delegate(sidebar, 'click', ACTIONS.toggleFolder.selector, (_e, header) => {
     const path = (header as HTMLElement).dataset.folderPath ?? '';
     if (path === '') return;
     if (diffViewStore.state.value.collapsedFolders.has(path)) {
@@ -97,14 +98,14 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
     saveCollapsedFolders();
   });
 
-  delegate(sidebar, 'click', '[data-action="show-risk-popover"]', (e, badge) => {
+  delegate(sidebar, 'click', ACTIONS.showRiskPopover.selector, (e, badge) => {
     e.stopPropagation();
     const fileId = (badge as HTMLElement).dataset.fileId ?? '';
     const score = (aiStore.state.value.riskScores ?? []).find(s => s.reviewFileId === fileId);
     if (score !== undefined) showRiskPopover(badge as HTMLElement, score);
   });
 
-  delegate(sidebar, 'click', '[data-action="retry-analysis"]', (_e, btn) => {
+  delegate(sidebar, 'click', ACTIONS.retryAnalysis.selector, (_e, btn) => {
     const mode = (btn as HTMLElement).dataset.mode as 'risk' | 'narrative';
     void import('./sortMode.js').then(m => { m.triggerAnalysis(mode); });
   });

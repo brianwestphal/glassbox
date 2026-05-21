@@ -11,6 +11,7 @@ import {
   sortedRiskScores,
   unscoredFiles,
 } from '../stores/index.js';
+import { ACTIONS } from './actions.js';
 import { buildFolderTree, type TreeNode } from './folderTree.js';
 
 export function fileListJsx(): SafeHtml {
@@ -69,7 +70,7 @@ function analysisErrorJsx(error: string | null, mode: 'risk' | 'narrative'): Saf
   return (
     <div className="analysis-error">
       <span>{'Analysis failed: ' + (error ?? 'Unknown error')}</span>
-      <button className="btn btn-xs btn-primary" data-action="retry-analysis" data-mode={mode}>Retry</button>
+      <button className="btn btn-xs btn-primary" {...ACTIONS.retryAnalysis.attrs} data-mode={mode}>Retry</button>
     </div>
   );
 }
@@ -132,12 +133,12 @@ function riskRowJsx(
   return (
     <div data-key={score.reviewFileId}
       className={`file-item${score.reviewFileId === review.currentFileId ? ' active' : ''}`}
-      data-action="select-file" data-file-id={score.reviewFileId} style="padding-left: 16px">
+      {...ACTIONS.selectFile.attrs} data-file-id={score.reviewFileId} style="padding-left: 16px">
       {ai.showRiskScores && (
         <span className={`risk-badge ${riskClass(displayScore)}`}
           style={`color: ${riskColor(displayScore)}`}
           title={score.rationale}
-          data-action="show-risk-popover" data-file-id={score.reviewFileId}>
+          {...ACTIONS.showRiskPopover.attrs} data-file-id={score.reviewFileId}>
           {displayScore.toFixed(2)}
         </span>
       )}
@@ -175,7 +176,7 @@ function narrativeRowJsx(item: NarrativeFileOrder, review: typeof reviewStore.st
   return (
     <div data-key={item.reviewFileId}
       className={`file-item${item.reviewFileId === review.currentFileId ? ' active' : ''}`}
-      data-action="select-file" data-file-id={item.reviewFileId} style="padding-left: 16px">
+      {...ACTIONS.selectFile.attrs} data-file-id={item.reviewFileId} style="padding-left: 16px">
       <span className="narrative-position" title={item.rationale}>{item.position}</span>
       <span className="file-name" title={item.filePath}>{fileName}</span>
       <span className="file-path-dim" title={item.filePath}>{dir}</span>
@@ -193,7 +194,7 @@ function flatRowJsx(file: typeof reviewStore.state.value['files'][number], revie
   return (
     <div data-key={file.id}
       className={`file-item${file.id === review.currentFileId ? ' active' : ''}`}
-      data-action="select-file" data-file-id={file.id} style="padding-left: 16px">
+      {...ACTIONS.selectFile.attrs} data-file-id={file.id} style="padding-left: 16px">
       <span className="file-name" title={file.file_path}>{fileName}</span>
       <span className="file-path-dim" title={file.file_path}>{dir}</span>
       {staleCount > 0 ? <span className="stale-dot"></span> : null}
@@ -258,7 +259,7 @@ function fileRowJsx(f: typeof reviewStore.state.value['files'][number], depth: n
   return (
     <div data-key={f.id}
       className={`file-item${f.id === review.currentFileId ? ' active' : ''}`}
-      data-action="select-file" data-file-id={f.id} style={pad}>
+      {...ACTIONS.selectFile.attrs} data-file-id={f.id} style={pad}>
       <span className={`status-dot ${f.status}`}></span>
       <span className="file-name" title={f.file_path}>{fileName}</span>
       <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>

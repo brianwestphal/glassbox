@@ -1,10 +1,20 @@
 import type { SafeHtml } from 'kerfjs';
-import { delegate, mount, signal } from 'kerfjs';
+import { attr, delegate, mount, signal } from 'kerfjs';
 
 import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { TOAST_DURATION_MS } from '../timing.js';
+
+const ACTIONS = {
+  cancelComplete: attr('data-action', 'cancel-complete'),
+  modalDone: attr('data-action', 'modal-done'),
+  discardStale: attr('data-action', 'discard-stale'),
+  keepStale: attr('data-action', 'keep-stale'),
+  gitignoreAdd: attr('data-action', 'gitignore-add'),
+  gitignoreDismiss: attr('data-action', 'gitignore-dismiss'),
+  sendToClaude: attr('data-action', 'send-to-claude'),
+} as const;
 
 interface CompleteResult {
   isCurrent: boolean;
@@ -70,10 +80,10 @@ function showCompleteModal(): void {
   // which stage we're in, since the data-action attribute identifies the
   // intent.
 
-  delegate(overlay, 'click', '[data-action="cancel-complete"]', close);
-  delegate(overlay, 'click', '[data-action="modal-done"]', close);
+  delegate(overlay, 'click', ACTIONS.cancelComplete.selector, close);
+  delegate(overlay, 'click', ACTIONS.modalDone.selector, close);
 
-  delegate(overlay, 'click', '[data-action="discard-stale"]', () => {
+  delegate(overlay, 'click', ACTIONS.discardStale.selector, () => {
     void (async () => {
       await api('/annotations/stale/delete-all', { method: 'POST' });
       reviewStore.actions.update({ staleCounts: {} });
@@ -81,7 +91,7 @@ function showCompleteModal(): void {
       void completeReview(stage);
     })();
   });
-  delegate(overlay, 'click', '[data-action="keep-stale"]', () => {
+  delegate(overlay, 'click', ACTIONS.keepStale.selector, () => {
     void (async () => {
       await api('/annotations/stale/keep-all', { method: 'POST' });
       reviewStore.actions.update({ staleCounts: {} });
@@ -97,7 +107,7 @@ function showCompleteModal(): void {
     setTimeout(() => { (el as HTMLElement).classList.remove('copied'); }, TOAST_DURATION_MS);
   });
 
-  delegate(overlay, 'click', '[data-action="gitignore-add"]', () => {
+  delegate(overlay, 'click', ACTIONS.gitignoreAdd.selector, () => {
     void (async () => {
       await api('/gitignore/add', { method: 'POST' });
       if (stage.value.kind === 'done') {
@@ -105,7 +115,7 @@ function showCompleteModal(): void {
       }
     })();
   });
-  delegate(overlay, 'click', '[data-action="gitignore-dismiss"]', () => {
+  delegate(overlay, 'click', ACTIONS.gitignoreDismiss.selector, () => {
     void (async () => {
       await api('/gitignore/dismiss', { method: 'POST' });
       if (stage.value.kind === 'done') {
@@ -114,7 +124,7 @@ function showCompleteModal(): void {
     })();
   });
 
-  delegate(overlay, 'click', '[data-action="send-to-claude"]', (_e, btn) => {
+  delegate(overlay, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
     if (stage.value.kind !== 'done') return;
     const aiCommand = stage.value.aiCommand;
     const sendBtn = btn as HTMLButtonElement;
@@ -187,9 +197,9 @@ function renderStalePrompt(totalStale: number): SafeHtml {
       <h3>Stale Annotations</h3>
       <p>{message}</p>
       <div className="modal-actions">
-        <button className="btn btn-sm" data-action="cancel-complete">Cancel</button>
-        <button className="btn btn-sm btn-danger" data-action="discard-stale">Discard All Stale</button>
-        <button className="btn btn-sm btn-primary" data-action="keep-stale">{'Keep All & Complete'}</button>
+        <button className="btn btn-sm" {...ACTIONS.cancelComplete.attrs}>Cancel</button>
+        <button className="btn btn-sm btn-danger" {...ACTIONS.discardStale.attrs}>Discard All Stale</button>
+        <button className="btn btn-sm btn-primary" {...ACTIONS.keepStale.attrs}>{'Keep All & Complete'}</button>
       </div>
     </>
   );
@@ -212,8 +222,8 @@ function renderDone(
         <div className="modal-gitignore">
           <p className="modal-label">.glassbox/ is not in your .gitignore</p>
           <div className="modal-actions" style="justify-content:flex-start;margin-top:4px">
-            <button className="btn btn-sm btn-primary" data-action="gitignore-add">Add to .gitignore</button>
-            <button className="btn btn-sm" data-action="gitignore-dismiss">{"Don't ask for 30 days"}</button>
+            <button className="btn btn-sm btn-primary" {...ACTIONS.gitignoreAdd.attrs}>Add to .gitignore</button>
+            <button className="btn btn-sm" {...ACTIONS.gitignoreDismiss.attrs}>{"Don't ask for 30 days"}</button>
           </div>
         </div>
       )}
@@ -224,9 +234,9 @@ function renderDone(
       )}
       <div className="modal-actions">
         {channelConnected && (
-          <button className="btn btn-sm btn-primary" data-action="send-to-claude">Send to Claude</button>
+          <button className="btn btn-sm btn-primary" {...ACTIONS.sendToClaude.attrs}>Send to Claude</button>
         )}
-        <button className="btn btn-sm btn-primary" data-action="modal-done">Done</button>
+        <button className="btn btn-sm btn-primary" {...ACTIONS.modalDone.attrs}>Done</button>
       </div>
     </>
   );
