@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.6] - 2026-05-21
+
+
+- Bumped kerfjs and eslint-plugin-kerfjs to ^0.11.1.
+- Migrated delegate() selectors to attr()-based ACTIONS/CTX constants to clear new `kerfjs/prefer-attr-selector` lint warnings.
+
 ## [0.9.5] - 2026-05-21
 
 
