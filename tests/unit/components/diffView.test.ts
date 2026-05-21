@@ -205,6 +205,30 @@ describe('DiffView', () => {
     expect(html).toContain('data-is-svg="true"');
   });
 
+  // Source maps and minified bundles can produce paired remove/add lines
+  // 100 KB+ each. charDiff used to build an O(m*n) LCS table over those,
+  // which OOM'd the server and bounced the browser back to the welcome
+  // screen as if the file selection had failed.
+  it('renders huge paired remove/add lines without OOMing', () => {
+    const huge = 'a'.repeat(120_000);
+    const huger = 'a'.repeat(120_000).replace('aaaa', 'bbbb');
+    const lines = [
+      makeLine('remove', 1, huge),
+      makeLine('add', 1, huger),
+    ];
+    const start = Date.now();
+    const html = DiffView({
+      file: makeFile(),
+      diff: makeDiff({ status: 'modified', hunks: [makeHunk(lines)] }),
+      annotations: [], mode: 'split',
+    }).toString();
+    // Rendering must stay well under the per-test memory + time budget;
+    // the pre-fix version exhausted a 4 GB heap before returning.
+    expect(Date.now() - start).toBeLessThan(2_000);
+    expect(html).toContain('diff-view');
+    expect(html.length).toBeGreaterThan(huge.length);
+  });
+
   it('renders drag handle and action buttons on annotations', () => {
     const lines = [makeLine('add', 1, 'code')];
     const ann = makeAnnotation({ line_number: 1, side: 'new' });

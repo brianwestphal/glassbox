@@ -10,6 +10,16 @@ export interface DiffSegment {
 }
 
 /**
+ * Maximum line length to attempt char-level diffing. The LCS table is
+ * O(m*n) in both time and memory — at m=n=5000 that's 200 MB of doubles,
+ * which is the upper bound we're willing to spend on inline highlighting.
+ * Real-world cases that blow past this: minified bundles, source maps,
+ * and other generated single-line files where char-level highlighting
+ * isn't visually useful anyway.
+ */
+const MAX_LINE_LENGTH = 5000;
+
+/**
  * Compute character-level diff segments for the old and new strings.
  * Returns two arrays: one for the old side, one for the new side.
  * Only computes if the strings are sufficiently similar (\> 20% common).
@@ -17,6 +27,7 @@ export interface DiffSegment {
 export function charDiff(oldStr: string, newStr: string): { oldSegments: DiffSegment[]; newSegments: DiffSegment[] } | null {
   if (!oldStr && !newStr) return null;
   if (oldStr === newStr) return null;
+  if (oldStr.length > MAX_LINE_LENGTH || newStr.length > MAX_LINE_LENGTH) return null;
 
   // Compute LCS length to check similarity
   const lcs = lcsTable(oldStr, newStr);

@@ -55,4 +55,19 @@ describe('charDiff', () => {
     const newUnchanged = result!.newSegments.filter(s => !s.changed).map(s => s.text).join('');
     expect(newUnchanged).toBe('abc');
   });
+
+  // Source-map and minified-bundle diffs frequently contain single
+  // lines >100 KB long. The LCS table is O(m*n), so computing it
+  // exhausted the Node heap and crashed the server when a user
+  // selected such a file. charDiff must bail before allocating.
+  it('returns null when either side exceeds the line-length cap', () => {
+    const huge = 'x'.repeat(100_000);
+    const small = 'xyz';
+    const start = Date.now();
+    expect(charDiff(huge, small)).toBeNull();
+    expect(charDiff(small, huge)).toBeNull();
+    expect(charDiff(huge, huge + 'y')).toBeNull();
+    // Sanity check: the early-out should be effectively instant.
+    expect(Date.now() - start).toBeLessThan(100);
+  });
 });

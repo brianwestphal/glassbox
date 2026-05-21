@@ -101,8 +101,14 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
     }
   });
 
-  // Edit-form category badge → opens the category picker
-  delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .form-category-badge', (e, badge) => {
+  // Form category badge → opens the category picker. Matches both the
+  // edit form (`[data-edit-for]`) and the create form (`[data-form-key]`),
+  // since `showCategoryPickerForBadge` writes back through the shared
+  // `editFormSignal` either way. Restricting this to `[data-edit-for]`
+  // silently broke type changes during initial annotation entry — the
+  // picker would open via the badge click, but no option click handler
+  // would fire because there was no delegate match.
+  delegate(diffContainer, 'click', '.annotation-form-container .form-category-badge', (e, badge) => {
     e.stopPropagation();
     showReclassifyPopupForEdit(badge as HTMLElement);
   });

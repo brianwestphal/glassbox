@@ -92,6 +92,33 @@ test.describe('Create annotation', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.annotation-form')).not.toBeVisible({ timeout: 3000 });
   });
+
+  // GB-796 — clicking the create form's category badge silently did nothing
+  // because the delegated handler only matched the edit form
+  // (`[data-edit-for]`), not the create form (`[data-form-key]`). The user-
+  // visible symptom: "you can change the issue type after submitting, but
+  // not during initial entry."
+  test('category badge in the create form opens the picker and applies the chosen category', async ({ page }) => {
+    await openFile(page, 'session');
+    await page.locator('.diff-line.add').first().click();
+    const form = page.locator('.annotation-form-container[data-form-key]');
+    await expect(form).toBeVisible({ timeout: 3000 });
+
+    const badge = form.locator('.form-category-badge');
+    const startLabel = (await badge.textContent() ?? '').trim();
+    await badge.click();
+    const popup = page.locator('.reclassify-popup');
+    await expect(popup).toBeVisible({ timeout: 3000 });
+
+    // Pick whichever category isn't currently active, so the assertion is
+    // meaningful regardless of which default the form opens with.
+    const targetOption = popup.locator('.reclassify-option:not(.active)').first();
+    const targetText = (await targetOption.locator('.annotation-category').textContent() ?? '').trim();
+    await targetOption.click();
+    await expect(popup).not.toBeVisible({ timeout: 3000 });
+    await expect(badge).toHaveText(targetText);
+    expect(targetText).not.toBe(startLabel);
+  });
 });
 
 test.describe('Edit annotation', () => {
