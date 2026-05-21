@@ -9,12 +9,13 @@ import { getTauriGlobal } from '../tauri.js';
 let findBar: HTMLElement | null = null;
 let findInput: HTMLInputElement | null = null;
 let currentQuery = '';
-let matches: Range[] = [];
+let matchCount = 0;
 let currentMatch = -1;
 let matchLabel: HTMLElement | null = null;
 
 const HIGHLIGHT_CLASS = 'find-highlight';
 const ACTIVE_HIGHLIGHT_CLASS = 'find-highlight-active';
+const MATCH_INDEX_ATTR = 'data-match-index';
 
 export function bindFind() {
   // Only activate in Tauri — browsers have their own find
@@ -64,7 +65,7 @@ function hideFindBar() {
   if (findBar) findBar.style.display = 'none';
   clearHighlights();
   currentQuery = '';
-  matches = [];
+  matchCount = 0;
   currentMatch = -1;
 }
 
@@ -112,9 +113,90 @@ function createFindBar() {
   }
 }
 
+interface TextSegment {
+  node: Text;
+  start: number;  // global offset of this node's first char in the concatenated string
+  length: number; // text length of this node
+}
+
+interface MatchSpan {
+  startSeg: number; // index into segments[]
+  startOff: number; // offset within segments[startSeg].node
+  endSeg: number;
+  endOff: number;
+}
+
+/** Pure segment shape — the DOM-agnostic subset of `TextSegment`. Exposed so
+ *  the indexing math (which is where the cross-element bug lived) is
+ *  unit-testable without a DOM environment. */
+export interface SegmentInfo { start: number; length: number }
+
+/**
+ * Build a flat text index over every text node under `container`, in
+ * document order. The concatenated string lets us run a single `indexOf`
+ * across what is structurally many `<span>` siblings (syntax-highlighted
+ * code), so a search like `raw(` matches even when "raw" lives in
+ * `<span class="hljs-title">raw</span>` and `(` is a separate text node
+ * right after it.
+ */
+function buildTextIndex(container: HTMLElement): { text: string; segments: TextSegment[] } {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const segments: TextSegment[] = [];
+  const parts: string[] = [];
+  let pos = 0;
+  let node: Text | null;
+  while ((node = walker.nextNode() as Text | null)) {
+    const content = node.data;
+    if (content.length === 0) continue;
+    segments.push({ node, start: pos, length: content.length });
+    parts.push(content);
+    pos += content.length;
+  }
+  return { text: parts.join(''), segments };
+}
+
+/** Find the segment index whose character range covers `offset`. Searches
+ *  forward from `hint` (matches advance monotonically through the text).
+ *  Exported for unit tests. */
+export function segmentForOffset(segments: SegmentInfo[], offset: number, hint: number): number {
+  for (let i = hint; i < segments.length; i++) {
+    const s = segments[i];
+    if (offset >= s.start && offset < s.start + s.length) return i;
+  }
+  return segments.length - 1;
+}
+
+/** Compute every match span across a concatenated-text + segment layout.
+ *  This is the pure piece of the find-across-elements fix — the DOM
+ *  walker builds `text + segments`, this function says where every match
+ *  lives, and the caller wraps the corresponding text-node ranges in
+ *  `<mark>` tags. Exported for unit tests. */
+export function findMatchSpans(text: string, segments: SegmentInfo[], query: string): MatchSpan[] {
+  if (query === '' || segments.length === 0) return [];
+  const lowerQuery = query.toLowerCase();
+  const lowerText = text.toLowerCase();
+  const spans: MatchSpan[] = [];
+  let idx = 0;
+  let hint = 0;
+  while ((idx = lowerText.indexOf(lowerQuery, idx)) !== -1) {
+    const endGlobal = idx + query.length;
+    const startSeg = segmentForOffset(segments, idx, hint);
+    const endSeg = segmentForOffset(segments, endGlobal - 1, startSeg);
+    spans.push({
+      startSeg,
+      startOff: idx - segments[startSeg].start,
+      endSeg,
+      endOff: endGlobal - segments[endSeg].start,
+    });
+    hint = startSeg;
+    idx = endGlobal;
+  }
+  return spans;
+}
+
 function runSearch(query: string) {
   clearHighlights();
-  matches = [];
+  matchCount = 0;
   currentMatch = -1;
   currentQuery = query;
 
@@ -126,29 +208,25 @@ function runSearch(query: string) {
   const container = document.getElementById('diff-container');
   if (!container) return;
 
-  const lowerQuery = query.toLowerCase();
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  let node: Text | null;
-
-  while ((node = walker.nextNode() as Text | null)) {
-    const text = node.textContent;
-    const lowerText = text.toLowerCase();
-    let idx = 0;
-    while ((idx = lowerText.indexOf(lowerQuery, idx)) !== -1) {
-      const range = document.createRange();
-      range.setStart(node, idx);
-      range.setEnd(node, idx + query.length);
-      matches.push(range);
-      idx += query.length;
-    }
+  const { text, segments } = buildTextIndex(container);
+  if (segments.length === 0) {
+    updateLabel();
+    return;
   }
 
-  // Apply highlights using CSS custom highlight API if available, otherwise wrap in spans
-  for (const range of matches) {
-    highlightRange(range);
+  const spans = findMatchSpans(text, segments, query);
+
+  // Wrap matches in reverse order so DOM mutation of later matches doesn't
+  // shift earlier offsets. Within each match, wrap segment-by-segment from
+  // the last involved node back to the first — same reason. All wraps stay
+  // within a single text node (after slicing), so `surroundContents` never
+  // crosses element boundaries.
+  for (let m = spans.length - 1; m >= 0; m--) {
+    wrapMatch(spans[m], segments, m);
   }
 
-  if (matches.length > 0) {
+  matchCount = spans.length;
+  if (matchCount > 0) {
     currentMatch = 0;
     activateMatch(0);
   }
@@ -156,11 +234,23 @@ function runSearch(query: string) {
   updateLabel();
 }
 
-function highlightRange(range: Range) {
-  try {
-    range.surroundContents(toElement(<mark className={HIGHLIGHT_CLASS}></mark>));
-  } catch {
-    // surroundContents fails if range crosses element boundaries — skip
+function wrapMatch(span: MatchSpan, segments: TextSegment[], matchIndex: number): void {
+  for (let i = span.endSeg; i >= span.startSeg; i--) {
+    const seg = segments[i];
+    const lo = i === span.startSeg ? span.startOff : 0;
+    const hi = i === span.endSeg ? span.endOff : seg.length;
+    if (lo >= hi) continue;
+    try {
+      const sub = document.createRange();
+      sub.setStart(seg.node, lo);
+      sub.setEnd(seg.node, hi);
+      const mark = toElement(<mark className={HIGHLIGHT_CLASS} {...{ [MATCH_INDEX_ATTR]: String(matchIndex) }}></mark>);
+      sub.surroundContents(mark);
+    } catch {
+      // Skip a single segment's wrap; the rest of the match still renders.
+      // surroundContents within a single text node should always succeed,
+      // so this is a defensive no-op.
+    }
   }
 }
 
@@ -174,24 +264,29 @@ function clearHighlights() {
   });
 }
 
+function marksForMatch(index: number): NodeListOf<Element> {
+  return document.querySelectorAll(`.${HIGHLIGHT_CLASS}[${MATCH_INDEX_ATTR}="${String(index)}"]`);
+}
+
 function activateMatch(index: number) {
-  // Remove previous active
+  // Remove previous active class from every fragment of the prior match.
   document.querySelectorAll(`.${ACTIVE_HIGHLIGHT_CLASS}`).forEach(el => { el.classList.remove(ACTIVE_HIGHLIGHT_CLASS); });
 
-  const allMarks = document.querySelectorAll(`.${HIGHLIGHT_CLASS}`);
-  if (index >= 0 && index < allMarks.length) {
-    allMarks[index].classList.add(ACTIVE_HIGHLIGHT_CLASS);
-    allMarks[index].scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }
+  const marks = marksForMatch(index);
+  if (marks.length === 0) return;
+  // A single logical match may be split across multiple `<mark>` siblings
+  // (one per text node it crosses). Mark all of them active so styling
+  // applies to the whole highlight, and scroll the first into view.
+  marks.forEach(el => { el.classList.add(ACTIVE_HIGHLIGHT_CLASS); });
+  marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 function goToMatch(direction: number) {
-  const allMarks = document.querySelectorAll(`.${HIGHLIGHT_CLASS}`);
-  if (allMarks.length === 0) return;
+  if (matchCount === 0) return;
 
   currentMatch += direction;
-  if (currentMatch >= allMarks.length) currentMatch = 0;
-  if (currentMatch < 0) currentMatch = allMarks.length - 1;
+  if (currentMatch >= matchCount) currentMatch = 0;
+  if (currentMatch < 0) currentMatch = matchCount - 1;
 
   activateMatch(currentMatch);
   updateLabel();
@@ -199,12 +294,11 @@ function goToMatch(direction: number) {
 
 function updateLabel() {
   if (!matchLabel) return;
-  const allMarks = document.querySelectorAll(`.${HIGHLIGHT_CLASS}`);
   if (!currentQuery || currentQuery.length < 2) {
     matchLabel.textContent = '';
-  } else if (allMarks.length === 0) {
+  } else if (matchCount === 0) {
     matchLabel.textContent = 'No matches';
   } else {
-    matchLabel.textContent = `${currentMatch + 1} of ${allMarks.length}`;
+    matchLabel.textContent = `${currentMatch + 1} of ${matchCount}`;
   }
 }
