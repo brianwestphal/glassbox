@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.5] - 2026-05-21
+
+
+- Upgraded kerfjs and eslint-plugin-kerfjs to 0.11.x.
+- Migrated raw-file display, language picker, outline breadcrumb, and image metadata panel to the kerf mount/signal/delegate pattern.
+
 ## [0.9.4] - 2026-05-20
 
 
