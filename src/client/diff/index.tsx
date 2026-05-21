@@ -102,6 +102,7 @@ function setupMount(container: HTMLElement): void {
     // is how a file/mode/whitespace switch replaces the tree.
     return (
       <div className="diff-content" data-key={`gen-${String(generation)}`} data-morph-skip>
+        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- server-rendered diff HTML from /file/:id; trusted source */}
         {raw(html)}
       </div>
     );
