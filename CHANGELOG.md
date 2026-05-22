@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.9] - 2026-05-22
+
+
+- Find-in-diff now matches text that crosses syntax-highlight span boundaries, so searches like `raw(` highlight and navigate correctly inside colorized code.
+- Matches split across multiple DOM text nodes are treated as a single logical match for highlighting and active-match navigation.
+
 ## [0.9.8] - 2026-05-22
 
 
