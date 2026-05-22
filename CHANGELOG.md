@@ -2,6 +2,23 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.11] - 2026-05-22
+
+
+- Add a GitHub Sponsors button to the sidebar share section with a heart icon
+- Add a Sponsor section to the README with a GitHub Sponsors badge
+
+- Sidebar share section now shows Share and Sponsor as evenly-sized side-by-side buttons
+- Rename the share section label from "Know someone who'd love this?" to "Love Glassbox?"
+
+- Fix the sidebar review mode label printing the full commit SHA twice and wrapping
+- Shorten 40-char commit hashes to 7 chars in the sidebar, review history, and exports
+- Range mode now shortens each endpoint independently (e.g. `range: main..<short>`)
+- Drop the redundant `(SHA)` suffix from the exported review markdown mode line
+- Long branch names and file patterns in the sidebar review mode now wrap cleanly
+
+- Upgrade kerfjs and eslint-plugin-kerfjs from 0.11.1 to 0.12.0
+
 ## [0.9.10] - 2026-05-22
 
 
