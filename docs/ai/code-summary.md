@@ -182,6 +182,7 @@ See §6 for the schema itself.
 |------|---------|
 | `charDiff.ts` | Character-level diff highlighting for intra-line changed words. |
 | `escapeHtml.ts` | HTML entity escaping used by the JSX runtime. |
+| `formatReviewMode.ts` | `formatReviewMode(mode, modeArgs)` — single source of truth for the sidebar / history "review mode" label. Strips the redundant `mode + ": " + mode_args` duplication and shortens 40-char SHAs in `commit:` / `range:` modes to 7 chars. |
 | `resolveReviewId.ts` | Hono helper: prefers `?reviewId=` query, falls back to middleware-provided current review. |
 | `validate.ts` | `checkEnum<T>()` — string-enum membership check returning `{ ok }` or `{ error }`. Used at all `/api` validation sites. |
 

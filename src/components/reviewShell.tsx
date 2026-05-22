@@ -2,6 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 
 import type { Review, ReviewFile } from '../db/queries.js';
 import { IconActualSize, IconFit, IconZoomIn, IconZoomOut } from '../icons.js';
+import { formatReviewMode } from '../utils/formatReviewMode.js';
 import { FileList } from './fileList.js';
 
 interface ReviewShellProps {
@@ -33,7 +34,7 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
         <aside className="sidebar">
           <div className="sidebar-header">
             <h2>{review.repo_name}</h2>
-            <span className="review-mode">{review.mode}{review.mode_args !== null && review.mode_args !== '' ? `: ${review.mode_args}` : ''}</span>
+            <span className="review-mode">{formatReviewMode(review.mode, review.mode_args)}</span>
           </div>
           <div className="file-filter">
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />

@@ -87,7 +87,7 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
   lines.push('# Code Review');
   lines.push('');
   lines.push(`- **Repository**: ${review.repo_name}`);
-  lines.push(`- **Review mode**: ${review.mode}${review.mode_args !== null && review.mode_args !== '' ? ` (${review.mode_args})` : ''}`);
+  lines.push(`- **Review mode**: ${review.mode}`);
   lines.push(`- **Review ID**: ${review.id}`);
   lines.push(`- **Date**: ${new Date().toISOString()}`);
   lines.push(`- **Files reviewed**: ${files.filter(f => f.status === 'reviewed').length}/${files.length}`);

@@ -1,22 +1,9 @@
 import type { Review } from '../db/queries.js';
 import { IconTrash16 } from '../icons.js';
+import { formatReviewMode } from '../utils/formatReviewMode.js';
 
 function titleCase(s: string): string {
   return s.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-// Shorten hex strings that look like commit SHAs (7+ hex chars)
-function shortenArgs(args: string): { short: string; full: string } {
-  const shaPattern = /\b([0-9a-f]{7,40})\b/gi;
-  const result: { hasLong: boolean } = { hasLong: false };
-  const short = args.replace(shaPattern, (match) => {
-    if (match.length > 8) {
-      result.hasLong = true;
-      return match.slice(0, 7);
-    }
-    return match;
-  });
-  return { short, full: result.hasLong ? args : '' };
 }
 
 export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[]; currentReviewId: string }) {
@@ -33,19 +20,14 @@ export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[];
           {reviews.map(r => {
             const isCurrent = r.id === currentReviewId;
             const href = isCurrent ? '/' : `/review/${r.id}`;
-            let argsDisplay = null;
-            if (r.mode_args !== null && r.mode_args !== '') {
-              const { short, full } = shortenArgs(r.mode_args);
-              argsDisplay = full !== ''
-                ? <span title={full}>: {short}</span>
-                : <span>: {short}</span>;
-            }
+            const modeLabel = titleCase(formatReviewMode(r.mode, r.mode_args));
+            const fullArgs = r.mode_args !== null && r.mode_args !== '' && /[0-9a-f]{40}/i.test(r.mode_args) ? r.mode_args : '';
             return (
               <div>
                 <a href={href} className="history-item-link">
                   <div className="history-item" data-review-id={r.id}>
                     <h3>
-                      {r.repo_name} - {titleCase(r.mode)}{argsDisplay}
+                      {r.repo_name} - {fullArgs !== '' ? <span title={fullArgs}>{modeLabel}</span> : modeLabel}
                       {isCurrent ? <span className="status-badge in_progress" style="margin-left:8px">Current</span> : null}
                       <span className={`status-badge ${r.status}`} style="margin-left:8px">{titleCase(r.status)}</span>
                     </h3>

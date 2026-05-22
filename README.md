@@ -341,6 +341,12 @@ npm link                 # Symlink for global 'glassbox' command
 - **[Hot Sheet](https://github.com/brianwestphal/hotsheet)** — Lightweight local project management for AI-assisted development. Pairs well with Glassbox for tracking review feedback as actionable tickets.
 - **[Changelog](CHANGELOG.md)** — Full release history
 
+## Sponsor
+
+Glassbox is free and open-source. If it saves you time on your AI workflow, consider sponsoring continued development:
+
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/brianwestphal)
+
 ## License
 
 MIT

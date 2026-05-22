@@ -6,7 +6,7 @@ import {
   getSharePromptState,
   refreshReview,
 } from "../api/index.js";
-import { IconGear, IconRefresh } from "../icons.js";
+import { IconGear, IconHeart, IconRefresh } from "../icons.js";
 import { initDebug } from "./api.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
@@ -116,8 +116,11 @@ async function initAISorting() {
       const shareSection = toElement(
         <div className="sidebar-share-section">
           <button className="sidebar-share-dismiss" id="share-dismiss-btn" title="Dismiss">&times;</button>
-          <p className="sidebar-share-label">Know someone who'd love this?</p>
-          <button className="btn btn-share" id="share-glassbox-btn">Share Glassbox</button>
+          <p className="sidebar-share-label">Love Glassbox?</p>
+          <div className="sidebar-share-actions">
+            <button className="btn btn-share" id="share-glassbox-btn">Share</button>
+            <a className="btn btn-sponsor" id="sponsor-glassbox-btn" href="https://github.com/sponsors/brianwestphal" target="_blank" rel="noopener noreferrer"><IconHeart />Sponsor</a>
+          </div>
         </div>
       );
       shareSection.querySelector("#share-glassbox-btn")?.addEventListener("click", () => {

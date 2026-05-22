@@ -40,6 +40,7 @@
   color: var(--text-dim);
   margin-top: 4px;
   display: block;
+  overflow-wrap: anywhere;
 }
 
 // --- File Filter ---
@@ -233,22 +234,46 @@
   margin-bottom: 6px;
 }
 
-.btn.btn-share {
+.sidebar-share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.btn.btn-share,
+.btn.btn-sponsor {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  background: var(--teal);
-  color: var(--bg);
-  border-color: var(--teal);
+  padding: 6px 12px;
   font-weight: 600;
   font-size: 13px;
   width: 100%;
   justify-content: center;
+  text-decoration: none;
 
   svg { flex-shrink: 0; }
+}
+
+.btn.btn-share {
+  background: var(--teal);
+  color: var(--bg);
+  border-color: var(--teal);
 
   &:hover { background: color-mix(in srgb, var(--teal) 85%, black); border-color: color-mix(in srgb, var(--teal) 85%, black); }
+}
+
+.btn.btn-sponsor {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+
+  svg { color: #ea4aaa; }
+
+  &:hover {
+    background: color-mix(in srgb, #ea4aaa 12%, transparent);
+    border-color: color-mix(in srgb, #ea4aaa 60%, var(--border));
+  }
 }
 
 // --- Share Prompt ---

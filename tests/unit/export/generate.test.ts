@@ -151,9 +151,13 @@ describe('generateReviewExport', () => {
     expect(existsSync(join(tempDir, '.glassbox', 'latest-review.md'))).toBe(false);
   });
 
-  it('includes mode_args when present', async () => {
+  it('preserves the full ref in the mode line without double-printing', async () => {
+    // The stored `mode` already contains the ref (e.g. `commit:abc123def…`),
+    // so the export now emits `mode` verbatim instead of appending
+    // `(${mode_args})` — the parenthetical was redundant in every production
+    // case and produced `commit:abc… (abc…)`.
     mockGetReview.mockResolvedValueOnce({
-      id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'commit', mode_args: 'abc123',
+      id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'commit:abc123def4567890', mode_args: 'abc123def4567890',
       head_commit: 'abc', status: 'in_progress', created_at: '2025-01-01',
     } as any);
     mockGetReviewFiles.mockResolvedValueOnce([]);
@@ -161,7 +165,10 @@ describe('generateReviewExport', () => {
 
     const result = await generateReviewExport('r1', tempDir, true);
     const content = readFileSync(result, 'utf-8');
-    expect(content).toContain('**Review mode**: commit (abc123)');
+    expect(content).toContain('**Review mode**: commit:abc123def4567890');
+    // The ref must appear exactly once on the mode line.
+    const modeLine = content.split('\n').find(l => l.includes('Review mode')) ?? '';
+    expect(modeLine.match(/abc123def4567890/g)?.length ?? 0).toBe(1);
   });
 });
 
