@@ -2,6 +2,14 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.10] - 2026-05-22
+
+
+- Fixed a crash when switching between files in the diff viewer that broke the outline breadcrumb.
+- Restored the theme editor's Reset feature for custom themes, which previously always fell back to the dark theme.
+
+- Enabled the GitHub Sponsor button on the repository.
+
 ## [0.9.9] - 2026-05-22
 
 
