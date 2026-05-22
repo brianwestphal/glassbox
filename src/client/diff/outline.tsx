@@ -1,5 +1,5 @@
 import type { SafeHtml } from 'kerfjs';
-import { delegate, mount, signal } from 'kerfjs';
+import { delegate, effect, morph, signal } from 'kerfjs';
 
 import { getOutline } from '../../api/index.js';
 import { toElement } from '../dom.js';
@@ -17,25 +17,29 @@ interface OutlineContainer extends HTMLElement {
 }
 
 // Reactive sources for the breadcrumb: the file's symbol tree and the
-// currently top-most visible line. The mount() in `loadOutline()` reads both
-// and re-renders automatically — no manual `updateBreadcrumb()` calls.
+// currently top-most visible line. The effect() in `loadOutline()` reads both
+// and re-runs `morph()` against the bar automatically — no manual
+// `updateBreadcrumb()` calls.
 const symbolsSignal = signal<OutlineSymbol[]>([]);
 const topLineSignal = signal<number | null>(null);
 let scrollRafId = 0;
-// Disposer for the current outline-bar mount. Held so a file switch (which
+// Disposer for the current breadcrumb effect. Held so a file switch (which
 // removes the bar element + creates a fresh one) can release the previous
-// mount's signal subscriptions instead of leaking them.
-let disposeOutlineMount: (() => void) | null = null;
+// effect's signal subscriptions instead of leaking them.
+let disposeOutlineEffect: (() => void) | null = null;
 
 export async function loadOutline(fileId: string) {
+  // Tear down the previous breadcrumb effect BEFORE clearing the signals it
+  // reads. On a file switch, kerf may have already replaced `.diff-content`
+  // (which removes the previous bar), so the previous effect is bound to a
+  // now-detached element. Writing to the signals before disposing would fire
+  // the dead effect and call `morph()` on the orphan node.
+  if (disposeOutlineEffect !== null) {
+    disposeOutlineEffect();
+    disposeOutlineEffect = null;
+  }
   symbolsSignal.value = [];
   topLineSignal.value = null;
-
-  // Tear down the previous mount before removing its root element.
-  if (disposeOutlineMount !== null) {
-    disposeOutlineMount();
-    disposeOutlineMount = null;
-  }
   document.querySelectorAll('.outline-bar').forEach(el => { el.remove(); });
 
   try {
@@ -54,15 +58,22 @@ export async function loadOutline(fileId: string) {
   const bar = toElement(<div className="outline-bar" id="outline-bar"></div>);
   header.after(bar);
 
-  // Single mount drives the breadcrumb against `symbolsSignal` + `topLineSignal`.
-  // The mount root is the bar itself (not inside any `data-morph-skip` region),
-  // so kerf owns the subtree end-to-end. The dropdown is a transient overlay
-  // appended to `bar` outside the mount tree (see `showDropdown` below) — kerf
-  // treats out-of-tree children as foreign and leaves them alone.
-  disposeOutlineMount = mount(bar, () => renderBreadcrumb(symbolsSignal.value, topLineSignal.value));
+  // The bar lives inside `#diff-container`, which itself has a `mount()` (see
+  // `setupMount()` in `diff/index.tsx`). kerf forbids nested `mount()` calls
+  // — `assertNotInsideMountedTree` walks ancestors and throws as soon as it
+  // sees the outer mount marker. So we drive the breadcrumb with a plain
+  // `effect()` + `morph()` instead: the effect subscribes to both signals,
+  // and each run reconciles the bar's contents against the latest template.
+  // (`data-morph-skip` on the parent `.diff-content` only affects morph
+  // traversal, not the mount-ancestry check — see GB-800.)
+  // The dropdown is a transient overlay appended to `bar` (see `showDropdown`
+  // below); morph leaves out-of-template children at the tail intact.
+  disposeOutlineEffect = effect(() => {
+    morph(bar, renderBreadcrumb(symbolsSignal.value, topLineSignal.value));
+  });
 
-  // Delegate clicks on the breadcrumb (inside the mount tree) up to the bar
-  // root so the handler survives every mount re-render.
+  // Delegate clicks on the breadcrumb up to the bar root so the handler
+  // survives every morph reconciliation.
   delegate(bar, 'click', '.outline-breadcrumb', (e) => {
     e.stopPropagation();
     toggleDropdown();
