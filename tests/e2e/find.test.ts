@@ -32,9 +32,19 @@ test.describe('GB-797: find-in-diff across text-node boundaries', () => {
   }
 
   async function search(page: import('@playwright/test').Page, query: string) {
-    // The find bar is created lazily on first Cmd+F. Use the keyboard
-    // event so the bind path under test actually runs.
-    await page.keyboard.press('Meta+F');
+    // The find bar is created lazily on first Cmd/Ctrl+F. We dispatch the
+    // keydown event directly into the DOM rather than going through
+    // `page.keyboard.press('Meta+F')` — on headless Chromium the browser
+    // itself intercepts Meta+F (and Ctrl+F) for its native find bar before
+    // the page's `document.addEventListener('keydown', …)` ever sees it,
+    // so the press-based shape never opens our bar in CI. Dispatching the
+    // event from inside the page bypasses that and exercises the exact
+    // same handler the production path runs.
+    await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'f', metaKey: true, bubbles: true, cancelable: true,
+      }));
+    });
     const input = page.locator('.find-bar .find-input');
     await expect(input).toBeVisible({ timeout: 3000 });
     await input.fill(query);
