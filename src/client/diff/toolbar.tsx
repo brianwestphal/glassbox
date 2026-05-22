@@ -1,7 +1,7 @@
 import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
-import { api } from '../api.js';
+import { saveAIPreferences } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { diffViewStore } from '../stores/index.js';
 import { applyHighlighting, getLanguageList } from './highlight.js';
@@ -29,7 +29,7 @@ export function bindToolbar(): void {
   delegate(toolbar, 'click', '[data-svg-mode]', (_e, btn) => {
     const mode = (btn as HTMLElement).dataset.svgMode as 'code' | 'rendered';
     diffViewStore.actions.update({ svgViewMode: mode });
-    void api('/ai/preferences', { method: 'POST', body: { svg_view_mode: mode } });
+    void saveAIPreferences({ svg_view_mode: mode });
     toolbar.querySelectorAll('[data-svg-mode]').forEach(b => b.classList.toggle('active', b === btn));
   });
 
@@ -54,13 +54,13 @@ export function bindToolbar(): void {
     const ignoreWhitespace = !diffViewStore.state.value.ignoreWhitespace;
     diffViewStore.actions.update({ ignoreWhitespace });
     (btn as HTMLElement).classList.toggle('active', ignoreWhitespace);
-    void api('/ai/preferences', { method: 'POST', body: { ignore_whitespace: ignoreWhitespace } });
+    void saveAIPreferences({ ignore_whitespace: ignoreWhitespace });
   });
 
   delegate(toolbar, 'click', '[data-image-mode]', (_e, btn) => {
     const mode = (btn as HTMLElement).dataset.imageMode ?? '';
     diffViewStore.actions.update({ lastImageMode: mode });
-    void api('/ai/preferences', { method: 'POST', body: { last_image_mode: mode } });
+    void saveAIPreferences({ last_image_mode: mode });
   });
 
   delegate(toolbar, 'click', '#language-btn', (e, btn) => {

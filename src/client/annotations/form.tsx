@@ -1,8 +1,8 @@
 import { delegate } from 'kerfjs';
 
-import { api } from '../api.js';
+import type { AnnotationCategory, AnnotationSide } from '../../api/index.js';
+import { createAnnotation } from '../../api/index.js';
 import { toElement } from '../dom.js';
-import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import { editFormSignal, reviewStore, setEditForm } from '../stores/index.js';
 import { buildCategoryBadge } from './categories.js';
@@ -95,15 +95,12 @@ async function saveNewAnnotation(): Promise<void> {
   const lineNumber = parseInt(lineNumberStr, 10);
   if (isNaN(lineNumber)) return;
 
-  const annotation = await api<Annotation>('/annotations', {
-    method: 'POST',
-    body: {
-      reviewFileId: reviewStore.state.value.currentFileId,
-      lineNumber,
-      side,
-      category: state.category,
-      content,
-    },
+  const annotation = await createAnnotation({
+    reviewFileId: reviewStore.state.value.currentFileId ?? '',
+    lineNumber,
+    side: side as AnnotationSide,
+    category: state.category as AnnotationCategory,
+    content,
   });
 
   document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${state.formKey}"]`).forEach(el => { el.remove(); });

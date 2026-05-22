@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { Hono } from 'hono';
 import { resolve } from 'path';
 
+import type { FindSymbolDefinitionResp, GetOutlineResp, SymbolDef } from '../../api/index.js';
 import { getReviewFile, getReviewFiles } from '../../db/queries.js';
 import { getFileContent, parseDiffData } from '../../git/diff.js';
 import type { OutlineSymbol } from '../../outline/parser.js';
@@ -11,14 +12,6 @@ import type { AppEnv } from '../../types.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const outlineRoutes = new Hono<AppEnv>();
-
-interface SymbolDef {
-  fileId: string | null;
-  filePath: string;
-  name: string;
-  kind: string;
-  line: number;
-}
 
 outlineRoutes.get('/outline/:fileId', async (c) => {
   const repoRoot = c.get('repoRoot');
@@ -35,10 +28,10 @@ outlineRoutes.get('/outline/:fileId', async (c) => {
       : getFileContent(file.file_path, 'working', repoRoot);
   } catch { /* file not accessible */ }
 
-  if (!content) return c.json({ symbols: [] });
+  if (!content) return c.json<GetOutlineResp>({ symbols: [] });
 
   const symbols = parseOutline(content, file.file_path);
-  return c.json({ symbols });
+  return c.json<GetOutlineResp>({ symbols });
 });
 
 outlineRoutes.get('/symbol-definition', async (c) => {
@@ -107,7 +100,7 @@ outlineRoutes.get('/symbol-definition', async (c) => {
     return 0;
   });
 
-  return c.json({ definitions });
+  return c.json<FindSymbolDefinitionResp>({ definitions });
 });
 
 function collectDefinitions(

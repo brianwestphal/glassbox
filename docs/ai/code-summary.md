@@ -60,6 +60,29 @@ glassbox/
 | `review-update.ts` | Refreshes diffs for an existing review when HEAD is the same but the working tree changed. Runs fuzzy annotation migration. |
 | `global-config.ts` | Single source of truth for `~/.glassbox/config.json` and the `~/.glassbox/` dir. Exports `readGlobalConfig()` and `updateGlobalConfig(mutator)` (read-modify-write under one call so concurrent writers can't clobber unrelated keys). All other modules go through this — channel toggle, share prompt, theme selection, AI preferences, API keys. |
 
+### `src/api/` — typed API layer (shared by client + server)
+
+| File | Purpose |
+|------|---------|
+| `_runner.ts` | Client-only runtime helper: re-exports `api()` from `client/api.ts` and a tiny `qs()` query-string builder. Per-resource caller functions go through this. |
+| `index.ts` | Aggregator. Re-exports every per-resource module (`export *`) so callers can `import { createAnnotation } from '../api/index.js'` AND get a flat `apis` namespace (`apis.createAnnotation({...})`) for discoverability. |
+| `annotations.ts` | Req/Resp types + callers for `/annotations/*` (create / update / delete / move / keep / stale-delete-all / stale-keep-all / list-all). |
+| `context.ts` | `GetContextLinesReq/Resp` + `getContextLines()` for hunk expansion. |
+| `files.ts` | `/files` list / detail / status / reveal. |
+| `outline.ts` | `/outline/:fileId` + `/symbol-definition` (go-to-definition). |
+| `image.ts` | `/image/:fileId/metadata` typed; per-side binary uses an `imageUrl()` URL builder (not a fetch). |
+| `project-settings.ts` | `.glassbox/settings.json` get/update. |
+| `reviews.ts` | Review CRUD, complete/reopen/refresh, delete-completed/all, gitignore add/dismiss. |
+| `share-prompt.ts` | Share-prompt state / dismiss / tick. |
+| `ai.ts` | Config / models / key-status / key / analysis (start/get/status) / preferences / debug. |
+| `themes.ts` | Themes list / active / create / edit / update / delete. |
+| `channel.ts` | Channel status / enable / disable / trigger / claude-check. |
+
+How the layer is used:
+- **Client** imports the typed callers — `await createAnnotation({...})` instead of `api<{...inline shape...}>('/annotations', {method: 'POST', body: {...}})`. No call site knows raw URLs anymore. The flat namespace `apis.createAnnotation(...)` is also available.
+- **Server** route handlers `import type { CreateAnnotationReq, CreateAnnotationResp } from '../../api/index.js'` and use them in `c.req.json<XReq>()` / `c.json<XResp>(...)`. Drift between client and server fails to compile.
+- Caller names are globally unique across modules (e.g. `getCurrentReview`, `getAIConfig`, `getOutline`) because they're aggregated into one flat namespace.
+
 ### `src/routes/` — HTTP handlers
 
 | File | Purpose |
@@ -556,9 +579,10 @@ Update `docs/ai/code-summary.md` in the same pass whenever you:
 
 1. Add, remove, or rename a file under `src/` or `src-tauri/src/`.
 2. Add, remove, or restructure a subfolder under `src/client/`,
-   `src/routes/`, `src/ai/`, `src/git/`, `src/db/`, `src/themes/`,
+   `src/routes/`, `src/api/`, `src/ai/`, `src/git/`, `src/db/`, `src/themes/`,
    `src/export/`, `src/outline/`, `src/utils/`, or `src/components/`.
-3. Add or remove an HTTP route (page, API, AI, theme, channel).
+3. Add or remove an HTTP route (page, API, AI, theme, channel). This
+   ALWAYS pairs with adding a typed Req/Resp + caller in `src/api/<resource>.ts`.
 4. Change the database schema (columns, tables, indexes).
 5. Add a new AI platform, analysis type, or annotation category.
 6. Change the build pipeline (tsup config, external deps,
@@ -574,7 +598,7 @@ two documents intentionally overlap.
 
 | Task | Start here |
 |------|------------|
-| Add a new API endpoint | Pick the right sub-router under `src/routes/api/` (or add a new one and mount it in `src/routes/api.ts`); for AI/themes/channel use `src/routes/ai-*.ts`, `theme-api.ts`, `channel-api.ts`. Register a brand-new group in `src/server.ts`. |
+| Add a new API endpoint | **Two-sided change.** 1) Define `XReq`/`XResp` types + a typed caller (`createX`, `getX`, …) in the matching `src/api/<resource>.ts`. 2) Pick the right sub-router under `src/routes/api/` (or `routes/ai-*.ts`, `theme-api.ts`, `channel-api.ts`) and use `c.req.json<XReq>()` / `c.json<XResp>(...)`. Caller names must be globally unique across modules (flat `apis` namespace). Client call sites use `await getX({ ... })` from `../api/index.js` — never the raw `api<T>()` helper. |
 | Add a new page/route | `src/routes/pages.tsx`; register in `src/server.ts`. |
 | Change the DB schema | `src/db/schema.ts` (tables/indexes) + a migration in `src/db/connection.ts` (`addColumnIfMissing` pattern). Query code in `src/db/queries.ts` or `ai-queries.ts`. |
 | Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api/annotations.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |

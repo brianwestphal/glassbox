@@ -2,31 +2,23 @@
  * Client-side theme application. Applies theme colors by setting CSS custom
  * properties on document.documentElement.
  */
-import { api } from './api.js';
+import { setActiveTheme } from '../api/index.js';
 
-interface ThemeColors {
-  [key: string]: string;
-}
-
-interface ActiveThemeResponse {
-  id: string;
-  colors: ThemeColors;
-}
-
-/** Apply theme colors to the document root. */
-export function applyThemeColors(colors: ThemeColors): void {
+/** Apply theme colors to the document root. Accepts either the typed
+ *  `ThemeColors` shape from `src/themes/built-in.ts` or a plain string map
+ *  (live-editor scratch state) — both are walked the same way. */
+export function applyThemeColors(colors: object): void {
   const root = document.documentElement;
   for (const [key, value] of Object.entries(colors)) {
-    root.style.setProperty(`--${key}`, value);
+    if (typeof value === 'string') {
+      root.style.setProperty(`--${key}`, value);
+    }
   }
 }
 
 /** Switch to a theme by ID. Persists via API and applies colors immediately. */
 export async function switchTheme(id: string): Promise<void> {
-  const result = await api<ActiveThemeResponse>('/themes/active', {
-    method: 'POST',
-    body: { id },
-  });
+  const result = await setActiveTheme({ id });
   applyThemeColors(result.colors);
   document.documentElement.setAttribute('data-theme', id);
 }

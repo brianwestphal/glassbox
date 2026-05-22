@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { CompleteReviewResp, DeleteAllReviewsResp, DeleteCompletedReviewsResp, GetCurrentReviewResp, ListReviewsResp, RefreshReviewResp, ReopenReviewResp } from '../../api/index.js';
 import { deleteReview, getReview, listReviews, updateReviewStatus } from '../../db/queries.js';
 import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt, generateReviewExport, shouldPromptGitignore } from '../../export/generate.js';
 import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js';
@@ -12,13 +13,13 @@ export const reviewsRoutes = new Hono<AppEnv>();
 reviewsRoutes.get('/reviews', async (c) => {
   const repoRoot = c.get('repoRoot');
   const reviews = await listReviews(repoRoot);
-  return c.json(reviews);
+  return c.json<ListReviewsResp>(reviews);
 });
 
 reviewsRoutes.get('/review', async (c) => {
   const reviewId = resolveReviewId(c);
   const review = await getReview(reviewId);
-  return c.json(review);
+  return c.json<GetCurrentReviewResp>(review ?? null);
 });
 
 reviewsRoutes.post('/review/complete', async (c) => {
@@ -29,7 +30,7 @@ reviewsRoutes.post('/review/complete', async (c) => {
   const isCurrent = reviewId === currentReviewId;
   const exportPath = await generateReviewExport(reviewId, repoRoot, isCurrent);
   const gitignorePrompt = shouldPromptGitignore(repoRoot);
-  return c.json({ status: 'completed', exportPath, isCurrent, reviewId, gitignorePrompt });
+  return c.json<CompleteReviewResp>({ status: 'completed', exportPath, isCurrent, reviewId, gitignorePrompt });
 });
 
 reviewsRoutes.post('/gitignore/add', (c) => {
@@ -47,7 +48,7 @@ reviewsRoutes.post('/gitignore/dismiss', (c) => {
 reviewsRoutes.post('/review/reopen', async (c) => {
   const reviewId = resolveReviewId(c);
   await updateReviewStatus(reviewId, 'in_progress');
-  return c.json({ status: 'in_progress' });
+  return c.json<ReopenReviewResp>({ status: 'in_progress' });
 });
 
 reviewsRoutes.post('/review/refresh', async (c) => {
@@ -61,7 +62,7 @@ reviewsRoutes.post('/review/refresh', async (c) => {
   const diffs = getFileDiffs(mode, repoRoot);
   const result = await updateReviewDiffs(reviewId, diffs, headCommit);
 
-  return c.json({
+  return c.json<RefreshReviewResp>({
     updated: result.updated,
     added: result.added,
     stale: result.stale,
@@ -90,7 +91,7 @@ reviewsRoutes.post('/reviews/delete-completed', async (c) => {
     deleteReviewExport(r.id, repoRoot);
     await deleteReview(r.id);
   }
-  return c.json({ deleted: toDelete.length });
+  return c.json<DeleteCompletedReviewsResp>({ deleted: toDelete.length });
 });
 
 reviewsRoutes.post('/reviews/delete-all', async (c) => {
@@ -102,5 +103,5 @@ reviewsRoutes.post('/reviews/delete-all', async (c) => {
     deleteReviewExport(r.id, repoRoot);
     await deleteReview(r.id);
   }
-  return c.json({ deleted: toDelete.length });
+  return c.json<DeleteAllReviewsResp>({ deleted: toDelete.length });
 });

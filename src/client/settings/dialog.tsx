@@ -1,7 +1,22 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
-import { api } from '../api.js';
+import type { AIPlatform, KeyStorage } from '../../api/index.js';
+import {
+  deleteAIKey,
+  disableChannel,
+  enableChannel,
+  getAIConfig,
+  getAIKeyStatus,
+  getChannelStatus,
+  getClaudeCheck,
+  getProjectSettings,
+  listAIModels,
+  listThemes,
+  saveAIConfig,
+  saveAIKey,
+  updateProjectSettings,
+} from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
 import { triggerShare } from '../share.js';
@@ -13,19 +28,11 @@ import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURAT
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
-import type { ChannelState, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
+import type { ChannelState, ConfigResponse, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
 import { updatesTab } from './updatesTab.js';
 
 const TABS: Tab[] = [generalTab, profileTab, experimentalTab, updatesTab];
-
-interface ConfigResponse {
-  platform: string;
-  model: string;
-  keyConfigured: boolean;
-  keySource: string | null;
-  guidedReview: { enabled: boolean; topics: string[] };
-}
 
 interface SettingsUIState {
   activeTab: string;
@@ -41,13 +48,13 @@ interface SettingsUIState {
 export function showSettingsDialog(onClose?: () => void): void {
   void (async () => {
     const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus] = await Promise.all([
-      api<KeyStatusResponse>('/ai/key-status'),
-      api<ModelsResponse>('/ai/models'),
-      api<ConfigResponse>('/ai/config'),
-      api<ProjectSettings>('/project-settings'),
-      api<ThemesResponse>('/themes'),
-      api<{ installed: boolean; version: string | null; meetsMinimum: boolean }>('/channel/claude-check'),
-      api<{ enabled: boolean; connected: boolean }>('/channel/status'),
+      getAIKeyStatus(),
+      listAIModels(),
+      getAIConfig(),
+      getProjectSettings(),
+      listThemes(),
+      getClaudeCheck(),
+      getChannelStatus(),
     ]);
 
     const channelState: ChannelState = {
@@ -175,16 +182,13 @@ function createActions(deps: ActionDeps): Actions {
       || newTopics.some(t => !lastSavedGuidedTopics.has(t));
 
     void (async () => {
-      await api('/ai/config', {
-        method: 'POST',
-        body: {
-          platform: cur.currentPlatform,
-          model: cur.currentModel,
-          guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
-        },
+      await saveAIConfig({
+        platform: cur.currentPlatform as AIPlatform,
+        model: cur.currentModel,
+        guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
       });
 
-      const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+      const newConfig = await getAIConfig();
       aiStore.actions.update({
         aiConfigured: newConfig.keyConfigured,
         guidedReviewEnabled: cur.guidedEnabled,
@@ -211,7 +215,7 @@ function createActions(deps: ActionDeps): Actions {
     appNameTimer = setTimeout(() => {
       const val = ui.value.appName.trim();
       if (val !== (projectSettings.appName ?? '')) {
-        void api('/project-settings', { method: 'PATCH', body: { appName: val } });
+        void updateProjectSettings({ appName: val });
         projectSettings.appName = val || undefined;
       }
     }, SETTINGS_APP_NAME_DEBOUNCE_MS);
@@ -223,13 +227,14 @@ function createActions(deps: ActionDeps): Actions {
     const storageRadio = overlay.querySelector<HTMLInputElement>('input[name="key-storage"]:checked');
     const storage = storageRadio?.value ?? 'config';
     void (async () => {
-      await api('/ai/key', {
-        method: 'POST',
-        body: { platform: ui.value.currentPlatform, key: keyInput.value.trim(), storage },
+      await saveAIKey({
+        platform: ui.value.currentPlatform as AIPlatform,
+        key: keyInput.value.trim(),
+        storage: storage as KeyStorage,
       });
-      const newStatus = await api<KeyStatusResponse>('/ai/key-status');
+      const newStatus = await getAIKeyStatus();
       keyStatus.status = newStatus.status;
-      const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+      const newConfig = await getAIConfig();
       aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
       forceRerender();
     })();
@@ -237,10 +242,10 @@ function createActions(deps: ActionDeps): Actions {
 
   function removeKey(): void {
     void (async () => {
-      await api(`/ai/key?platform=${ui.value.currentPlatform}`, { method: 'DELETE' });
-      const newStatus = await api<KeyStatusResponse>('/ai/key-status');
+      await deleteAIKey({ platform: ui.value.currentPlatform as AIPlatform });
+      const newStatus = await getAIKeyStatus();
       keyStatus.status = newStatus.status;
-      const newConfig = await api<{ keyConfigured: boolean }>('/ai/config');
+      const newConfig = await getAIConfig();
       aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
       forceRerender();
     })();
@@ -305,7 +310,7 @@ function buildContext(args: {
     saveAppNameDebounced: args.actions.saveAppNameDebounced,
     switchTheme: (id: string) => void switchTheme(id),
     showThemeManager,
-    refreshThemes: () => api<ThemesResponse>('/themes').then(updated => {
+    refreshThemes: () => listThemes().then(updated => {
       args.themesData.themes = updated.themes;
       args.themesData.activeId = updated.activeId;
       return updated;
@@ -344,7 +349,7 @@ function setupDelegates(args: {
   delegate(overlay, 'click', '#manage-themes-btn', () => {
     showThemeManager(() => {
       void (async () => {
-        const updated = await api<ThemesResponse>('/themes');
+        const updated = await listThemes();
         themesData.themes = updated.themes;
         themesData.activeId = updated.activeId;
         setUi({ activeThemeId: updated.activeId });
@@ -371,7 +376,7 @@ function setupDelegates(args: {
   delegate(overlay, 'click', '.settings-platform-control [data-platform]', (_e, btn) => {
     const platform = (btn as HTMLElement).dataset.platform;
     if (platform === undefined) return;
-    const models = modelsData.models[platform] ?? [];
+    const models = modelsData.models[platform as AIPlatform];
     const defaultModel = models.find(m => m.isDefault);
     const newModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
     setUi({ currentPlatform: platform, currentModel: newModel });
@@ -394,7 +399,7 @@ function setupDelegates(args: {
   delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
     const enabled = (cb as HTMLInputElement).checked;
     channelState.enabled = enabled;
-    void api(enabled ? '/channel/enable' : '/channel/disable', { method: 'POST' });
+    void (enabled ? enableChannel() : disableChannel());
     forceRerender();
   });
   delegate(overlay, 'click', '#channel-copy-btn', (_e, btn) => {

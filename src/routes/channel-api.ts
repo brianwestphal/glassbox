@@ -3,6 +3,7 @@ import { mkdirSync } from 'fs';
 import { Hono } from 'hono';
 import { join } from 'path';
 
+import type { GetChannelStatusResp, GetClaudeCheckResp, TriggerChannelReq } from '../api/index.js';
 import { isChannelAlive, registerChannel, triggerChannel, unregisterChannel } from '../channel-config.js';
 import { readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import type { AppEnv } from '../types.js';
@@ -17,7 +18,7 @@ channelApiRoutes.get('/status', async (c) => {
   const repoRoot = c.get('repoRoot');
   const dataDir = join(repoRoot, '.glassbox');
   const connected = enabled ? await isChannelAlive(dataDir) : false;
-  return c.json({ enabled, connected });
+  return c.json<GetChannelStatusResp>({ enabled, connected });
 });
 
 /** POST /channel/enable — enable channel and register in .mcp.json */
@@ -45,7 +46,7 @@ channelApiRoutes.post('/disable', (c) => {
 
 /** POST /channel/trigger — send a message to Claude via the channel */
 channelApiRoutes.post('/trigger', async (c) => {
-  const body = await c.req.json<{ message: string }>();
+  const body = await c.req.json<TriggerChannelReq>();
   if (!isNonEmptyString(body.message)) {
     return c.json({ error: 'message must be a non-empty string' }, 400);
   }
@@ -63,7 +64,7 @@ channelApiRoutes.get('/claude-check', (c) => {
   try {
     const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', timeout: 5000 });
     if (result.status !== 0) {
-      return c.json({ installed: false, version: null, meetsMinimum: false });
+      return c.json<GetClaudeCheckResp>({ installed: false, version: null, meetsMinimum: false });
     }
     const version = result.stdout.trim();
     // Extract version number (e.g., "claude v2.1.80" → "2.1.80")
@@ -75,8 +76,8 @@ channelApiRoutes.get('/claude-check', (c) => {
       const parts = ver.split('.').map(Number);
       meetsMinimum = parts[0] > 2 || (parts[0] === 2 && parts[1] > 1) || (parts[0] === 2 && parts[1] === 1 && parts[2] >= 80);
     }
-    return c.json({ installed: true, version: ver, meetsMinimum });
+    return c.json<GetClaudeCheckResp>({ installed: true, version: ver, meetsMinimum });
   } catch {
-    return c.json({ installed: false, version: null, meetsMinimum: false });
+    return c.json<GetClaudeCheckResp>({ installed: false, version: null, meetsMinimum: false });
   }
 });

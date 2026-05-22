@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { getContextLines } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { postHunkExpand } from './index.js';
 
@@ -101,8 +101,7 @@ export function handleHunkExpand(el: HTMLElement): void {
   if (gapEnd < gapStart) return;
 
   void (async () => {
-    const data = await api<{ lines: Array<{ num: number; content: string }> }>(
-      `/context/${fileId}?start=${String(gapStart)}&end=${String(gapEnd)}`);
+    const data = await getContextLines({ fileId, start: gapStart, end: gapEnd });
     if (data.lines.length === 0) return;
 
     if (splitCol !== null) {
@@ -122,8 +121,7 @@ function handleTailExpand(el: HTMLElement, fileId: string): void {
   const splitCol = el.closest('.split-col');
 
   void (async () => {
-    const data = await api<{ lines: Array<{ num: number; content: string }> }>(
-      `/context/${fileId}?start=${String(start)}&end=999999`);
+    const data = await getContextLines({ fileId, start, end: 999999 });
     if (data.lines.length === 0) {
       if (splitCol !== null) {
         const splitColumns = splitCol.closest('.split-columns');

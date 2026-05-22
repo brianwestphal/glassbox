@@ -1,5 +1,17 @@
 import { Hono } from 'hono';
 
+import type {
+  CreateAnnotationReq,
+  CreateAnnotationResp,
+  DeleteAnnotationResp,
+  DeleteStaleAnnotationsResp,
+  KeepAllStaleAnnotationsResp,
+  KeepAnnotationResp,
+  ListAllAnnotationsResp,
+  MoveAnnotationReq,
+  UpdateAnnotationReq,
+  UpdateAnnotationResp,
+} from '../../api/index.js';
 import { addAnnotation, deleteAnnotation, deleteStaleAnnotations, getAnnotationsForReview, keepAllStaleAnnotations, markAnnotationCurrent, moveAnnotation, updateAnnotation } from '../../db/queries.js';
 import { scheduleAutoExport } from '../../export/auto-export.js';
 import type { AppEnv } from '../../types.js';
@@ -17,13 +29,7 @@ function autoExport(c: { get: (key: 'reviewId' | 'repoRoot') => string }) {
 }
 
 annotationsRoutes.post('/annotations', async (c) => {
-  const body = await c.req.json<{
-    reviewFileId: string;
-    lineNumber: number;
-    side: string;
-    category: string;
-    content: string;
-  }>();
+  const body = await c.req.json<CreateAnnotationReq>();
 
   if (!isNonEmptyString(body.reviewFileId)) {
     return c.json({ error: 'reviewFileId must be a non-empty string' }, 400);
@@ -43,11 +49,11 @@ annotationsRoutes.post('/annotations', async (c) => {
     body.reviewFileId, body.lineNumber, sideCheck.ok, categoryCheck.ok, body.content
   );
   autoExport(c);
-  return c.json(annotation, 201);
+  return c.json<CreateAnnotationResp>(annotation, 201);
 });
 
 annotationsRoutes.patch('/annotations/:id', async (c) => {
-  const { content, category } = await c.req.json<{ content: string; category: string }>();
+  const { content, category } = await c.req.json<Omit<UpdateAnnotationReq, 'id'>>();
 
   if (!isNonEmptyString(content)) {
     return c.json({ error: 'content must be a non-empty string' }, 400);
@@ -57,17 +63,17 @@ annotationsRoutes.patch('/annotations/:id', async (c) => {
 
   await updateAnnotation(c.req.param('id'), content, categoryCheck.ok);
   autoExport(c);
-  return c.json({ ok: true });
+  return c.json<UpdateAnnotationResp>({ ok: true });
 });
 
 annotationsRoutes.delete('/annotations/:id', async (c) => {
   await deleteAnnotation(c.req.param('id'));
   autoExport(c);
-  return c.json({ ok: true });
+  return c.json<DeleteAnnotationResp>({ ok: true });
 });
 
 annotationsRoutes.patch('/annotations/:id/move', async (c) => {
-  const { lineNumber, side } = await c.req.json<{ lineNumber: number; side: string }>();
+  const { lineNumber, side } = await c.req.json<Omit<MoveAnnotationReq, 'id'>>();
 
   if (typeof lineNumber !== 'number' || !Number.isInteger(lineNumber) || lineNumber < 1) {
     return c.json({ error: 'lineNumber must be a positive integer' }, 400);
@@ -77,31 +83,31 @@ annotationsRoutes.patch('/annotations/:id/move', async (c) => {
 
   await moveAnnotation(c.req.param('id'), lineNumber, sideCheck.ok);
   autoExport(c);
-  return c.json({ ok: true });
+  return c.json<UpdateAnnotationResp>({ ok: true });
 });
 
 annotationsRoutes.post('/annotations/:id/keep', async (c) => {
   await markAnnotationCurrent(c.req.param('id'));
   autoExport(c);
-  return c.json({ ok: true });
+  return c.json<KeepAnnotationResp>({ ok: true });
 });
 
 annotationsRoutes.post('/annotations/stale/delete-all', async (c) => {
   const reviewId = resolveReviewId(c);
   await deleteStaleAnnotations(reviewId);
   autoExport(c);
-  return c.json({ ok: true });
+  return c.json<DeleteStaleAnnotationsResp>({ ok: true });
 });
 
 annotationsRoutes.post('/annotations/stale/keep-all', async (c) => {
   const reviewId = resolveReviewId(c);
   await keepAllStaleAnnotations(reviewId);
   autoExport(c);
-  return c.json({ ok: true });
+  return c.json<KeepAllStaleAnnotationsResp>({ ok: true });
 });
 
 annotationsRoutes.get('/annotations/all', async (c) => {
   const reviewId = resolveReviewId(c);
   const annotations = await getAnnotationsForReview(reviewId);
-  return c.json(annotations);
+  return c.json<ListAllAnnotationsResp>(annotations);
 });

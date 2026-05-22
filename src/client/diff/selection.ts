@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { setFileStatus } from '../../api/index.js';
 import { reviewStore } from '../stores/index.js';
 import { updateNavFilePath } from './index.js';
 import { navPush } from './navStack.js';
@@ -14,7 +14,7 @@ export async function selectFile(fileId: string): Promise<void> {
 
   // Mark as reviewed on first visit
   if (file !== undefined && file.status === 'pending') {
-    await api('/files/' + fileId + '/status', { method: 'PATCH', body: { status: 'reviewed' } });
+    await setFileStatus({ fileId, status: 'reviewed' });
     const files = reviewStore.state.value.files.map(f =>
       f.id === fileId ? { ...f, status: 'reviewed' } : f,
     );

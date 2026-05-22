@@ -1,8 +1,9 @@
 import type { SafeHtml } from 'kerfjs';
 import { attr, delegate, mount, signal } from 'kerfjs';
 
+import type { ListThemesResp, ThemeSummary as ApiThemeSummary } from '../../api/index.js';
+import { createTheme, deleteTheme, getActiveTheme, listThemes } from '../../api/index.js';
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash } from '../../icons.js';
-import { api } from '../api.js';
 import { toElement } from '../dom.js';
 import { applyThemeColors, switchTheme } from '../themes.js';
 import { showThemeEditor } from './themeEditor.js';
@@ -13,17 +14,8 @@ const CTX = {
   delete: attr('data-ctx', 'delete'),
 } as const;
 
-interface ThemeSummary {
-  id: string;
-  name: string;
-  builtIn: boolean;
-  colors: Record<string, string>;
-}
-
-interface ThemesResponse {
-  themes: ThemeSummary[];
-  activeId: string;
-}
+type ThemesResponse = ListThemesResp;
+type ThemeSummary = ApiThemeSummary;
 
 const SWATCH_KEYS = ['bg', 'text', 'accent', 'green', 'red'];
 
@@ -55,7 +47,7 @@ function showDeleteConfirm(themeName: string, onConfirm: () => void): void {
 
 export function showThemeManager(onThemeChanged?: () => void): void {
   void (async () => {
-    const initial = await api<ThemesResponse>('/themes');
+    const initial = await listThemes();
     const themesSignal = signal<ThemesResponse>(initial);
 
     const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog theme-manager-dialog"></div></div>);
@@ -89,7 +81,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
     }
 
     async function refresh(): Promise<void> {
-      themesSignal.value = await api<ThemesResponse>('/themes');
+      themesSignal.value = await listThemes();
     }
 
     async function useTheme(id: string): Promise<void> {
@@ -156,7 +148,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
       delegate(menu, 'click', CTX.duplicate.selector, () => {
         void (async () => {
           removeContextMenu();
-          await api('/themes', { method: 'POST', body: { sourceId: themeId } });
+          await createTheme({ sourceId: themeId });
           await refresh();
           if (onThemeChanged !== undefined) onThemeChanged();
         })();
@@ -166,9 +158,9 @@ export function showThemeManager(onThemeChanged?: () => void): void {
         showDeleteConfirm(theme.name, () => {
           void (async () => {
             const wasActive = themeId === themesSignal.value.activeId;
-            await api(`/themes/${themeId}`, { method: 'DELETE' });
+            await deleteTheme({ id: themeId });
             if (wasActive) {
-              const active = await api<{ id: string; colors: Record<string, string> }>('/themes/active');
+              const active = await getActiveTheme();
               applyThemeColors(active.colors);
               document.documentElement.setAttribute('data-theme', active.id);
             }
@@ -223,7 +215,7 @@ function renderItem(t: ThemeSummary, activeId: string): SafeHtml {
       <div className="theme-manager-info" data-click-use={t.id}>
         <div className="theme-manager-swatches">
           {SWATCH_KEYS.map(k => (
-            <span className="theme-swatch" style={`background:${t.colors[k] ?? '#888'}`}></span>
+            <span className="theme-swatch" style={`background:${(t.colors as unknown as Record<string, string>)[k] ?? '#888'}`}></span>
           ))}
         </div>
         <span className="theme-manager-name">{t.name}</span>

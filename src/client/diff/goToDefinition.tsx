@@ -2,7 +2,7 @@
  * Go-to-definition: Cmd+Click (macOS) / Ctrl+Click (Windows/Linux) on a symbol
  * in the diff view navigates to its definition.
  */
-import { api } from '../api.js';
+import { findSymbolDefinition } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
@@ -10,13 +10,6 @@ import { setRawDiffContent } from './index.js';
 import { navPush } from './navStack.js';
 import { selectFile, updateNavFilePath } from './selection.js';
 
-interface SymbolDef {
-  fileId: string | null;
-  filePath: string;
-  name: string;
-  kind: string;
-  line: number;
-}
 
 export function bindGoToDefinition() {
   const container = document.getElementById('diff-container');
@@ -99,9 +92,7 @@ const SKIP_WORDS = new Set([
 
 async function navigateToDefinition(symbolName: string) {
   const currentFileId = reviewStore.state.value.currentFileId ?? '';
-  const data = await api<{ definitions: SymbolDef[] }>(
-    `/symbol-definition?name=${encodeURIComponent(symbolName)}&currentFileId=${encodeURIComponent(currentFileId)}`
-  );
+  const data = await findSymbolDefinition({ name: symbolName, currentFileId });
 
   if (data.definitions.length === 0) {
     showToast(`No definition found for "${symbolName}"`);

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { GetSharePromptStateResp, TickSharePromptReq, TickSharePromptResp } from '../../api/index.js';
 import { readGlobalConfig, updateGlobalConfig } from '../../global-config.js';
 import type { AppEnv } from '../../types.js';
 
@@ -10,7 +11,7 @@ sharePromptRoutes.get('/share-prompt/state', (c) => {
   const sp = config.sharePrompt as Record<string, unknown> | undefined;
   const dismissedAt = sp !== undefined && typeof sp.dismissedAt === 'number' ? sp.dismissedAt : null;
   const totalOpenMs = sp !== undefined && typeof sp.totalOpenMs === 'number' ? sp.totalOpenMs : 0;
-  return c.json({ dismissedAt, totalOpenMs });
+  return c.json<GetSharePromptStateResp>({ dismissedAt, totalOpenMs });
 });
 
 sharePromptRoutes.post('/share-prompt/dismiss', (c) => {
@@ -26,7 +27,7 @@ sharePromptRoutes.post('/share-prompt/tick', async (c) => {
   if (typeof raw !== 'object' || raw === null) {
     return c.json({ error: 'body must be a JSON object' }, 400);
   }
-  const body = raw as { sessionMs?: unknown };
+  const body = raw as Partial<TickSharePromptReq>;
   if (typeof body.sessionMs !== 'number' || !Number.isFinite(body.sessionMs)) {
     return c.json({ error: 'sessionMs must be a finite number' }, 400);
   }
@@ -40,5 +41,5 @@ sharePromptRoutes.post('/share-prompt/tick', async (c) => {
     sp.totalOpenMs = next;
     totalOpenMs = next;
   });
-  return c.json({ totalOpenMs });
+  return c.json<TickSharePromptResp>({ totalOpenMs });
 });

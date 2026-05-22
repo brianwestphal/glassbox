@@ -1,6 +1,7 @@
 import { delegate, morph } from 'kerfjs';
 
-import { api } from '../api.js';
+import type { AnnotationCategory } from '../../api/index.js';
+import { updateAnnotation } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
@@ -64,9 +65,10 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
       return;
     }
     void (async () => {
-      await api('/annotations/' + annotation.id, {
-        method: 'PATCH',
-        body: { content: annotation.content, category: newCategory },
+      await updateAnnotation({
+        id: annotation.id,
+        content: annotation.content,
+        category: newCategory as AnnotationCategory,
       });
       const updated: Annotation = { ...annotation, category: newCategory };
       morph(item, buildAnnotationItemHtml(updated));

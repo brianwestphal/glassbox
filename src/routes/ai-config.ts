@@ -14,6 +14,14 @@ import {
 } from '../ai/config.js';
 import type { AIPlatform } from '../ai/models.js';
 import { MODELS, PLATFORMS } from '../ai/models.js';
+import type {
+  AIConfigResp,
+  AIKeyStatusEntry,
+  GetAIKeyStatusResp,
+  ListAIModelsResp,
+  SaveAIConfigReq,
+  SaveAIKeyReq,
+} from '../api/index.js';
 import { getDemoMode, isAIServiceTest } from '../debug.js';
 import type { AppEnv } from '../types.js';
 import { checkEnum, isNonEmptyString } from '../utils/validate.js';
@@ -25,7 +33,7 @@ const VALID_KEY_STORAGES = ['keychain', 'config'] as const;
 
 aiConfigRoutes.get('/config', (c) => {
   const config = loadAIConfig();
-  return c.json({
+  return c.json<AIConfigResp>({
     platform: config.platform,
     model: config.model,
     keyConfigured: config.apiKey !== null || isAIServiceTest() || getDemoMode() !== null,
@@ -35,11 +43,7 @@ aiConfigRoutes.get('/config', (c) => {
 });
 
 aiConfigRoutes.post('/config', async (c) => {
-  const body = await c.req.json<{
-    platform: string;
-    model: string;
-    guidedReview?: { enabled: boolean; topics: string[] };
-  }>();
+  const body = await c.req.json<SaveAIConfigReq>();
 
   const platformCheck = checkEnum(body.platform, 'platform', VALID_PLATFORMS);
   if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);
@@ -68,7 +72,7 @@ aiConfigRoutes.post('/config', async (c) => {
 });
 
 aiConfigRoutes.get('/models', (c) => {
-  return c.json({
+  return c.json<ListAIModelsResp>({
     platforms: PLATFORMS,
     models: MODELS,
   });
@@ -76,12 +80,13 @@ aiConfigRoutes.get('/models', (c) => {
 
 aiConfigRoutes.get('/key-status', (c) => {
   const platforms = (['anthropic', 'openai', 'google'] as AIPlatform[]);
-  const status: Record<string, { configured: boolean; source: string | null }> = {};
+  const status = {} as GetAIKeyStatusResp['status'];
   for (const platform of platforms) {
     const { source } = resolveAPIKey(platform);
-    status[platform] = { configured: source !== null, source };
+    const entry: AIKeyStatusEntry = { configured: source !== null, source };
+    status[platform] = entry;
   }
-  return c.json({
+  return c.json<GetAIKeyStatusResp>({
     status,
     keychainAvailable: isKeychainAvailable(),
     keychainLabel: getKeychainLabel(),
@@ -90,7 +95,7 @@ aiConfigRoutes.get('/key-status', (c) => {
 });
 
 aiConfigRoutes.post('/key', async (c) => {
-  const body = await c.req.json<{ platform: string; key: string; storage: string }>();
+  const body = await c.req.json<SaveAIKeyReq>();
 
   const platformCheck = checkEnum(body.platform, 'platform', VALID_PLATFORMS);
   if ('error' in platformCheck) return c.json({ error: platformCheck.error }, 400);

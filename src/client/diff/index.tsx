@@ -1,8 +1,8 @@
 import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
 
+import { moveAnnotation, revealFile } from '../../api/index.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
-import { api } from '../api.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
@@ -292,7 +292,7 @@ function setupDelegatedHandlers(container: HTMLElement): void {
   // Reveal button (server-rendered for image-not-found etc.)
   delegate(container, 'click', '.reveal-btn', (_e, btn) => {
     const fid = (btn as HTMLElement).dataset.fileId ?? '';
-    void api('/files/' + fid + '/reveal', { method: 'POST' });
+    void revealFile({ fileId: fid });
   });
 
   // Hunk expanders
@@ -343,10 +343,7 @@ function setupDelegatedHandlers(container: HTMLElement): void {
 
     dragStore.actions.setAnnotation(null);
     void (async () => {
-      await api('/annotations/' + drag.id + '/move', {
-        method: 'PATCH',
-        body: { lineNumber: dropTarget.line, side: dropTarget.side },
-      });
+      await moveAnnotation({ id: drag.id, lineNumber: dropTarget.line, side: dropTarget.side as 'old' | 'new' });
       // The server's diff HTML for this file now reflects the new
       // annotation position; the file ID hasn't changed, so the fetch
       // effect's dedupe would skip the refetch without this nudge.

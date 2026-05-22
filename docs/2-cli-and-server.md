@@ -75,6 +75,12 @@ The server shall expose three route groups:
 - **AI APIs** — `/api/ai/*` — AI configuration, analysis triggering, model listing, API key management, and user preferences.
 - **Pages** — `/*` — Server-rendered HTML pages (main review, file view, past review view, review history).
 
+**FR-2.7a Typed API layer.** Every endpoint shall be backed by a typed module under `src/api/<resource>.ts` that defines the request and response shapes (`XReq` / `XResp` interfaces) **and** the client-side caller function that wraps the underlying HTTP call (e.g. `createAnnotation({...})`, `getContextLines({...})`). The same module's types shall be imported by the corresponding server route handler via `import type { XReq, XResp }` and used to constrain `c.req.json<XReq>()` and `c.json<XResp>(...)`. The intent is that adding or changing an endpoint requires editing one resource module and one route handler — drift between the two then fails to compile.
+
+- Client code shall not call the raw `api<T>()` helper from `src/client/api.ts` directly. Every call site shall use a typed caller imported from `src/api/<resource>.ts` (or, equivalently, `apis.<name>(...)` from `src/api/index.ts`).
+- The flat namespace `apis` aggregates every per-resource caller; caller names shall therefore be globally unique across modules (`createAnnotation`, `getCurrentReview`, `getAIConfig`, `getOutline`, etc.).
+- Binary endpoints that the browser fetches via `<img src>` (e.g. `/api/image/:fileId/:side`) expose a URL builder (`imageUrl({ fileId, side })`) rather than a fetch caller.
+
 ### 2.8 API Endpoints — Review Management
 
 | Method | Path | Description |

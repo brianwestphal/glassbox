@@ -1,6 +1,7 @@
 import { delegate, morph } from 'kerfjs';
 
-import { api } from '../api.js';
+import type { AnnotationCategory } from '../../api/index.js';
+import { deleteAnnotation, keepAnnotation, updateAnnotation } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import {
@@ -129,7 +130,7 @@ async function handleDelete(item: HTMLElement): Promise<void> {
   const annotationRow = item.closest<HTMLElement>('.annotation-row');
   const lineEl = annotationRow?.previousElementSibling as HTMLElement | null;
 
-  await api('/annotations/' + annotation.id, { method: 'DELETE' });
+  await deleteAnnotation({ id: annotation.id });
   item.remove();
   if (annotationRow !== null && annotationRow.querySelector('.annotation-item') === null) {
     annotationRow.remove();
@@ -147,7 +148,7 @@ async function handleDelete(item: HTMLElement): Promise<void> {
 async function handleKeep(item: HTMLElement): Promise<void> {
   const annotation = readAnnotation(item);
   if (annotation === null) return;
-  await api('/annotations/' + annotation.id + '/keep', { method: 'POST' });
+  await keepAnnotation({ id: annotation.id });
   const updated = { ...annotation, is_stale: false };
   item.classList.remove('annotation-stale');
   delete item.dataset.isStale;
@@ -205,9 +206,10 @@ async function saveEdit(): Promise<void> {
   const content = state.content.trim();
   if (content === '') return;
 
-  await api('/annotations/' + state.annotationId, {
-    method: 'PATCH',
-    body: { content, category: state.category },
+  await updateAnnotation({
+    id: state.annotationId,
+    content,
+    category: state.category as AnnotationCategory,
   });
 
   const item = findAnnotationItem(state.annotationId);

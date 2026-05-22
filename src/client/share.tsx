@@ -5,7 +5,7 @@
  */
 import { delegate } from 'kerfjs';
 
-import { api } from './api.js';
+import { dismissSharePrompt, getSharePromptState } from '../api/index.js';
 import { toElement } from './dom.js';
 
 const SHARE_URL = 'https://www.npmjs.com/package/glassbox';
@@ -13,11 +13,6 @@ const SESSION_THRESHOLD_MS = 60_000;    // 1 minute in current session
 const TOTAL_THRESHOLD_MS = 300_000;     // 5 minutes cumulative
 const DISMISS_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const TICK_INTERVAL_MS = 15_000;        // check every 15 seconds
-
-interface ShareState {
-  dismissedAt: number | null;
-  totalOpenMs: number;
-}
 
 let sessionStartMs = Date.now();
 let prompted = false;
@@ -56,7 +51,7 @@ function showCopyToast() {
 
 /** Record a dismiss (share or no thanks) — suppresses prompt for 30 days. */
 function dismissPrompt(): void {
-  void api('/share-prompt/dismiss', { method: 'POST' });
+  void dismissSharePrompt();
 }
 
 /** Show the share prompt banner. */
@@ -105,7 +100,7 @@ export function initSharePrompt(isDemoMode: boolean) {
 
 async function checkAndPrompt(timer: ReturnType<typeof setInterval>): Promise<void> {
   try {
-    const state = await api<ShareState>('/share-prompt/state');
+    const state = await getSharePromptState();
 
     // Already dismissed within cooldown?
     if (state.dismissedAt !== null) {

@@ -1,17 +1,9 @@
 import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
-import { api } from '../api.js';
+import { editTheme, listThemes } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
-
-interface ThemeData {
-  id: string;
-  name: string;
-  builtIn: boolean;
-  baseTheme?: string;
-  colors: Record<string, string>;
-}
 
 /** Color variable groups for the editor UI. */
 const COLOR_GROUPS: Array<{ label: string; vars: Array<[string, string]> }> = [
@@ -72,7 +64,7 @@ function toHex(color: string): string {
  */
 export function showThemeEditor(themeId: string, onDone?: () => void): void {
   void (async () => {
-    const listData = await api<{ themes: ThemeData[]; activeId: string }>('/themes');
+    const listData = await listThemes();
     let theme = listData.themes.find(t => t.id === themeId);
     if (theme === undefined) return;
     const isBuiltIn = theme.builtIn;
@@ -80,13 +72,15 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
     // Resolve base theme colors for Reset functionality
     const baseThemeId = theme.builtIn ? theme.id : (theme.baseTheme ?? 'dark');
     const baseTheme = listData.themes.find(t => t.id === baseThemeId);
-    const baseColors = baseTheme ? { ...baseTheme.colors } : { ...theme.colors };
+    const baseColors: Record<string, string> = baseTheme
+      ? { ...baseTheme.colors as unknown as Record<string, string> }
+      : { ...theme.colors as unknown as Record<string, string> };
 
     // Live edit state lives in signals. The `editColorsSignal` drives both
     // the live preview (an `effect()` that pushes CSS custom properties to
     // `document.documentElement`) AND the `mount()` render of the form
     // below — every color change reactively updates both.
-    const editColorsSignal = signal<Record<string, string>>({ ...theme.colors });
+    const editColorsSignal = signal<Record<string, string>>({ ...theme.colors as unknown as Record<string, string> });
     const editNameSignal = signal(theme.name);
     let dirty = false;
     let currentThemeId = themeId;
@@ -116,11 +110,10 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
 
     async function save(): Promise<void> {
       if (!dirty) return;
-      const body: Record<string, unknown> = { colors: editColorsSignal.value };
-      if (editNameSignal.value !== originalName) body.name = editNameSignal.value;
-      const result = await api<{ theme: ThemeData; copied: boolean }>(`/themes/${currentThemeId}/edit`, {
-        method: 'POST',
-        body,
+      const result = await editTheme({
+        id: currentThemeId,
+        colors: editColorsSignal.value,
+        ...(editNameSignal.value !== originalName ? { name: editNameSignal.value } : {}),
       });
       if (result.copied) {
         currentThemeId = result.theme.id;

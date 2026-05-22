@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { GetContextLinesResp } from '../../api/index.js';
 import { getReviewFile } from '../../db/queries.js';
 import { getFileContent } from '../../git/diff.js';
 import type { AppEnv } from '../../types.js';
@@ -25,5 +26,5 @@ contextRoutes.get('/context/:fileId', async (c) => {
   for (let i = clampedStart; i <= clampedEnd; i++) {
     lines.push({ num: i, content: allLines[i - 1] || '' });
   }
-  return c.json({ lines });
+  return c.json<GetContextLinesResp>({ lines });
 });

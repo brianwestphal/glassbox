@@ -1,9 +1,10 @@
 import type { SafeHtml } from 'kerfjs';
 
+import type { AIKeyStatusEntry, AIPlatform } from '../../api/index.js';
 import { IconCheck, IconFlask } from '../../icons.js';
-import type { ChannelState, KeyStatusInfo, Tab, TabContext } from './tabContext.js';
+import type { ChannelState, Tab, TabContext } from './tabContext.js';
 
-function keyStatusHtml(keyInfo: KeyStatusInfo): SafeHtml {
+function keyStatusHtml(keyInfo: AIKeyStatusEntry): SafeHtml {
   if (keyInfo.configured) {
     return (
       <div className="settings-key-status settings-key-configured">
@@ -41,8 +42,8 @@ function channelHintHtml(channelState: ChannelState): SafeHtml {
 function renderExperimentalTab(ctx: TabContext): SafeHtml {
   const { modelsData, currentPlatform, currentModel, keyStatus, guidedEnabled, channelState } = ctx;
   const platforms = modelsData.platforms;
-  const platformModels = modelsData.models[currentPlatform] ?? [];
-  const keyInfo = keyStatus.status[currentPlatform] ?? { configured: false, source: null };
+  const platformModels = modelsData.models[currentPlatform as AIPlatform];
+  const keyInfo = keyStatus.status[currentPlatform as AIPlatform];
   const showInput = !keyInfo.configured;
 
   return (

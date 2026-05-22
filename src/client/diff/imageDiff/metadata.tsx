@@ -1,13 +1,13 @@
 import type { SafeHtml } from 'kerfjs';
 
-import { api } from '../../api.js';
+import { getImageMetadata } from '../../../api/index.js';
 import { toElement } from '../../dom.js';
 
 export async function loadMetadata(fileId: string, container: Element): Promise<void> {
   const panel = container.querySelector('.image-diff-metadata');
   if (!panel) return;
   try {
-    const data = await api<{ old: string[] | null; new: string[] | null }>(`/image/${fileId}/metadata`);
+    const data = await getImageMetadata({ fileId });
     panel.replaceChildren(toElement(renderMetadataBody(data.old, data.new)));
   } catch {
     panel.replaceChildren(toElement(<div className="image-metadata-error">Could not load metadata</div>));

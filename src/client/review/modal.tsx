@@ -1,7 +1,16 @@
 import type { SafeHtml } from 'kerfjs';
 import { attr, delegate, mount, signal } from 'kerfjs';
 
-import { api } from '../api.js';
+import {
+  addGitignoreEntry,
+  completeReview as apiCompleteReview,
+  deleteStaleAnnotations,
+  dismissGitignorePrompt,
+  getChannelStatus,
+  keepAllStaleAnnotations,
+  reopenReview,
+  triggerChannel,
+} from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { TOAST_DURATION_MS } from '../timing.js';
@@ -43,7 +52,7 @@ export function bindReopenButton(): void {
   const root = document.querySelector<HTMLElement>('.review-app') ?? document.body;
   delegate(root, 'click', '#reopen-review', (_e, btn) => {
     void (async () => {
-      await api('/review/reopen', { method: 'POST' });
+      await reopenReview();
       const completeBtn = toElement(
         <button className="btn btn-primary btn-complete" id="complete-review">Complete Review</button>
       );
@@ -85,7 +94,7 @@ function showCompleteModal(): void {
 
   delegate(overlay, 'click', ACTIONS.discardStale.selector, () => {
     void (async () => {
-      await api('/annotations/stale/delete-all', { method: 'POST' });
+      await deleteStaleAnnotations();
       reviewStore.actions.update({ staleCounts: {} });
       stage.value = { kind: 'completing' };
       void completeReview(stage);
@@ -93,7 +102,7 @@ function showCompleteModal(): void {
   });
   delegate(overlay, 'click', ACTIONS.keepStale.selector, () => {
     void (async () => {
-      await api('/annotations/stale/keep-all', { method: 'POST' });
+      await keepAllStaleAnnotations();
       reviewStore.actions.update({ staleCounts: {} });
       stage.value = { kind: 'completing' };
       void completeReview(stage);
@@ -109,7 +118,7 @@ function showCompleteModal(): void {
 
   delegate(overlay, 'click', ACTIONS.gitignoreAdd.selector, () => {
     void (async () => {
-      await api('/gitignore/add', { method: 'POST' });
+      await addGitignoreEntry();
       if (stage.value.kind === 'done') {
         stage.value = { ...stage.value, gitignoreApplied: 'added' };
       }
@@ -117,7 +126,7 @@ function showCompleteModal(): void {
   });
   delegate(overlay, 'click', ACTIONS.gitignoreDismiss.selector, () => {
     void (async () => {
-      await api('/gitignore/dismiss', { method: 'POST' });
+      await dismissGitignorePrompt();
       if (stage.value.kind === 'done') {
         stage.value = { ...stage.value, gitignoreApplied: 'dismissed' };
       }
@@ -129,7 +138,7 @@ function showCompleteModal(): void {
     const aiCommand = stage.value.aiCommand;
     const sendBtn = btn as HTMLButtonElement;
     void (async () => {
-      await api('/channel/trigger', { method: 'POST', body: { message: aiCommand } });
+      await triggerChannel({ message: aiCommand });
       sendBtn.textContent = 'Sent!';
       sendBtn.setAttribute('disabled', 'true');
       setTimeout(() => { close(); }, 1000);
@@ -146,7 +155,7 @@ function showCompleteModal(): void {
 }
 
 async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Promise<void> {
-  const result = await api<CompleteResult>('/review/complete', { method: 'POST' });
+  const result = await apiCompleteReview();
   const aiCommand = result.isCurrent
     ? 'Read .glassbox/latest-review.md and apply the feedback.'
     : 'Read .glassbox/review-' + result.reviewId + '.md and apply the feedback.';
@@ -167,7 +176,7 @@ async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Pro
   }
 
   try {
-    const channelStatus = await api<{ enabled: boolean; connected: boolean }>('/channel/status');
+    const channelStatus = await getChannelStatus();
     if (channelStatus.enabled && channelStatus.connected) {
       // `stage.value` has been narrowed to `{ kind: 'done', ... }` by TS
       // flow analysis since we assigned that shape above, but in principle

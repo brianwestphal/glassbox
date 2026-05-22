@@ -1,5 +1,13 @@
+import {
+  dismissSharePrompt as apiDismissSharePrompt,
+  getAIConfig,
+  getAIPreferences,
+  getCurrentReview,
+  getSharePromptState,
+  refreshReview,
+} from "../api/index.js";
 import { IconGear, IconRefresh } from "../icons.js";
-import { api, initDebug } from "./api.js";
+import { initDebug } from "./api.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
 import { initDiffView, invalidateDiffCache, setRawDiffContent, updateNavFilePath } from "./diff/index.js";
@@ -22,22 +30,20 @@ import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
 async function initAISorting() {
   try {
     // Load user preferences
-    const prefs = await api<{ sort_mode: string; risk_sort_dimension: string; show_risk_scores: boolean; ignore_whitespace: boolean; svg_view_mode: string; last_image_mode: string }>(
-      "/ai/preferences",
-    );
+    const prefs = await getAIPreferences();
     aiStore.actions.update({
-      sortMode: prefs.sort_mode as SortMode,
-      riskSortDimension: prefs.risk_sort_dimension,
-      showRiskScores: prefs.show_risk_scores,
+      sortMode: (prefs.sort_mode ?? 'folder') as SortMode,
+      riskSortDimension: prefs.risk_sort_dimension ?? 'aggregate',
+      showRiskScores: prefs.show_risk_scores ?? true,
     });
     diffViewStore.actions.update({
-      ignoreWhitespace: prefs.ignore_whitespace,
-      svgViewMode: prefs.svg_view_mode as 'code' | 'rendered',
-      lastImageMode: prefs.last_image_mode,
+      ignoreWhitespace: prefs.ignore_whitespace ?? false,
+      svgViewMode: (prefs.svg_view_mode ?? 'code') as 'code' | 'rendered',
+      lastImageMode: prefs.last_image_mode ?? 'metadata',
     });
 
     // Check if AI is configured
-    const config = await api<{ keyConfigured: boolean; guidedReview: { enabled: boolean } }>("/ai/config");
+    const config = await getAIConfig();
     aiStore.actions.update({
       aiConfigured: config.keyConfigured,
       guidedReviewEnabled: config.guidedReview.enabled,
@@ -69,9 +75,7 @@ async function initAISorting() {
       refreshBtn.style.opacity = "0.4";
       refreshBtn.style.pointerEvents = "none";
       try {
-        await api<{ updated: number; added: number; stale: number; fileCount: number }>("/review/refresh", {
-          method: "POST",
-        });
+        await refreshReview();
         await loadFiles();
         // Server-side diff content changed; same fileId so the fetch
         // effect's dedupe would skip the refetch otherwise.
@@ -104,7 +108,7 @@ async function initAISorting() {
   const shareContainer = document.getElementById("sidebar-share");
   if (shareContainer) {
     // Check if share section was dismissed
-    void api<{ dismissedAt: number | null }>('/share-prompt/state').then((state) => {
+    void getSharePromptState().then((state) => {
       if (state.dismissedAt !== null) {
         const elapsed = Date.now() - state.dismissedAt;
         if (elapsed < 30 * 24 * 60 * 60 * 1000) return; // within 30-day cooldown
@@ -121,7 +125,7 @@ async function initAISorting() {
       });
       shareSection.querySelector("#share-dismiss-btn")?.addEventListener("click", () => {
         shareSection.remove();
-        void api('/share-prompt/dismiss', { method: 'POST' });
+        void apiDismissSharePrompt();
       });
       shareContainer.appendChild(shareSection);
     }).catch(() => { /* ignore */ });
@@ -272,6 +276,6 @@ void init();
 void checkForUpdate();
 
 // Share prompt — detect demo mode from the review's mode field
-void api<{ mode: string }>('/review').then((review) => {
-  initSharePrompt(review.mode === 'demo');
+void getCurrentReview().then((review) => {
+  initSharePrompt(review?.mode === 'demo');
 }).catch(() => { /* ignore */ });

@@ -1,4 +1,5 @@
-import { api, clientLog } from './api.js';
+import { getAnalysis, getAnalysisStatus, startAnalysis } from '../api/index.js';
+import { clientLog } from './api.js';
 import { aiStore } from './stores/index.js';
 import { ANALYSIS_POLL_INTERVAL_MS } from './timing.js';
 
@@ -38,7 +39,7 @@ export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
 
   void (async () => {
     try {
-      await api('/ai/analyze', { method: 'POST', body: { type: 'guided', invalidateCache } });
+      await startAnalysis({ type: 'guided', invalidateCache });
       if (gen !== pollGeneration) return;
       clientLog(`triggerGuidedAnalysis: server accepted, starting poll (gen=${String(gen)})`);
       pollGuidedStatus(gen);
@@ -63,12 +64,7 @@ function pollGuidedStatus(gen: number) {
     }
 
     void (async () => {
-      const result = await api<{
-        status: string;
-        error?: string;
-        progressCompleted?: number;
-        progressTotal?: number;
-      }>('/ai/analysis/guided/status');
+      const result = await getAnalysisStatus({ type: 'guided' });
       if (gen !== pollGeneration) return;
 
       if (result.status === 'running') {
@@ -116,13 +112,7 @@ function pollGuidedStatus(gen: number) {
 }
 
 async function loadGuidedResults(partial: boolean) {
-  const data = await api<{
-    status: string;
-    scores: Array<{
-      reviewFileId: string;
-      notes: { overview: string; lines: Array<{ line: number; content: string }> } | null;
-    }>;
-  }>('/ai/analysis/guided');
+  const data = await getAnalysis({ type: 'guided' });
 
   clientLog(`loadGuidedResults(partial=${String(partial)}): ${String(data.scores.length)} entries`);
 

@@ -72,8 +72,9 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 
 - `src/cli.ts` — CLI entry point, arg parsing
 - `src/server.ts` — Hono app setup, middleware injection
-- `src/routes/api.ts` — JSON API (annotations CRUD, file status, review management)
-- `src/routes/ai-api.ts` — AI analysis, configuration, and preferences API
+- `src/api/` — **Typed API layer (shared by client + server).** Each per-resource module (`annotations.ts`, `reviews.ts`, `themes.ts`, `files.ts`, `context.ts`, `outline.ts`, `image.ts`, `project-settings.ts`, `share-prompt.ts`, `ai.ts`, `channel.ts`) exports the request/response types AND the typed client caller functions. `src/api/index.ts` aggregates everything into a flat namespace (`apis.getContext(...)`, `apis.createAnnotation(...)`, etc.) and re-exports each callable. Client code calls these typed wrappers — never the raw `api<T>()` helper. Server route handlers `import type { XReq, XResp }` to type `c.req.json<>` and `c.json<>` against the same shapes — drift fails at compile time.
+- `src/routes/api.ts` — JSON API (annotations CRUD, file status, review management). Handlers consume Req/Resp types from `src/api/`.
+- `src/routes/ai-api.ts` — AI analysis, configuration, and preferences API. Handlers consume Req/Resp types from `src/api/ai.ts`.
 - `src/routes/pages.tsx` — Server-rendered HTML pages
 - `src/components/` — TSX components (layout, diffView, fileList, reviewHistory)
 - `src/db/connection.ts` — PGLite setup and schema initialization (raw SQL, no ORM)

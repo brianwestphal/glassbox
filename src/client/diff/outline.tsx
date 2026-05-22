@@ -1,7 +1,7 @@
 import type { SafeHtml } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
-import { api } from '../api.js';
+import { getOutline } from '../../api/index.js';
 import { toElement } from '../dom.js';
 
 interface OutlineSymbol {
@@ -39,7 +39,7 @@ export async function loadOutline(fileId: string) {
   document.querySelectorAll('.outline-bar').forEach(el => { el.remove(); });
 
   try {
-    const data = await api<{ symbols: OutlineSymbol[] }>('/outline/' + fileId);
+    const data = await getOutline({ fileId });
     if (data.symbols.length === 0) return;
     symbolsSignal.value = data.symbols;
   } catch {

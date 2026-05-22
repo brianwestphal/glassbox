@@ -1,41 +1,28 @@
 import type { SafeHtml } from 'kerfjs';
 
+import type {
+  GetAIKeyStatusResp,
+  GetProjectSettingsResp,
+  ListAIModelsResp,
+  ListThemesResp,
+} from '../../api/index.js';
+
+// Per-tab type aliases re-export the shared API response shapes so the
+// dialog and its tabs all agree with the server contract in `src/api/`.
+export type {
+  AIConfigResp as ConfigResponse,
+  GetAIKeyStatusResp as KeyStatusResponse,
+  ListAIModelsResp as ModelsResponse,
+  GetProjectSettingsResp as ProjectSettings,
+  ListThemesResp as ThemesResponse,
+  ThemeSummary,
+} from '../../api/index.js';
+
 export interface ChannelState {
   enabled: boolean;
   claudeInstalled: boolean;
   claudeVersion: string | null;
   meetsMinimum: boolean;
-}
-
-export interface ThemeSummary {
-  id: string;
-  name: string;
-  builtIn: boolean;
-}
-
-export interface KeyStatusInfo {
-  configured: boolean;
-  source: string | null;
-}
-
-export interface KeyStatusResponse {
-  status: Record<string, KeyStatusInfo>;
-  keychainAvailable: boolean;
-  keychainLabel: string;
-}
-
-export interface ModelsResponse {
-  platforms: Record<string, string>;
-  models: Record<string, Array<{ id: string; name: string; isDefault: boolean }>>;
-}
-
-export interface ThemesResponse {
-  themes: ThemeSummary[];
-  activeId: string;
-}
-
-export interface ProjectSettings {
-  appName?: string;
 }
 
 /**
@@ -45,10 +32,10 @@ export interface ProjectSettings {
  */
 export interface TabContext {
   // Server data (mutated by save handlers when the server returns fresh data).
-  keyStatus: KeyStatusResponse;
-  modelsData: ModelsResponse;
-  themesData: ThemesResponse;
-  projectSettings: ProjectSettings;
+  keyStatus: GetAIKeyStatusResp;
+  modelsData: ListAIModelsResp;
+  themesData: ListThemesResp;
+  projectSettings: GetProjectSettingsResp;
   channelState: ChannelState;
 
   // Live form state.
@@ -72,7 +59,7 @@ export interface TabContext {
   saveAppNameDebounced: () => void;
   switchTheme: (id: string) => void;
   showThemeManager: (onClose: () => void) => void;
-  refreshThemes: () => Promise<ThemesResponse>;
+  refreshThemes: () => Promise<ListThemesResp>;
 }
 
 export interface Tab {

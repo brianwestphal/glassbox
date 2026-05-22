@@ -1,4 +1,5 @@
-import { api, clientLog } from '../api.js';
+import { getAnalysis, getAnalysisStatus, saveAIPreferences, startAnalysis } from '../../api/index.js';
+import { clientLog } from '../api.js';
 import type { SortMode } from '../state.js';
 import { aiStore, getAnalysisModeState } from '../stores/index.js';
 import { ANALYSIS_POLL_INTERVAL_MS } from '../timing.js';
@@ -16,7 +17,7 @@ export function switchSortMode(mode: SortMode): void {
     clientLog(`switchSortMode: stopped ${prevMode} polls (gen=${String(pollGenerations[prevMode])})`);
   }
 
-  void api('/ai/preferences', { method: 'POST', body: { sort_mode: mode } });
+  void saveAIPreferences({ sort_mode: mode });
 
   if (mode === 'folder') return;
 
@@ -82,7 +83,7 @@ export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boo
 
   void (async () => {
     try {
-      await api('/ai/analyze', { method: 'POST', body: { type: mode, invalidateCache } });
+      await startAnalysis({ type: mode, invalidateCache });
       if (gen !== pollGenerations[mode]) return;
       clientLog(`triggerAnalysis(${mode}): server accepted, starting poll (gen=${String(gen)})`);
       pollAnalysisStatus(mode, gen);
@@ -109,12 +110,7 @@ function pollAnalysisStatus(mode: 'risk' | 'narrative', gen: number): void {
     }
 
     void (async () => {
-      const result = await api<{
-        status: string;
-        error?: string;
-        progressCompleted?: number;
-        progressTotal?: number;
-      }>(`/ai/analysis/${mode}/status`);
+      const result = await getAnalysisStatus({ type: mode });
       if (gen !== pollGenerations[mode]) return;
 
       if (result.status === 'running') {
@@ -206,20 +202,7 @@ export function invalidateAnalysisCache(): void {
 }
 
 export async function loadAnalysisResults(mode: 'risk' | 'narrative', partial: boolean = false): Promise<void> {
-  const data = await api<{
-    status: string;
-    progressCompleted?: number;
-    progressTotal?: number;
-    scores: Array<{
-      reviewFileId: string;
-      filePath: string;
-      sortOrder: number;
-      aggregateScore: number | null;
-      rationale: string | null;
-      dimensionScores: Record<string, number> | null;
-      notes: { overview: string; lines: Array<{ line: number; content: string }> } | null;
-    }>;
-  }>(`/ai/analysis/${mode}`);
+  const data = await getAnalysis({ type: mode });
 
   clientLog(`loadAnalysisResults(${mode}, partial=${String(partial)}): status=${data.status}, ${String(data.scores.length)} scores`);
 

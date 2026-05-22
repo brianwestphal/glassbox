@@ -1,6 +1,6 @@
 import { delegate, effect, mount } from 'kerfjs';
 
-import { api } from '../api.js';
+import { saveAIPreferences } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
@@ -56,13 +56,13 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
   delegate(sidebar, 'click', ACTIONS.toggleRiskScores.selector, () => {
     const next = !aiStore.state.value.showRiskScores;
     aiStore.actions.update({ showRiskScores: next });
-    void api('/ai/preferences', { method: 'POST', body: { show_risk_scores: next } });
+    void saveAIPreferences({ show_risk_scores: next });
   });
 
   delegate(sidebar, 'change', ACTIONS.setRiskDimension.selector, (_e, sel) => {
     const value = (sel as HTMLSelectElement).value;
     aiStore.actions.update({ riskSortDimension: value });
-    void api('/ai/preferences', { method: 'POST', body: { risk_sort_dimension: value } });
+    void saveAIPreferences({ risk_sort_dimension: value });
   });
 
   let filterTimer: ReturnType<typeof setTimeout> | null = null;

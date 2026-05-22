@@ -12,6 +12,15 @@ import type { AIConfig, GuidedReviewConfig } from '../ai/config.js';
 import { loadAIConfig, loadGuidedReviewConfig } from '../ai/config.js';
 import { mockGuidedAnalysisBatch, mockNarrativeAnalysisBatch, mockRiskAnalysisBatch } from '../ai/mock.js';
 import { getModelContextWindow } from '../ai/models.js';
+import type {
+  GetAIDebugStatusResp,
+  GetAIPreferencesResp,
+  GetAnalysisResp,
+  GetAnalysisStatusResp,
+  SaveAIPreferencesReq,
+  StartAnalysisReq,
+  StartAnalysisResp,
+} from '../api/index.js';
 import {
   appendFileScores,
   createAnalysis,
@@ -49,8 +58,8 @@ const canceledAnalyses = new Set<string>();
 aiAnalysisRoutes.post('/analyze', async (c) => {
   const reviewId = resolveReviewId(c);
   const repoRoot = c.get('repoRoot');
-  const body = await c.req.json<{ type: string; invalidateCache?: boolean }>();
-  const analysisType = body.type;
+  const body = await c.req.json<StartAnalysisReq>();
+  const analysisType: string = body.type;
   const invalidateCache = body.invalidateCache === true;
 
   debugLog(`POST /analyze: type=${analysisType}, reviewId=${reviewId}`);
@@ -106,7 +115,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
       if (ageMs < 15 * 60 * 1000) {
         // Still recent, reuse it
         debugLog('POST /analyze: reusing existing running analysis');
-        return c.json({ analysisId: existing.id, status: 'running' });
+        return c.json<StartAnalysisResp>({ analysisId: existing.id, status: 'running' });
       }
       // Stale — mark it as failed so we can start fresh
       debugLog('POST /analyze: marking stale analysis as timed out');
@@ -132,7 +141,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
     invalidateCache,
   });
 
-  return c.json({ analysisId: analysis.id, status: 'running' });
+  return c.json<StartAnalysisResp>({ analysisId: analysis.id, status: 'running' });
 });
 
 interface ExecuteAnalysisInput {
@@ -467,13 +476,13 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
     debugLog(`GET /analysis/${analysisType}: no analysis found`);
-    return c.json({ status: 'none', scores: [] });
+    return c.json<GetAnalysisResp>({ status: 'none', scores: [] });
   }
 
   debugLog(`GET /analysis/${analysisType}: id=${analysis.id}, status=${analysis.status}, error=${analysis.error_message ?? 'none'}`);
 
   if (analysis.status === 'failed') {
-    return c.json({
+    return c.json<GetAnalysisResp>({
       status: analysis.status,
       error: analysis.error_message,
       scores: [],
@@ -482,7 +491,7 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
 
   // Return partial or complete results (works for both 'running' and 'completed')
   const scores = await getFileScoresForReview(reviewId, analysisType);
-  return c.json({
+  return c.json<GetAnalysisResp>({
     status: analysis.status,
     progressCompleted: analysis.progress_completed,
     progressTotal: analysis.progress_total,
@@ -522,7 +531,7 @@ aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
     debugLog(`GET /analysis/${analysisType}/status: no analysis found`);
-    return c.json({ status: 'none' });
+    return c.json<GetAnalysisStatusResp>({ status: 'none' });
   }
 
   debugLog(`GET /analysis/${analysisType}/status: id=${analysis.id}, status=${analysis.status}, progress=${String(analysis.progress_completed)}/${String(analysis.progress_total)}, updated=${analysis.updated_at}`);
@@ -533,11 +542,11 @@ aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
     if (ageMs > 15 * 60 * 1000) {
       debugLog(`GET /analysis/${analysisType}/status: timing out stale analysis (age=${String(Math.round(ageMs / 1000))}s)`);
       await updateAnalysisStatus(analysis.id, 'failed', 'Analysis timed out');
-      return c.json({ status: 'failed', error: 'Analysis timed out' });
+      return c.json<GetAnalysisStatusResp>({ status: 'failed', error: 'Analysis timed out' });
     }
   }
 
-  return c.json({
+  return c.json<GetAnalysisStatusResp>({
     status: analysis.status,
     error: analysis.error_message,
     progressCompleted: analysis.progress_completed,
@@ -548,7 +557,7 @@ aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
 // --- Debug ---
 
 aiAnalysisRoutes.get('/debug-status', (c) => {
-  return c.json({ enabled: isDebug() });
+  return c.json<GetAIDebugStatusResp>({ enabled: isDebug() });
 });
 
 aiAnalysisRoutes.post('/debug-log', async (c) => {
@@ -565,7 +574,7 @@ aiAnalysisRoutes.post('/debug-log', async (c) => {
 
 aiAnalysisRoutes.get('/preferences', async (c) => {
   const prefs = await getUserPreferences();
-  return c.json(prefs);
+  return c.json<GetAIPreferencesResp>(prefs);
 });
 
 aiAnalysisRoutes.post('/preferences', async (c) => {
@@ -573,7 +582,7 @@ aiAnalysisRoutes.post('/preferences', async (c) => {
   if (typeof raw !== 'object' || raw === null) {
     return c.json({ error: 'body must be a JSON object' }, 400);
   }
-  const body = raw as { sort_mode?: string; risk_sort_dimension?: string; show_risk_scores?: boolean; ignore_whitespace?: boolean; svg_view_mode?: string; last_image_mode?: string };
+  const body = raw as SaveAIPreferencesReq;
 
   if (body.sort_mode !== undefined) {
     const v = checkEnum(body.sort_mode, 'sort_mode', VALID_SORT_MODES);

@@ -2,13 +2,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Hono } from 'hono';
 import { join } from 'path';
 
+import type { GetProjectSettingsResp, UpdateProjectSettingsReq, UpdateProjectSettingsResp } from '../../api/index.js';
 import type { AppEnv } from '../../types.js';
 
 export const projectSettingsRoutes = new Hono<AppEnv>();
 
-interface ProjectSettings {
-  appName?: string;
-}
+type ProjectSettings = GetProjectSettingsResp;
 
 function readProjectSettings(repoRoot: string): ProjectSettings {
   const settingsPath = join(repoRoot, '.glassbox', 'settings.json');
@@ -28,7 +27,7 @@ function writeProjectSettings(repoRoot: string, settings: ProjectSettings): void
 
 projectSettingsRoutes.get('/project-settings', (c) => {
   const repoRoot = c.get('repoRoot');
-  return c.json(readProjectSettings(repoRoot));
+  return c.json<GetProjectSettingsResp>(readProjectSettings(repoRoot));
 });
 
 projectSettingsRoutes.patch('/project-settings', async (c) => {
@@ -37,7 +36,7 @@ projectSettingsRoutes.patch('/project-settings', async (c) => {
   if (typeof raw !== 'object' || raw === null) {
     return c.json({ error: 'body must be a JSON object' }, 400);
   }
-  const body = raw as Partial<ProjectSettings>;
+  const body = raw as UpdateProjectSettingsReq;
 
   if (body.appName !== undefined && typeof body.appName !== 'string') {
     return c.json({ error: 'appName must be a string' }, 400);
@@ -46,5 +45,5 @@ projectSettingsRoutes.patch('/project-settings', async (c) => {
   const current = readProjectSettings(repoRoot);
   if (body.appName !== undefined) current.appName = body.appName || undefined;
   writeProjectSettings(repoRoot, current);
-  return c.json(current);
+  return c.json<UpdateProjectSettingsResp>(current);
 });

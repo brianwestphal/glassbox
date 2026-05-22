@@ -1,4 +1,4 @@
-import { api } from '../../api.js';
+import { saveAIPreferences } from '../../../api/index.js';
 import { diffViewStore } from '../../stores/index.js';
 import { loadMetadata } from './metadata.js';
 import { initSliceTool } from './sliceTool.js';
@@ -79,7 +79,7 @@ export function bindImageDiff(): void {
     btn.addEventListener('click', () => {
       const mode = (btn as HTMLElement).dataset.imageMode ?? '';
       diffViewStore.actions.update({ lastImageMode: mode });
-      void api('/ai/preferences', { method: 'POST', body: { last_image_mode: mode } });
+      void saveAIPreferences({ last_image_mode: mode });
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p =>
         p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { resolve } from 'path';
 
+import type { GetFileResp, ListFilesResp, SetFileStatusReq } from '../../api/index.js';
 import { getAnnotationCountsForReview, getAnnotationsForFile, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
@@ -18,18 +19,18 @@ filesRoutes.get('/files', async (c) => {
     getAnnotationCountsForReview(reviewId),
     getStaleCountsForReview(reviewId),
   ]);
-  return c.json({ files, annotationCounts, staleCounts });
+  return c.json<ListFilesResp>({ files, annotationCounts, staleCounts });
 });
 
 filesRoutes.get('/files/:fileId', async (c) => {
   const file = await getReviewFile(c.req.param('fileId'));
   if (!file) return c.json({ error: 'Not found' }, 404);
   const annotations = await getAnnotationsForFile(file.id);
-  return c.json({ file, annotations });
+  return c.json<GetFileResp>({ file, annotations });
 });
 
 filesRoutes.patch('/files/:fileId/status', async (c) => {
-  const { status } = await c.req.json<{ status: string }>();
+  const { status } = await c.req.json<Omit<SetFileStatusReq, 'fileId'>>();
   const v = checkEnum(status, 'status', VALID_FILE_STATUSES);
   if ('error' in v) return c.json({ error: v.error }, 400);
 

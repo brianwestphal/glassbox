@@ -1,8 +1,13 @@
+// Mirrors the server-side row shape from `src/db/queries.ts` (one source of
+// truth on the wire). `diff_data` is nullable because the database column
+// is nullable; `created_at` and `review_id` round-trip through `/api/files`.
 export interface ReviewFile {
   id: string;
+  review_id: string;
   file_path: string;
   status: string;
-  diff_data: string;
+  diff_data: string | null;
+  created_at: string;
 }
 
 export interface Annotation {
