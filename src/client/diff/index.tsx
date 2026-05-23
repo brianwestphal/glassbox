@@ -3,7 +3,7 @@ import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
 import { moveAnnotation, revealFile } from '../../api/index.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
-import { asEl } from '../dom.js';
+import { asEl, asElement } from '../dom.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
@@ -311,7 +311,7 @@ function setupDelegatedHandlers(container: HTMLElement): void {
   delegate(container, 'click', '.diff-line', (e, line) => {
     const me = e as MouseEvent;
     if (me.metaKey || me.ctrlKey) return;
-    const target = asEl(me.target);
+    const target = asElement(me.target);
     if (target.closest('.annotation-form-container') || target.closest('.annotation-row')) return;
     const dx = Math.abs(me.clientX - clickStart.x);
     const dy = Math.abs(me.clientY - clickStart.y);

@@ -115,14 +115,19 @@ export const FileScoreNoteSchema = z.object({
 });
 export type FileScoreNote = z.infer<typeof FileScoreNoteSchema>;
 
+// The score entry — every field except the identifying ones may be
+// missing from the wire (server omits fields it didn't compute) and may
+// be `null` for historical rows. `.nullable().default(null)` collapses
+// both cases to `null` so downstream `s.notes !== null` checks behave
+// the same way regardless of which form the server used.
 export const FileScoreSchema = z.object({
   reviewFileId: z.string(),
   filePath: z.string(),
   sortOrder: z.number(),
-  aggregateScore: z.number().nullable(),
-  rationale: z.string().nullable(),
-  dimensionScores: z.record(z.string(), z.number()).nullable(),
-  notes: FileScoreNoteSchema.nullable(),
+  aggregateScore: z.number().nullable().default(null),
+  rationale: z.string().nullable().default(null),
+  dimensionScores: z.record(z.string(), z.number()).nullable().default(null),
+  notes: FileScoreNoteSchema.nullable().default(null),
 });
 export type FileScore = z.infer<typeof FileScoreSchema>;
 

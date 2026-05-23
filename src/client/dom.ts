@@ -61,6 +61,19 @@ export function asElOrNull(node: unknown): HTMLElement | null {
   return node instanceof HTMLElement ? node : null;
 }
 
+/** Narrow an `EventTarget` (or any unknown) to `Element` — the parent
+ *  type of both `HTMLElement` and `SVGElement`. Use this when an event
+ *  handler reads `e.target` and only needs `.closest()` / `.tagName`,
+ *  because a click on an icon inside a button surfaces with
+ *  `e.target = <svg>`, not the host `HTMLElement` — `asEl` would throw
+ *  there. Throws on non-Element targets (Text, Comment, Window). */
+export function asElement(node: unknown): Element {
+  if (!(node instanceof Element)) {
+    throw new Error(`asElement: expected Element, got ${describeNode(node)}`);
+  }
+  return node;
+}
+
 function describeNode(node: unknown): string {
   if (node === null) return 'null';
   if (node === undefined) return 'undefined';

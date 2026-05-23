@@ -3,7 +3,7 @@
  * in the diff view navigates to its definition.
  */
 import { findSymbolDefinition } from '../../api/index.js';
-import { asEl, toElement } from '../dom.js';
+import { asElement, toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
 import { setRawDiffContent } from './index.js';
@@ -19,7 +19,7 @@ export function bindGoToDefinition() {
     // Cmd+Click (macOS) or Ctrl+Click (Windows/Linux)
     if (!(e.metaKey || e.ctrlKey)) return;
     // Don't interfere with existing click handlers (annotations, buttons, etc.)
-    if (asEl(e.target).closest('button, a, .annotation-row, .annotation-form-container')) return;
+    if (asElement(e.target).closest('button, a, .annotation-row, .annotation-form-container')) return;
 
     const word = getWordAtPoint(e.clientX, e.clientY);
     if (word === null || word.length < 2) return;
@@ -31,9 +31,10 @@ export function bindGoToDefinition() {
 
   // Show pointer cursor when Cmd/Ctrl is held over identifiers
   container.addEventListener('mousemove', (e) => {
-    const code = asEl(e.target).closest('.code');
-    if (code) {
-      asEl(code).style.cursor = (e.metaKey || e.ctrlKey) ? 'pointer' : '';
+    if (!(e.target instanceof Element)) return;
+    const code = e.target.closest('.code');
+    if (code instanceof HTMLElement) {
+      code.style.cursor = (e.metaKey || e.ctrlKey) ? 'pointer' : '';
     }
   });
 }

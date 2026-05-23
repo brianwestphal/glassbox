@@ -2,7 +2,7 @@ import { delegate, morph } from 'kerfjs';
 
 import type { AnnotationCategory } from '../../api/index.js';
 import { deleteAnnotation, keepAnnotation, updateAnnotation } from '../../api/index.js';
-import { asEl, asElOrNull, asTextarea, toElement } from '../dom.js';
+import { asEl, asElement, asElOrNull, asTextarea, toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import {
   dragStore,
@@ -38,7 +38,7 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
     e.stopPropagation();
     const el = asEl(item);
     if (el.querySelector('.annotation-form') !== null) return;
-    if (asEl(e.target).closest('.annotation-form-container') !== null) return;
+    if (asElement(e.target).closest('.annotation-form-container') !== null) return;
     startEdit(el);
   });
 

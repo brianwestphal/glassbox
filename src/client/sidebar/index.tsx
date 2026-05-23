@@ -2,7 +2,7 @@ import { delegate, effect, mount } from 'kerfjs';
 
 import { RiskDimensionSchema, saveAIPreferences } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
-import { asEl, asInput, asSelect, toElement } from '../dom.js';
+import { asEl, asElement, asInput, asSelect, toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { aiStore, diffViewStore, reviewStore, visibleFileOrder } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
@@ -160,7 +160,7 @@ function bindSidebarResize(): void {
 function bindKeyboardNav(): void {
   delegate(document.body, 'keydown', 'body', (e) => {
     const ke = e as KeyboardEvent;
-    const tag = asEl(ke.target).tagName;
+    const tag = asElement(ke.target).tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT') return;
     if (ke.key === 'j' || ke.key === 'ArrowDown') {
       navigateFile(1);
