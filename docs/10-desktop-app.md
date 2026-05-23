@@ -44,19 +44,26 @@ The desktop app shall support three launch flows:
 - Updates shall be cryptographically verified against a public key embedded in the app configuration.
 - Updates shall be served from GitHub Releases.
 
-### 10.6 macOS Entitlements
+### 10.6 External Links
+
+- External links (e.g., the Sponsor link) shall open in the user's default system browser.
+- Because the desktop app runs the UI in a webview with no concept of a new tab, an anchor's `target="_blank"` does not reach a real browser — clicking such a link in the webview does nothing. To handle this, when running inside the desktop shell the client shall route external-link clicks to the local server's `POST /api/open-external` endpoint, which opens the URL in the OS default browser (the same OS-open mechanism used by "reveal in file manager").
+- In a standard browser (CLI launch), the link shall retain its default `target="_blank"` behavior so it opens a new tab in the same browser; the desktop routing shall apply only when the Tauri runtime is detected.
+- The `/api/open-external` endpoint shall accept only `http`/`https` URLs.
+
+### 10.7 macOS Entitlements
 
 - The app shall declare entitlements for JIT compilation, unsigned executable memory, and library validation bypass (required for PGLite WASM under Hardened Runtime).
 
 ## Non-Functional Requirements
 
-### 10.7 Platform Support
+### 10.8 Platform Support
 
 - The desktop app shall be distributed for: macOS (Apple Silicon + Intel), Linux (x86_64), and Windows (x86_64).
 - macOS builds shall be code-signed and notarized with Apple Developer credentials.
 - CI/CD shall produce all platform artifacts on git tag push via GitHub Actions.
 - **Active testing is performed only on macOS.** Linux and Windows builds are produced by the same pipeline and intended to work, but are not regularly exercised by the maintainers. Documentation (`README.md`) shall make this explicit and invite external contributors to test, file issues, and submit fixes for Linux and Windows.
 
-### 10.8 CLI Symlink
+### 10.9 CLI Symlink
 
 - The CLI symlink shall point into the installed app bundle, so app updates automatically update the CLI without re-installation.

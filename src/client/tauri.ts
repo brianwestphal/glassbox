@@ -1,5 +1,6 @@
 import { delegate } from 'kerfjs';
 
+import { openExternal } from '../api/system.js';
 import { asButton } from './dom.js';
 
 interface TauriGlobal {
@@ -11,12 +12,37 @@ interface TauriGlobal {
  *  Tauri shell, undefined in a plain browser). Centralized here so every
  *  caller doesn't repeat the cast-through-unknown pattern. */
 export function getTauriGlobal(): TauriGlobal | undefined {
+  if (typeof window === 'undefined') return undefined;
   return (window as unknown as Record<string, unknown>).__TAURI__ as TauriGlobal | undefined;
 }
 
 /** Convenience: returns the Tauri `invoke()` if available, otherwise `null`. */
 export function getTauriInvoke(): ((cmd: string) => Promise<unknown>) | null {
   return getTauriGlobal()?.core?.invoke ?? null;
+}
+
+/** Open a URL in the OS default browser, but only when running inside the
+ *  Tauri shell.
+ *
+ *  Inside Tauri the frontend is a webview with no concept of a new tab, so an
+ *  anchor's `target="_blank"` navigation silently does nothing — that's why
+ *  the Sponsor link appeared dead in the desktop app. We route the URL to the
+ *  local server's `/open-external` endpoint (which shells out to the OS "open"
+ *  handler, the same path "reveal in finder" uses); the Node sidecar is a real
+ *  local process in both the desktop and CLI cases, so this works without any
+ *  native command.
+ *
+ *  Returns `true` if it handled the open (the caller should `preventDefault()`
+ *  the originating click); `false` in a plain browser, where the anchor's
+ *  default `target="_blank"` behavior opens a tab in the same browser and
+ *  should be left alone. */
+export function openExternalUrl(url: string): boolean {
+  if (getTauriGlobal() === undefined) return false;
+  // Fire-and-forget: we've already suppressed the anchor's default nav, so a
+  // failed open just means the link doesn't open — don't let it surface as an
+  // unhandled rejection.
+  openExternal({ url }).catch(() => { /* ignore */ });
+  return true;
 }
 
 let bannerDelegatesBound = false;

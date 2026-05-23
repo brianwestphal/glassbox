@@ -9,6 +9,7 @@ import { outlineRoutes } from './api/outline.js';
 import { projectSettingsRoutes } from './api/project-settings.js';
 import { reviewsRoutes } from './api/reviews.js';
 import { sharePromptRoutes } from './api/share-prompt.js';
+import { systemRoutes } from './api/system.js';
 
 /**
  * Aggregator for the core JSON API mounted at `/api/*` in `server.ts`. Each
@@ -25,3 +26,4 @@ apiRoutes.route('/', contextRoutes);
 apiRoutes.route('/', projectSettingsRoutes);
 apiRoutes.route('/', imageRoutes);
 apiRoutes.route('/', sharePromptRoutes);
+apiRoutes.route('/', systemRoutes);

@@ -26,7 +26,7 @@ import { initSidebar } from "./sidebar/index.js";
 import { loadAnalysisResults, triggerAnalysis } from "./sidebar/sortMode.js";
 import { aiStore, diffViewStore, dragStore, reviewStore, visibleFileOrder } from "./stores/index.js";
 // --- Tauri update notification ---
-import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
+import { getTauriInvoke, openExternalUrl, showUpdateBanner } from "./tauri.js";
 
 async function initAISorting() {
   try {
@@ -136,6 +136,14 @@ async function initAISorting() {
       );
       shareSection.querySelector("#share-glassbox-btn")?.addEventListener("click", () => {
         void triggerShare();
+      });
+      // In the Tauri desktop shell, `target="_blank"` never reaches a real
+      // browser, so route the Sponsor link through the OS default browser.
+      // In a plain browser this is a no-op and the anchor opens normally.
+      shareSection.querySelector("#sponsor-glassbox-btn")?.addEventListener("click", (e) => {
+        if (openExternalUrl("https://github.com/sponsors/brianwestphal")) {
+          e.preventDefault();
+        }
       });
       shareSection.querySelector("#share-dismiss-btn")?.addEventListener("click", () => {
         shareSection.remove();

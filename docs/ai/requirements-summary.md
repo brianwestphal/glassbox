@@ -250,6 +250,13 @@ auto-installed — surfaced as a banner with an "Install Update" button,
 plus a "Check for Updates" button in Settings. Cryptographically
 verified against an embedded public key; served from GitHub Releases.
 
+External links (e.g. the Sponsor link) open in the OS default browser.
+Inside the webview `target="_blank"` reaches no real browser, so when the
+Tauri runtime is detected the client routes the click to the local
+`POST /api/open-external` endpoint (http/https only), which opens the URL
+via the same OS-open mechanism as file reveal; a plain-browser CLI launch
+keeps the anchor's native `target="_blank"` behavior.
+
 macOS entitlements declare JIT, unsigned-executable-memory, and
 library-validation bypass (required for PGLite WASM under Hardened
 Runtime).

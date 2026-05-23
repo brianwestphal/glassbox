@@ -74,6 +74,7 @@ glassbox/
 | `project-settings.ts` | `.glassbox/settings.json` get/update. |
 | `reviews.ts` | Review CRUD, complete/reopen/refresh, delete-completed/all, gitignore add/dismiss. |
 | `share-prompt.ts` | Share-prompt state / dismiss / tick. |
+| `system.ts` | `/open-external` — open an http(s) URL in the OS default browser (used by the client under Tauri, where `target="_blank"` can't). |
 | `ai.ts` | Config / models / key-status / key / analysis (start/get/status) / preferences / debug. |
 | `themes.ts` | Themes list / active / create / edit / update / delete. |
 | `channel.ts` | Channel status / enable / disable / trigger / claude-check. |
@@ -97,6 +98,7 @@ How the layer is used:
 | `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`). |
 | `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side` with SVG rasterization. |
 | `api/share-prompt.ts` | Share prompt state / dismiss / tick (uses `global-config.ts`). |
+| `api/system.ts` | `POST /open-external` — opens a validated http(s) URL via `openOS` (same OS-open path as file reveal). |
 | `ai-api.ts` | Router that mounts ai-config + ai-analysis handlers under `/api/ai/*`. |
 | `ai-analysis.ts` | `POST /analyze` dispatch (risk/narrative/guided), progress polling, cancellation. |
 | `ai-config.ts` | `/config`, `/models`, `/key-status`, `/key`, `/preferences`. |

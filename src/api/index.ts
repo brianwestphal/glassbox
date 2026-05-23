@@ -29,6 +29,7 @@ import * as outline from './outline.js';
 import * as projectSettings from './project-settings.js';
 import * as reviews from './reviews.js';
 import * as sharePrompt from './share-prompt.js';
+import * as system from './system.js';
 import * as themes from './themes.js';
 
 export * from './ai.js';
@@ -41,6 +42,7 @@ export * from './outline.js';
 export * from './project-settings.js';
 export * from './reviews.js';
 export * from './share-prompt.js';
+export * from './system.js';
 export * from './themes.js';
 
 /** Flat namespace combining every typed caller across the resource
@@ -57,5 +59,6 @@ export const apis = {
   ...projectSettings,
   ...reviews,
   ...sharePrompt,
+  ...system,
   ...themes,
 };

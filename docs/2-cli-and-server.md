@@ -119,6 +119,7 @@ The server shall expose three route groups:
 | PATCH | `/api/project-settings` | Save project-specific settings |
 | POST | `/api/gitignore/add` | Add `.glassbox/` to `.gitignore` |
 | POST | `/api/gitignore/dismiss` | Dismiss gitignore prompt (30-day cooldown) |
+| POST | `/api/open-external` | Open an http(s) URL in the OS default browser (used by external links in the desktop app) |
 
 ### 2.11 API Endpoints — AI
 
