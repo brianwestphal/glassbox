@@ -61,13 +61,21 @@ describe('connection', () => {
     await expect(getDb()).rejects.toThrow('Data directory not set');
   });
 
-  it('getDb creates PGlite with correct path', async () => {
+  it('getDb creates PGlite with correct path and pins the template1 database', async () => {
     const { setDataDir, getDb } = await import('../../../src/db/connection.js');
     setDataDir('/tmp/test-glassbox');
 
     await getDb();
 
-    expect(mockPGliteConstructor).toHaveBeenCalledWith('/tmp/test-glassbox/data/reviews');
+    // The `database: 'template1'` option is load-bearing: PGLite 0.4.0 changed
+    // the default working database from `template1` to `postgres`, so without
+    // this option an existing pre-0.4 data dir would open an empty `postgres`
+    // database and the user's reviews would appear to vanish. Guard against a
+    // regression that drops it.
+    expect(mockPGliteConstructor).toHaveBeenCalledWith(
+      '/tmp/test-glassbox/data/reviews',
+      { database: 'template1' },
+    );
   });
 
   it('getDb runs schema SQL', async () => {

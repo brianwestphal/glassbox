@@ -10,6 +10,7 @@ Requirements for data persistence, database schema, and data management.
 - Database files shall be stored locally in `~/.glassbox/data/reviews`.
 - The database schema shall be initialized automatically on first use.
 - Schema migrations shall be applied safely on startup without data loss.
+- The application tables shall live in the `template1` database. PGLite ≤0.3.x used `template1` as its default working database; PGLite 0.4.0 changed the default to `postgres`. To keep existing on-disk data dirs readable across that upgrade, the connection explicitly pins `database: 'template1'` (see `src/db/connection.ts`) so the storage location is identical for both pre-0.4 and freshly created databases. A future PGLite upgrade must preserve this option (or perform a one-time `template1` → `postgres` data migration) or existing users' reviews will appear to vanish.
 
 ### 9.2 Data Model
 

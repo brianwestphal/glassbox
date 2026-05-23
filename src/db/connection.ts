@@ -7,6 +7,17 @@ import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './schema.js';
 let db: PGlite | null = null;
 let currentDbPath: string | null = null;
 
+// PGLite ≤0.3.x stored the working tables in the `template1` database (its
+// historical default). PGLite 0.4.0 changed the default working database to
+// `postgres` — so opening an existing pre-0.4 data directory with the default
+// options connects to an empty `postgres` database and the user's reviews /
+// annotations (which live in `template1`) appear to have vanished. Pinning the
+// connection to `template1` keeps the storage location identical across the
+// upgrade: existing data dirs open with their data intact, and freshly created
+// dirs put their tables in the same place. Verified against a real pre-0.4
+// data directory (61 reviews recovered) and a fresh-create + reopen round-trip.
+const DB_OPTIONS = { database: 'template1' } as const;
+
 export function setDataDir(dataDir: string) {
   const dbDir = join(dataDir, 'data');
   mkdirSync(dbDir, { recursive: true });
@@ -17,7 +28,7 @@ export async function getDb(): Promise<PGlite> {
   if (db) return db;
   if (currentDbPath === null) throw new Error('Data directory not set. Call setDataDir() first.');
   try {
-    db = new PGlite(currentDbPath);
+    db = new PGlite(currentDbPath, DB_OPTIONS);
     await db.waitReady;
     await initSchema(db);
     return db;
@@ -31,7 +42,7 @@ export async function getDb(): Promise<PGlite> {
       try {
         rmSync(currentDbPath, { recursive: true, force: true });
       } catch { /* may not exist */ }
-      db = new PGlite(currentDbPath);
+      db = new PGlite(currentDbPath, DB_OPTIONS);
       await db.waitReady;
       await initSchema(db);
       return db;

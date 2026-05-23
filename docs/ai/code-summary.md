@@ -120,7 +120,7 @@ How the layer is used:
 
 | File | Purpose |
 |------|---------|
-| `connection.ts` | PGLite init, schema apply, corrupt-DB recovery, `addColumnIfMissing` migrations. Exported `setDataDir`, `getDb`. |
+| `connection.ts` | PGLite init, schema apply, corrupt-DB recovery, `addColumnIfMissing` migrations. Exported `setDataDir`, `getDb`. Pins `database: 'template1'` in the `PGlite` constructor so on-disk data dirs created under PGLite ≤0.3.x (whose default working DB was `template1`) keep opening after the 0.4.x upgrade (whose default is `postgres`). |
 | `schema.ts` | `SCHEMA_CORE_SQL` (reviews, review_files, annotations) and `SCHEMA_AI_SQL` (ai_analyses, ai_file_scores, user_preferences). Single source of truth. |
 | `queries.ts` | CRUD for reviews, review_files, annotations. |
 | `ai-queries.ts` | CRUD for ai_analyses, ai_file_scores, user_preferences. |

@@ -53,7 +53,7 @@
     "!dist/*.map"
   ],
   "dependencies": {
-    "@electric-sql/pglite": "^0.3.15",
+    "@electric-sql/pglite": "^0.4.5",
     "@hono/node-server": "^1.19.9",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@resvg/resvg-wasm": "^2.6.2",
