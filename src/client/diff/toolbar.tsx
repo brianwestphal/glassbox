@@ -2,7 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { ImageModeSchema, saveAIPreferences } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, asInput, toElement } from '../dom.js';
 import { diffViewStore } from '../stores/index.js';
 import { applyHighlighting, getLanguageList } from './highlight.js';
 import { updateToolbarLanguage } from './index.js';
@@ -27,14 +27,14 @@ export function bindToolbar(): void {
   reflectToolbarState();
 
   delegate(toolbar, 'click', '[data-svg-mode]', (_e, btn) => {
-    const mode = (btn as HTMLElement).dataset.svgMode as 'code' | 'rendered';
+    const mode = asEl(btn).dataset.svgMode as 'code' | 'rendered';
     diffViewStore.actions.update({ svgViewMode: mode });
     void saveAIPreferences({ svg_view_mode: mode });
     toolbar.querySelectorAll('[data-svg-mode]').forEach(b => b.classList.toggle('active', b === btn));
   });
 
   delegate(toolbar, 'click', '[data-diff-mode]', (_e, btn) => {
-    const mode = (btn as HTMLElement).dataset.diffMode as 'split' | 'unified';
+    const mode = asEl(btn).dataset.diffMode as 'split' | 'unified';
     diffViewStore.actions.update({ diffMode: mode });
     toolbar.querySelectorAll('[data-diff-mode]').forEach(b => b.classList.toggle('active', b === btn));
   });
@@ -42,10 +42,10 @@ export function bindToolbar(): void {
   delegate(toolbar, 'click', '#wrap-toggle', (_e, btn) => {
     const wrapLines = !diffViewStore.state.value.wrapLines;
     diffViewStore.actions.update({ wrapLines });
-    (btn as HTMLElement).classList.toggle('active', wrapLines);
+    asEl(btn).classList.toggle('active', wrapLines);
     if (!wrapLines) {
       document.getElementById('diff-container')?.querySelectorAll('.split-row .code, .split-columns .code').forEach(el => {
-        (el as HTMLElement).scrollLeft = 0;
+        asEl(el).scrollLeft = 0;
       });
     }
   });
@@ -53,12 +53,12 @@ export function bindToolbar(): void {
   delegate(toolbar, 'click', '#whitespace-toggle', (_e, btn) => {
     const ignoreWhitespace = !diffViewStore.state.value.ignoreWhitespace;
     diffViewStore.actions.update({ ignoreWhitespace });
-    (btn as HTMLElement).classList.toggle('active', ignoreWhitespace);
+    asEl(btn).classList.toggle('active', ignoreWhitespace);
     void saveAIPreferences({ ignore_whitespace: ignoreWhitespace });
   });
 
   delegate(toolbar, 'click', '[data-image-mode]', (_e, btn) => {
-    const mode = (btn as HTMLElement).dataset.imageMode ?? '';
+    const mode = asEl(btn).dataset.imageMode ?? '';
     diffViewStore.actions.update({ lastImageMode: mode });
     const imageModeParsed = ImageModeSchema.safeParse(mode);
     if (imageModeParsed.success) {
@@ -68,7 +68,7 @@ export function bindToolbar(): void {
 
   delegate(toolbar, 'click', '#language-btn', (e, btn) => {
     e.stopPropagation();
-    showLanguagePicker(btn as HTMLElement);
+    showLanguagePicker(asEl(btn));
   });
 }
 
@@ -83,7 +83,7 @@ function reflectToolbarState(): void {
     const ws = document.getElementById('whitespace-toggle');
     if (ws !== null) ws.classList.toggle('active', dv.ignoreWhitespace);
     document.querySelectorAll('[data-diff-mode]').forEach(b =>
-      b.classList.toggle('active', (b as HTMLElement).dataset.diffMode === dv.diffMode));
+      b.classList.toggle('active', asEl(b).dataset.diffMode === dv.diffMode));
   });
 }
 
@@ -172,13 +172,13 @@ function showLanguagePicker(btn: HTMLElement): void {
 
   // Filter input: route through the signal, not a direct addEventListener.
   delegate(popup, 'input', '.language-filter', (e) => {
-    filterSignal.value = (e.target as HTMLInputElement).value;
+    filterSignal.value = asInput(e.target).value;
   });
 
   // Click selection: list options live inside the mount tree, so we delegate
   // from the popup root to survive every re-render.
   delegate(popup, 'click', '.language-option:not(.disabled)', (_e, opt) => {
-    const lang = (opt as HTMLElement).dataset.lang ?? '';
+    const lang = asEl(opt).dataset.lang ?? '';
     if (lang === '__auto__') selectLang('', true);
     else selectLang(lang, false);
   });

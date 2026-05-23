@@ -1,3 +1,4 @@
+import { asButton } from '../dom.js';
 /**
  * Navigation stack for tracking file/scroll position history.
  * Supports back/forward navigation like a browser.
@@ -73,11 +74,11 @@ function updateButtons() {
   const fwdBtn = document.getElementById('nav-forward-btn');
   if (backBtn) {
     backBtn.classList.toggle('disabled', !canGoBack());
-    (backBtn as HTMLButtonElement).disabled = !canGoBack();
+    asButton(backBtn).disabled = !canGoBack();
   }
   if (fwdBtn) {
     fwdBtn.classList.toggle('disabled', !canGoForward());
-    (fwdBtn as HTMLButtonElement).disabled = !canGoForward();
+    asButton(fwdBtn).disabled = !canGoForward();
   }
 }
 

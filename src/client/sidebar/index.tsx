@@ -2,7 +2,7 @@ import { delegate, effect, mount } from 'kerfjs';
 
 import { RiskDimensionSchema, saveAIPreferences } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
-import { toElement } from '../dom.js';
+import { asEl, asInput, asSelect, toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { aiStore, diffViewStore, reviewStore, visibleFileOrder } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
@@ -42,7 +42,7 @@ function mountFileList(sidebar: HTMLElement): void {
 
 function bindDelegatedEvents(sidebar: HTMLElement): void {
   delegate(sidebar, 'click', '[data-sort-mode]', (_e, btn) => {
-    const mode = (btn as HTMLElement).dataset.sortMode as SortMode;
+    const mode = asEl(btn).dataset.sortMode as SortMode;
     if (mode === aiStore.state.value.sortMode) return;
     if ((mode === 'risk' || mode === 'narrative') && !aiStore.state.value.aiConfigured) {
       void import('../settings/dialog.js').then(m => {
@@ -60,7 +60,7 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
   });
 
   delegate(sidebar, 'change', ACTIONS.setRiskDimension.selector, (_e, sel) => {
-    const value = (sel as HTMLSelectElement).value;
+    const value = asSelect(sel).value;
     aiStore.actions.update({ riskSortDimension: value });
     const riskDimParsed = RiskDimensionSchema.safeParse(value);
     if (riskDimParsed.success) {
@@ -70,7 +70,7 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
 
   let filterTimer: ReturnType<typeof setTimeout> | null = null;
   delegate(sidebar, 'input', '#file-filter', (_e, input) => {
-    const value = (input as HTMLInputElement).value;
+    const value = asInput(input).value;
     if (filterTimer !== null) clearTimeout(filterTimer);
     filterTimer = setTimeout(() => {
       reviewStore.actions.update({ filterText: value });
@@ -78,7 +78,7 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
   });
   delegate(sidebar, 'keydown', '#file-filter', (e, input) => {
     if ((e as KeyboardEvent).key === 'Escape') {
-      const el = input as HTMLInputElement;
+      const el = asInput(input);
       el.value = '';
       reviewStore.actions.update({ filterText: '' });
       el.blur();
@@ -86,12 +86,12 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
   });
 
   delegate(sidebar, 'click', ACTIONS.selectFile.selector, (_e, el) => {
-    const fileId = (el as HTMLElement).dataset.fileId;
+    const fileId = asEl(el).dataset.fileId;
     if (fileId !== undefined && fileId !== '') void selectFile(fileId);
   });
 
   delegate(sidebar, 'click', ACTIONS.toggleFolder.selector, (_e, header) => {
-    const path = (header as HTMLElement).dataset.folderPath ?? '';
+    const path = asEl(header).dataset.folderPath ?? '';
     if (path === '') return;
     if (diffViewStore.state.value.collapsedFolders.has(path)) {
       diffViewStore.actions.removeCollapsedFolder(path);
@@ -103,13 +103,13 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
 
   delegate(sidebar, 'click', ACTIONS.showRiskPopover.selector, (e, badge) => {
     e.stopPropagation();
-    const fileId = (badge as HTMLElement).dataset.fileId ?? '';
+    const fileId = asEl(badge).dataset.fileId ?? '';
     const score = (aiStore.state.value.riskScores ?? []).find(s => s.reviewFileId === fileId);
-    if (score !== undefined) showRiskPopover(badge as HTMLElement, score);
+    if (score !== undefined) showRiskPopover(asEl(badge), score);
   });
 
   delegate(sidebar, 'click', ACTIONS.retryAnalysis.selector, (_e, btn) => {
-    const mode = (btn as HTMLElement).dataset.mode as 'risk' | 'narrative';
+    const mode = asEl(btn).dataset.mode as 'risk' | 'narrative';
     void import('./sortMode.js').then(m => { m.triggerAnalysis(mode); });
   });
 }
@@ -160,7 +160,7 @@ function bindSidebarResize(): void {
 function bindKeyboardNav(): void {
   delegate(document.body, 'keydown', 'body', (e) => {
     const ke = e as KeyboardEvent;
-    const tag = (ke.target as HTMLElement).tagName;
+    const tag = asEl(ke.target).tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT') return;
     if (ke.key === 'j' || ke.key === 'ArrowDown') {
       navigateFile(1);

@@ -1,3 +1,4 @@
+import { asEl } from '../dom.js';
 /**
  * Synchronize line heights between left and right columns in split-columns layout.
  * When wrapping is enabled, lines can wrap to different heights on each side.
@@ -15,18 +16,18 @@ export function syncSplitColumnHeights() {
 
     // First pass: clear previous min-heights so we measure natural sizes
     for (let i = 0; i < count; i++) {
-      (leftLines[i] as HTMLElement).style.minHeight = '';
-      (rightLines[i] as HTMLElement).style.minHeight = '';
+      asEl(leftLines[i]).style.minHeight = '';
+      asEl(rightLines[i]).style.minHeight = '';
     }
 
     // Second pass: measure and sync
     for (let i = 0; i < count; i++) {
-      const lh = (leftLines[i] as HTMLElement).offsetHeight;
-      const rh = (rightLines[i] as HTMLElement).offsetHeight;
+      const lh = asEl(leftLines[i]).offsetHeight;
+      const rh = asEl(rightLines[i]).offsetHeight;
       if (lh !== rh) {
         const max = `${Math.max(lh, rh)}px`;
-        (leftLines[i] as HTMLElement).style.minHeight = max;
-        (rightLines[i] as HTMLElement).style.minHeight = max;
+        asEl(leftLines[i]).style.minHeight = max;
+        asEl(rightLines[i]).style.minHeight = max;
       }
     }
   });

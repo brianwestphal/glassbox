@@ -3,6 +3,7 @@ import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
 import { moveAnnotation, revealFile } from '../../api/index.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
+import { asEl } from '../dom.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
@@ -163,7 +164,7 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
     svgToggle.style.display = isSvg ? '' : 'none';
     const svgMode = diffViewStore.state.value.svgViewMode;
     svgToggle.querySelectorAll('[data-svg-mode]').forEach(btn => {
-      btn.classList.toggle('active', (btn as HTMLElement).dataset.svgMode === svgMode);
+      btn.classList.toggle('active', asEl(btn).dataset.svgMode === svgMode);
     });
   }
   toolbar?.classList.toggle('svg-file', isSvg);
@@ -239,9 +240,9 @@ function adaptImageToolbar(container: HTMLElement, imageToolbar: HTMLElement | n
   if (!hasComparison && (mode === 'difference' || mode === 'slice')) mode = 'image';
   if (hasComparison && mode === 'image') mode = 'slice';
   imageToolbar.querySelectorAll('[data-image-mode]').forEach(b =>
-    b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === mode));
+    b.classList.toggle('active', asEl(b).dataset.imageMode === mode));
   container.querySelectorAll('.image-diff-panel').forEach(p =>
-    p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
+    p.classList.toggle('active', asEl(p).dataset.panel === mode));
 }
 
 // --- Reactive image mode panel switching ---
@@ -255,9 +256,9 @@ function setupImageModeEffect(): void {
     if (imageDiffEl === null) return;
     const imageToolbar = document.querySelector<HTMLElement>('.diff-toolbar-image');
     imageToolbar?.querySelectorAll('[data-image-mode]').forEach(b =>
-      b.classList.toggle('active', (b as HTMLElement).dataset.imageMode === mode));
+      b.classList.toggle('active', asEl(b).dataset.imageMode === mode));
     container.querySelectorAll('.image-diff-panel').forEach(p =>
-      p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
+      p.classList.toggle('active', asEl(p).dataset.panel === mode));
   });
 }
 
@@ -291,13 +292,13 @@ function readLineAndSide(el: HTMLElement): { line: number; side: string } | null
 function setupDelegatedHandlers(container: HTMLElement): void {
   // Reveal button (server-rendered for image-not-found etc.)
   delegate(container, 'click', '.reveal-btn', (_e, btn) => {
-    const fid = (btn as HTMLElement).dataset.fileId ?? '';
+    const fid = asEl(btn).dataset.fileId ?? '';
     void revealFile({ fileId: fid });
   });
 
   // Hunk expanders
   delegate(container, 'click', '.hunk-separator', (_e, el) => {
-    handleHunkExpand(el as HTMLElement);
+    handleHunkExpand(asEl(el));
   });
 
   // Diff line click → annotation form
@@ -310,12 +311,12 @@ function setupDelegatedHandlers(container: HTMLElement): void {
   delegate(container, 'click', '.diff-line', (e, line) => {
     const me = e as MouseEvent;
     if (me.metaKey || me.ctrlKey) return;
-    const target = me.target as HTMLElement;
+    const target = asEl(me.target);
     if (target.closest('.annotation-form-container') || target.closest('.annotation-row')) return;
     const dx = Math.abs(me.clientX - clickStart.x);
     const dy = Math.abs(me.clientY - clickStart.y);
     if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) return;
-    const el = line as HTMLElement;
+    const el = asEl(line);
     const target_ = readLineAndSide(el);
     if (target_ !== null) showAnnotationForm(el, target_.line, target_.side);
   });
@@ -327,10 +328,10 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const dragEvent = e as DragEvent;
     if (dragEvent.dataTransfer !== null) dragEvent.dataTransfer.dropEffect = 'move';
     container.querySelectorAll('.diff-line.drag-over').forEach(d => { d.classList.remove('drag-over'); });
-    (line as HTMLElement).classList.add('drag-over');
+    asEl(line).classList.add('drag-over');
   });
   delegate(container, 'dragleave', '.diff-line', (_e, line) => {
-    (line as HTMLElement).classList.remove('drag-over');
+    asEl(line).classList.remove('drag-over');
   });
   delegate(container, 'drop', '.diff-line', (e, line) => {
     e.preventDefault();
@@ -338,7 +339,7 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const drag = dragStore.state.value.annotation;
     if (drag === null) return;
 
-    const dropTarget = readLineAndSide(line as HTMLElement);
+    const dropTarget = readLineAndSide(asEl(line));
     if (dropTarget === null) return;
 
     dragStore.actions.setAnnotation(null);
@@ -367,7 +368,7 @@ function delegateCaptureScroll(container: HTMLElement): void {
   delegateCapture(container, 'scroll', '.code', (_e, target) => {
     const dv = diffViewStore.state.value;
     if (syncing || dv.wrapLines || dv.diffMode !== 'split') return;
-    const el = target as HTMLElement;
+    const el = asEl(target);
     if (!el.closest('.split-row') && !el.closest('.split-columns')) return;
     const scrollLeft = el.scrollLeft;
     if (scrollLeft === lastScrollLeft) return;
@@ -376,8 +377,8 @@ function delegateCaptureScroll(container: HTMLElement): void {
     rafId = requestAnimationFrame(() => {
       syncing = true;
       container.querySelectorAll('.split-row .code, .split-columns .code').forEach(other => {
-        if (other !== el && (other as HTMLElement).scrollLeft !== scrollLeft) {
-          (other as HTMLElement).scrollLeft = scrollLeft;
+        if (other !== el && asEl(other).scrollLeft !== scrollLeft) {
+          asEl(other).scrollLeft = scrollLeft;
         }
       });
       syncing = false;

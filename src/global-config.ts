@@ -1,6 +1,13 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { z } from 'zod';
+
+/** Permissive top-level shape of `~/.glassbox/config.json`. Keys vary by
+ *  feature (`ai`, `guidedReview`, `sharePrompt`, `themes`, …), so the
+ *  schema only asserts it's a JSON object — narrower per-feature schemas
+ *  live in the modules that own those keys. */
+const GlobalConfigSchema = z.record(z.string(), z.unknown());
 
 /**
  * Single source of truth for `~/.glassbox/` and the global `config.json`
@@ -17,10 +24,9 @@ export type GlobalConfig = Record<string, unknown>;
 export function readGlobalConfig(): GlobalConfig {
   try {
     if (existsSync(GLOBAL_CONFIG_PATH)) {
-      const parsed: unknown = JSON.parse(readFileSync(GLOBAL_CONFIG_PATH, 'utf-8'));
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        return parsed as GlobalConfig;
-      }
+      const raw: unknown = JSON.parse(readFileSync(GLOBAL_CONFIG_PATH, 'utf-8'));
+      const parsed = GlobalConfigSchema.safeParse(raw);
+      if (parsed.success) return parsed.data;
     }
   } catch { /* corrupt or unreadable — start fresh */ }
   return {};

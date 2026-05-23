@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { ReviewFile } from '../db/queries.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
 import { runAnalysisBatch } from './shared.js';
@@ -69,13 +71,14 @@ If you need full file content to explain accurately, output ONLY: {"needContext"
 CRITICAL: Your entire response must be parseable by JSON.parse(). No prose, no markdown, no explanation.`;
 }
 
-export interface GuidedFileResult {
-  filePath: string;
-  notes: {
-    overview: string;
-    lines: Array<{ line: number; content: string }>;
-  };
-}
+export const GuidedFileResultSchema = z.object({
+  filePath: z.string(),
+  notes: z.object({
+    overview: z.string(),
+    lines: z.array(z.object({ line: z.number(), content: z.string() })),
+  }),
+});
+export type GuidedFileResult = z.infer<typeof GuidedFileResultSchema>;
 
 /** Analyze a single batch of files for guided review educational content. */
 export function runGuidedAnalysisBatch(
@@ -89,5 +92,6 @@ export function runGuidedAnalysisBatch(
     initialPromptHeader: (n) => `Provide educational walkthrough notes for these ${String(n)} changed files:`,
     resultLabel: 'guided review notes',
     analysisName: 'Guided analysis',
+    itemSchema: GuidedFileResultSchema,
   });
 }

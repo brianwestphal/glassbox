@@ -1,5 +1,6 @@
 import hljs from 'highlight.js';
 
+import { asEl } from '../dom.js';
 import { diffViewStore } from '../stores/index.js';
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -95,7 +96,7 @@ export function applyHighlighting() {
   if (!container) return;
 
   container.querySelectorAll('.code').forEach(el => {
-    const codeEl = el as HTMLElement;
+    const codeEl = asEl(el);
     const charChangeSpans = codeEl.querySelectorAll('.char-change');
 
     if (charChangeSpans.length === 0) {
@@ -142,7 +143,7 @@ function clearHighlighting() {
   if (!container) return;
 
   container.querySelectorAll('.code').forEach(el => {
-    const codeEl = el as HTMLElement;
+    const codeEl = asEl(el);
     // Preserve char-change spans when clearing
     const charChangeSpans = codeEl.querySelectorAll('.char-change');
     if (charChangeSpans.length === 0) {

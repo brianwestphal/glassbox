@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { debugLog } from '../debug.js';
 import type { AIConfig } from './config.js';
 
@@ -11,6 +13,36 @@ export interface AIResponse {
   inputTokens: number;
   outputTokens: number;
 }
+
+// --- Response schemas for the three upstream APIs ---
+// Each shape is a minimal projection of what we actually consume — the
+// vendors return more fields than this, but `.loose()` lets the parser
+// ignore them. The schemas exist so a vendor-side breaking change shows
+// up as a clear validation error rather than `undefined.text`.
+
+const AnthropicResponseSchema = z.object({
+  content: z.array(z.object({ type: z.string(), text: z.string().optional() }).loose()),
+  usage: z.object({ input_tokens: z.number(), output_tokens: z.number() }).loose(),
+}).loose();
+
+const OpenAIResponseSchema = z.object({
+  choices: z.array(z.object({
+    message: z.object({ content: z.string() }).loose(),
+  }).loose()).min(1),
+  usage: z.object({ prompt_tokens: z.number(), completion_tokens: z.number() }).loose(),
+}).loose();
+
+const GoogleResponseSchema = z.object({
+  candidates: z.array(z.object({
+    content: z.object({
+      parts: z.array(z.object({ text: z.string() }).loose()),
+    }).loose(),
+  }).loose()).min(1),
+  usageMetadata: z.object({
+    promptTokenCount: z.number(),
+    candidatesTokenCount: z.number(),
+  }).loose().optional(),
+}).loose();
 
 export async function sendAIRequest(
   config: AIConfig,
@@ -72,14 +104,12 @@ async function sendAnthropicRequest(
     throw new Error(`Anthropic API error (${String(response.status)}): ${errorText}`);
   }
 
-  const data = await response.json() as {
-    content: Array<{ type: string; text: string }>;
-    usage: { input_tokens: number; output_tokens: number };
-  };
+  const raw: unknown = await response.json();
+  const data = AnthropicResponseSchema.parse(raw);
 
   const text = data.content
     .filter(c => c.type === 'text')
-    .map(c => c.text)
+    .map(c => c.text ?? '')
     .join('');
 
   return {
@@ -97,7 +127,7 @@ async function sendOpenAIRequest(
 ): Promise<AIResponse> {
   const oaiMessages = [
     { role: 'system' as const, content: systemPrompt },
-    ...messages.map(m => ({ role: m.role as string, content: m.content })),
+    ...messages.map(m => ({ role: m.role, content: m.content })),
   ];
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -118,10 +148,8 @@ async function sendOpenAIRequest(
     throw new Error(`OpenAI API error (${String(response.status)}): ${errorText}`);
   }
 
-  const data = await response.json() as {
-    choices: Array<{ message: { content: string } }>;
-    usage: { prompt_tokens: number; completion_tokens: number };
-  };
+  const raw: unknown = await response.json();
+  const data = OpenAIResponseSchema.parse(raw);
 
   return {
     content: data.choices[0].message.content,
@@ -162,10 +190,8 @@ async function sendGoogleRequest(
     throw new Error(`Google AI API error (${String(response.status)}): ${errorText}`);
   }
 
-  const data = await response.json() as {
-    candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
-    usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number };
-  };
+  const raw: unknown = await response.json();
+  const data = GoogleResponseSchema.parse(raw);
 
   const text = data.candidates[0].content.parts.map(p => p.text).join('');
 

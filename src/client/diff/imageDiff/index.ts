@@ -1,4 +1,5 @@
 import { ImageModeSchema, saveAIPreferences } from '../../../api/index.js';
+import { asEl } from '../../dom.js';
 import { diffViewStore } from '../../stores/index.js';
 import { loadMetadata } from './metadata.js';
 import { initSliceTool } from './sliceTool.js';
@@ -8,9 +9,9 @@ export function bindImageDiff(): void {
   const container = document.querySelector('.image-diff');
   if (!container) return;
 
-  const fileId = (container as HTMLElement).dataset.fileId ?? '';
-  const hasOld = (container as HTMLElement).dataset.hasOld === 'true';
-  const hasNew = (container as HTMLElement).dataset.hasNew === 'true';
+  const fileId = asEl(container).dataset.fileId ?? '';
+  const hasOld = asEl(container).dataset.hasOld === 'true';
+  const hasNew = asEl(container).dataset.hasNew === 'true';
   const hasComparison = hasOld && hasNew;
 
   void loadMetadata(fileId, container);
@@ -77,7 +78,7 @@ export function bindImageDiff(): void {
 
   imageToolbar?.querySelectorAll('[data-image-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const mode = (btn as HTMLElement).dataset.imageMode ?? '';
+      const mode = asEl(btn).dataset.imageMode ?? '';
       diffViewStore.actions.update({ lastImageMode: mode });
       const imageModeParsed = ImageModeSchema.safeParse(mode);
       if (imageModeParsed.success) {
@@ -85,7 +86,7 @@ export function bindImageDiff(): void {
       }
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p =>
-        p.classList.toggle('active', (p as HTMLElement).dataset.panel === mode));
+        p.classList.toggle('active', asEl(p).dataset.panel === mode));
       requestAnimationFrame(() => { syncVisible(); });
     });
   });
@@ -150,8 +151,8 @@ export function bindImageDiff(): void {
         sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0;
         syncVisible();
       } else if (action === 'actual') {
-        const bw = parseInt((container as HTMLElement).dataset.baseWidth ?? '', 10);
-        const bh = parseInt((container as HTMLElement).dataset.baseHeight ?? '', 10);
+        const bw = parseInt(asEl(container).dataset.baseWidth ?? '', 10);
+        const bh = parseInt(asEl(container).dataset.baseHeight ?? '', 10);
         const nw = (bw > 0 && bh > 0) ? bw : refImg.naturalWidth;
         const nh = (bw > 0 && bh > 0) ? bh : refImg.naturalHeight;
         if (nw > 0 && nh > 0) {

@@ -1,8 +1,18 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { z } from 'zod';
 
 const MCP_SERVER_KEY = 'glassbox-channel';
+
+/** Shape of `.mcp.json`. Permissive (`.loose()`) so unrelated tool keys
+ *  the user has configured pass through unmodified. */
+const McpConfigSchema = z.object({
+  mcpServers: z.record(z.string(), z.unknown()).optional(),
+}).loose();
+type McpConfig = z.infer<typeof McpConfigSchema>;
+
+const HealthResponseSchema = z.object({ ok: z.boolean() });
 
 /** Get the path to the channel server and the command to run it. */
 function getChannelServerPath(): { command: string; args: string[] } {
@@ -34,10 +44,12 @@ export function registerChannel(dataDir: string): void {
   const mcpPath = join(root, '.mcp.json');
   const { command, args } = getChannelServerPath();
 
-  let config: { mcpServers?: Record<string, unknown>; [key: string]: unknown } = {};
+  let config: McpConfig = {};
   if (existsSync(mcpPath)) {
     try {
-      config = JSON.parse(readFileSync(mcpPath, 'utf-8')) as typeof config;
+      const raw: unknown = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+      const parsed = McpConfigSchema.safeParse(raw);
+      if (parsed.success) config = parsed.data;
     } catch { /* corrupt, overwrite */ }
   }
 
@@ -58,7 +70,10 @@ export function unregisterChannel(dataDir: string): void {
   if (!existsSync(mcpPath)) return;
 
   try {
-    const config = JSON.parse(readFileSync(mcpPath, 'utf-8')) as { mcpServers?: Record<string, unknown> };
+    const raw: unknown = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    const parsed = McpConfigSchema.safeParse(raw);
+    if (!parsed.success) return;
+    const config = parsed.data;
     if (config.mcpServers?.[MCP_SERVER_KEY] !== undefined) {
       const servers = { ...config.mcpServers };
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -86,8 +101,9 @@ export async function isChannelAlive(dataDir: string): Promise<boolean> {
   if (port === null) return false;
   try {
     const res = await fetch(`http://127.0.0.1:${port}/health`);
-    const data = await res.json() as { ok: boolean };
-    return data.ok;
+    const raw: unknown = await res.json();
+    const parsed = HealthResponseSchema.safeParse(raw);
+    return parsed.success && parsed.data.ok;
   } catch {
     return false;
   }

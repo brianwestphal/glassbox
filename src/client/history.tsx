@@ -1,7 +1,7 @@
 /** Client script for the review history page. Built separately from app.ts. */
 import { delegate } from 'kerfjs';
 
-import { toElement } from './dom.js';
+import { asEl, toElement } from './dom.js';
 
 function updateBulkVisibility(): void {
   const bulk = document.querySelector('.bulk-actions');
@@ -39,12 +39,12 @@ function showConfirm(message: string, onConfirm: () => void): void {
 delegate(document.body, 'click', '.delete-review-btn', (e, btn) => {
   e.preventDefault();
   e.stopPropagation();
-  const id = (btn as HTMLElement).dataset.deleteId ?? '';
+  const id = asEl(btn).dataset.deleteId ?? '';
   showConfirm('Delete this review? This cannot be undone.', () => {
     void fetch('/api/review/' + encodeURIComponent(id), { method: 'DELETE' })
       .then(r => r.json())
       .then(() => {
-        (btn as HTMLElement).closest('.history-item-link')?.parentElement?.remove();
+        asEl(btn).closest('.history-item-link')?.parentElement?.remove();
         updateBulkVisibility();
       });
   });

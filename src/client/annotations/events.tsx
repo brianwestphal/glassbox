@@ -2,7 +2,7 @@ import { delegate, morph } from 'kerfjs';
 
 import type { AnnotationCategory } from '../../api/index.js';
 import { deleteAnnotation, keepAnnotation, updateAnnotation } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, asElOrNull, asTextarea, toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import {
   dragStore,
@@ -22,45 +22,45 @@ import { buildAnnotationItemHtml } from './render.js';
 export function bindAnnotationEvents(diffContainer: HTMLElement): void {
   delegate(diffContainer, 'click', '.annotation-item [data-action="delete"]', (e, btn) => {
     e.stopPropagation();
-    const item = (btn as HTMLElement).closest<HTMLElement>('.annotation-item');
+    const item = asEl(btn).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     void handleDelete(item);
   });
 
   delegate(diffContainer, 'click', '.annotation-item [data-action="edit"]', (e, btn) => {
     e.stopPropagation();
-    const item = (btn as HTMLElement).closest<HTMLElement>('.annotation-item');
+    const item = asEl(btn).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     startEdit(item);
   });
 
   delegate(diffContainer, 'dblclick', '.annotation-item', (e, item) => {
     e.stopPropagation();
-    const el = item as HTMLElement;
+    const el = asEl(item);
     if (el.querySelector('.annotation-form') !== null) return;
-    if ((e.target as HTMLElement).closest('.annotation-form-container') !== null) return;
+    if (asEl(e.target).closest('.annotation-form-container') !== null) return;
     startEdit(el);
   });
 
   delegate(diffContainer, 'click', '.annotation-item [data-action="reclassify"]', (e, badge) => {
     e.stopPropagation();
-    const item = (badge as HTMLElement).closest<HTMLElement>('.annotation-item');
+    const item = asEl(badge).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     const annotation = readAnnotation(item);
     if (annotation === null) return;
-    showReclassifyPopup(badge as HTMLElement, item, annotation);
+    showReclassifyPopup(asEl(badge), item, annotation);
   });
 
   delegate(diffContainer, 'click', '.annotation-item [data-action="keep"]', (e, btn) => {
     e.stopPropagation();
-    const item = (btn as HTMLElement).closest<HTMLElement>('.annotation-item');
+    const item = asEl(btn).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     void handleKeep(item);
   });
 
   delegate(diffContainer, 'dragstart', '.annotation-drag-handle', (e, handle) => {
     e.stopPropagation();
-    const item = (handle as HTMLElement).closest<HTMLElement>('.annotation-item');
+    const item = asEl(handle).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     const annotation = readAnnotation(item);
     if (annotation === null) return;
@@ -88,7 +88,7 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
   delegate(diffContainer, 'input', '.annotation-form-container[data-edit-for] textarea', (_e, textarea) => {
     const cur = editFormSignal.value;
     if (cur === null) return;
-    setEditForm({ ...cur, content: (textarea as HTMLTextAreaElement).value });
+    setEditForm({ ...cur, content: asTextarea(textarea).value });
   });
 
   delegate(diffContainer, 'keydown', '.annotation-form-container[data-edit-for] textarea', (e) => {
@@ -111,7 +111,7 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
   // would fire because there was no delegate match.
   delegate(diffContainer, 'click', '.annotation-form-container .form-category-badge', (e, badge) => {
     e.stopPropagation();
-    showReclassifyPopupForEdit(badge as HTMLElement);
+    showReclassifyPopupForEdit(asEl(badge));
   });
 }
 
@@ -128,7 +128,7 @@ async function handleDelete(item: HTMLElement): Promise<void> {
   const annotation = readAnnotation(item);
   if (annotation === null) return;
   const annotationRow = item.closest<HTMLElement>('.annotation-row');
-  const lineEl = annotationRow?.previousElementSibling as HTMLElement | null;
+  const lineEl = asElOrNull(annotationRow?.previousElementSibling);
 
   await deleteAnnotation({ id: annotation.id });
   item.remove();

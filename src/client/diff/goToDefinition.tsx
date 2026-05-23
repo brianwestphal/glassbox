@@ -3,7 +3,7 @@
  * in the diff view navigates to its definition.
  */
 import { findSymbolDefinition } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
 import { setRawDiffContent } from './index.js';
@@ -19,7 +19,7 @@ export function bindGoToDefinition() {
     // Cmd+Click (macOS) or Ctrl+Click (Windows/Linux)
     if (!(e.metaKey || e.ctrlKey)) return;
     // Don't interfere with existing click handlers (annotations, buttons, etc.)
-    if ((e.target as HTMLElement).closest('button, a, .annotation-row, .annotation-form-container')) return;
+    if (asEl(e.target).closest('button, a, .annotation-row, .annotation-form-container')) return;
 
     const word = getWordAtPoint(e.clientX, e.clientY);
     if (word === null || word.length < 2) return;
@@ -31,9 +31,9 @@ export function bindGoToDefinition() {
 
   // Show pointer cursor when Cmd/Ctrl is held over identifiers
   container.addEventListener('mousemove', (e) => {
-    const code = (e.target as HTMLElement).closest('.code');
+    const code = asEl(e.target).closest('.code');
     if (code) {
-      (code as HTMLElement).style.cursor = (e.metaKey || e.ctrlKey) ? 'pointer' : '';
+      asEl(code).style.cursor = (e.metaKey || e.ctrlKey) ? 'pointer' : '';
     }
   });
 }

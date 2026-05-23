@@ -17,7 +17,7 @@ import {
   saveAIKey,
   updateProjectSettings,
 } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asButton, asEl, asInput, asSelect, toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
 import { triggerShare } from '../share.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
@@ -336,13 +336,13 @@ function setupDelegates(args: {
 
   delegate(overlay, 'click', '#settings-close', closeDialog);
   delegate(overlay, 'click', '[data-tab]', (_e, btn) => {
-    const t = (btn as HTMLElement).dataset.tab;
+    const t = asEl(btn).dataset.tab;
     if (t !== undefined) setUi({ activeTab: t });
   });
 
   // General tab
   delegate(overlay, 'change', '#settings-theme', (_e, sel) => {
-    const id = (sel as HTMLSelectElement).value;
+    const id = asSelect(sel).value;
     setUi({ activeThemeId: id });
     void switchTheme(id);
   });
@@ -361,20 +361,20 @@ function setupDelegates(args: {
     void triggerShare();
   });
   delegate(overlay, 'input', '#settings-app-name', (_e, input) => {
-    setUi({ appName: (input as HTMLInputElement).value });
+    setUi({ appName: asInput(input).value });
     actions.saveAppNameDebounced();
   });
 
   // Profile tab
   delegate(overlay, 'click', '.settings-tag', (_e, tag) => {
-    const topic = (tag as HTMLElement).dataset.topic;
+    const topic = asEl(tag).dataset.topic;
     if (topic !== undefined) actions.toggleTopic(topic);
   });
   delegate(overlay, 'click', '#show-more-langs', () => { setUi({ showMoreLangs: true }); });
 
   // Experimental tab
   delegate(overlay, 'click', '.settings-platform-control [data-platform]', (_e, btn) => {
-    const platform = (btn as HTMLElement).dataset.platform;
+    const platform = asEl(btn).dataset.platform;
     if (platform === undefined) return;
     const models = modelsData.models[platform as AIPlatform];
     const defaultModel = models.find(m => m.isDefault);
@@ -383,7 +383,7 @@ function setupDelegates(args: {
     actions.saveConfig();
   });
   delegate(overlay, 'change', '#settings-model', (_e, sel) => {
-    setUi({ currentModel: (sel as HTMLSelectElement).value });
+    setUi({ currentModel: asSelect(sel).value });
     actions.saveConfig();
   });
   delegate(overlay, 'click', '#remove-key', actions.removeKey);
@@ -393,25 +393,25 @@ function setupDelegates(args: {
     if (ke.key === 'Enter') { ke.preventDefault(); actions.saveKey(); }
   });
   delegate(overlay, 'change', '#settings-guided-enabled', (_e, cb) => {
-    setUi({ guidedEnabled: (cb as HTMLInputElement).checked });
+    setUi({ guidedEnabled: asInput(cb).checked });
     actions.saveConfig();
   });
   delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
-    const enabled = (cb as HTMLInputElement).checked;
+    const enabled = asInput(cb).checked;
     channelState.enabled = enabled;
     void (enabled ? enableChannel() : disableChannel());
     forceRerender();
   });
   delegate(overlay, 'click', '#channel-copy-btn', (_e, btn) => {
     void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
-    const el = btn as HTMLElement;
+    const el = asEl(btn);
     el.textContent = 'Copied!';
     setTimeout(() => { el.textContent = 'Copy'; }, TOAST_DURATION_MS);
   });
 
   // Updates tab
   delegate(overlay, 'click', '#check-updates-btn', (_e, btn) => {
-    void handleCheckUpdates(btn as HTMLButtonElement, overlay);
+    void handleCheckUpdates(asButton(btn), overlay);
   });
 
   // Click outside (on the dimmed overlay background) closes the dialog. Bound

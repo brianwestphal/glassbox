@@ -4,7 +4,7 @@ import { attr, delegate, mount, signal } from 'kerfjs';
 import type { ListThemesResp, ThemeSummary as ApiThemeSummary } from '../../api/index.js';
 import { createTheme, deleteTheme, getActiveTheme, listThemes } from '../../api/index.js';
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash } from '../../icons.js';
-import { toElement } from '../dom.js';
+import { asEl, toElement } from '../dom.js';
 import { applyThemeColors, switchTheme } from '../themes.js';
 import { showThemeEditor } from './themeEditor.js';
 
@@ -184,17 +184,17 @@ export function showThemeManager(onThemeChanged?: () => void): void {
     // Delegated handlers
     delegate(overlay, 'click', '#tm-close', close);
     delegate(overlay, 'click', '[data-click-use]', (_e, el) => {
-      const id = (el as HTMLElement).dataset.clickUse ?? '';
+      const id = asEl(el).dataset.clickUse ?? '';
       if (id !== '') void useTheme(id);
     });
     delegate(overlay, 'dblclick', '.theme-manager-item', (_e, el) => {
-      const id = (el as HTMLElement).dataset.themeId ?? '';
+      const id = asEl(el).dataset.themeId ?? '';
       if (id !== '') openEditor(id);
     });
     delegate(overlay, 'click', '.tm-menu-btn', (e, btn) => {
       e.stopPropagation();
-      const id = (btn as HTMLElement).dataset.menuId ?? '';
-      if (id !== '') showContextMenu(id, btn as HTMLElement);
+      const id = asEl(btn).dataset.menuId ?? '';
+      if (id !== '') showContextMenu(id, asEl(btn));
     });
 
     // Click outside the modal closes — direct listener on the overlay

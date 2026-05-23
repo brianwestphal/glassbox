@@ -1,5 +1,7 @@
 import { delegate } from 'kerfjs';
 
+import { asButton } from './dom.js';
+
 interface TauriGlobal {
   core?: { invoke: (cmd: string) => Promise<unknown> };
   event?: { listen: (name: string, cb: () => void) => void };
@@ -32,7 +34,7 @@ export function showUpdateBanner(version: string): void {
   bannerDelegatesBound = true;
 
   delegate(banner, 'click', '#update-install-btn', (_e, btn) => {
-    const installBtn = btn as HTMLButtonElement;
+    const installBtn = asButton(btn);
     void (async () => {
       installBtn.textContent = 'Installing...';
       installBtn.disabled = true;

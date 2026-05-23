@@ -1,5 +1,7 @@
 /** Shared utilities for AI analysis modules */
 
+import { z } from 'zod';
+
 import type { ReviewFile } from '../db/queries.js';
 import { getFileContent } from '../git/diff.js';
 import type { AIMessage } from './client.js';
@@ -8,17 +10,13 @@ import type { AIConfig } from './config.js';
 import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
 import { getModelContextWindow } from './models.js';
 
-export interface NeedContextResponse {
-  needContext: string[];
-}
+export const NeedContextResponseSchema = z.object({
+  needContext: z.array(z.string()),
+});
+export type NeedContextResponse = z.infer<typeof NeedContextResponseSchema>;
 
 export function isNeedContext(parsed: unknown): parsed is NeedContextResponse {
-  return (
-    typeof parsed === 'object' &&
-    parsed !== null &&
-    'needContext' in parsed &&
-    Array.isArray((parsed as NeedContextResponse).needContext)
-  );
+  return NeedContextResponseSchema.safeParse(parsed).success;
 }
 
 /** Try to extract JSON from a response that may contain surrounding prose */
@@ -45,7 +43,7 @@ export function extractJSON(text: string): unknown {
   throw new Error(`Could not extract JSON from AI response: ${text.slice(0, 300)}`);
 }
 
-interface AnalysisBatchOptions {
+interface AnalysisBatchOptions<T> {
   /** System prompt to send with every round. */
   systemPrompt: string;
   /** Builds the first line of the user prompt (e.g. "Analyze the following 5 file diffs for risk:"). */
@@ -54,6 +52,10 @@ interface AnalysisBatchOptions {
   resultLabel: string;
   /** Label for the "Risk/Narrative/Guided analysis did not converge…" error. */
   analysisName: string;
+  /** zod schema for a single result element. The whole array is parsed
+   *  through `z.array(itemSchema)` so a malformed entry fails loudly
+   *  instead of slipping through the previous `as T[]` cast. */
+  itemSchema: z.ZodType<T>;
 }
 
 /**
@@ -69,7 +71,7 @@ export async function runAnalysisBatch<T>(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,
-  options: AnalysisBatchOptions,
+  options: AnalysisBatchOptions<T>,
 ): Promise<T[]> {
   const contextWindow = getModelContextWindow(config.platform, config.model);
   // Reserve ~30% of the context window for output and system prompt.
@@ -110,11 +112,15 @@ export async function runAnalysisBatch<T>(
       continue;
     }
 
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Expected an array of ${options.resultLabel} from AI`);
+    const arrayResult = z.array(options.itemSchema).safeParse(parsed);
+    if (!arrayResult.success) {
+      const summary = arrayResult.error.issues
+        .slice(0, 3)
+        .map(i => `${i.path.join('.')}: ${i.message}`)
+        .join('; ');
+      throw new Error(`Expected an array of ${options.resultLabel} from AI — ${summary}`);
     }
-
-    return parsed as T[];
+    return arrayResult.data;
   }
 
   throw new Error(`${options.analysisName} did not converge after 3 context rounds`);

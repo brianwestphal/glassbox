@@ -1,14 +1,18 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { z } from 'zod';
 
 let lockPath: string | null = null;
+
+const LockFileSchema = z.object({ pid: z.number().int() });
 
 export function acquireLock(dataDir: string): void {
   lockPath = join(dataDir, 'glassbox.lock');
 
   if (existsSync(lockPath)) {
     try {
-      const contents = JSON.parse(readFileSync(lockPath, 'utf-8')) as { pid: number };
+      const raw: unknown = JSON.parse(readFileSync(lockPath, 'utf-8'));
+      const contents = LockFileSchema.parse(raw);
       const pid = contents.pid;
 
       // Check if the process is still alive (signal 0 = test only)

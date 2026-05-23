@@ -11,7 +11,7 @@ import {
   reopenReview,
   triggerChannel,
 } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asButton, asEl, toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { TOAST_DURATION_MS } from '../timing.js';
 
@@ -56,7 +56,7 @@ export function bindReopenButton(): void {
       const completeBtn = toElement(
         <button className="btn btn-primary btn-complete" id="complete-review">Complete Review</button>
       );
-      (btn as HTMLElement).replaceWith(completeBtn);
+      asEl(btn).replaceWith(completeBtn);
       // The delegate above is bound to a stable ancestor (`.review-app`)
       // so the click still fires on the freshly-inserted `#complete-review`
       // without needing to re-bind anything.
@@ -110,10 +110,10 @@ function showCompleteModal(): void {
   });
 
   delegate(overlay, 'click', '.modal-copyable', (_e, el) => {
-    const copyText = (el as HTMLElement).dataset.copy ?? '';
+    const copyText = asEl(el).dataset.copy ?? '';
     void navigator.clipboard.writeText(copyText);
-    (el as HTMLElement).classList.add('copied');
-    setTimeout(() => { (el as HTMLElement).classList.remove('copied'); }, TOAST_DURATION_MS);
+    asEl(el).classList.add('copied');
+    setTimeout(() => { asEl(el).classList.remove('copied'); }, TOAST_DURATION_MS);
   });
 
   delegate(overlay, 'click', ACTIONS.gitignoreAdd.selector, () => {
@@ -136,7 +136,7 @@ function showCompleteModal(): void {
   delegate(overlay, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
     if (stage.value.kind !== 'done') return;
     const aiCommand = stage.value.aiCommand;
-    const sendBtn = btn as HTMLButtonElement;
+    const sendBtn = asButton(btn);
     void (async () => {
       await triggerChannel({ message: aiCommand });
       sendBtn.textContent = 'Sent!';

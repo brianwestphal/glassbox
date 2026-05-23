@@ -83,8 +83,9 @@ function createFindBar() {
     </div>
   );
 
-  findInput = findBar.querySelector('.find-input') as HTMLInputElement;
-  matchLabel = findBar.querySelector('.find-match-count') as HTMLElement;
+  findInput = findBar.querySelector<HTMLInputElement>('.find-input');
+  matchLabel = findBar.querySelector<HTMLElement>('.find-match-count');
+  if (findInput === null) return;
 
   findInput.addEventListener('input', () => {
     if (findInput !== null) runSearch(findInput.value);

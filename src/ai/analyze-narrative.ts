@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { ReviewFile } from '../db/queries.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
 import { buildGuidedReviewSuffix } from './guided-review.js';
@@ -29,17 +31,19 @@ If you need full file content to determine dependencies, output ONLY: {"needCont
 CRITICAL: Your entire response must be parseable by JSON.parse(). No prose, no markdown, no explanation.`;
 
 
-export interface NarrativeFileNotes {
-  overview: string;
-  lines: Array<{ line: number; content: string }>;
-}
+export const NarrativeFileNotesSchema = z.object({
+  overview: z.string(),
+  lines: z.array(z.object({ line: z.number(), content: z.string() })),
+});
+export type NarrativeFileNotes = z.infer<typeof NarrativeFileNotesSchema>;
 
-export interface NarrativeFileResult {
-  filePath: string;
-  position: number;
-  rationale: string;
-  notes?: NarrativeFileNotes;
-}
+export const NarrativeFileResultSchema = z.object({
+  filePath: z.string(),
+  position: z.number(),
+  rationale: z.string(),
+  notes: NarrativeFileNotesSchema.optional(),
+});
+export type NarrativeFileResult = z.infer<typeof NarrativeFileResultSchema>;
 
 /** Analyze a single batch of files for narrative reading order. */
 export function runNarrativeAnalysisBatch(
@@ -56,6 +60,7 @@ export function runNarrativeAnalysisBatch(
     initialPromptHeader: (n) => `Determine the best reading order for reviewing these ${String(n)} changed files:`,
     resultLabel: 'narrative ordering',
     analysisName: 'Narrative analysis',
+    itemSchema: NarrativeFileResultSchema,
   });
 }
 

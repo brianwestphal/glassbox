@@ -2,7 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, morph, signal } from 'kerfjs';
 
 import { getOutline } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, toElement } from '../dom.js';
 
 interface OutlineSymbol {
   name: string;
@@ -102,14 +102,14 @@ function getTopVisibleLine(): number | null {
   const containerRect = container.getBoundingClientRect();
   const headerEl = container.querySelector<HTMLElement>('.diff-header');
   const headerHeight = headerEl?.offsetHeight ?? 0;
-  const outlineBar = container.querySelector('.outline-bar');
-  const outlineHeight = (outlineBar as HTMLElement | null)?.offsetHeight ?? 0;
+  const outlineBar = container.querySelector<HTMLElement>('.outline-bar');
+  const outlineHeight = outlineBar?.offsetHeight ?? 0;
   const topOffset = containerRect.top + headerHeight + outlineHeight;
 
   for (const el of lines) {
     const rect = el.getBoundingClientRect();
     if (rect.bottom > topOffset && rect.top < containerRect.bottom) {
-      const lineNum = parseInt((el as HTMLElement).dataset.line ?? '0', 10);
+      const lineNum = parseInt(asEl(el).dataset.line ?? '0', 10);
       if (lineNum > 0) return lineNum;
     }
   }
@@ -160,7 +160,7 @@ function showDropdown() {
   // the mount-managed children), so a single delegated listener on the
   // dropdown root is stable. Item clicks navigate + close.
   delegate(dropdown, 'click', '.outline-item', (_e, el) => {
-    const line = parseInt((el as HTMLElement).dataset.line ?? '0', 10);
+    const line = parseInt(asEl(el).dataset.line ?? '0', 10);
     if (line > 0) {
       scrollToLine(line);
       dropdown.remove();
@@ -206,8 +206,8 @@ function scrollToLine(lineNum: number) {
 
   const headerEl = container.querySelector<HTMLElement>('.diff-header');
   const headerHeight = headerEl?.offsetHeight ?? 0;
-  const outlineBar = container.querySelector('.outline-bar');
-  const outlineHeight = (outlineBar as HTMLElement | null)?.offsetHeight ?? 0;
+  const outlineBar = container.querySelector<HTMLElement>('.outline-bar');
+  const outlineHeight = outlineBar?.offsetHeight ?? 0;
 
   const targetRect = target.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();

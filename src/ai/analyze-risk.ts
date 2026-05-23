@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { ReviewFile } from '../db/queries.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
 import { buildGuidedReviewSuffix } from './guided-review.js';
@@ -38,18 +40,20 @@ export const RISK_DIMENSIONS = [
 
 export type RiskDimension = typeof RISK_DIMENSIONS[number];
 
-export interface FileNotes {
-  overview: string;
-  lines: Array<{ line: number; content: string }>;
-}
+export const FileNotesSchema = z.object({
+  overview: z.string(),
+  lines: z.array(z.object({ line: z.number(), content: z.string() })),
+});
+export type FileNotes = z.infer<typeof FileNotesSchema>;
 
-export interface RiskFileResult {
-  filePath: string;
-  scores: Record<RiskDimension, number>;
-  aggregate: number;
-  rationale: string;
-  notes?: FileNotes;
-}
+export const RiskFileResultSchema = z.object({
+  filePath: z.string(),
+  scores: z.record(z.enum(RISK_DIMENSIONS), z.number()),
+  aggregate: z.number(),
+  rationale: z.string(),
+  notes: FileNotesSchema.optional(),
+});
+export type RiskFileResult = z.infer<typeof RiskFileResultSchema>;
 
 /** Analyze a single batch of files for risk. Used by the batch runner. */
 export function runRiskAnalysisBatch(
@@ -66,5 +70,6 @@ export function runRiskAnalysisBatch(
     initialPromptHeader: (n) => `Analyze the following ${String(n)} file diffs for risk:`,
     resultLabel: 'risk assessments',
     analysisName: 'Risk analysis',
+    itemSchema: RiskFileResultSchema,
   });
 }

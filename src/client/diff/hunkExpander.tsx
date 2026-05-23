@@ -1,5 +1,5 @@
 import { getContextLines } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, toElement } from '../dom.js';
 import { postHunkExpand } from './index.js';
 
 function buildUnifiedContextLines(lines: Array<{ num: number; content: string }>): DocumentFragment {
@@ -40,7 +40,7 @@ function getFileId(): string | undefined {
 function findOtherSeparator(el: Element, splitCol: Element): HTMLElement | null {
   const splitColumns = splitCol.closest('.split-columns');
   if (splitColumns === null) return null;
-  const hunkIdx = (el as HTMLElement).dataset.hunkIdx;
+  const hunkIdx = asEl(el).dataset.hunkIdx;
   const isLeft = splitCol.classList.contains('split-col-left');
   const otherColClass = isLeft ? 'split-col-right' : 'split-col-left';
   return splitColumns.querySelector<HTMLElement>(`.${otherColClass} .hunk-separator[data-hunk-idx="${hunkIdx}"]`);

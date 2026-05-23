@@ -1,3 +1,4 @@
+import { asEl } from '../../dom.js';
 import { getZoomState, onZoomChange, type ZoomState } from './zoom.js';
 
 interface SliceState {
@@ -16,7 +17,7 @@ interface SliceState {
 type Edge = 'top' | 'right' | 'bottom' | 'left';
 
 export function initSliceTool(canvasEl: Element): void {
-  const canvas = canvasEl as HTMLElement;
+  const canvas = asEl(canvasEl);
   const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
   const oldImg = canvas.querySelector<HTMLImageElement>('.image-layer-old');
   const clipped = canvas.querySelector<HTMLImageElement>('.image-slice-clipped');

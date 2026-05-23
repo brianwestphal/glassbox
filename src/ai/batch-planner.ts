@@ -1,6 +1,6 @@
 import type { ReviewFile } from '../db/queries.js';
 import { debugLog } from '../debug.js';
-import type { FileDiff } from '../git/diff.js';
+import { emptyFileDiff,parseDiffData } from '../git/parseDiffData.js';
 
 export interface Batch {
   files: ReviewFile[];
@@ -12,27 +12,22 @@ export interface BatchPlan {
   binaryFiles: ReviewFile[];
 }
 
-function parseDiff(file: ReviewFile): FileDiff {
-  return JSON.parse(
-    file.diff_data !== null && file.diff_data !== '' ? file.diff_data : '{}'
-  ) as FileDiff;
-}
-
 function isBinary(file: ReviewFile): boolean {
-  const diff = parseDiff(file);
+  const diff = parseDiffData(file.diff_data) ?? emptyFileDiff(file.file_path);
   return diff.isBinary;
 }
 
-/** Estimate token count for a file's diff (rough: 1 token ~ 3 chars) */
+/** Estimate token count for a file's diff (rough: 1 token ~ 3 chars).
+ *  The schema-validated parse returns `null` only when `diff_data` is
+ *  missing or corrupt; the `emptyFileDiff` fallback gives a valid empty
+ *  shape with `hunks: []`, so the loop below handles every case without
+ *  a `Partial<FileDiff>` cast. */
 function estimateFileTokens(file: ReviewFile): number {
-  const diff = parseDiff(file);
+  const diff = parseDiffData(file.diff_data) ?? emptyFileDiff(file.file_path);
   if (diff.isBinary) return 0;
-  // hunks may be missing when diff_data is '{}' (runtime data from JSON.parse)
-  const hunks = (diff as Partial<FileDiff>).hunks;
-  if (!hunks) return 0;
 
   let charCount = 0;
-  for (const hunk of hunks) {
+  for (const hunk of diff.hunks) {
     // Hunk header
     charCount += 40;
     for (const line of hunk.lines) {

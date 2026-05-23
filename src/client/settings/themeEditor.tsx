@@ -2,7 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { editTheme, listThemes } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, asInput, toElement } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
 
 /** Color variable groups for the editor UI. */
@@ -137,23 +137,23 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
     delegate(overlay, 'click', '#te-close', close);
 
     delegate(overlay, 'input', '#te-name', (_e, input) => {
-      editNameSignal.value = (input as HTMLInputElement).value;
+      editNameSignal.value = asInput(input).value;
       dirty = true;
     });
 
     delegate(overlay, 'input', '.theme-editor-picker', (_e, picker) => {
-      const varName = (picker as HTMLElement).dataset.var ?? '';
-      if (varName !== '') updateColor(varName, (picker as HTMLInputElement).value);
+      const varName = asEl(picker).dataset.var ?? '';
+      if (varName !== '') updateColor(varName, asInput(picker).value);
     });
 
     delegate(overlay, 'change', '.theme-editor-hex', (_e, input) => {
-      const varName = (input as HTMLElement).dataset.var ?? '';
-      const value = (input as HTMLInputElement).value.trim();
+      const varName = asEl(input).dataset.var ?? '';
+      const value = asInput(input).value.trim();
       if (varName !== '' && value !== '') updateColor(varName, value);
     });
 
     delegate(overlay, 'click', '.theme-editor-reset', (_e, btn) => {
-      const varName = (btn as HTMLElement).dataset.var ?? '';
+      const varName = asEl(btn).dataset.var ?? '';
       const baseValue = baseColors[varName];
       if (varName !== '' && baseValue !== '') updateColor(varName, baseValue);
     });

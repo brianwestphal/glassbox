@@ -2,7 +2,7 @@ import { delegate } from 'kerfjs';
 
 import type { AnnotationCategory, AnnotationSide } from '../../api/index.js';
 import { createAnnotation } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asTextarea, toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
 import { editFormSignal, reviewStore, setEditForm } from '../stores/index.js';
 import { buildCategoryBadge } from './categories.js';
@@ -14,7 +14,7 @@ export function bindCreateFormEvents(diffContainer: HTMLElement): void {
   delegate(diffContainer, 'input', '.annotation-form-container[data-form-key] textarea', (_e, textarea) => {
     const cur = editFormSignal.value;
     if (cur === null || cur.formKey === null) return;
-    setEditForm({ ...cur, content: (textarea as HTMLTextAreaElement).value });
+    setEditForm({ ...cur, content: asTextarea(textarea).value });
   });
 
   delegate(diffContainer, 'keydown', '.annotation-form-container[data-form-key] textarea', (e) => {

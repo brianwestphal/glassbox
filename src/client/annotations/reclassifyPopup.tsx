@@ -2,7 +2,7 @@ import { delegate, morph } from 'kerfjs';
 
 import type { AnnotationCategory } from '../../api/index.js';
 import { updateAnnotation } from '../../api/index.js';
-import { toElement } from '../dom.js';
+import { asEl, toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import {
@@ -59,7 +59,7 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
 
   delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
-    const newCategory = (opt as HTMLElement).dataset.value ?? '';
+    const newCategory = asEl(opt).dataset.value ?? '';
     if (newCategory === annotation.category) {
       popup.remove();
       return;
@@ -91,7 +91,7 @@ export function showCategoryPickerForBadge(badge: HTMLElement): void {
 
   delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
-    const value = (opt as HTMLElement).dataset.value ?? '';
+    const value = asEl(opt).dataset.value ?? '';
     const cat = CATEGORIES.find(c => c.value === value);
     badge.className = `annotation-category category-${value} form-category-badge`;
     badge.dataset.category = value;
