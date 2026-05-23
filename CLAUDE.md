@@ -244,6 +244,7 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 - `vitest.config.ts` — Unit test config, excludes `tests/e2e/`, coverage via `@vitest/coverage-v8`
 - `playwright.config.ts` — E2E config, Chromium only, starts server in demo mode on port 4183
 - `tests/e2e/coverage-fixture.ts` — Playwright fixture that collects browser V8 coverage per test
+- `tests/e2e/memoryHelper.ts` — Heap-stability helpers (`measureHeap`, `expectStableHeap`) used by `stability.test.ts`. Forces V8 GC via CDP and reads `performance.memory.usedJSHeapSize` to assert that repeated interaction (file switching, modal open/close, sort-mode cycling) doesn't grow the heap proportionally with iteration count — catches per-cycle DOM / listener retention of the GB-800 / GB-748 class.
 - `scripts/test-all.sh` — Orchestrates unit + E2E runs and merges coverage
 - `scripts/test-e2e-coverage.sh` — Manages server lifecycle for E2E coverage collection
 
