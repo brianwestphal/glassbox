@@ -1,6 +1,6 @@
 import type { ReviewFile } from '../db/queries.js';
 import type { DiffHunk, FileDiff } from '../git/diff.js';
-import { parseDiffData } from '../git/parseDiffData.js';
+import { emptyFileDiff, parseDiffData } from '../git/parseDiffData.js';
 
 export interface FileContext {
   fileId: string;
@@ -66,12 +66,11 @@ export function buildFileContexts(files: ReviewFile[], charBudget: number): File
   const perFileBudget = Math.floor(charBudget / Math.max(files.length, 1));
 
   for (const file of files) {
-    const diff: FileDiff = parseDiffData(file.diff_data) ?? ({} as FileDiff);
+    const diff: FileDiff = parseDiffData(file.diff_data) ?? emptyFileDiff(file.file_path);
 
     let added = 0;
     let removed = 0;
-    const hunks = diff.hunks as DiffHunk[] | undefined;
-    for (const hunk of hunks ?? []) {
+    for (const hunk of diff.hunks) {
       for (const line of hunk.lines) {
         if (line.type === 'add') added++;
         if (line.type === 'remove') removed++;
@@ -81,7 +80,7 @@ export function buildFileContexts(files: ReviewFile[], charBudget: number): File
     contexts.push({
       fileId: file.id,
       filePath: file.file_path,
-      status: (diff.status as string | undefined) ?? file.status,
+      status: diff.status,
       linesAdded: added,
       linesRemoved: removed,
       diffText: buildDiffText(diff, perFileBudget),

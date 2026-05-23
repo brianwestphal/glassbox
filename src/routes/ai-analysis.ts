@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 
 import type { GuidedFileResult } from '../ai/analyze-guided.js';
 import { runGuidedAnalysisBatch } from '../ai/analyze-guided.js';
@@ -12,14 +13,10 @@ import type { AIConfig, GuidedReviewConfig } from '../ai/config.js';
 import { loadAIConfig, loadGuidedReviewConfig } from '../ai/config.js';
 import { mockGuidedAnalysisBatch, mockNarrativeAnalysisBatch, mockRiskAnalysisBatch } from '../ai/mock.js';
 import { getModelContextWindow } from '../ai/models.js';
-import type {
-  GetAIDebugStatusResp,
-  GetAIPreferencesResp,
-  GetAnalysisResp,
-  GetAnalysisStatusResp,
-  SaveAIPreferencesReq,
-  StartAnalysisReq,
-  StartAnalysisResp,
+import {
+  AnalysisTypeSchema,
+  SaveAIPreferencesReqSchema,
+  StartAnalysisReqSchema,
 } from '../api/index.js';
 import {
   appendFileScores,
@@ -35,18 +32,27 @@ import {
 import { getDb } from '../db/connection.js';
 import type { ReviewFile } from '../db/queries.js';
 import { getReviewFiles } from '../db/queries.js';
+import { DimensionScoresSchema, FileScoreNotesSchema, parseJsonColumn } from '../db/schemas.js';
 import { debugLog, isAIServiceTest, isDebug } from '../debug.js';
 import type { AppEnv } from '../types.js';
+import { errorResponse, parseBody } from '../utils/parseBody.js';
 import { resolveReviewId } from '../utils/resolveReviewId.js';
-import { checkEnum } from '../utils/validate.js';
 
 export const aiAnalysisRoutes = new Hono<AppEnv>();
 
-const VALID_SORT_MODES = ['folder', 'risk', 'narrative', 'guided'] as const;
-const VALID_RISK_DIMENSIONS = ['aggregate', 'security', 'correctness', 'error-handling', 'maintainability', 'architecture', 'performance'] as const;
-const VALID_SVG_VIEW_MODES = ['code', 'rendered'] as const;
-const VALID_IMAGE_MODES = ['metadata', 'side-by-side', 'difference', 'slice'] as const;
-const VALID_ANALYSIS_TYPES = ['risk', 'narrative', 'guided'] as const;
+/** Parse the `updated_at` timestamp on an analysis row. PGLite returns
+ *  raw `TIMESTAMP` columns in the server's local time; the previous
+ *  implementation appended `Z` to coerce them to UTC. The DB-row schema
+ *  now normalizes either a `Date` or a string via `toISOString()`, so
+ *  the value is already a valid ISO-with-Z when it reaches us. For
+ *  legacy bare-naive strings without a trailing `Z` (still used as test
+ *  fixtures), append the Z explicitly. */
+function parseAnalysisTimestamp(updatedAt: string): Date {
+  if (updatedAt.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(updatedAt)) {
+    return new Date(updatedAt);
+  }
+  return new Date(updatedAt + 'Z');
+}
 
 // Track canceled analysis IDs — checked by batch runner before starting new batches.
 // When a user switches from risk→narrative (or vice versa), the old analysis is added here.
@@ -58,14 +64,12 @@ const canceledAnalyses = new Set<string>();
 aiAnalysisRoutes.post('/analyze', async (c) => {
   const reviewId = resolveReviewId(c);
   const repoRoot = c.get('repoRoot');
-  const body = await c.req.json<StartAnalysisReq>();
-  const analysisType: string = body.type;
-  const invalidateCache = body.invalidateCache === true;
+  const parsed = await parseBody(c, StartAnalysisReqSchema);
+  if (!parsed.ok) return parsed.response;
+  const analysisType = parsed.data.type;
+  const invalidateCache = parsed.data.invalidateCache === true;
 
   debugLog(`POST /analyze: type=${analysisType}, reviewId=${reviewId}`);
-
-  const typeCheck = checkEnum(analysisType, 'type', VALID_ANALYSIS_TYPES);
-  if ('error' in typeCheck) return c.json({ error: typeCheck.error }, 400);
 
   const testMode = isAIServiceTest();
   const config = loadAIConfig();
@@ -110,12 +114,12 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
       debugLog(`POST /analyze: found existing ${analysisType} analysis id=${existing.id}, status=${existing.status}, created=${existing.created_at}, updated=${existing.updated_at}`);
     }
     if (existing !== undefined && existing.status === 'running') {
-      const ageMs = Date.now() - new Date(existing.updated_at + 'Z').getTime();
+      const ageMs = Date.now() - parseAnalysisTimestamp(existing.updated_at).getTime();
       debugLog(`POST /analyze: existing analysis age=${String(Math.round(ageMs / 1000))}s`);
       if (ageMs < 15 * 60 * 1000) {
         // Still recent, reuse it
         debugLog('POST /analyze: reusing existing running analysis');
-        return c.json<StartAnalysisResp>({ analysisId: existing.id, status: 'running' });
+        return c.json({ analysisId: existing.id, status: 'running' as const });
       }
       // Stale — mark it as failed so we can start fresh
       debugLog('POST /analyze: marking stale analysis as timed out');
@@ -132,7 +136,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
   // so the HTTP response returns immediately while batches stream results.
   void executeAnalysis({
     analysisId: analysis.id,
-    analysisType: typeCheck.ok,
+    analysisType,
     reviewId,
     files,
     config,
@@ -141,7 +145,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
     invalidateCache,
   });
 
-  return c.json<StartAnalysisResp>({ analysisId: analysis.id, status: 'running' });
+  return c.json({ analysisId: analysis.id, status: 'running' as const });
 });
 
 interface ExecuteAnalysisInput {
@@ -249,8 +253,8 @@ async function applyCachedScores(args: {
       sortOrder: s.sort_order,
       aggregateScore: s.aggregate_score,
       rationale: s.rationale,
-      dimensionScores: safeJsonParse(s.dimension_scores) as Record<string, number> | null,
-      notes: safeJsonParse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } | null,
+      dimensionScores: parseJsonColumn(DimensionScoresSchema, s.dimension_scores),
+      notes: parseJsonColumn(FileScoreNotesSchema, s.notes),
     }));
     await appendFileScores(analysisId, cachedForInsert);
   }
@@ -401,7 +405,7 @@ function riskAnalysisConfig(
       sortOrder: 0, // Placeholder — final sort happens after all batches
       aggregateScore: r.aggregate,
       rationale: r.rationale,
-      dimensionScores: r.scores as Record<string, number>,
+      dimensionScores: r.scores,
       notes: r.notes ?? null,
     }),
     finalize: async (allResults) => {
@@ -468,21 +472,21 @@ function guidedAnalysisConfig(
 
 aiAnalysisRoutes.get('/analysis/:type', async (c) => {
   const reviewId = resolveReviewId(c);
-  const analysisType = c.req.param('type');
-
-  const typeCheck = checkEnum(analysisType, 'type', VALID_ANALYSIS_TYPES);
-  if ('error' in typeCheck) return c.json({ error: typeCheck.error }, 400);
+  const rawType = c.req.param('type');
+  const typeParse = AnalysisTypeSchema.safeParse(rawType);
+  if (!typeParse.success) return errorResponse(c, 'type must be risk|narrative|guided');
+  const analysisType = typeParse.data;
 
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
     debugLog(`GET /analysis/${analysisType}: no analysis found`);
-    return c.json<GetAnalysisResp>({ status: 'none', scores: [] });
+    return c.json({ status: 'none', scores: [] });
   }
 
   debugLog(`GET /analysis/${analysisType}: id=${analysis.id}, status=${analysis.status}, error=${analysis.error_message ?? 'none'}`);
 
   if (analysis.status === 'failed') {
-    return c.json<GetAnalysisResp>({
+    return c.json({
       status: analysis.status,
       error: analysis.error_message,
       scores: [],
@@ -491,7 +495,7 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
 
   // Return partial or complete results (works for both 'running' and 'completed')
   const scores = await getFileScoresForReview(reviewId, analysisType);
-  return c.json<GetAnalysisResp>({
+  return c.json({
     status: analysis.status,
     progressCompleted: analysis.progress_completed,
     progressTotal: analysis.progress_total,
@@ -501,52 +505,38 @@ aiAnalysisRoutes.get('/analysis/:type', async (c) => {
       sortOrder: s.sort_order,
       aggregateScore: s.aggregate_score,
       rationale: s.rationale,
-      dimensionScores: safeJsonParse(s.dimension_scores) as Record<string, number> | null,
-      notes: safeJsonParse(s.notes) as { overview: string; lines: Array<{ line: number; content: string }> } | null,
+      dimensionScores: parseJsonColumn(DimensionScoresSchema, s.dimension_scores),
+      notes: parseJsonColumn(FileScoreNotesSchema, s.notes),
     })),
   });
 });
 
-/** Defensive wrapper around `JSON.parse` for stored DB strings. Returns
- *  `null` if the input is null/undefined or unparseable, so a corrupt row
- *  never 500s the request. The caller asserts the shape via the local
- *  `as T` site rather than here, to keep this helper generic. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function safeJsonParse(raw: string | null | undefined): any {
-  if (raw === null || raw === undefined) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
 aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
   const reviewId = resolveReviewId(c);
-  const analysisType = c.req.param('type');
-
-  const typeCheck = checkEnum(analysisType, 'type', VALID_ANALYSIS_TYPES);
-  if ('error' in typeCheck) return c.json({ error: typeCheck.error }, 400);
+  const rawType = c.req.param('type');
+  const typeParse = AnalysisTypeSchema.safeParse(rawType);
+  if (!typeParse.success) return errorResponse(c, 'type must be risk|narrative|guided');
+  const analysisType = typeParse.data;
 
   const analysis = await getLatestAnalysis(reviewId, analysisType);
   if (analysis === undefined) {
     debugLog(`GET /analysis/${analysisType}/status: no analysis found`);
-    return c.json<GetAnalysisStatusResp>({ status: 'none' });
+    return c.json({ status: 'none' });
   }
 
   debugLog(`GET /analysis/${analysisType}/status: id=${analysis.id}, status=${analysis.status}, progress=${String(analysis.progress_completed)}/${String(analysis.progress_total)}, updated=${analysis.updated_at}`);
 
   // Auto-timeout stale running analyses (e.g. server restarted mid-analysis)
   if (analysis.status === 'running') {
-    const ageMs = Date.now() - new Date(analysis.updated_at + 'Z').getTime();
+    const ageMs = Date.now() - parseAnalysisTimestamp(analysis.updated_at).getTime();
     if (ageMs > 15 * 60 * 1000) {
       debugLog(`GET /analysis/${analysisType}/status: timing out stale analysis (age=${String(Math.round(ageMs / 1000))}s)`);
       await updateAnalysisStatus(analysis.id, 'failed', 'Analysis timed out');
-      return c.json<GetAnalysisStatusResp>({ status: 'failed', error: 'Analysis timed out' });
+      return c.json({ status: 'failed', error: 'Analysis timed out' });
     }
   }
 
-  return c.json<GetAnalysisStatusResp>({
+  return c.json({
     status: analysis.status,
     error: analysis.error_message,
     progressCompleted: analysis.progress_completed,
@@ -557,61 +547,43 @@ aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
 // --- Debug ---
 
 aiAnalysisRoutes.get('/debug-status', (c) => {
-  return c.json<GetAIDebugStatusResp>({ enabled: isDebug() });
+  return c.json({ enabled: isDebug() });
 });
 
+const DebugLogReqSchema = z.object({ message: z.string() });
+
 aiAnalysisRoutes.post('/debug-log', async (c) => {
-  if (!isDebug()) return c.json({ ok: true });
-  const body = await c.req.json<{ message: string }>();
-  if (typeof body.message !== 'string') {
-    return c.json({ error: 'message must be a string' }, 400);
-  }
-  debugLog(`[client] ${body.message}`);
-  return c.json({ ok: true });
+  if (!isDebug()) return c.json({ ok: true } as const);
+  const parsed = await parseBody(c, DebugLogReqSchema);
+  if (!parsed.ok) return parsed.response;
+  debugLog(`[client] ${parsed.data.message}`);
+  return c.json({ ok: true } as const);
 });
 
 // --- Preferences ---
 
 aiAnalysisRoutes.get('/preferences', async (c) => {
   const prefs = await getUserPreferences();
-  return c.json<GetAIPreferencesResp>(prefs);
+  return c.json(prefs);
 });
 
 aiAnalysisRoutes.post('/preferences', async (c) => {
-  const raw = await c.req.json<unknown>();
-  if (typeof raw !== 'object' || raw === null) {
-    return c.json({ error: 'body must be a JSON object' }, 400);
-  }
-  const body = raw as SaveAIPreferencesReq;
-
-  if (body.sort_mode !== undefined) {
-    const v = checkEnum(body.sort_mode, 'sort_mode', VALID_SORT_MODES);
-    if ('error' in v) return c.json({ error: v.error }, 400);
-  }
-  if (body.risk_sort_dimension !== undefined) {
-    const v = checkEnum(body.risk_sort_dimension, 'risk_sort_dimension', VALID_RISK_DIMENSIONS);
-    if ('error' in v) return c.json({ error: v.error }, 400);
-  }
-  if (body.show_risk_scores !== undefined && typeof body.show_risk_scores !== 'boolean') {
-    return c.json({ error: 'show_risk_scores must be a boolean' }, 400);
-  }
-  if (body.ignore_whitespace !== undefined && typeof body.ignore_whitespace !== 'boolean') {
-    return c.json({ error: 'ignore_whitespace must be a boolean' }, 400);
-  }
-  if (body.svg_view_mode !== undefined) {
-    const v = checkEnum(body.svg_view_mode, 'svg_view_mode', VALID_SVG_VIEW_MODES);
-    if ('error' in v) return c.json({ error: v.error }, 400);
-  }
-  if (body.last_image_mode !== undefined) {
-    const v = checkEnum(body.last_image_mode, 'last_image_mode', VALID_IMAGE_MODES);
-    if ('error' in v) return c.json({ error: v.error }, 400);
-  }
+  const parsed = await parseBody(c, SaveAIPreferencesReqSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   // Project to a known allowlist before persisting — drops any unknown
   // keys the client may have sent. Only include keys actually set in the
   // body; including `undefined` for absent keys would let the spread in
-  // `saveUserPreferences` overwrite existing values with NULL.
-  const allowed: Record<string, unknown> = {};
+  // `saveUserPreferences` overwrite existing values.
+  const allowed: Partial<{
+    sort_mode: string;
+    risk_sort_dimension: string;
+    show_risk_scores: boolean;
+    ignore_whitespace: boolean;
+    svg_view_mode: string;
+    last_image_mode: string;
+  }> = {};
   if (body.sort_mode !== undefined) allowed.sort_mode = body.sort_mode;
   if (body.risk_sort_dimension !== undefined) allowed.risk_sort_dimension = body.risk_sort_dimension;
   if (body.show_risk_scores !== undefined) allowed.show_risk_scores = body.show_risk_scores;
@@ -619,5 +591,5 @@ aiAnalysisRoutes.post('/preferences', async (c) => {
   if (body.svg_view_mode !== undefined) allowed.svg_view_mode = body.svg_view_mode;
   if (body.last_image_mode !== undefined) allowed.last_image_mode = body.last_image_mode;
   await saveUserPreferences(allowed);
-  return c.json({ ok: true });
+  return c.json({ ok: true } as const);
 });

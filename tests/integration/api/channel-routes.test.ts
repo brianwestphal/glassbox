@@ -45,7 +45,9 @@ describe('POST /api/channel/trigger', () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('message must be a non-empty string');
+    // zod produces a path-qualified error message; we accept any error
+    // string here as long as the status is 400 and the field is mentioned.
+    expect(body.error).toMatch(/message/);
   });
 
   it('returns 400 when message is an empty string', async () => {

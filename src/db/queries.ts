@@ -1,47 +1,52 @@
+import { z } from 'zod';
+
 import { getDb } from './connection.js';
 import { generateId } from './ids.js';
+import type { Annotation, AnnotationWithFilePath, Review, ReviewFile } from './schemas.js';
+import {
+  AnnotationSchema,
+  AnnotationWithFilePathSchema,
+  parseRow,
+  parseRows,
+  ReviewFileSchema,
+  ReviewSchema,
+} from './schemas.js';
+
+// Re-export the canonical types so existing call sites keep importing from
+// `./queries.js`. The runtime shapes live in `./schemas.js`.
+export type { Annotation, AnnotationWithFilePath, Review, ReviewFile } from './schemas.js';
 
 // --- Reviews ---
-
-export interface Review {
-  id: string;
-  repo_path: string;
-  repo_name: string;
-  mode: string;
-  mode_args: string | null;
-  head_commit: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
 
 export async function createReview(repoPath: string, repoName: string, mode: string, modeArgs?: string, headCommit?: string): Promise<Review> {
   const db = await getDb();
   const id = generateId();
-  const result = await db.query<Review>(
+  const result = await db.query(
     `INSERT INTO reviews (id, repo_path, repo_name, mode, mode_args, head_commit)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [id, repoPath, repoName, mode, modeArgs ?? null, headCommit ?? null]
   );
-  return result.rows[0];
+  const review = parseRow(ReviewSchema, result.rows[0]);
+  if (review === undefined) throw new Error('createReview: INSERT did not return a row');
+  return review;
 }
 
 export async function getReview(id: string): Promise<Review | undefined> {
   const db = await getDb();
-  const result = await db.query<Review>('SELECT * FROM reviews WHERE id = $1', [id]);
-  return result.rows[0];
+  const result = await db.query('SELECT * FROM reviews WHERE id = $1', [id]);
+  return parseRow(ReviewSchema, result.rows[0]);
 }
 
 export async function listReviews(repoPath?: string): Promise<Review[]> {
   const db = await getDb();
   if (repoPath !== undefined && repoPath !== '') {
-    const result = await db.query<Review>(
+    const result = await db.query(
       'SELECT * FROM reviews WHERE repo_path = $1 ORDER BY created_at DESC', [repoPath]
     );
-    return result.rows;
+    return parseRows(ReviewSchema, result.rows);
   }
-  const result = await db.query<Review>('SELECT * FROM reviews ORDER BY created_at DESC');
-  return result.rows;
+  const result = await db.query('SELECT * FROM reviews ORDER BY created_at DESC');
+  return parseRows(ReviewSchema, result.rows);
 }
 
 export async function updateReviewStatus(id: string, status: string): Promise<void> {
@@ -63,50 +68,43 @@ export async function deleteReview(id: string): Promise<void> {
 
 export async function getLatestInProgressReview(repoPath: string, mode: string, modeArgs?: string): Promise<Review | undefined> {
   const db = await getDb();
-  const result = await db.query<Review>(
+  const result = await db.query(
     `SELECT * FROM reviews
      WHERE repo_path = $1 AND mode = $2 AND status = 'in_progress'
      AND ($3::text IS NULL OR mode_args = $3)
      ORDER BY created_at DESC LIMIT 1`,
     [repoPath, mode, modeArgs ?? null]
   );
-  return result.rows[0];
+  return parseRow(ReviewSchema, result.rows[0]);
 }
 
 // --- Review Files ---
 
-export interface ReviewFile {
-  id: string;
-  review_id: string;
-  file_path: string;
-  status: string;
-  diff_data: string | null;
-  created_at: string;
-}
-
 export async function addReviewFile(reviewId: string, filePath: string, diffData: string): Promise<ReviewFile> {
   const db = await getDb();
   const id = generateId();
-  const result = await db.query<ReviewFile>(
+  const result = await db.query(
     `INSERT INTO review_files (id, review_id, file_path, diff_data)
      VALUES ($1, $2, $3, $4) RETURNING *`,
     [id, reviewId, filePath, diffData]
   );
-  return result.rows[0];
+  const file = parseRow(ReviewFileSchema, result.rows[0]);
+  if (file === undefined) throw new Error('addReviewFile: INSERT did not return a row');
+  return file;
 }
 
 export async function getReviewFiles(reviewId: string): Promise<ReviewFile[]> {
   const db = await getDb();
-  const result = await db.query<ReviewFile>(
+  const result = await db.query(
     'SELECT * FROM review_files WHERE review_id = $1 ORDER BY file_path', [reviewId]
   );
-  return result.rows;
+  return parseRows(ReviewFileSchema, result.rows);
 }
 
 export async function getReviewFile(id: string): Promise<ReviewFile | undefined> {
   const db = await getDb();
-  const result = await db.query<ReviewFile>('SELECT * FROM review_files WHERE id = $1', [id]);
-  return result.rows[0];
+  const result = await db.query('SELECT * FROM review_files WHERE id = $1', [id]);
+  return parseRow(ReviewFileSchema, result.rows[0]);
 }
 
 export async function updateFileStatus(id: string, status: string): Promise<void> {
@@ -127,51 +125,40 @@ export async function deleteReviewFile(id: string): Promise<void> {
 
 // --- Annotations ---
 
-export interface Annotation {
-  id: string;
-  review_file_id: string;
-  line_number: number;
-  side: string;
-  category: string;
-  content: string;
-  is_stale: boolean;
-  original_content: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export async function addAnnotation(
   reviewFileId: string, lineNumber: number, side: string, category: string, content: string
 ): Promise<Annotation> {
   const db = await getDb();
   const id = generateId();
-  const result = await db.query<Annotation>(
+  const result = await db.query(
     `INSERT INTO annotations (id, review_file_id, line_number, side, category, content)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [id, reviewFileId, lineNumber, side, category, content]
   );
-  return result.rows[0];
+  const annotation = parseRow(AnnotationSchema, result.rows[0]);
+  if (annotation === undefined) throw new Error('addAnnotation: INSERT did not return a row');
+  return annotation;
 }
 
 export async function getAnnotationsForFile(reviewFileId: string): Promise<Annotation[]> {
   const db = await getDb();
-  const result = await db.query<Annotation>(
+  const result = await db.query(
     'SELECT * FROM annotations WHERE review_file_id = $1 ORDER BY line_number, created_at',
     [reviewFileId]
   );
-  return result.rows;
+  return parseRows(AnnotationSchema, result.rows);
 }
 
-export async function getAnnotationsForReview(reviewId: string): Promise<(Annotation & { file_path: string })[]> {
+export async function getAnnotationsForReview(reviewId: string): Promise<AnnotationWithFilePath[]> {
   const db = await getDb();
-  const result = await db.query<Annotation & { file_path: string }>(
+  const result = await db.query(
     `SELECT a.*, rf.file_path FROM annotations a
      JOIN review_files rf ON a.review_file_id = rf.id
      WHERE rf.review_id = $1
      ORDER BY rf.file_path, a.line_number, a.created_at`,
     [reviewId]
   );
-  return result.rows;
+  return parseRows(AnnotationWithFilePathSchema, result.rows);
 }
 
 export async function updateAnnotation(id: string, content: string, category: string): Promise<void> {
@@ -230,17 +217,23 @@ export async function keepAllStaleAnnotations(reviewId: string): Promise<void> {
   );
 }
 
+const CountRowSchema = z.object({
+  review_file_id: z.string(),
+  count: z.string(),
+});
+
 export async function getStaleCountsForReview(reviewId: string): Promise<Record<string, number>> {
   const db = await getDb();
-  const result = await db.query<{ review_file_id: string; count: string }>(
+  const result = await db.query(
     `SELECT a.review_file_id, COUNT(*)::text as count FROM annotations a
      JOIN review_files rf ON a.review_file_id = rf.id
      WHERE rf.review_id = $1 AND a.is_stale = TRUE
      GROUP BY a.review_file_id`,
     [reviewId]
   );
+  const rows = parseRows(CountRowSchema, result.rows);
   const counts: Record<string, number> = {};
-  for (const row of result.rows) {
+  for (const row of rows) {
     counts[row.review_file_id] = parseInt(row.count, 10);
   }
   return counts;
@@ -248,15 +241,16 @@ export async function getStaleCountsForReview(reviewId: string): Promise<Record<
 
 export async function getAnnotationCountsForReview(reviewId: string): Promise<Record<string, number>> {
   const db = await getDb();
-  const result = await db.query<{ review_file_id: string; count: string }>(
+  const result = await db.query(
     `SELECT a.review_file_id, COUNT(*)::text as count FROM annotations a
      JOIN review_files rf ON a.review_file_id = rf.id
      WHERE rf.review_id = $1
      GROUP BY a.review_file_id`,
     [reviewId]
   );
+  const rows = parseRows(CountRowSchema, result.rows);
   const counts: Record<string, number> = {};
-  for (const row of result.rows) {
+  for (const row of rows) {
     counts[row.review_file_id] = parseInt(row.count, 10);
   }
   return counts;

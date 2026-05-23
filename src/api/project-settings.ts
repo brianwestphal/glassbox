@@ -1,21 +1,28 @@
 /**
  * Typed API for `.glassbox/settings.json` (per-repo project settings).
  */
-import { api } from './_runner.js';
+import { z } from 'zod';
 
-export interface ProjectSettings {
-  appName?: string;
-}
+import { apiCall } from './_runner.js';
 
-export type GetProjectSettingsResp = ProjectSettings;
+export const ProjectSettingsSchema = z.object({
+  appName: z.string().optional(),
+});
+export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 
-export type UpdateProjectSettingsReq = Partial<ProjectSettings>;
-export type UpdateProjectSettingsResp = ProjectSettings;
+export const GetProjectSettingsRespSchema = ProjectSettingsSchema;
+export type GetProjectSettingsResp = z.infer<typeof GetProjectSettingsRespSchema>;
+
+export const UpdateProjectSettingsReqSchema = ProjectSettingsSchema.partial();
+export type UpdateProjectSettingsReq = z.infer<typeof UpdateProjectSettingsReqSchema>;
+
+export const UpdateProjectSettingsRespSchema = ProjectSettingsSchema;
+export type UpdateProjectSettingsResp = z.infer<typeof UpdateProjectSettingsRespSchema>;
 
 export async function getProjectSettings(): Promise<GetProjectSettingsResp> {
-  return api<GetProjectSettingsResp>('/project-settings');
+  return apiCall(GetProjectSettingsRespSchema, '/project-settings');
 }
 
 export async function updateProjectSettings(req: UpdateProjectSettingsReq): Promise<UpdateProjectSettingsResp> {
-  return api<UpdateProjectSettingsResp>('/project-settings', { method: 'PATCH', body: req });
+  return apiCall(UpdateProjectSettingsRespSchema, '/project-settings', { method: 'PATCH', body: req });
 }

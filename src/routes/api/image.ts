@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 
-import type { GetImageMetadataResp } from '../../api/index.js';
 import { getReview, getReviewFile } from '../../db/queries.js';
 import { parseDiffData, parseModeString } from '../../git/diff.js';
 import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isSvgFile } from '../../git/image.js';
@@ -30,7 +29,7 @@ imageRoutes.get('/image/:fileId/metadata', async (c) => {
   const oldMeta = oldImage !== null ? extractMetadata(oldImage.data, oldPath ?? file.file_path) : null;
   const newMeta = newImage !== null ? extractMetadata(newImage.data, file.file_path) : null;
 
-  return c.json<GetImageMetadataResp>({
+  return c.json({
     old: oldMeta ? formatMetadataLines(oldMeta) : null,
     new: newMeta ? formatMetadataLines(newMeta) : null,
   });

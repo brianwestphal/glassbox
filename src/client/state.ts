@@ -31,7 +31,7 @@ export interface Category {
 // TreeNode lives in `client/sidebar/folderTree.ts` — import from there
 // (it used to live here back when the file held a runtime state object too).
 
-export type SortMode = 'folder' | 'risk' | 'narrative';
+export type SortMode = 'folder' | 'risk' | 'narrative' | 'guided';
 
 export type AnalysisStatusValue = 'idle' | 'running' | 'completed' | 'failed';
 

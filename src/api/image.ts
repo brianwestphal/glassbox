@@ -4,23 +4,29 @@
  * — so this module exposes a URL builder (`imageUrl`) instead of a typed
  * caller for that endpoint.
  */
-import { api } from './_runner.js';
+import { z } from 'zod';
 
-export type ImageSide = 'old' | 'new';
+import { apiCall } from './_runner.js';
 
-export interface GetImageMetadataReq { fileId: string }
-export interface GetImageMetadataResp {
-  old: string[] | null;
-  new: string[] | null;
-}
+export const ImageSideSchema = z.enum(['old', 'new']);
+export type ImageSide = z.infer<typeof ImageSideSchema>;
+
+export const GetImageMetadataReqSchema = z.object({ fileId: z.string() });
+export type GetImageMetadataReq = z.infer<typeof GetImageMetadataReqSchema>;
+
+export const GetImageMetadataRespSchema = z.object({
+  old: z.array(z.string()).nullable(),
+  new: z.array(z.string()).nullable(),
+});
+export type GetImageMetadataResp = z.infer<typeof GetImageMetadataRespSchema>;
 
 export async function getImageMetadata(req: GetImageMetadataReq): Promise<GetImageMetadataResp> {
-  return api<GetImageMetadataResp>(`/image/${req.fileId}/metadata`);
+  return apiCall(GetImageMetadataRespSchema, `/image/${req.fileId}/metadata`);
 }
 
 /** Build the `<img src>` URL for one side of an image diff. Not a fetch
  *  helper — the response is binary and goes through the browser's image
- *  loader, not the JSON `api()` helper. */
+ *  loader, not the JSON `apiCall()` helper. */
 export function imageUrl(req: { fileId: string; side: ImageSide }): string {
   return `/api/image/${req.fileId}/${req.side}`;
 }

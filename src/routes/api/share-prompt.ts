@@ -1,45 +1,49 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 
-import type { GetSharePromptStateResp, TickSharePromptReq, TickSharePromptResp } from '../../api/index.js';
+import { TickSharePromptReqSchema } from '../../api/share-prompt.js';
 import { readGlobalConfig, updateGlobalConfig } from '../../global-config.js';
 import type { AppEnv } from '../../types.js';
+import { parseBody } from '../../utils/parseBody.js';
 
 export const sharePromptRoutes = new Hono<AppEnv>();
 
+const SharePromptShapeSchema = z.object({
+  dismissedAt: z.number().nullable().optional(),
+  totalOpenMs: z.number().optional(),
+});
+
 sharePromptRoutes.get('/share-prompt/state', (c) => {
   const config = readGlobalConfig();
-  const sp = config.sharePrompt as Record<string, unknown> | undefined;
-  const dismissedAt = sp !== undefined && typeof sp.dismissedAt === 'number' ? sp.dismissedAt : null;
-  const totalOpenMs = sp !== undefined && typeof sp.totalOpenMs === 'number' ? sp.totalOpenMs : 0;
-  return c.json<GetSharePromptStateResp>({ dismissedAt, totalOpenMs });
+  const sp = SharePromptShapeSchema.safeParse(config.sharePrompt);
+  const data = sp.success ? sp.data : {};
+  return c.json({
+    dismissedAt: data.dismissedAt ?? null,
+    totalOpenMs: data.totalOpenMs ?? 0,
+  });
 });
 
 sharePromptRoutes.post('/share-prompt/dismiss', (c) => {
   updateGlobalConfig((config) => {
-    if (config.sharePrompt === undefined) config.sharePrompt = {};
-    (config.sharePrompt as Record<string, unknown>).dismissedAt = Date.now();
+    const current = SharePromptShapeSchema.safeParse(config.sharePrompt);
+    const base = current.success ? current.data : {};
+    config.sharePrompt = { ...base, dismissedAt: Date.now() };
   });
-  return c.json({ ok: true });
+  return c.json({ ok: true } as const);
 });
 
 sharePromptRoutes.post('/share-prompt/tick', async (c) => {
-  const raw = await c.req.json<unknown>();
-  if (typeof raw !== 'object' || raw === null) {
-    return c.json({ error: 'body must be a JSON object' }, 400);
-  }
-  const body = raw as Partial<TickSharePromptReq>;
-  if (typeof body.sessionMs !== 'number' || !Number.isFinite(body.sessionMs)) {
-    return c.json({ error: 'sessionMs must be a finite number' }, 400);
-  }
-  const sessionMs = body.sessionMs;
+  const parsed = await parseBody(c, TickSharePromptReqSchema);
+  if (!parsed.ok) return parsed.response;
+  const sessionMs = parsed.data.sessionMs;
   let totalOpenMs = 0;
   updateGlobalConfig((config) => {
-    if (config.sharePrompt === undefined) config.sharePrompt = {};
-    const sp = config.sharePrompt as Record<string, unknown>;
-    const current = typeof sp.totalOpenMs === 'number' ? sp.totalOpenMs : 0;
-    const next = current + (sessionMs > 0 ? sessionMs : 0);
-    sp.totalOpenMs = next;
+    const current = SharePromptShapeSchema.safeParse(config.sharePrompt);
+    const base = current.success ? current.data : {};
+    const previousTotal = base.totalOpenMs ?? 0;
+    const next = previousTotal + (sessionMs > 0 ? sessionMs : 0);
+    config.sharePrompt = { ...base, totalOpenMs: next };
     totalOpenMs = next;
   });
-  return c.json<TickSharePromptResp>({ totalOpenMs });
+  return c.json({ totalOpenMs });
 });

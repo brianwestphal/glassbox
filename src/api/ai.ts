@@ -3,190 +3,263 @@
  * runs, and per-user preferences. The server routes mount these under
  * `/api/ai/*`.
  */
-import type { AIModel, AIPlatform } from '../ai/models.js';
-import { api, qs } from './_runner.js';
+import { z } from 'zod';
 
-// Re-export so the flat `apis` namespace + named imports can pull these
-// directly from the API layer without round-tripping through ai/models.js.
-export type { AIModel,AIPlatform } from '../ai/models.js';
+import { AIModelSchema, AIPlatformSchema } from '../ai/models.js';
+import { apiCall, OkResponseSchema, qs } from './_runner.js';
+
+export { AIModelSchema, AIPlatformSchema };
+export type { AIModel, AIPlatform } from '../ai/models.js';
 
 // --- Config ---
 
-export type KeySource = 'env' | 'keychain' | 'config' | null;
-export type KeyStorage = 'keychain' | 'config';
+export const KeySourceSchema = z.enum(['env', 'keychain', 'config']).nullable();
+export type KeySource = z.infer<typeof KeySourceSchema>;
 
-export interface AIConfigResp {
-  platform: AIPlatform;
-  model: string;
-  keyConfigured: boolean;
-  keySource: KeySource;
-  guidedReview: GuidedReviewConfigShape;
-}
+export const KeyStorageSchema = z.enum(['keychain', 'config']);
+export type KeyStorage = z.infer<typeof KeyStorageSchema>;
 
-export interface GuidedReviewConfigShape {
-  enabled: boolean;
-  topics: string[];
-}
+export const GuidedReviewConfigShapeSchema = z.object({
+  enabled: z.boolean(),
+  topics: z.array(z.string()),
+});
+export type GuidedReviewConfigShape = z.infer<typeof GuidedReviewConfigShapeSchema>;
 
-export interface SaveAIConfigReq {
-  platform: AIPlatform;
-  model: string;
-  guidedReview?: GuidedReviewConfigShape;
-}
-export interface SaveAIConfigResp { ok: true }
+export const AIConfigRespSchema = z.object({
+  platform: AIPlatformSchema,
+  model: z.string(),
+  keyConfigured: z.boolean(),
+  keySource: KeySourceSchema,
+  guidedReview: GuidedReviewConfigShapeSchema,
+});
+export type AIConfigResp = z.infer<typeof AIConfigRespSchema>;
 
-export interface ListAIModelsResp {
-  platforms: Record<AIPlatform, string>;
-  models: Record<AIPlatform, AIModel[]>;
-}
+export const SaveAIConfigReqSchema = z.object({
+  platform: AIPlatformSchema,
+  model: z.string().min(1),
+  guidedReview: GuidedReviewConfigShapeSchema.optional(),
+});
+export type SaveAIConfigReq = z.infer<typeof SaveAIConfigReqSchema>;
 
-export interface AIKeyStatusEntry {
-  configured: boolean;
-  source: KeySource;
-}
+export const SaveAIConfigRespSchema = OkResponseSchema;
+export type SaveAIConfigResp = z.infer<typeof SaveAIConfigRespSchema>;
 
-export interface AvailablePlatformEntry {
-  platform: AIPlatform;
-  source: 'env' | 'keychain' | 'config';
-}
+export const ListAIModelsRespSchema = z.object({
+  platforms: z.record(AIPlatformSchema, z.string()),
+  models: z.record(AIPlatformSchema, z.array(AIModelSchema)),
+});
+export type ListAIModelsResp = z.infer<typeof ListAIModelsRespSchema>;
 
-export interface GetAIKeyStatusResp {
-  status: Record<AIPlatform, AIKeyStatusEntry>;
-  keychainAvailable: boolean;
-  keychainLabel: string;
-  availablePlatforms: AvailablePlatformEntry[];
-}
+export const AIKeyStatusEntrySchema = z.object({
+  configured: z.boolean(),
+  source: KeySourceSchema,
+});
+export type AIKeyStatusEntry = z.infer<typeof AIKeyStatusEntrySchema>;
 
-export interface SaveAIKeyReq {
-  platform: AIPlatform;
-  key: string;
-  storage: KeyStorage;
-}
-export interface SaveAIKeyResp { ok: true }
+export const AvailablePlatformEntrySchema = z.object({
+  platform: AIPlatformSchema,
+  source: z.enum(['env', 'keychain', 'config']),
+});
+export type AvailablePlatformEntry = z.infer<typeof AvailablePlatformEntrySchema>;
 
-export interface DeleteAIKeyReq { platform: AIPlatform }
-export interface DeleteAIKeyResp { ok: true }
+export const GetAIKeyStatusRespSchema = z.object({
+  status: z.record(AIPlatformSchema, AIKeyStatusEntrySchema),
+  keychainAvailable: z.boolean(),
+  keychainLabel: z.string(),
+  availablePlatforms: z.array(AvailablePlatformEntrySchema),
+});
+export type GetAIKeyStatusResp = z.infer<typeof GetAIKeyStatusRespSchema>;
+
+export const SaveAIKeyReqSchema = z.object({
+  platform: AIPlatformSchema,
+  key: z.string().min(1),
+  storage: KeyStorageSchema,
+});
+export type SaveAIKeyReq = z.infer<typeof SaveAIKeyReqSchema>;
+export const SaveAIKeyRespSchema = OkResponseSchema;
+export type SaveAIKeyResp = z.infer<typeof SaveAIKeyRespSchema>;
+
+export const DeleteAIKeyReqSchema = z.object({ platform: AIPlatformSchema });
+export type DeleteAIKeyReq = z.infer<typeof DeleteAIKeyReqSchema>;
+export const DeleteAIKeyRespSchema = OkResponseSchema;
+export type DeleteAIKeyResp = z.infer<typeof DeleteAIKeyRespSchema>;
 
 // --- Analysis ---
 
-export type AnalysisType = 'risk' | 'narrative' | 'guided';
+export const AnalysisTypeSchema = z.enum(['risk', 'narrative', 'guided']);
+export type AnalysisType = z.infer<typeof AnalysisTypeSchema>;
+
 /** Server-side analysis row status — narrow to known values but allow a
  *  fallthrough string for forward-compat. */
+export const AnalysisStatusSchema = z.string();
 export type AnalysisStatus = 'none' | 'running' | 'completed' | 'failed' | (string & {});
 
-export interface StartAnalysisReq {
-  type: AnalysisType;
-  invalidateCache?: boolean;
-}
-export interface StartAnalysisResp {
-  analysisId: string;
-  status: 'running';
-}
-export interface StartAnalysisErrorResp { error: string }
+export const StartAnalysisReqSchema = z.object({
+  type: AnalysisTypeSchema,
+  invalidateCache: z.boolean().optional(),
+});
+export type StartAnalysisReq = z.infer<typeof StartAnalysisReqSchema>;
 
-export interface FileScoreNote {
-  overview: string;
-  lines: { line: number; content: string }[];
-}
+export const StartAnalysisRespSchema = z.object({
+  analysisId: z.string(),
+  status: z.literal('running'),
+});
+export type StartAnalysisResp = z.infer<typeof StartAnalysisRespSchema>;
 
-export interface FileScore {
-  reviewFileId: string;
-  filePath: string;
-  sortOrder: number;
-  aggregateScore: number | null;
-  rationale: string | null;
-  dimensionScores: Record<string, number> | null;
-  notes: FileScoreNote | null;
-}
+export const StartAnalysisErrorRespSchema = z.object({ error: z.string() });
+export type StartAnalysisErrorResp = z.infer<typeof StartAnalysisErrorRespSchema>;
 
-export interface GetAnalysisReq { type: AnalysisType }
-export interface GetAnalysisResp {
-  status: AnalysisStatus;
-  error?: string | null;
-  progressCompleted?: number;
-  progressTotal?: number;
-  scores: FileScore[];
-}
+export const FileScoreNoteSchema = z.object({
+  overview: z.string(),
+  lines: z.array(z.object({ line: z.number(), content: z.string() })),
+});
+export type FileScoreNote = z.infer<typeof FileScoreNoteSchema>;
 
-export interface GetAnalysisStatusReq { type: AnalysisType }
-export interface GetAnalysisStatusResp {
-  status: AnalysisStatus;
-  error?: string | null;
-  progressCompleted?: number;
-  progressTotal?: number;
-}
+export const FileScoreSchema = z.object({
+  reviewFileId: z.string(),
+  filePath: z.string(),
+  sortOrder: z.number(),
+  aggregateScore: z.number().nullable(),
+  rationale: z.string().nullable(),
+  dimensionScores: z.record(z.string(), z.number()).nullable(),
+  notes: FileScoreNoteSchema.nullable(),
+});
+export type FileScore = z.infer<typeof FileScoreSchema>;
+
+export const GetAnalysisReqSchema = z.object({ type: AnalysisTypeSchema });
+export type GetAnalysisReq = z.infer<typeof GetAnalysisReqSchema>;
+
+export const GetAnalysisRespSchema = z.object({
+  status: AnalysisStatusSchema,
+  error: z.string().nullable().optional(),
+  progressCompleted: z.number().optional(),
+  progressTotal: z.number().optional(),
+  scores: z.array(FileScoreSchema),
+});
+export type GetAnalysisResp = z.infer<typeof GetAnalysisRespSchema>;
+
+export const GetAnalysisStatusReqSchema = z.object({ type: AnalysisTypeSchema });
+export type GetAnalysisStatusReq = z.infer<typeof GetAnalysisStatusReqSchema>;
+
+export const GetAnalysisStatusRespSchema = z.object({
+  status: AnalysisStatusSchema,
+  error: z.string().nullable().optional(),
+  progressCompleted: z.number().optional(),
+  progressTotal: z.number().optional(),
+});
+export type GetAnalysisStatusResp = z.infer<typeof GetAnalysisStatusRespSchema>;
 
 // --- Debug ---
 
-export interface GetAIDebugStatusResp { enabled: boolean }
+export const GetAIDebugStatusRespSchema = z.object({ enabled: z.boolean() });
+export type GetAIDebugStatusResp = z.infer<typeof GetAIDebugStatusRespSchema>;
 
-export interface SendAIDebugLogReq { message: string }
-export interface SendAIDebugLogResp { ok: true }
+export const SendAIDebugLogReqSchema = z.object({ message: z.string() });
+export type SendAIDebugLogReq = z.infer<typeof SendAIDebugLogReqSchema>;
+export const SendAIDebugLogRespSchema = OkResponseSchema;
+export type SendAIDebugLogResp = z.infer<typeof SendAIDebugLogRespSchema>;
 
 // --- Preferences ---
 
-export interface UserPreferencesShape {
-  sort_mode?: string;
-  risk_sort_dimension?: string;
-  show_risk_scores?: boolean;
-  ignore_whitespace?: boolean;
-  svg_view_mode?: string;
-  last_image_mode?: string;
-}
-export type GetAIPreferencesResp = UserPreferencesShape;
-export type SaveAIPreferencesReq = UserPreferencesShape;
-export interface SaveAIPreferencesResp { ok: true }
+export const SortModeSchema = z.enum(['folder', 'risk', 'narrative', 'guided']);
+export type SortMode = z.infer<typeof SortModeSchema>;
+
+export const RiskDimensionSchema = z.enum([
+  'aggregate', 'security', 'correctness', 'error-handling', 'maintainability', 'architecture', 'performance',
+]);
+export type RiskDimension = z.infer<typeof RiskDimensionSchema>;
+
+export const SvgViewModeSchema = z.enum(['code', 'rendered']);
+export type SvgViewMode = z.infer<typeof SvgViewModeSchema>;
+
+export const ImageModeSchema = z.enum(['metadata', 'side-by-side', 'difference', 'slice']);
+export type ImageMode = z.infer<typeof ImageModeSchema>;
+
+/**
+ * Stored preferences shape. The GET response uses `z.string()` (not the
+ * enum schemas) for fields the DB persists as plain strings, so a row
+ * written by an older version of Glassbox still parses cleanly. The
+ * SAVE request, however, validates against the enums — that's the
+ * sharp end where invalid input should be rejected.
+ */
+export const UserPreferencesShapeSchema = z.object({
+  sort_mode: z.string().optional(),
+  risk_sort_dimension: z.string().optional(),
+  show_risk_scores: z.boolean().optional(),
+  ignore_whitespace: z.boolean().optional(),
+  svg_view_mode: z.string().optional(),
+  last_image_mode: z.string().optional(),
+});
+export type UserPreferencesShape = z.infer<typeof UserPreferencesShapeSchema>;
+
+export const GetAIPreferencesRespSchema = UserPreferencesShapeSchema;
+export type GetAIPreferencesResp = z.infer<typeof GetAIPreferencesRespSchema>;
+
+export const SaveAIPreferencesReqSchema = z.object({
+  sort_mode: SortModeSchema.optional(),
+  risk_sort_dimension: RiskDimensionSchema.optional(),
+  show_risk_scores: z.boolean().optional(),
+  ignore_whitespace: z.boolean().optional(),
+  svg_view_mode: SvgViewModeSchema.optional(),
+  last_image_mode: ImageModeSchema.optional(),
+});
+export type SaveAIPreferencesReq = z.infer<typeof SaveAIPreferencesReqSchema>;
+
+export const SaveAIPreferencesRespSchema = OkResponseSchema;
+export type SaveAIPreferencesResp = z.infer<typeof SaveAIPreferencesRespSchema>;
 
 // --- Callers ---
 
 export async function getAIConfig(): Promise<AIConfigResp> {
-  return api<AIConfigResp>('/ai/config');
+  return apiCall(AIConfigRespSchema, '/ai/config');
 }
 
 export async function saveAIConfig(req: SaveAIConfigReq): Promise<SaveAIConfigResp> {
-  return api<SaveAIConfigResp>('/ai/config', { method: 'POST', body: req });
+  return apiCall(SaveAIConfigRespSchema, '/ai/config', { method: 'POST', body: req });
 }
 
 export async function listAIModels(): Promise<ListAIModelsResp> {
-  return api<ListAIModelsResp>('/ai/models');
+  return apiCall(ListAIModelsRespSchema, '/ai/models');
 }
 
 export async function getAIKeyStatus(): Promise<GetAIKeyStatusResp> {
-  return api<GetAIKeyStatusResp>('/ai/key-status');
+  return apiCall(GetAIKeyStatusRespSchema, '/ai/key-status');
 }
 
 export async function saveAIKey(req: SaveAIKeyReq): Promise<SaveAIKeyResp> {
-  return api<SaveAIKeyResp>('/ai/key', { method: 'POST', body: req });
+  return apiCall(SaveAIKeyRespSchema, '/ai/key', { method: 'POST', body: req });
 }
 
 export async function deleteAIKey(req: DeleteAIKeyReq): Promise<DeleteAIKeyResp> {
-  return api<DeleteAIKeyResp>(`/ai/key${qs({ platform: req.platform })}`, { method: 'DELETE' });
+  return apiCall(DeleteAIKeyRespSchema, `/ai/key${qs({ platform: req.platform })}`, { method: 'DELETE' });
 }
 
+const StartAnalysisRespOrErrorSchema = z.union([StartAnalysisRespSchema, StartAnalysisErrorRespSchema]);
+
 export async function startAnalysis(req: StartAnalysisReq): Promise<StartAnalysisResp | StartAnalysisErrorResp> {
-  return api<StartAnalysisResp | StartAnalysisErrorResp>('/ai/analyze', { method: 'POST', body: req });
+  return apiCall(StartAnalysisRespOrErrorSchema, '/ai/analyze', { method: 'POST', body: req });
 }
 
 export async function getAnalysis(req: GetAnalysisReq): Promise<GetAnalysisResp> {
-  return api<GetAnalysisResp>(`/ai/analysis/${req.type}`);
+  return apiCall(GetAnalysisRespSchema, `/ai/analysis/${req.type}`);
 }
 
 export async function getAnalysisStatus(req: GetAnalysisStatusReq): Promise<GetAnalysisStatusResp> {
-  return api<GetAnalysisStatusResp>(`/ai/analysis/${req.type}/status`);
+  return apiCall(GetAnalysisStatusRespSchema, `/ai/analysis/${req.type}/status`);
 }
 
 export async function getAIDebugStatus(): Promise<GetAIDebugStatusResp> {
-  return api<GetAIDebugStatusResp>('/ai/debug-status');
+  return apiCall(GetAIDebugStatusRespSchema, '/ai/debug-status');
 }
 
 export async function sendAIDebugLog(req: SendAIDebugLogReq): Promise<SendAIDebugLogResp> {
-  return api<SendAIDebugLogResp>('/ai/debug-log', { method: 'POST', body: req });
+  return apiCall(SendAIDebugLogRespSchema, '/ai/debug-log', { method: 'POST', body: req });
 }
 
 export async function getAIPreferences(): Promise<GetAIPreferencesResp> {
-  return api<GetAIPreferencesResp>('/ai/preferences');
+  return apiCall(GetAIPreferencesRespSchema, '/ai/preferences');
 }
 
 export async function saveAIPreferences(req: SaveAIPreferencesReq): Promise<SaveAIPreferencesResp> {
-  return api<SaveAIPreferencesResp>('/ai/preferences', { method: 'POST', body: req });
+  return apiCall(SaveAIPreferencesRespSchema, '/ai/preferences', { method: 'POST', body: req });
 }

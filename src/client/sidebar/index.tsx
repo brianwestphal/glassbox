@@ -1,6 +1,6 @@
 import { delegate, effect, mount } from 'kerfjs';
 
-import { saveAIPreferences } from '../../api/index.js';
+import { RiskDimensionSchema, saveAIPreferences } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
@@ -62,7 +62,10 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
   delegate(sidebar, 'change', ACTIONS.setRiskDimension.selector, (_e, sel) => {
     const value = (sel as HTMLSelectElement).value;
     aiStore.actions.update({ riskSortDimension: value });
-    void saveAIPreferences({ risk_sort_dimension: value });
+    const riskDimParsed = RiskDimensionSchema.safeParse(value);
+    if (riskDimParsed.success) {
+      void saveAIPreferences({ risk_sort_dimension: riskDimParsed.data });
+    }
   });
 
   let filterTimer: ReturnType<typeof setTimeout> | null = null;

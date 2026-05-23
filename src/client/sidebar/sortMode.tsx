@@ -30,6 +30,11 @@ export function switchSortMode(mode: SortMode): void {
     return;
   }
 
+  // Narrow to the two modes the analysis trigger/poll helpers accept.
+  // 'guided' is handled separately by `guided.ts` so we never fall into
+  // these paths with that value.
+  if (mode !== 'risk' && mode !== 'narrative') return;
+
   if (modeState.status === 'running') {
     pollGenerations[mode]++;
     clientLog(`switchSortMode: ${mode} is running, resuming poll (gen=${String(pollGenerations[mode])})`);

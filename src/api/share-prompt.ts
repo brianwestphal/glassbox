@@ -2,26 +2,35 @@
  * Typed API for the share-prompt nudge state (dismissed timestamp, total
  * open time tick).
  */
-import { api } from './_runner.js';
+import { z } from 'zod';
 
-export interface GetSharePromptStateResp {
-  dismissedAt: number | null;
-  totalOpenMs: number;
-}
+import { apiCall, OkResponseSchema } from './_runner.js';
 
-export interface DismissSharePromptResp { ok: true }
+export const GetSharePromptStateRespSchema = z.object({
+  dismissedAt: z.number().nullable(),
+  totalOpenMs: z.number(),
+});
+export type GetSharePromptStateResp = z.infer<typeof GetSharePromptStateRespSchema>;
 
-export interface TickSharePromptReq { sessionMs: number }
-export interface TickSharePromptResp { totalOpenMs: number }
+export const DismissSharePromptRespSchema = OkResponseSchema;
+export type DismissSharePromptResp = z.infer<typeof DismissSharePromptRespSchema>;
+
+export const TickSharePromptReqSchema = z.object({
+  sessionMs: z.number(),
+});
+export type TickSharePromptReq = z.infer<typeof TickSharePromptReqSchema>;
+
+export const TickSharePromptRespSchema = z.object({ totalOpenMs: z.number() });
+export type TickSharePromptResp = z.infer<typeof TickSharePromptRespSchema>;
 
 export async function getSharePromptState(): Promise<GetSharePromptStateResp> {
-  return api<GetSharePromptStateResp>('/share-prompt/state');
+  return apiCall(GetSharePromptStateRespSchema, '/share-prompt/state');
 }
 
 export async function dismissSharePrompt(): Promise<DismissSharePromptResp> {
-  return api<DismissSharePromptResp>('/share-prompt/dismiss', { method: 'POST' });
+  return apiCall(DismissSharePromptRespSchema, '/share-prompt/dismiss', { method: 'POST' });
 }
 
 export async function tickSharePrompt(req: TickSharePromptReq): Promise<TickSharePromptResp> {
-  return api<TickSharePromptResp>('/share-prompt/tick', { method: 'POST', body: req });
+  return apiCall(TickSharePromptRespSchema, '/share-prompt/tick', { method: 'POST', body: req });
 }

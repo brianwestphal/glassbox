@@ -72,12 +72,13 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 
 - `src/cli.ts` — CLI entry point, arg parsing
 - `src/server.ts` — Hono app setup, middleware injection
-- `src/api/` — **Typed API layer (shared by client + server).** Each per-resource module (`annotations.ts`, `reviews.ts`, `themes.ts`, `files.ts`, `context.ts`, `outline.ts`, `image.ts`, `project-settings.ts`, `share-prompt.ts`, `ai.ts`, `channel.ts`) exports the request/response types AND the typed client caller functions. `src/api/index.ts` aggregates everything into a flat namespace (`apis.getContext(...)`, `apis.createAnnotation(...)`, etc.) and re-exports each callable. Client code calls these typed wrappers — never the raw `api<T>()` helper. Server route handlers `import type { XReq, XResp }` to type `c.req.json<>` and `c.json<>` against the same shapes — drift fails at compile time.
+- `src/api/` — **Typed API layer (shared by client + server).** Each per-resource module (`annotations.ts`, `reviews.ts`, `themes.ts`, `files.ts`, `context.ts`, `outline.ts`, `image.ts`, `project-settings.ts`, `share-prompt.ts`, `ai.ts`, `channel.ts`) defines a zod `XReqSchema` / `XRespSchema` for each endpoint and exports the inferred TS types alongside the typed client caller functions. Client callers go through `apiCall(RespSchema, path, ...)` (see `src/api/_runner.ts`) which validates the response against the schema before returning — a bad response fails loudly at the boundary. Server route handlers parse incoming bodies with `parseBody(c, ReqSchema)` (see `src/utils/parseBody.ts`) and return a structured 400 on failure. The schema is the single source of truth; drift fails at compile time AND at runtime.
 - `src/routes/api.ts` — JSON API (annotations CRUD, file status, review management). Handlers consume Req/Resp types from `src/api/`.
 - `src/routes/ai-api.ts` — AI analysis, configuration, and preferences API. Handlers consume Req/Resp types from `src/api/ai.ts`.
 - `src/routes/pages.tsx` — Server-rendered HTML pages
 - `src/components/` — TSX components (layout, diffView, fileList, reviewHistory)
 - `src/db/connection.ts` — PGLite setup and schema initialization (raw SQL, no ORM)
+- `src/db/schemas.ts` — Zod schemas for every DB row shape (`Review`, `ReviewFile`, `Annotation`, `AIAnalysis`, `AIFileScore`, `UserPreferences`) plus `parseRow` / `parseRows` / `parseJsonColumn` helpers. The SSOT for runtime row validation; `queries.ts` and `ai-queries.ts` route every PGLite result through these.
 - `src/db/queries.ts` — All database operations
 - `src/db/ai-queries.ts` — AI analysis and preferences database operations
 - `src/ai/models.ts` — Curated AI model lists per platform (CHECK DAILY: keep model IDs and names up to date with latest releases from Anthropic, OpenAI, and Google)
@@ -96,6 +97,17 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/export/generate.ts` — Generates `.glassbox/latest-review.md` on review completion
 - `src/types.ts` — Shared Hono environment types
 - `src-tauri/` — Tauri desktop app (Rust backend, loading screens, CLI wrappers) — see `docs/tauri-architecture.md`
+
+### Type safety: validating, not asserting
+
+The codebase prefers **runtime validation** over `as` assertions for any data crossing a trust boundary (the network, the file system, PGLite, a JSON column). The mechanics:
+
+- **Wire data** flows through zod schemas in `src/api/*.ts`. Never write `body as XReq` or `json as XResp`; use `parseBody(c, XReqSchema)` on the server and `apiCall(XRespSchema, ...)` on the client.
+- **DB rows** are validated by `parseRow` / `parseRows` in `src/db/schemas.ts`. Never declare `db.query<X>(...)` and trust the cast; the helpers return parsed values whose TS type is guaranteed.
+- **JSON columns** (the `dimension_scores` / `notes` columns in `ai_file_scores`, plus `review_files.diff_data`) are validated by `parseJsonColumn(schema, raw)` and `FileDiffSchema` respectively.
+- **JSON config files** (`~/.glassbox/config.json`, project `.glassbox/settings.json`) are validated by `ConfigFileSchema` / `ProjectSettingsSchema` at read time.
+
+When `as` is genuinely the right tool — DOM casts inside `delegate(root, 'click', selector, (_e, el) => ...)` where the selector is the runtime check, or framework-bridging casts like `appFetch as never` — keep the cast tight (one line, with the runtime guarantee visible right beside it). Avoid `as` on anything that started life as `JSON.parse`, `c.req.json`, `fetch().json()`, `db.query`, or user input.
 
 ### JSX Runtime
 

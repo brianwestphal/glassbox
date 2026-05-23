@@ -1,7 +1,7 @@
 import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
-import { saveAIPreferences } from '../../api/index.js';
+import { ImageModeSchema, saveAIPreferences } from '../../api/index.js';
 import { toElement } from '../dom.js';
 import { diffViewStore } from '../stores/index.js';
 import { applyHighlighting, getLanguageList } from './highlight.js';
@@ -60,7 +60,10 @@ export function bindToolbar(): void {
   delegate(toolbar, 'click', '[data-image-mode]', (_e, btn) => {
     const mode = (btn as HTMLElement).dataset.imageMode ?? '';
     diffViewStore.actions.update({ lastImageMode: mode });
-    void saveAIPreferences({ last_image_mode: mode });
+    const imageModeParsed = ImageModeSchema.safeParse(mode);
+    if (imageModeParsed.success) {
+      void saveAIPreferences({ last_image_mode: imageModeParsed.data });
+    }
   });
 
   delegate(toolbar, 'click', '#language-btn', (e, btn) => {

@@ -2,7 +2,7 @@ import { spawnSync } from 'child_process';
 
 import { updateGlobalConfig } from '../global-config.js';
 import type { ConfigFile } from './config.js';
-import { readConfigFile } from './config.js';
+import { ConfigFileSchema, readConfigFile } from './config.js';
 import { getKeyFromKeychain, saveKeyToKeychain, winCredTarget } from './keychain.js';
 import type { AIPlatform } from './models.js';
 import { ENV_KEY_NAMES } from './models.js';
@@ -44,10 +44,12 @@ export function saveAPIKey(platform: AIPlatform, key: string, storage: 'keychain
     saveKeyToKeychain(platform, key);
   } else {
     updateGlobalConfig((raw) => {
-      const cfg = raw as ConfigFile;
-      if (cfg.ai === undefined) cfg.ai = {};
-      if (cfg.ai.keys === undefined) cfg.ai.keys = {};
+      const parsed = ConfigFileSchema.safeParse(raw);
+      const cfg: ConfigFile = parsed.success ? parsed.data : {};
+      cfg.ai ??= {};
+      cfg.ai.keys ??= {};
       cfg.ai.keys[platform] = Buffer.from(key).toString('base64');
+      return cfg;
     });
   }
 }
@@ -71,16 +73,20 @@ export function deleteAPIKey(platform: AIPlatform): void {
   // Remove from config file (only if there is something to clear)
   if (readConfigFile().ai?.keys === undefined) return;
   updateGlobalConfig((raw) => {
-    const cfg = raw as ConfigFile;
+    const parsed = ConfigFileSchema.safeParse(raw);
+    const cfg: ConfigFile = parsed.success ? parsed.data : {};
     if (cfg.ai?.keys !== undefined) {
       cfg.ai.keys[platform] = '';
     }
+    return cfg;
   });
 }
 
+const PLATFORMS_TUPLE: AIPlatform[] = ['anthropic', 'openai', 'google'];
+
 export function detectAvailablePlatforms(): { platform: AIPlatform; source: 'env' | 'keychain' | 'config' }[] {
   const results: { platform: AIPlatform; source: 'env' | 'keychain' | 'config' }[] = [];
-  for (const platform of ['anthropic', 'openai', 'google'] as AIPlatform[]) {
+  for (const platform of PLATFORMS_TUPLE) {
     const { source } = resolveAPIKey(platform);
     if (source !== null) {
       results.push({ platform, source });

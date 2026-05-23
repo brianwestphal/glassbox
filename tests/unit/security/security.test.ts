@@ -92,11 +92,16 @@ describe('FR-14.2: API input validation', () => {
 
   it('ai-analysis.ts validates analysis type', () => {
     const content = readFileSync(join(SRC_ROOT, 'routes', 'ai-analysis.ts'), 'utf-8');
-    expect(content).toContain('VALID_ANALYSIS_TYPES');
-    expect(content).toContain("'risk'");
-    expect(content).toContain("'narrative'");
-    expect(content).toContain("'guided'");
+    // Validation is now done via the AnalysisTypeSchema zod schema
+    // imported from the typed API layer, which enumerates the three
+    // analysis types and produces structured 400 errors on mismatch.
+    expect(content).toContain('AnalysisTypeSchema');
     expect(content).toContain('400');
+    // The schema definition itself lives in the typed API module.
+    const schemaContent = readFileSync(join(SRC_ROOT, 'api', 'ai.ts'), 'utf-8');
+    expect(schemaContent).toContain("'risk'");
+    expect(schemaContent).toContain("'narrative'");
+    expect(schemaContent).toContain("'guided'");
   });
 });
 

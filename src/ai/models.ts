@@ -1,11 +1,20 @@
-export interface AIModel {
-  id: string;
-  name: string;
-  contextWindow: number;
-  isDefault: boolean;
-}
+import { z } from 'zod';
 
-export type AIPlatform = 'anthropic' | 'openai' | 'google';
+export const AIModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  contextWindow: z.number(),
+  isDefault: z.boolean(),
+});
+export type AIModel = z.infer<typeof AIModelSchema>;
+
+export const AIPlatformSchema = z.enum(['anthropic', 'openai', 'google']);
+export type AIPlatform = z.infer<typeof AIPlatformSchema>;
+
+/** Runtime guard — narrows `unknown` to `AIPlatform`. */
+export function isAIPlatform(value: unknown): value is AIPlatform {
+  return AIPlatformSchema.safeParse(value).success;
+}
 
 export const PLATFORMS: Record<AIPlatform, string> = {
   anthropic: 'Anthropic',

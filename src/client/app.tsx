@@ -5,6 +5,8 @@ import {
   getCurrentReview,
   getSharePromptState,
   refreshReview,
+  SortModeSchema,
+  SvgViewModeSchema,
 } from "../api/index.js";
 import { IconGear, IconHeart, IconRefresh } from "../icons.js";
 import { initDebug } from "./api.js";
@@ -22,7 +24,6 @@ import { initSharePrompt, triggerShare } from "./share.js";
 import { loadFiles } from "./sidebar/fileTree.js";
 import { initSidebar } from "./sidebar/index.js";
 import { loadAnalysisResults, triggerAnalysis } from "./sidebar/sortMode.js";
-import type { SortMode } from "./state.js";
 import { aiStore, diffViewStore, dragStore, reviewStore, visibleFileOrder } from "./stores/index.js";
 // --- Tauri update notification ---
 import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
@@ -31,14 +32,24 @@ async function initAISorting() {
   try {
     // Load user preferences
     const prefs = await getAIPreferences();
+    // Re-validate each enum-typed pref. The server's response schema
+    // permits any string for forward-compat (an older config row may
+    // hold a value we don't recognize), so we narrow back to the
+    // expected enum and fall back to the default on mismatch.
+    const sortMode = SortModeSchema.safeParse(prefs.sort_mode).success
+      ? SortModeSchema.parse(prefs.sort_mode)
+      : 'folder';
+    const svgViewMode = SvgViewModeSchema.safeParse(prefs.svg_view_mode).success
+      ? SvgViewModeSchema.parse(prefs.svg_view_mode)
+      : 'code';
     aiStore.actions.update({
-      sortMode: (prefs.sort_mode ?? 'folder') as SortMode,
+      sortMode,
       riskSortDimension: prefs.risk_sort_dimension ?? 'aggregate',
       showRiskScores: prefs.show_risk_scores ?? true,
     });
     diffViewStore.actions.update({
       ignoreWhitespace: prefs.ignore_whitespace ?? false,
-      svgViewMode: (prefs.svg_view_mode ?? 'code') as 'code' | 'rendered',
+      svgViewMode,
       lastImageMode: prefs.last_image_mode ?? 'metadata',
     });
 

@@ -12,6 +12,7 @@ import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getRevi
 import type { FileDiff } from '../git/diff.js';
 import { getSingleFileDiff, parseDiffData, parseModeString } from '../git/diff.js';
 import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
+import { emptyFileDiff } from '../git/parseDiffData.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-rasterize.js';
 import { IconReveal } from '../icons.js';
 import type { AppEnv } from '../types.js';
@@ -52,7 +53,7 @@ pageRoutes.get('/file/:fileId', async (c) => {
   const file = await getReviewFile(fileId);
   if (!file) return c.text('File not found', 404);
 
-  const diff: FileDiff = parseDiffData(file.diff_data) ?? ({} as FileDiff);
+  const diff: FileDiff = parseDiffData(file.diff_data) ?? emptyFileDiff(file.file_path);
 
   // SVG rendered view: return ImageDiff component
   if (view === 'rendered' && isSvgFile(file.file_path)) {
