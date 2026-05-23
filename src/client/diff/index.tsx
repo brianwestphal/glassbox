@@ -291,24 +291,24 @@ function readLineAndSide(el: HTMLElement): { line: number; side: string } | null
 
 function setupDelegatedHandlers(container: HTMLElement): void {
   // Reveal button (server-rendered for image-not-found etc.)
-  delegate(container, 'click', '.reveal-btn', (_e, btn) => {
+  void delegate(container, 'click', '.reveal-btn', (_e, btn) => {
     const fid = asEl(btn).dataset.fileId ?? '';
     void revealFile({ fileId: fid });
   });
 
   // Hunk expanders
-  delegate(container, 'click', '.hunk-separator', (_e, el) => {
+  void delegate(container, 'click', '.hunk-separator', (_e, el) => {
     handleHunkExpand(asEl(el));
   });
 
   // Diff line click → annotation form
   const clickStart = { x: 0, y: 0 };
-  delegate(container, 'mousedown', '.diff-line', (e) => {
+  void delegate(container, 'mousedown', '.diff-line', (e) => {
     const me = e as MouseEvent;
     clickStart.x = me.clientX;
     clickStart.y = me.clientY;
   });
-  delegate(container, 'click', '.diff-line', (e, line) => {
+  void delegate(container, 'click', '.diff-line', (e, line) => {
     const me = e as MouseEvent;
     if (me.metaKey || me.ctrlKey) return;
     const target = asElement(me.target);
@@ -322,7 +322,7 @@ function setupDelegatedHandlers(container: HTMLElement): void {
   });
 
   // Drag-and-drop annotation onto a different line
-  delegate(container, 'dragover', '.diff-line', (e, line) => {
+  void delegate(container, 'dragover', '.diff-line', (e, line) => {
     if (dragStore.state.value.annotation === null) return;
     e.preventDefault();
     const dragEvent = e as DragEvent;
@@ -330,10 +330,10 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     container.querySelectorAll('.diff-line.drag-over').forEach(d => { d.classList.remove('drag-over'); });
     asEl(line).classList.add('drag-over');
   });
-  delegate(container, 'dragleave', '.diff-line', (_e, line) => {
+  void delegate(container, 'dragleave', '.diff-line', (_e, line) => {
     asEl(line).classList.remove('drag-over');
   });
-  delegate(container, 'drop', '.diff-line', (e, line) => {
+  void delegate(container, 'drop', '.diff-line', (e, line) => {
     e.preventDefault();
     container.querySelectorAll('.diff-line.drag-over').forEach(d => { d.classList.remove('drag-over'); });
     const drag = dragStore.state.value.annotation;
@@ -365,7 +365,7 @@ function delegateCaptureScroll(container: HTMLElement): void {
   // Scroll doesn't bubble, but `delegateCapture` registers the listener in the
   // capture phase. `target.matches('.code')` is the right semantics here —
   // we only want to react to scroll on a `.code` cell, not its container.
-  delegateCapture(container, 'scroll', '.code', (_e, target) => {
+  void delegateCapture(container, 'scroll', '.code', (_e, target) => {
     const dv = diffViewStore.state.value;
     if (syncing || dv.wrapLines || dv.diffMode !== 'split') return;
     const el = asEl(target);

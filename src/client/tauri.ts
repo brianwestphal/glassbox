@@ -33,7 +33,7 @@ export function showUpdateBanner(version: string): void {
   if (bannerDelegatesBound) return;
   bannerDelegatesBound = true;
 
-  delegate(banner, 'click', '#update-install-btn', (_e, btn) => {
+  void delegate(banner, 'click', '#update-install-btn', (_e, btn) => {
     const installBtn = asButton(btn);
     void (async () => {
       installBtn.textContent = 'Installing...';
@@ -50,7 +50,7 @@ export function showUpdateBanner(version: string): void {
     })();
   });
 
-  delegate(banner, 'click', '#update-banner-dismiss', () => {
+  void delegate(banner, 'click', '#update-banner-dismiss', () => {
     banner.style.display = 'none';
   });
 }

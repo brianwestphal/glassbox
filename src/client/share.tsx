@@ -67,13 +67,13 @@ function showPrompt() {
     </div>
   );
 
-  delegate(banner, 'click', '.share-prompt-share', () => {
+  void delegate(banner, 'click', '.share-prompt-share', () => {
     void triggerShare();
     banner.remove();
     dismissPrompt();
   });
 
-  delegate(banner, 'click', '.share-prompt-dismiss', () => {
+  void delegate(banner, 'click', '.share-prompt-dismiss', () => {
     banner.remove();
     dismissPrompt();
   });

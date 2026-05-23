@@ -11,13 +11,13 @@ import { renderAnnotationInline } from './render.js';
 /** Register the create-form delegates on the diff container. Called once
  *  from `initDiffView()`. */
 export function bindCreateFormEvents(diffContainer: HTMLElement): void {
-  delegate(diffContainer, 'input', '.annotation-form-container[data-form-key] textarea', (_e, textarea) => {
+  void delegate(diffContainer, 'input', '.annotation-form-container[data-form-key] textarea', (_e, textarea) => {
     const cur = editFormSignal.value;
     if (cur === null || cur.formKey === null) return;
     setEditForm({ ...cur, content: asTextarea(textarea).value });
   });
 
-  delegate(diffContainer, 'keydown', '.annotation-form-container[data-form-key] textarea', (e) => {
+  void delegate(diffContainer, 'keydown', '.annotation-form-container[data-form-key] textarea', (e) => {
     const ke = e as KeyboardEvent;
     if ((ke.metaKey || ke.ctrlKey) && ke.key === 'Enter') {
       ke.preventDefault();
@@ -28,12 +28,12 @@ export function bindCreateFormEvents(diffContainer: HTMLElement): void {
     }
   });
 
-  delegate(diffContainer, 'click', '.annotation-form-container[data-form-key] .cancel-btn', (e) => {
+  void delegate(diffContainer, 'click', '.annotation-form-container[data-form-key] .cancel-btn', (e) => {
     e.stopPropagation();
     cancelNewAnnotation();
   });
 
-  delegate(diffContainer, 'click', '.annotation-form-container[data-form-key] .annotation-save-btn', (e) => {
+  void delegate(diffContainer, 'click', '.annotation-form-container[data-form-key] .annotation-save-btn', (e) => {
     e.stopPropagation();
     void saveNewAnnotation();
   });

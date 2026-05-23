@@ -141,11 +141,11 @@ export function showThemeManager(onThemeChanged?: () => void): void {
       // Delegate clicks within the transient menu — and stop propagation so the
       // outside-click handler below doesn't immediately dismiss it.
       menu.addEventListener('click', (e) => { e.stopPropagation(); });
-      delegate(menu, 'click', CTX.edit.selector, () => {
+      void delegate(menu, 'click', CTX.edit.selector, () => {
         removeContextMenu();
         openEditor(themeId);
       });
-      delegate(menu, 'click', CTX.duplicate.selector, () => {
+      void delegate(menu, 'click', CTX.duplicate.selector, () => {
         void (async () => {
           removeContextMenu();
           await createTheme({ sourceId: themeId });
@@ -153,7 +153,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
           if (onThemeChanged !== undefined) onThemeChanged();
         })();
       });
-      delegate(menu, 'click', CTX.delete.selector, () => {
+      void delegate(menu, 'click', CTX.delete.selector, () => {
         removeContextMenu();
         showDeleteConfirm(theme.name, () => {
           void (async () => {
@@ -182,16 +182,16 @@ export function showThemeManager(onThemeChanged?: () => void): void {
     disposeMount = mount(modalEl, () => renderManager(themesSignal.value));
 
     // Delegated handlers
-    delegate(overlay, 'click', '#tm-close', close);
-    delegate(overlay, 'click', '[data-click-use]', (_e, el) => {
+    void delegate(overlay, 'click', '#tm-close', close);
+    void delegate(overlay, 'click', '[data-click-use]', (_e, el) => {
       const id = asEl(el).dataset.clickUse ?? '';
       if (id !== '') void useTheme(id);
     });
-    delegate(overlay, 'dblclick', '.theme-manager-item', (_e, el) => {
+    void delegate(overlay, 'dblclick', '.theme-manager-item', (_e, el) => {
       const id = asEl(el).dataset.themeId ?? '';
       if (id !== '') openEditor(id);
     });
-    delegate(overlay, 'click', '.tm-menu-btn', (e, btn) => {
+    void delegate(overlay, 'click', '.tm-menu-btn', (e, btn) => {
       e.stopPropagation();
       const id = asEl(btn).dataset.menuId ?? '';
       if (id !== '') showContextMenu(id, asEl(btn));

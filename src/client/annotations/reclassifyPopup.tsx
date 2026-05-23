@@ -57,7 +57,7 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
   positionPopup(popup, anchor);
   document.body.appendChild(popup);
 
-  delegate(popup, 'click', '.reclassify-option', (e, opt) => {
+  void delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
     const newCategory = asEl(opt).dataset.value ?? '';
     if (newCategory === annotation.category) {
@@ -89,7 +89,7 @@ export function showCategoryPickerForBadge(badge: HTMLElement): void {
   positionPopup(popup, badge);
   document.body.appendChild(popup);
 
-  delegate(popup, 'click', '.reclassify-option', (e, opt) => {
+  void delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
     const value = asEl(opt).dataset.value ?? '';
     const cat = CATEGORIES.find(c => c.value === value);

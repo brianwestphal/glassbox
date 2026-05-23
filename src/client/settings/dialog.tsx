@@ -334,19 +334,19 @@ function setupDelegates(args: {
 }): void {
   const { overlay, setUi, forceRerender, actions, modelsData, themesData, channelState, closeDialog } = args;
 
-  delegate(overlay, 'click', '#settings-close', closeDialog);
-  delegate(overlay, 'click', '[data-tab]', (_e, btn) => {
+  void delegate(overlay, 'click', '#settings-close', closeDialog);
+  void delegate(overlay, 'click', '[data-tab]', (_e, btn) => {
     const t = asEl(btn).dataset.tab;
     if (t !== undefined) setUi({ activeTab: t });
   });
 
   // General tab
-  delegate(overlay, 'change', '#settings-theme', (_e, sel) => {
+  void delegate(overlay, 'change', '#settings-theme', (_e, sel) => {
     const id = asSelect(sel).value;
     setUi({ activeThemeId: id });
     void switchTheme(id);
   });
-  delegate(overlay, 'click', '#manage-themes-btn', () => {
+  void delegate(overlay, 'click', '#manage-themes-btn', () => {
     showThemeManager(() => {
       void (async () => {
         const updated = await listThemes();
@@ -356,24 +356,24 @@ function setupDelegates(args: {
       })();
     });
   });
-  delegate(overlay, 'click', '#settings-share-link', (e) => {
+  void delegate(overlay, 'click', '#settings-share-link', (e) => {
     e.preventDefault();
     void triggerShare();
   });
-  delegate(overlay, 'input', '#settings-app-name', (_e, input) => {
+  void delegate(overlay, 'input', '#settings-app-name', (_e, input) => {
     setUi({ appName: asInput(input).value });
     actions.saveAppNameDebounced();
   });
 
   // Profile tab
-  delegate(overlay, 'click', '.settings-tag', (_e, tag) => {
+  void delegate(overlay, 'click', '.settings-tag', (_e, tag) => {
     const topic = asEl(tag).dataset.topic;
     if (topic !== undefined) actions.toggleTopic(topic);
   });
-  delegate(overlay, 'click', '#show-more-langs', () => { setUi({ showMoreLangs: true }); });
+  void delegate(overlay, 'click', '#show-more-langs', () => { setUi({ showMoreLangs: true }); });
 
   // Experimental tab
-  delegate(overlay, 'click', '.settings-platform-control [data-platform]', (_e, btn) => {
+  void delegate(overlay, 'click', '.settings-platform-control [data-platform]', (_e, btn) => {
     const platform = asEl(btn).dataset.platform;
     if (platform === undefined) return;
     const models = modelsData.models[platform as AIPlatform];
@@ -382,27 +382,27 @@ function setupDelegates(args: {
     setUi({ currentPlatform: platform, currentModel: newModel });
     actions.saveConfig();
   });
-  delegate(overlay, 'change', '#settings-model', (_e, sel) => {
+  void delegate(overlay, 'change', '#settings-model', (_e, sel) => {
     setUi({ currentModel: asSelect(sel).value });
     actions.saveConfig();
   });
-  delegate(overlay, 'click', '#remove-key', actions.removeKey);
-  delegate(overlay, 'click', '#save-key-btn', actions.saveKey);
-  delegate(overlay, 'keydown', '#settings-key', (e) => {
+  void delegate(overlay, 'click', '#remove-key', actions.removeKey);
+  void delegate(overlay, 'click', '#save-key-btn', actions.saveKey);
+  void delegate(overlay, 'keydown', '#settings-key', (e) => {
     const ke = e as KeyboardEvent;
     if (ke.key === 'Enter') { ke.preventDefault(); actions.saveKey(); }
   });
-  delegate(overlay, 'change', '#settings-guided-enabled', (_e, cb) => {
+  void delegate(overlay, 'change', '#settings-guided-enabled', (_e, cb) => {
     setUi({ guidedEnabled: asInput(cb).checked });
     actions.saveConfig();
   });
-  delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
+  void delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
     const enabled = asInput(cb).checked;
     channelState.enabled = enabled;
     void (enabled ? enableChannel() : disableChannel());
     forceRerender();
   });
-  delegate(overlay, 'click', '#channel-copy-btn', (_e, btn) => {
+  void delegate(overlay, 'click', '#channel-copy-btn', (_e, btn) => {
     void navigator.clipboard.writeText('claude --dangerously-load-development-channels server:glassbox-channel');
     const el = asEl(btn);
     el.textContent = 'Copied!';
@@ -410,7 +410,7 @@ function setupDelegates(args: {
   });
 
   // Updates tab
-  delegate(overlay, 'click', '#check-updates-btn', (_e, btn) => {
+  void delegate(overlay, 'click', '#check-updates-btn', (_e, btn) => {
     void handleCheckUpdates(asButton(btn), overlay);
   });
 

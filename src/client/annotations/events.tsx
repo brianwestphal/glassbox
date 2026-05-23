@@ -20,21 +20,21 @@ import { buildAnnotationItemHtml } from './render.js';
  *  delegated handlers fire for every annotation row, current and future,
  *  without ever needing per-element `addEventListener`. */
 export function bindAnnotationEvents(diffContainer: HTMLElement): void {
-  delegate(diffContainer, 'click', '.annotation-item [data-action="delete"]', (e, btn) => {
+  void delegate(diffContainer, 'click', '.annotation-item [data-action="delete"]', (e, btn) => {
     e.stopPropagation();
     const item = asEl(btn).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     void handleDelete(item);
   });
 
-  delegate(diffContainer, 'click', '.annotation-item [data-action="edit"]', (e, btn) => {
+  void delegate(diffContainer, 'click', '.annotation-item [data-action="edit"]', (e, btn) => {
     e.stopPropagation();
     const item = asEl(btn).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     startEdit(item);
   });
 
-  delegate(diffContainer, 'dblclick', '.annotation-item', (e, item) => {
+  void delegate(diffContainer, 'dblclick', '.annotation-item', (e, item) => {
     e.stopPropagation();
     const el = asEl(item);
     if (el.querySelector('.annotation-form') !== null) return;
@@ -42,7 +42,7 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
     startEdit(el);
   });
 
-  delegate(diffContainer, 'click', '.annotation-item [data-action="reclassify"]', (e, badge) => {
+  void delegate(diffContainer, 'click', '.annotation-item [data-action="reclassify"]', (e, badge) => {
     e.stopPropagation();
     const item = asEl(badge).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
@@ -51,14 +51,14 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
     showReclassifyPopup(asEl(badge), item, annotation);
   });
 
-  delegate(diffContainer, 'click', '.annotation-item [data-action="keep"]', (e, btn) => {
+  void delegate(diffContainer, 'click', '.annotation-item [data-action="keep"]', (e, btn) => {
     e.stopPropagation();
     const item = asEl(btn).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
     void handleKeep(item);
   });
 
-  delegate(diffContainer, 'dragstart', '.annotation-drag-handle', (e, handle) => {
+  void delegate(diffContainer, 'dragstart', '.annotation-drag-handle', (e, handle) => {
     e.stopPropagation();
     const item = asEl(handle).closest<HTMLElement>('.annotation-item');
     if (item === null) return;
@@ -75,23 +75,23 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
   // Edit-form delegates. Scoped to `[data-edit-for]` so the equivalent
   // create-form delegates in `form.tsx` (which target `[data-form-key]`)
   // don't double-fire — both forms reuse the `.annotation-form` shell.
-  delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .cancel-edit', (e) => {
+  void delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .cancel-edit', (e) => {
     e.stopPropagation();
     cancelEdit();
   });
 
-  delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .save-edit', (e) => {
+  void delegate(diffContainer, 'click', '.annotation-form-container[data-edit-for] .save-edit', (e) => {
     e.stopPropagation();
     void saveEdit();
   });
 
-  delegate(diffContainer, 'input', '.annotation-form-container[data-edit-for] textarea', (_e, textarea) => {
+  void delegate(diffContainer, 'input', '.annotation-form-container[data-edit-for] textarea', (_e, textarea) => {
     const cur = editFormSignal.value;
     if (cur === null) return;
     setEditForm({ ...cur, content: asTextarea(textarea).value });
   });
 
-  delegate(diffContainer, 'keydown', '.annotation-form-container[data-edit-for] textarea', (e) => {
+  void delegate(diffContainer, 'keydown', '.annotation-form-container[data-edit-for] textarea', (e) => {
     const ke = e as KeyboardEvent;
     if ((ke.metaKey || ke.ctrlKey) && ke.key === 'Enter') {
       ke.preventDefault();
@@ -109,7 +109,7 @@ export function bindAnnotationEvents(diffContainer: HTMLElement): void {
   // silently broke type changes during initial annotation entry — the
   // picker would open via the badge click, but no option click handler
   // would fire because there was no delegate match.
-  delegate(diffContainer, 'click', '.annotation-form-container .form-category-badge', (e, badge) => {
+  void delegate(diffContainer, 'click', '.annotation-form-container .form-category-badge', (e, badge) => {
     e.stopPropagation();
     showReclassifyPopupForEdit(asEl(badge));
   });

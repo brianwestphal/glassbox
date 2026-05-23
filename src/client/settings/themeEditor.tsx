@@ -134,31 +134,31 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
     // morph preserves the focused input's value and cursor across renders
     // (docs §4.4), so the picker keeps focus while another color updates.
 
-    delegate(overlay, 'click', '#te-close', close);
+    void delegate(overlay, 'click', '#te-close', close);
 
-    delegate(overlay, 'input', '#te-name', (_e, input) => {
+    void delegate(overlay, 'input', '#te-name', (_e, input) => {
       editNameSignal.value = asInput(input).value;
       dirty = true;
     });
 
-    delegate(overlay, 'input', '.theme-editor-picker', (_e, picker) => {
+    void delegate(overlay, 'input', '.theme-editor-picker', (_e, picker) => {
       const varName = asEl(picker).dataset.var ?? '';
       if (varName !== '') updateColor(varName, asInput(picker).value);
     });
 
-    delegate(overlay, 'change', '.theme-editor-hex', (_e, input) => {
+    void delegate(overlay, 'change', '.theme-editor-hex', (_e, input) => {
       const varName = asEl(input).dataset.var ?? '';
       const value = asInput(input).value.trim();
       if (varName !== '' && value !== '') updateColor(varName, value);
     });
 
-    delegate(overlay, 'click', '.theme-editor-reset', (_e, btn) => {
+    void delegate(overlay, 'click', '.theme-editor-reset', (_e, btn) => {
       const varName = asEl(btn).dataset.var ?? '';
       const baseValue = baseColors[varName];
       if (varName !== '' && baseValue !== '') updateColor(varName, baseValue);
     });
 
-    delegate(overlay, 'click', '#te-reset-all', () => {
+    void delegate(overlay, 'click', '#te-reset-all', () => {
       editColorsSignal.value = { ...baseColors };
       dirty = true;
     });

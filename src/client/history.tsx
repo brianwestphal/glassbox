@@ -23,8 +23,8 @@ function showConfirm(message: string, onConfirm: () => void): void {
       </div>
     </div>
   );
-  delegate(overlay, 'click', '.modal-cancel', () => { overlay.remove(); });
-  delegate(overlay, 'click', '.modal-confirm', () => { overlay.remove(); onConfirm(); });
+  void delegate(overlay, 'click', '.modal-cancel', () => { overlay.remove(); });
+  void delegate(overlay, 'click', '.modal-confirm', () => { overlay.remove(); onConfirm(); });
   // Click-outside-to-close. The overlay isn't inside a mount() tree, so a
   // direct listener is stable (same precedent as the other transient
   // confirmation modals across the app).
@@ -36,7 +36,7 @@ function showConfirm(message: string, onConfirm: () => void): void {
 // rows + persistent bulk-action buttons all live there; no per-element
 // listeners needed.
 
-delegate(document.body, 'click', '.delete-review-btn', (e, btn) => {
+void delegate(document.body, 'click', '.delete-review-btn', (e, btn) => {
   e.preventDefault();
   e.stopPropagation();
   const id = asEl(btn).dataset.deleteId ?? '';
@@ -50,7 +50,7 @@ delegate(document.body, 'click', '.delete-review-btn', (e, btn) => {
   });
 });
 
-delegate(document.body, 'click', '#delete-completed-btn', () => {
+void delegate(document.body, 'click', '#delete-completed-btn', () => {
   showConfirm('Delete all completed reviews (except current)? This cannot be undone.', () => {
     void fetch('/api/reviews/delete-completed', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
@@ -58,7 +58,7 @@ delegate(document.body, 'click', '#delete-completed-btn', () => {
   });
 });
 
-delegate(document.body, 'click', '#delete-all-btn', () => {
+void delegate(document.body, 'click', '#delete-all-btn', () => {
   showConfirm('Delete ALL reviews except the current one? This cannot be undone.', () => {
     void fetch('/api/reviews/delete-all', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())

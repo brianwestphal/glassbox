@@ -74,7 +74,7 @@ export async function loadOutline(fileId: string) {
 
   // Delegate clicks on the breadcrumb up to the bar root so the handler
   // survives every morph reconciliation.
-  delegate(bar, 'click', '.outline-breadcrumb', (e) => {
+  void delegate(bar, 'click', '.outline-breadcrumb', (e) => {
     e.stopPropagation();
     toggleDropdown();
   });
@@ -159,7 +159,7 @@ function showDropdown() {
   // Dropdown sits outside the breadcrumb mount tree (appended to `bar` after
   // the mount-managed children), so a single delegated listener on the
   // dropdown root is stable. Item clicks navigate + close.
-  delegate(dropdown, 'click', '.outline-item', (_e, el) => {
+  void delegate(dropdown, 'click', '.outline-item', (_e, el) => {
     const line = parseInt(asEl(el).dataset.line ?? '0', 10);
     if (line > 0) {
       scrollToLine(line);

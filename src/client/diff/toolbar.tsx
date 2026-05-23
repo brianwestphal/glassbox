@@ -26,20 +26,20 @@ export function bindToolbar(): void {
   // these buttons are server-rendered and outside any mount() tree.
   reflectToolbarState();
 
-  delegate(toolbar, 'click', '[data-svg-mode]', (_e, btn) => {
+  void delegate(toolbar, 'click', '[data-svg-mode]', (_e, btn) => {
     const mode = asEl(btn).dataset.svgMode as 'code' | 'rendered';
     diffViewStore.actions.update({ svgViewMode: mode });
     void saveAIPreferences({ svg_view_mode: mode });
     toolbar.querySelectorAll('[data-svg-mode]').forEach(b => b.classList.toggle('active', b === btn));
   });
 
-  delegate(toolbar, 'click', '[data-diff-mode]', (_e, btn) => {
+  void delegate(toolbar, 'click', '[data-diff-mode]', (_e, btn) => {
     const mode = asEl(btn).dataset.diffMode as 'split' | 'unified';
     diffViewStore.actions.update({ diffMode: mode });
     toolbar.querySelectorAll('[data-diff-mode]').forEach(b => b.classList.toggle('active', b === btn));
   });
 
-  delegate(toolbar, 'click', '#wrap-toggle', (_e, btn) => {
+  void delegate(toolbar, 'click', '#wrap-toggle', (_e, btn) => {
     const wrapLines = !diffViewStore.state.value.wrapLines;
     diffViewStore.actions.update({ wrapLines });
     asEl(btn).classList.toggle('active', wrapLines);
@@ -50,14 +50,14 @@ export function bindToolbar(): void {
     }
   });
 
-  delegate(toolbar, 'click', '#whitespace-toggle', (_e, btn) => {
+  void delegate(toolbar, 'click', '#whitespace-toggle', (_e, btn) => {
     const ignoreWhitespace = !diffViewStore.state.value.ignoreWhitespace;
     diffViewStore.actions.update({ ignoreWhitespace });
     asEl(btn).classList.toggle('active', ignoreWhitespace);
     void saveAIPreferences({ ignore_whitespace: ignoreWhitespace });
   });
 
-  delegate(toolbar, 'click', '[data-image-mode]', (_e, btn) => {
+  void delegate(toolbar, 'click', '[data-image-mode]', (_e, btn) => {
     const mode = asEl(btn).dataset.imageMode ?? '';
     diffViewStore.actions.update({ lastImageMode: mode });
     const imageModeParsed = ImageModeSchema.safeParse(mode);
@@ -66,7 +66,7 @@ export function bindToolbar(): void {
     }
   });
 
-  delegate(toolbar, 'click', '#language-btn', (e, btn) => {
+  void delegate(toolbar, 'click', '#language-btn', (e, btn) => {
     e.stopPropagation();
     showLanguagePicker(asEl(btn));
   });
@@ -171,13 +171,13 @@ function showLanguagePicker(btn: HTMLElement): void {
   const disposeMount = mount(listEl, () => renderPickerList(filterSignal.value));
 
   // Filter input: route through the signal, not a direct addEventListener.
-  delegate(popup, 'input', '.language-filter', (e) => {
+  void delegate(popup, 'input', '.language-filter', (e) => {
     filterSignal.value = asInput(e.target).value;
   });
 
   // Click selection: list options live inside the mount tree, so we delegate
   // from the popup root to survive every re-render.
-  delegate(popup, 'click', '.language-option:not(.disabled)', (_e, opt) => {
+  void delegate(popup, 'click', '.language-option:not(.disabled)', (_e, opt) => {
     const lang = asEl(opt).dataset.lang ?? '';
     if (lang === '__auto__') selectLang('', true);
     else selectLang(lang, false);

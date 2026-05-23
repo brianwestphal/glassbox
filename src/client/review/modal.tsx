@@ -45,12 +45,12 @@ type ModalStage =
 
 export function bindCompleteButton(): void {
   const root = document.querySelector<HTMLElement>('.review-app') ?? document.body;
-  delegate(root, 'click', '#complete-review', () => { showCompleteModal(); });
+  void delegate(root, 'click', '#complete-review', () => { showCompleteModal(); });
 }
 
 export function bindReopenButton(): void {
   const root = document.querySelector<HTMLElement>('.review-app') ?? document.body;
-  delegate(root, 'click', '#reopen-review', (_e, btn) => {
+  void delegate(root, 'click', '#reopen-review', (_e, btn) => {
     void (async () => {
       await reopenReview();
       const completeBtn = toElement(
@@ -89,10 +89,10 @@ function showCompleteModal(): void {
   // which stage we're in, since the data-action attribute identifies the
   // intent.
 
-  delegate(overlay, 'click', ACTIONS.cancelComplete.selector, close);
-  delegate(overlay, 'click', ACTIONS.modalDone.selector, close);
+  void delegate(overlay, 'click', ACTIONS.cancelComplete.selector, close);
+  void delegate(overlay, 'click', ACTIONS.modalDone.selector, close);
 
-  delegate(overlay, 'click', ACTIONS.discardStale.selector, () => {
+  void delegate(overlay, 'click', ACTIONS.discardStale.selector, () => {
     void (async () => {
       await deleteStaleAnnotations();
       reviewStore.actions.update({ staleCounts: {} });
@@ -100,7 +100,7 @@ function showCompleteModal(): void {
       void completeReview(stage);
     })();
   });
-  delegate(overlay, 'click', ACTIONS.keepStale.selector, () => {
+  void delegate(overlay, 'click', ACTIONS.keepStale.selector, () => {
     void (async () => {
       await keepAllStaleAnnotations();
       reviewStore.actions.update({ staleCounts: {} });
@@ -109,14 +109,14 @@ function showCompleteModal(): void {
     })();
   });
 
-  delegate(overlay, 'click', '.modal-copyable', (_e, el) => {
+  void delegate(overlay, 'click', '.modal-copyable', (_e, el) => {
     const copyText = asEl(el).dataset.copy ?? '';
     void navigator.clipboard.writeText(copyText);
     asEl(el).classList.add('copied');
     setTimeout(() => { asEl(el).classList.remove('copied'); }, TOAST_DURATION_MS);
   });
 
-  delegate(overlay, 'click', ACTIONS.gitignoreAdd.selector, () => {
+  void delegate(overlay, 'click', ACTIONS.gitignoreAdd.selector, () => {
     void (async () => {
       await addGitignoreEntry();
       if (stage.value.kind === 'done') {
@@ -124,7 +124,7 @@ function showCompleteModal(): void {
       }
     })();
   });
-  delegate(overlay, 'click', ACTIONS.gitignoreDismiss.selector, () => {
+  void delegate(overlay, 'click', ACTIONS.gitignoreDismiss.selector, () => {
     void (async () => {
       await dismissGitignorePrompt();
       if (stage.value.kind === 'done') {
@@ -133,7 +133,7 @@ function showCompleteModal(): void {
     })();
   });
 
-  delegate(overlay, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
+  void delegate(overlay, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
     if (stage.value.kind !== 'done') return;
     const aiCommand = stage.value.aiCommand;
     const sendBtn = asButton(btn);
