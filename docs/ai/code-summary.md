@@ -546,6 +546,14 @@ machine. Without it, any test that triggers a live risk/narrative analysis
 only passes where a key happens to be configured (env / keychain / config),
 and 400s in CI.
 
+To reproduce CI's Linux e2e environment locally, `scripts/test-e2e-docker.sh`
+(`npm run test:e2e:docker`) runs the suite inside the
+`mcr.microsoft.com/playwright:vX.Y.Z-noble` image (version pinned from
+`package.json`). Because the container has no macOS keychain / API key, it
+catches environment-dependent failures a local macOS pass would miss. It
+shadows `node_modules` with an anonymous volume so the container's
+Linux-native binaries don't overwrite the host's.
+
 Coverage pipeline (`scripts/test-all.sh`) merges three lcov streams:
 server V8 (via `NODE_V8_COVERAGE`), browser V8 (via Playwright
 `page.coverage` + esbuild source maps), and vitest V8. `genhtml` produces

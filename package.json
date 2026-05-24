@@ -41,6 +41,7 @@
     "test:watch": "vitest",
     "test:all": "bash scripts/test-all.sh",
     "test:e2e": "npx playwright test",
+    "test:e2e:docker": "bash scripts/test-e2e-docker.sh",
     "test:smoke": "bash tests/smoke/smoke-test.sh",
     "lint": "eslint src/",
     "clean": "rm -rf dist node_modules/.cache",
