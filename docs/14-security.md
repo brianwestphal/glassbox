@@ -41,3 +41,9 @@ Requirements for network security, input validation, and safe system interaction
 ### 14.7 Error Responses
 
 - Error responses shall not leak internal file paths, stack traces, or system details to the client beyond what is necessary for the user to understand and resolve the issue.
+
+### 14.8 Dependency Security
+
+- The release pipeline shall block on known-vulnerable shipped dependencies: a `npm audit --omit=dev --audit-level=high` gate in `release-candidate.yml` hard-fails the release on any high/critical advisory in the production dependency tree (npm package + bundled desktop sidecar). See doc 11 (§11.6, §11.9) for the pipeline mechanics.
+- Dependency freshness between releases is maintained by Dependabot (`.github/dependabot.yml`, weekly npm), so transitive-dependency advisories don't accumulate silently between releases.
+- The `--omit=dev` scope is deliberate: build/test-only tooling never reaches a user's machine, so its advisories don't affect the released artifact and would only add release-blocking noise. The threat model (localhost-only binding, trusted local machine — see 14.1/14.6) keeps practical exploitability of even shipped advisories low, but the gate clears them regardless because the fixes are typically free, non-breaking patches inside existing semver ranges.

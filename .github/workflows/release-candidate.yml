@@ -87,13 +87,42 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # Security audit gate. A release publishes to npm AND ships a bundled Node
+  # server (the desktop "sidecar"), so a known-vulnerable SHIPPED dependency
+  # reaches end users. This job hard-fails the release when any high/critical
+  # advisory exists in the production dependency tree.
+  #
+  # Why `--omit=dev`: build/test-only tooling (vite, eslint, vitest, …) never
+  # ships to a user's machine, so its advisories don't affect the released
+  # artifact and would only add release-blocking noise. Ongoing freshness of
+  # the full tree (including dev deps) is handled out-of-band by Dependabot
+  # (`.github/dependabot.yml`), not by this gate.
+  #
+  # Why `--audit-level=high`: a high or critical advisory in a shipped dep
+  # blocks the release; moderates/lows still print in the audit summary but
+  # don't fail the job. Patch-level fixes that sit inside our existing semver
+  # ranges should be picked up by `npm audit fix` + Dependabot well before a
+  # release is cut, so in steady state this gate has nothing to block on — it
+  # exists to stop a genuinely vulnerable build from shipping.
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+
   # ══════════════════════════════════════════════════════════════
   # Phase 1b: Expensive checks — only run if fast checks pass
   # ══════════════════════════════════════════════════════════════
 
   test-e2e:
     name: E2E Tests
-    needs: [lint, typecheck, test-unit]
+    needs: [lint, typecheck, test-unit, audit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,7 +137,7 @@ jobs:
 
   npm-pack:
     name: npm Pack (Dry Run)
-    needs: [lint, typecheck, test-unit]
+    needs: [lint, typecheck, test-unit, audit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +159,7 @@ jobs:
     # discarded; the real signed beta bundles come from the `build` phase
     # below which DOES do the bump and therefore needs the MSI-skip conditional.
     name: Build Tauri (${{ matrix.friendly }})
-    needs: [lint, typecheck, test-unit]
+    needs: [lint, typecheck, test-unit, audit]
     strategy:
       fail-fast: true
       matrix:

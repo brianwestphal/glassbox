@@ -81,6 +81,13 @@ Requirements for building, packaging, and distributing the application.
   - `release-candidate.yml` (triggered by `v*-rc.*`) — full validate → npm beta → smoke → promote → desktop dispatch
   - `release-beta.yml` (triggered by `v*-beta.*`) — opt-in pre-release; npm `--tag beta` + GH Release `prerelease: true`; no auto-promote
   - `release-desktop.yml` (triggered by `v[0-9]*` excluding `-rc.*` and `-beta.*`) — final desktop bundles for stable releases
+- The release validation phase shall include a **security-audit gate** (`audit` job in `release-candidate.yml`) that runs `npm audit --omit=dev --audit-level=high` and hard-fails the release on any high/critical advisory in a shipped (production) dependency. Dev/build/test-only advisories are excluded (they never reach a user's machine) and are kept fresh out-of-band instead (see 11.9). The gate runs alongside `lint` / `typecheck` / `test-unit` and blocks every downstream publish job.
+
+### 11.9 Dependency Security Auditing
+
+- A release shall not ship a known-vulnerable production dependency: the `audit` gate in 11.6 blocks the release on a high/critical advisory in the `--omit=dev` tree.
+- Dependency freshness between releases shall be maintained automatically by Dependabot (`.github/dependabot.yml`, weekly `npm` ecosystem) so patch/minor fixes — including those already inside our existing `^` semver ranges — land continuously rather than only being caught at release time.
+- Dev/build/test-only dependency updates shall be grouped into a single weekly PR to cut review noise; production dependency updates shall be raised individually because each is security-relevant.
 
 ### 11.7 Development Mode
 

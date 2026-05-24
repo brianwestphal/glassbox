@@ -1,0 +1,25 @@
+# Dependabot keeps dependencies fresh *between* releases. Without it,
+# vulnerable transitive packages accumulate silently and only surface when a
+# release is cut and the security-audit gate in
+# `.github/workflows/release-candidate.yml` finally runs `npm audit`. Weekly
+# update PRs mean patch/minor fixes (often the exact ones that sit inside our
+# existing `^` semver ranges) land continuously, so the release-time gate
+# rarely has anything left to block on.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    # Production dependencies are what actually ship (npm package + bundled
+    # desktop sidecar), so they get individual PRs — each is security-relevant
+    # and worth reviewing on its own. Dev/build/test tooling (tsup, vite,
+    # eslint, vitest, playwright, …) never reaches a user's machine, so its
+    # updates are collapsed into a single weekly PR to keep review overhead low.
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"

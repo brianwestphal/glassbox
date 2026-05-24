@@ -567,6 +567,13 @@ Updates: `tauri-plugin-updater` reads `latest.json` from GitHub Releases
 on every launch (via `releases/latest/...`, which skips prereleases).
 Opt-in install only. Public key embedded in `tauri.conf.json`.
 
+Dependency security: `release-candidate.yml`'s validation phase includes an
+`audit` gate (`npm audit --omit=dev --audit-level=high`) that hard-fails the
+release on a high/critical advisory in a *shipped* dependency; it gates every
+downstream publish job. `.github/dependabot.yml` (weekly npm, dev-deps grouped
+into one PR) keeps the tree fresh between releases so the gate rarely has
+anything to block on.
+
 CI workflows:
 - `release-candidate.yml` — `v*-rc.*` tags → validate → npm@beta → smoke →
   promote to npm@latest → dispatch `release-desktop.yml`.
