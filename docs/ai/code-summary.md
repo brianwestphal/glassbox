@@ -538,6 +538,14 @@ tests/
 └── helpers/      # db.ts test helpers
 ```
 
+The E2E web server runs `--demo:4 --ai-service-test` (see
+`playwright.config.ts`). `--ai-service-test` makes AI analysis use mock
+responses and bypass the API-key check, so the suite is **hermetic** — it
+never makes real AI calls and doesn't depend on a real key existing on the
+machine. Without it, any test that triggers a live risk/narrative analysis
+only passes where a key happens to be configured (env / keychain / config),
+and 400s in CI.
+
 Coverage pipeline (`scripts/test-all.sh`) merges three lcov streams:
 server V8 (via `NODE_V8_COVERAGE`), browser V8 (via Playwright
 `page.coverage` + esbuild source maps), and vitest V8. `genhtml` produces
