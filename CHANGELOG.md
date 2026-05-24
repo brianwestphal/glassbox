@@ -2,6 +2,28 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.10.0] - 2026-05-25
+
+
+Here's a draft for CHANGELOG.md. This cycle is heavy on type-safety hardening, dependency work, tests, and CI — so most of the user-visible content lands in Bug fixes and Developer-facing; there's genuinely no new feature, UX, or performance work to report, so I've omitted those headings rather than pad them.
+
+```markdown
+
+- Sponsor button now opens in your default browser in the desktop app (was a no-op).
+- AI analysis no longer gets stuck "running" — the 15-minute auto-timeout now fires.
+- Analysis timestamps are now computed in correct UTC regardless of server timezone.
+- Fixed two regressions where stricter validation rejected previously-valid input.
+- Legacy or corrupt diff data now degrades gracefully instead of breaking the view.
+
+
+- Runtime validation (zod) now guards every trust boundary — wire, DB, JSON, config.
+- AI provider responses are now validated; vendor API changes fail with clear errors.
+- Upgraded embedded PostgreSQL (PGlite 0.3.15→0.4.5) with auto-migration for existing data.
+- Resolved 11 dependency vulnerabilities (6 production, 5 development).
+- Added a security-audit gate to the release pipeline plus Dependabot monitoring.
+- Upgraded the kerfjs UI runtime to 0.13.
+- Added Cursor editor support (`.cursorrules`) for contributors.
+
 ## [0.9.11] - 2026-05-22
 
 
