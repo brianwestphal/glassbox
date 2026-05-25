@@ -28,7 +28,7 @@ glassbox/
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
 ├── docs/                   # Requirements (1-17) + ARCHITECTURE, tauri-*
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
-├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, etc.
+├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture)
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
 ├── assets/                 # Static assets shipped with the app
 ├── CLAUDE.md               # Project rules for AI sessions
@@ -506,6 +506,15 @@ Scripts (`package.json`):
 - `dev:server` — dev with `--no-open --strict-port`
 - `tauri:dev` / `tauri:build` — desktop dev / full desktop build
 - `test`, `test:watch`, `test:all`, `test:e2e`, `test:smoke`, `lint`
+- `demo:capture` — regenerate the animated README hero `assets/demo.svg` (+
+  `.svgz`). Boots a real `--demo:1` server, drives the risk-triage → annotate →
+  complete → `/glassbox` loop with Playwright, captures each beat via
+  `domotion-svg`, and composites one looping SVG framed in browser/terminal
+  window chrome with captions + an animated cursor. Lives in `scripts/demo/`
+  (`capture-demo.ts` orchestrator, `scenes.ts` terminal/markdown/end-card,
+  `chrome.ts` window-chrome compositing); see `scripts/demo/README.md`.
+  `domotion-svg` is pinned to 0.3.3 (path-mode text). Must run outside the
+  command sandbox (Chromium).
 - `release` — version bump + publish stable (see `scripts/release.sh`)
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
 
