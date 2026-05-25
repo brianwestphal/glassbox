@@ -35,13 +35,14 @@ import { fileURLToPath } from 'node:url';
 
 import {
   captureElementTree,
-  clearGlyphDefs,
+  clearEmbeddedFonts,
   elementTreeToSvg,
   generateAnimatedSvg,
-  getGlyphDefs,
+  getEmbeddedFontFaceCss,
   gzipSvg,
   launchChromium,
   optimizeSvg,
+  setRenderTextMode,
 } from 'domotion-svg';
 import type { AnimationFrame, CursorEvent, Overlay } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
@@ -247,7 +248,7 @@ async function main(): Promise<void> {
     await page.click(lineSel, { position: { x: 60, y: lineBox.height / 2 } });
     await page.waitForSelector('.annotation-form-container textarea', { timeout: 5000 });
     await page.waitForTimeout(250);
-    const wrap = await page.evaluate((text) => {
+    const field = await page.evaluate(() => {
       const el = document.querySelector<HTMLTextAreaElement>('.annotation-form-container textarea');
       if (!el) return null;
       el.placeholder = '';
@@ -256,46 +257,30 @@ async function main(): Promise<void> {
       const padL = parseFloat(cs.paddingLeft);
       const padR = parseFloat(cs.paddingRight);
       const padT = parseFloat(cs.paddingTop);
-      const fontSize = parseFloat(cs.fontSize);
-      const lineHeight = cs.lineHeight === 'normal' ? fontSize * 1.4 : parseFloat(cs.lineHeight);
-      const maxW = r.width - padL - padR;
-      const cx = document.createElement('canvas').getContext('2d');
-      if (cx) cx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-      const lines: string[] = [];
-      let cur = '';
-      for (const w of text.split(' ')) {
-        const t = cur === '' ? w : `${cur} ${w}`;
-        if (cur === '' || (cx?.measureText(t).width ?? 0) <= maxW) cur = t;
-        else { lines.push(cur); cur = w; }
-      }
-      if (cur !== '') lines.push(cur);
-      return { x: r.x + padL, y: r.y + padT, fontSize, lineHeight, color: cs.color, lines };
-    }, FEEDBACK);
-    if (wrap === null) throw new Error('annotation textarea not found');
+      return { x: r.x + padL, y: r.y + padT, w: r.width - padL - padR, fontSize: parseFloat(cs.fontSize), color: cs.color, bg: cs.backgroundColor };
+    });
+    if (field === null) throw new Error('annotation textarea not found');
 
     const saveBox = await page.locator('.annotation-form-container .annotation-save-btn').boundingBox();
     if (saveBox === null) throw new Error('save button not found');
 
-    let cumChars = 0;
     const baseDelay = 250;
-    const typingOverlays: Overlay[] = wrap.lines.map((line, i) => {
-      const ov: Overlay = {
-        kind: 'typing', text: line,
-        x: wrap.x + OX,
-        y: wrap.y + OY + wrap.fontSize * 0.9 + i * wrap.lineHeight,
-        fontSize: wrap.fontSize, color: wrap.color, speed: TYPING_SPEED,
-        delay: baseDelay + cumChars * TYPING_SPEED,
-      };
-      cumChars += line.length + 1;
-      return ov;
-    });
-    typeEnd = baseDelay + cumChars * TYPING_SPEED;
+    typeEnd = baseDelay + FEEDBACK.length * TYPING_SPEED;
+    // One typing overlay: domotion wraps to bgWidth like a textarea (DM-840) and
+    // renders a blinking insertion caret (DM-870) — no manual line-splitting.
+    const typingOverlay: Overlay = {
+      kind: 'typing', text: FEEDBACK,
+      x: field.x + OX, y: field.y + OY + field.fontSize * 0.9,
+      fontSize: field.fontSize, color: field.color, speed: TYPING_SPEED,
+      delay: baseDelay, bgColor: field.bg, bgWidth: field.w, bgHeight: field.fontSize * 1.5,
+      caret: true,
+    };
 
     await debugShot(page, 'form');
     clickSpecs.push({
       frame: pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Leave a note for your AI' },
-        { duration: typeEnd + 900, transition: { type: 'crossfade', duration: 260 }, overlays: typingOverlays }),
-      offset: typeEnd + 450, hit: center(saveBox),
+        { duration: typeEnd + 1100, transition: { type: 'crossfade', duration: 260 }, overlays: [typingOverlay] }),
+      offset: typeEnd + 550, hit: center(saveBox),
     });
 
     // === 4. Save + complete ===============================================
@@ -379,7 +364,7 @@ async function main(): Promise<void> {
         overlays: [{
           kind: 'typing', text: '/glassbox',
           x: promptAnchor.x + OX, y: promptAnchor.y + OY + promptAnchor.fontSize * 0.9,
-          fontSize: promptAnchor.fontSize, color: '#79c0ff', speed: 55, delay: 300,
+          fontSize: promptAnchor.fontSize, color: '#79c0ff', speed: 55, delay: 300, caret: true,
         }],
       },
     };
@@ -411,9 +396,14 @@ async function main(): Promise<void> {
     browser = null;
     server.kill('SIGTERM');
 
-    clearGlyphDefs();
+    // Pin the text mode so a future domotion default change can't silently
+    // break the demo (v0.4.0's switch to embedded-font once rendered as tofu).
+    setRenderTextMode('embedded-font');
+    clearEmbeddedFonts();
     const frames: AnimationFrame[] = jobs.map(j => ({
       ...j.meta,
+      // includeGlyphDefs=false → per-frame font CSS is also suppressed; the
+      // embedded-font @font-face is collected once below for the whole SVG.
       svgContent: chromeWrap(elementTreeToSvg(j.tree as CapturedTree, CONTENT_W, CONTENT_H, j.prefix, false), {
         title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
       }),
@@ -423,7 +413,7 @@ async function main(): Promise<void> {
       svgContent: endCardSvg(CANVAS_W, CANVAS_H),
       duration: 2400, transition: { type: 'crossfade', duration: 380 },
     });
-    const sharedDefs = getGlyphDefs();
+    const fontFaceCss = getEmbeddedFontFaceCss(); // base64 font subset, hoisted once
 
     // === Cursor track =====================================================
     const frameStart: number[] = [];
@@ -445,17 +435,9 @@ async function main(): Promise<void> {
     cursorEvents.push({ type: 'hide', t: frameStart[endJobIndex] });
 
     let svg = generateAnimatedSvg({
-      width: CANVAS_W, height: CANVAS_H, frames, sharedDefs,
+      width: CANVAS_W, height: CANVAS_H, frames, fontFaceCss,
       cursorOverlay: { events: cursorEvents, style: { cursorScale: 1.6 } },
     });
-    // Defensive: if any captured frame fell back to a CSS `<text>` element,
-    // domotion emits the computed font-family with inner double-quotes, which
-    // is malformed XML. Single-quote the known family names so the SVG stays
-    // valid (and SVGO can parse it).
-    svg = svg.replace(
-      /"(SF Mono|SF Pro|SF Pro Text|SF Pro Display|Segoe UI|Cascadia Code|system-ui|ui-monospace|Apple Color Emoji|Helvetica Neue)"/g,
-      "'$1'",
-    );
     writeFileSync(resolve(DEBUG_DIR, '_raw.svg'), svg);
     try {
       svg = optimizeSvg(svg);
@@ -463,18 +445,18 @@ async function main(): Promise<void> {
       console.warn(`optimizeSvg failed (${(e as Error).message}); shipping unoptimized.`);
     }
 
-    const useCount = (svg.match(/<use\b/g) ?? []).length;
-    if (useCount < 500) {
-      throw new Error(
-        `Glyph path-mode fell back to <text> this run (only ${String(useCount)} <use>). ` +
-          'Flaky CoreText/fontkit failure, not a code change — re-run `npm run demo:capture`.',
-      );
+    // domotion 0.5.0 renders captured text via an embedded @font-face subset
+    // (carried in the SVG), so it renders identically anywhere. Guard that the
+    // font actually got embedded — without it the text would render as tofu.
+    if (!svg.includes('@font-face')) {
+      throw new Error('No embedded @font-face in the output — captured text would render as tofu. Check domotion text mode.');
     }
 
     const gz = gzipSvg(svg);
     writeFileSync(OUT_SVG, svg);
     writeFileSync(OUT_SVGZ, gz);
-    console.log(`\n✓ Wrote ${OUT_SVG} (${(svg.length / 1024).toFixed(1)} KB, ${String(useCount)} glyphs)`);
+    const texts = (svg.match(/<text\b/g) ?? []).length;
+    console.log(`\n✓ Wrote ${OUT_SVG} (${(svg.length / 1024).toFixed(1)} KB, ${String(texts)} text runs, embedded font)`);
     console.log(`✓ Wrote ${OUT_SVGZ} (${(gz.length / 1024).toFixed(1)} KB gzipped)`);
     console.log(`  ${String(frames.length)} frames · debug screenshots in ${DEBUG_DIR}`);
   } finally {

@@ -39,7 +39,7 @@ That's it. Data stays local. Works in any git repo.
 
 <br>
 
-<img src="assets/demo-guided-review.png" alt="Glassbox reviewing a diff with guided review notes" width="720">
+<img src="assets/demo.svg" alt="Glassbox: triage by AI risk, annotate a diff, and let Claude Code apply the fix — the full review loop" width="720">
 
 </div>
 

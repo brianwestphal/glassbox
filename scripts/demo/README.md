@@ -40,13 +40,14 @@ captured beat land in `scripts/demo/.debug/` (gitignored).
   bootstrap ports; a sandbox blocks that with a `mach_port_rendezvous … Permission
   denied` crash.
 - **`domotion-svg`** — pinned to an exact version in `devDependencies`
-  (currently `0.3.3`). The pin is deliberate: this script relies on domotion's
-  glyph **path-outline** text rendering, which produces an SVG that looks
-  identical on any viewer regardless of installed fonts. domotion `0.4.x`
-  changed the default text mode to "embedded-font" — keep the pin until that
-  mode is verified to render correctly in this pipeline before bumping. The
-  capture asserts path mode (thousands of `<use>` glyphs) and fails loudly if a
-  build ever falls back to `<text>`.
+  (currently `0.5.0`). The script calls `setRenderTextMode('embedded-font')` so
+  the demo is always built in **embedded-font** mode: text is `<text>` rendered
+  with an `@font-face` subset embedded in the SVG, so it looks identical on any
+  viewer regardless of installed fonts, and it's lighter than the older
+  per-glyph path-outline mode. The exact pin + explicit mode are deliberate — a
+  domotion default-mode change (0.4.0 once flipped the default and briefly broke
+  this) can't silently change the output. The capture asserts an `@font-face` is
+  present and fails loudly otherwise (text would render as tofu without it).
 
 ## Files
 
@@ -65,9 +66,11 @@ captured beat land in `scripts/demo/.debug/` (gitignored).
 
 ## Notes / gotchas
 
-- The end card is **hand-built SVG**, not captured HTML — domotion's
-  `<text>`-fallback path emits computed font-families with inner double-quotes
-  (invalid XML); a small sanitizer in `capture-demo.ts` also single-quotes known
-  family names as a safety net for any captured frame that falls back.
+- The end card is **hand-built SVG**, not captured HTML — purely for precise
+  branding/layout control (it's the one frame that isn't a screenshot of the app
+  or a captured HTML scene).
 - The risk badges use mocked (random) scores, so their exact values/order vary
   per run — that's cosmetic; the point is the colored risk triage.
+- The typed feedback wraps natively (domotion's typing-overlay `bgWidth`) and
+  shows a blinking insertion caret (`caret: true`); the terminal `/glassbox`
+  prompt has a caret too.
