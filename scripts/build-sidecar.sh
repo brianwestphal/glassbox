@@ -86,6 +86,11 @@ mkdir -p "$SERVER_DIR"
 
 # Copy the built server bundle and client assets
 cp dist/cli.js "$SERVER_DIR/"
+# SVG rasterization worker — spawned by cli.js as a sibling worker thread.
+# Must sit next to cli.js so `new URL('./svg-rasterize-worker.js', import.meta.url)`
+# resolves at runtime; forgetting this makes SVG image-diff rasterization fall
+# back to blocking in-process rendering.
+cp dist/svg-rasterize-worker.js "$SERVER_DIR/"
 mkdir -p "$SERVER_DIR/client"
 cp dist/client/app.global.js "$SERVER_DIR/client/"
 cp dist/client/history.global.js "$SERVER_DIR/client/"

@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import {
   captureElementTree,
   clearEmbeddedFonts,
+  cullElementsOutsideViewBox,
   elementTreeToSvg,
   generateAnimatedSvg,
   getEmbeddedFontFaceCss,
@@ -400,14 +401,22 @@ async function main(): Promise<void> {
     // break the demo (v0.4.0's switch to embedded-font once rendered as tofu).
     setRenderTextMode('embedded-font');
     clearEmbeddedFonts();
-    const frames: AnimationFrame[] = jobs.map(j => ({
-      ...j.meta,
+    const frames: AnimationFrame[] = jobs.map(j => {
+      const tree = j.tree as CapturedTree;
+      // Drop elements outside the content viewport (diff lines below the fold,
+      // scrolled-off sidebar rows) — the window chrome clips them anyway, but
+      // they'd still emit glyphs into the embedded font. Static frames don't
+      // scroll, so we mutate the tree and discard the returned cull keyframes.
+      cullElementsOutsideViewBox(tree, CONTENT_W, CONTENT_H, undefined, 0, 1);
       // includeGlyphDefs=false → per-frame font CSS is also suppressed; the
       // embedded-font @font-face is collected once below for the whole SVG.
-      svgContent: chromeWrap(elementTreeToSvg(j.tree as CapturedTree, CONTENT_W, CONTENT_H, j.prefix, false), {
-        title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
-      }),
-    }));
+      return {
+        ...j.meta,
+        svgContent: chromeWrap(elementTreeToSvg(tree, CONTENT_W, CONTENT_H, j.prefix, false), {
+          title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
+        }),
+      };
+    });
     // End card: full-canvas hand-built SVG, no chrome, no glyph capture.
     frames.push({
       svgContent: endCardSvg(CANVAS_W, CANVAS_H),

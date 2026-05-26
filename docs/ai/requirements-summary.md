@@ -99,8 +99,10 @@ difference`; slice mode overlays center-to-center with a draggable cut
 line at any angle. Added/deleted images show metadata + zoom/pan viewer
 only. **SVGs** get a Code/Rendered toggle; Rendered rasterizes via
 `@resvg/resvg-wasm` at 10× (max 8000 px in largest dimension), default
-300×150 per HTML spec. The user's Code/Rendered choice is remembered
-across files.
+300×150 per HTML spec. Rasterization runs in a worker thread so the
+synchronous WASM render never blocks the HTTP event loop (falls back to
+in-process if a worker can't start). The user's Code/Rendered choice is
+remembered across files.
 
 Other controls: wrap toggle, ignore-whitespace toggle (regenerates with
 `-w`, persisted in user_preferences), syntax highlighting (auto-detected

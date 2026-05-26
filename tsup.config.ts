@@ -2,9 +2,16 @@ import { defineConfig } from 'tsup';
 import { execSync } from 'child_process';
 
 export default defineConfig([
-  // Server bundle (CLI entry point + channel server)
+  // Server bundle (CLI entry point + channel server + SVG rasterization worker).
+  // Object form pins output filenames so the worker lands at
+  // dist/svg-rasterize-worker.js (a sibling of cli.js), which the rasterization
+  // manager resolves at runtime via `new URL('./svg-rasterize-worker.js', …)`.
   {
-    entry: ['src/cli.ts', 'src/channel.ts'],
+    entry: {
+      cli: 'src/cli.ts',
+      channel: 'src/channel.ts',
+      'svg-rasterize-worker': 'src/git/svg-rasterize-worker.ts',
+    },
     format: 'esm',
     outDir: 'dist',
     target: 'node20',

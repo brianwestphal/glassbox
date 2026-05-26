@@ -89,7 +89,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
 - `src/git/diff.ts` — Git operations: diff generation, parsing, file listing
 - `src/git/image.ts` — Image diff support: old/new image retrieval from git, metadata extraction from headers
-- `src/git/svg-rasterize.ts` — SVG to PNG rasterization using `@resvg/resvg-wasm` for rendered comparison mode
+- `src/git/svg-rasterize.ts` — SVG to PNG rasterization for rendered comparison mode. `rasterizeSvg()` offloads the synchronous `@resvg/resvg-wasm` render to a worker thread (`svg-rasterize-worker.ts`, shared render core in `svg-rasterize-render.ts`) so it never blocks the HTTP event loop; falls back to in-process rendering if a worker can't start. tsup emits the worker as `dist/svg-rasterize-worker.js` and `build-sidecar.sh` copies it next to `cli.js`; `svg-rasterize-worker-boot.mjs` is the dev-only tsx shim
 - `src/themes/built-in.ts` — Built-in theme definitions (Dark, Light, High Contrast, Dracula, Tokyo Night), ThemeColors type
 - `src/themes/config.ts` — Theme persistence: active theme in config.json, custom themes in ~/.glassbox/themes/
 - `src/routes/theme-api.ts` — Theme REST API: list, get/set active, create/update/delete custom themes

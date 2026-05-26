@@ -1,203 +1,175 @@
-import { vi } from 'vitest';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fakePngData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
-const mockRendered = {
-  asPng: vi.fn(() => fakePngData),
-  free: vi.fn(),
-};
-const mockResvgInstance = {
-  render: vi.fn(() => mockRendered),
-  free: vi.fn(),
-};
+/**
+ * Tests for the public rasterization facade in `svg-rasterize.ts`.
+ *
+ * The point of this module is that `rasterizeSvg` offloads the blocking WASM
+ * render to a worker thread (so the HTTP server's event loop stays responsive)
+ * and only renders in-process when a worker cannot start. These tests stub the
+ * worker and the in-process render core to assert that offloading / fallback
+ * routing happens correctly — the render math itself is covered by
+ * `svg-rasterize-render.test.ts`.
+ */
 
-// Use a real function (not arrow) so it's constructable with `new`
-const MockResvgClass = vi.fn(function (this: any) {
-  Object.assign(this, mockResvgInstance);
+// A controllable fake Worker. Tests drive it by calling `.emit(...)` to
+// simulate the messages a real worker thread would post back.
+const hoisted = vi.hoisted(() => {
+  const state = { instances: [] as FakeWorker[], ctorThrows: false };
+
+  class FakeWorker {
+    url: unknown;
+    listeners: Record<string, ((...args: any[]) => void)[]> = {};
+    postMessage = vi.fn();
+    terminate = vi.fn();
+    removeAllListeners = vi.fn(function (this: FakeWorker) {
+      this.listeners = {};
+      return this;
+    });
+
+    constructor(url: unknown) {
+      if (state.ctorThrows) throw new Error('cannot spawn worker thread');
+      this.url = url;
+      state.instances.push(this);
+    }
+
+    on(event: string, cb: (...args: any[]) => void) {
+      (this.listeners[event] ||= []).push(cb);
+      return this;
+    }
+
+    emit(event: string, ...args: any[]) {
+      for (const cb of [...(this.listeners[event] ?? [])]) cb(...args);
+    }
+  }
+
+  return { state, FakeWorker };
 });
 
-vi.mock('@resvg/resvg-wasm', () => ({
-  initWasm: vi.fn(),
-  Resvg: MockResvgClass,
-}));
+vi.mock('node:worker_threads', () => ({ Worker: hoisted.FakeWorker }));
 
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
+// Keep the real pure helpers (re-exported by the facade) but stub the blocking
+// render core so the in-process fallback path is observable and instant.
+vi.mock('../../../src/git/svg-rasterize-render.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/git/svg-rasterize-render.js')>();
   return {
     ...actual,
-    existsSync: vi.fn(() => false),
-    readFileSync: vi.fn((path: string, ...args: any[]) => {
-      // Allow reading the WASM file path by returning a fake buffer
-      if (typeof path === 'string' && path.endsWith('.wasm')) {
-        return Buffer.from('fake-wasm');
-      }
-      return actual.readFileSync(path, ...args);
-    }),
-    readdirSync: vi.fn(() => []),
+    renderSvgToPng: vi.fn(async () => Buffer.from('in-process-fallback')),
   };
 });
 
-vi.mock('module', () => ({
-  createRequire: () => ({
-    resolve: () => '/fake/node_modules/@resvg/resvg-wasm/index.js',
-  }),
-}));
+type FakeWorker = InstanceType<typeof hoisted.FakeWorker>;
 
-import { parseSvgDimensions, svgUsesExternalFonts, rasterizeSvg } from '../../../src/git/svg-rasterize.js';
+interface LoadedManager {
+  rasterizeSvg: (buf: Buffer) => Promise<Buffer>;
+  renderSvgToPng: Mock;
+  instances: FakeWorker[];
+}
 
-describe('parseSvgDimensions', () => {
-  it('extracts width and height from attributes', () => {
-    const result = parseSvgDimensions('<svg width="200" height="100"></svg>');
-    expect(result).toEqual({ width: 200, height: 100 });
+/** Fresh manager per test — the facade keeps worker state at module scope. */
+async function freshManager(): Promise<LoadedManager> {
+  vi.resetModules();
+  vi.clearAllMocks(); // reset call history (mock instances survive resetModules)
+  hoisted.state.instances.length = 0;
+  hoisted.state.ctorThrows = false;
+  const facade = await import('../../../src/git/svg-rasterize.js');
+  const core = await import('../../../src/git/svg-rasterize-render.js');
+  return {
+    rasterizeSvg: facade.rasterizeSvg,
+    renderSvgToPng: core.renderSvgToPng as unknown as Mock,
+    instances: hoisted.state.instances,
+  };
+}
+
+describe('rasterizeSvg — worker offloading', () => {
+  it('offloads rendering to a worker instead of running it in-process', async () => {
+    const { rasterizeSvg, renderSvgToPng, instances } = await freshManager();
+
+    const p = rasterizeSvg(Buffer.from('<svg width="10" height="10"/>'));
+    expect(instances).toHaveLength(1);
+    const worker = instances[0];
+
+    // The blocking render must NOT happen on the main thread.
+    expect(renderSvgToPng).not.toHaveBeenCalled();
+    expect(worker.postMessage).toHaveBeenCalledWith({ id: 0, svg: '<svg width="10" height="10"/>' });
+
+    worker.emit('message', { type: 'ready' });
+    worker.emit('message', { type: 'result', id: 0, png: new Uint8Array([1, 2, 3]) });
+
+    await expect(p).resolves.toEqual(Buffer.from([1, 2, 3]));
   });
 
-  it('extracts dimensions from viewBox when no width/height', () => {
-    const result = parseSvgDimensions('<svg viewBox="0 0 500 300"></svg>');
-    expect(result).toEqual({ width: 500, height: 300 });
+  it('reuses a single worker across calls', async () => {
+    const { rasterizeSvg, instances } = await freshManager();
+
+    void rasterizeSvg(Buffer.from('<svg/>'));
+    void rasterizeSvg(Buffer.from('<svg/>'));
+
+    expect(instances).toHaveLength(1);
+    expect(instances[0].postMessage).toHaveBeenCalledTimes(2);
   });
 
-  it('uses viewBox for missing dimension only', () => {
-    const result = parseSvgDimensions('<svg width="400" viewBox="0 0 500 300"></svg>');
-    expect(result).toEqual({ width: 400, height: 300 });
-  });
+  it('rejects when the worker reports a per-render error', async () => {
+    const { rasterizeSvg, instances } = await freshManager();
 
-  it('defaults to 300x150 when no size info', () => {
-    const result = parseSvgDimensions('<svg></svg>');
-    expect(result).toEqual({ width: 300, height: 150 });
-  });
+    const p = rasterizeSvg(Buffer.from('<svg/>'));
+    instances[0].emit('message', { type: 'ready' });
+    instances[0].emit('message', { type: 'error', id: 0, message: 'bad svg' });
 
-  it('defaults width to 300 when only height is given', () => {
-    const result = parseSvgDimensions('<svg height="200"></svg>');
-    expect(result).toEqual({ width: 300, height: 200 });
-  });
-
-  it('defaults height to 150 when only width is given', () => {
-    const result = parseSvgDimensions('<svg width="400"></svg>');
-    expect(result).toEqual({ width: 400, height: 150 });
-  });
-
-  it('handles viewBox with comma separators', () => {
-    const result = parseSvgDimensions('<svg viewBox="0,0,800,600"></svg>');
-    expect(result).toEqual({ width: 800, height: 600 });
-  });
-
-  it('handles decimal dimensions', () => {
-    const result = parseSvgDimensions('<svg width="100.5" height="200.75"></svg>');
-    expect(result).toEqual({ width: 100.5, height: 200.75 });
-  });
-
-  it('handles dimensions with units (parsed as float)', () => {
-    // parseFloat("100px") returns 100
-    const result = parseSvgDimensions('<svg width="100px" height="200px"></svg>');
-    expect(result).toEqual({ width: 100, height: 200 });
-  });
-});
-
-describe('svgUsesExternalFonts', () => {
-  it('returns true for SVG with text elements', () => {
-    const svg = '<svg><text x="10" y="20">Hello</text></svg>';
-    expect(svgUsesExternalFonts(Buffer.from(svg))).toBe(true);
-  });
-
-  it('returns true for SVG with font-family style', () => {
-    const svg = '<svg><rect style="font-family: Arial"/></svg>';
-    expect(svgUsesExternalFonts(Buffer.from(svg))).toBe(true);
-  });
-
-  it('returns true for SVG with @font-face', () => {
-    const svg = '<svg><style>@font-face { font-family: Custom; }</style></svg>';
-    expect(svgUsesExternalFonts(Buffer.from(svg))).toBe(true);
-  });
-
-  it('returns false for SVG without text or fonts', () => {
-    const svg = '<svg><rect width="100" height="100" fill="red"/></svg>';
-    expect(svgUsesExternalFonts(Buffer.from(svg))).toBe(false);
-  });
-
-  it('is case-insensitive', () => {
-    const svg = '<svg><TEXT x="0" y="0">Hi</TEXT></svg>';
-    expect(svgUsesExternalFonts(Buffer.from(svg))).toBe(true);
+    await expect(p).rejects.toThrow('bad svg');
   });
 });
 
-describe('rasterizeSvg', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Restore the default mock behaviors after clearAllMocks
-    mockRendered.asPng.mockReturnValue(fakePngData);
-    mockResvgInstance.render.mockReturnValue(mockRendered);
+describe('rasterizeSvg — in-process fallback', () => {
+  it('renders in-process when a worker cannot be spawned', async () => {
+    const { rasterizeSvg, renderSvgToPng, instances } = await freshManager();
+    hoisted.state.ctorThrows = true;
+
+    const result = await rasterizeSvg(Buffer.from('<svg width="5" height="5"/>'));
+
+    expect(instances).toHaveLength(0);
+    expect(renderSvgToPng).toHaveBeenCalledWith('<svg width="5" height="5"/>');
+    expect(result).toEqual(Buffer.from('in-process-fallback'));
   });
 
-  it('rasterizes a simple SVG to PNG buffer', async () => {
-    const svg = '<svg width="100" height="50"><rect width="100" height="50" fill="red"/></svg>';
-    const result = await rasterizeSvg(Buffer.from(svg));
+  it('falls back to in-process rendering when the worker fails to start', async () => {
+    const { rasterizeSvg, renderSvgToPng, instances } = await freshManager();
 
-    expect(result).toBeInstanceOf(Buffer);
-    expect(MockResvgClass).toHaveBeenCalledWith(
-      svg,
-      expect.objectContaining({
-        fitTo: { mode: 'width', value: expect.any(Number) },
-        font: expect.objectContaining({
-          loadSystemFonts: false,
-          defaultFontFamily: 'Helvetica',
-        }),
-      })
-    );
+    const p = rasterizeSvg(Buffer.from('<svg/>'));
+    // Worker errors before ever signalling 'ready' (e.g. missing artifact).
+    instances[0].emit('error', new Error('module not found'));
+
+    await expect(p).resolves.toEqual(Buffer.from('in-process-fallback'));
+    expect(renderSvgToPng).toHaveBeenCalledTimes(1);
+
+    // Subsequent calls skip the worker entirely.
+    await rasterizeSvg(Buffer.from('<svg/>'));
+    expect(instances).toHaveLength(1); // no respawn
+    expect(renderSvgToPng).toHaveBeenCalledTimes(2);
   });
 
-  it('calls render, asPng, and frees resources', async () => {
-    const svg = '<svg width="100" height="50"><rect/></svg>';
-    await rasterizeSvg(Buffer.from(svg));
+  it('rejects in-flight jobs and respawns after a mid-flight crash', async () => {
+    const { rasterizeSvg, instances } = await freshManager();
 
-    // Verify the instance created by new MockResvgClass has render called via prototype chain
-    // Since we use Object.assign, the mock instance methods are on `this`
-    expect(mockResvgInstance.render).toHaveBeenCalled();
-    expect(mockRendered.asPng).toHaveBeenCalled();
-    expect(mockRendered.free).toHaveBeenCalled();
-    expect(mockResvgInstance.free).toHaveBeenCalled();
+    const p = rasterizeSvg(Buffer.from('<svg/>'));
+    instances[0].emit('message', { type: 'ready' });
+    instances[0].emit('error', new Error('worker crashed'));
+
+    await expect(p).rejects.toThrow('worker crashed');
+
+    // A healthy worker had started, so the next call respawns rather than
+    // permanently falling back.
+    void rasterizeSvg(Buffer.from('<svg/>'));
+    expect(instances).toHaveLength(2);
   });
+});
 
-  it('scales up to 10x base size', async () => {
-    // 100x50 SVG, scale = min(10, 8000/100) = 10, targetWidth = 1000
-    const svg = '<svg width="100" height="50"><rect/></svg>';
-    await rasterizeSvg(Buffer.from(svg));
-
-    const call = MockResvgClass.mock.calls[0];
-    expect(call[1].fitTo.value).toBe(1000); // 100 * 10
-  });
-
-  it('caps scale at 8000px max dimension', async () => {
-    // 2000x1000 SVG: maxDim=2000, scale=min(10, 8000/2000)=4, targetWidth=2000*4=8000
-    const svg = '<svg width="2000" height="1000"><rect/></svg>';
-    await rasterizeSvg(Buffer.from(svg));
-
-    const call = MockResvgClass.mock.calls[0];
-    expect(call[1].fitTo.value).toBe(8000); // 2000 * 4
-  });
-
-  it('uses viewBox dimensions when width/height are absent', async () => {
-    const svg = '<svg viewBox="0 0 400 200"><rect/></svg>';
-    await rasterizeSvg(Buffer.from(svg));
-
-    const call = MockResvgClass.mock.calls[0];
-    // maxDim=400, scale=min(10,8000/400)=10, targetWidth=400*10=4000
-    expect(call[1].fitTo.value).toBe(4000);
-  });
-
-  it('defaults to 300x150 for SVG without dimensions', async () => {
-    const svg = '<svg><rect/></svg>';
-    await rasterizeSvg(Buffer.from(svg));
-
-    const call = MockResvgClass.mock.calls[0];
-    // default 300x150, maxDim=300, scale=10, targetWidth=3000
-    expect(call[1].fitTo.value).toBe(3000);
-  });
-
-  it('propagates errors from render', async () => {
-    mockResvgInstance.render.mockImplementation(() => {
-      throw new Error('Render failed');
-    });
-
-    const svg = '<svg width="100" height="100"><rect/></svg>';
-    await expect(rasterizeSvg(Buffer.from(svg))).rejects.toThrow('Render failed');
+describe('re-exported pure helpers', () => {
+  it('re-exports the real parseSvgDimensions and svgUsesExternalFonts', async () => {
+    vi.resetModules();
+    const { parseSvgDimensions, svgUsesExternalFonts } = await import('../../../src/git/svg-rasterize.js');
+    expect(parseSvgDimensions('<svg width="40" height="20"/>')).toEqual({ width: 40, height: 20 });
+    expect(svgUsesExternalFonts(Buffer.from('<svg><text>hi</text></svg>'))).toBe(true);
+    expect(svgUsesExternalFonts(Buffer.from('<svg><rect/></svg>'))).toBe(false);
   });
 });

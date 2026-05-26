@@ -38,6 +38,8 @@ SVG files support both code and rendered viewing via a "Code | Rendered" toggle 
 
 The user's Code/Rendered choice is remembered across file selections.
 
+**NFR — non-blocking rasterization:** `resvg.render()` is synchronous CPU-bound WASM work that can take hundreds of milliseconds (seconds for large/animated SVGs). It runs in a dedicated worker thread so it never blocks the HTTP server's event loop — other requests (file switches, annotations, the other image side) stay responsive while a render is in flight. If a worker thread cannot be started, rasterization degrades gracefully to in-process rendering. See `src/git/svg-rasterize.ts` (worker manager), `svg-rasterize-worker.ts` (worker entry), and `svg-rasterize-render.ts` (shared render core).
+
 ### 4.4 Line Wrapping and Display
 
 - **Wrap toggle** — The system shall provide a toggle to enable/disable line wrapping for long lines.

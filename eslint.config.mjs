@@ -7,7 +7,9 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "scripts/**"],
+    // svg-rasterize-worker-boot.mjs is a plain-JS runtime shim (outside the TS
+    // project) that registers the tsx loader inside the worker thread in dev.
+    ignores: ["dist/**", "node_modules/**", "scripts/**", "src/git/svg-rasterize-worker-boot.mjs"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

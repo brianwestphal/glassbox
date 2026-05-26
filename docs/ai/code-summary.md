@@ -136,7 +136,9 @@ See §6 for the schema itself.
 | `types.ts` | `ReviewMode`, `FileDiff`, `DiffHunk`, `DiffLine`. |
 | `image.ts` | Image side retrieval from git (old/new), binary detection, format identification. |
 | `image-metadata.ts` | Parse image headers (PNG IHDR, JPEG SOF/JFIF, GIF, WebP VP8/VP8L/VP8X) — no native deps. |
-| `svg-rasterize.ts` | Rasterize SVG → PNG via `@resvg/resvg-wasm` for SVG "Rendered" mode. |
+| `svg-rasterize.ts` | Public rasterization facade for SVG "Rendered" mode. `rasterizeSvg()` offloads the blocking WASM render to a long-lived worker thread (keeps the HTTP event loop responsive); re-exports `parseSvgDimensions` / `svgUsesExternalFonts`. Falls back to in-process rendering if a worker can't start. |
+| `svg-rasterize-render.ts` | Shared synchronous render core (`@resvg/resvg-wasm`, font loading, 10x→8000px scale math). Used by both the worker and the in-process fallback. |
+| `svg-rasterize-worker.ts` | Worker-thread entry: initializes WASM, renders SVG→PNG off the main thread. Emitted by tsup as `dist/svg-rasterize-worker.js` and copied next to `cli.js` in the sidecar. `svg-rasterize-worker-boot.mjs` is a dev-only shim that registers the tsx loader so the worker can load TS source. |
 | `parseDiffData.ts` | Pure helper to parse `review_files.diff_data` JSON into `FileDiff` (or `null` for missing/corrupt). Safe to import from both server and client bundles. |
 
 ### `src/ai/` — AI analysis subsystem
@@ -524,6 +526,10 @@ Scripts (`package.json`):
   `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`,
   `@modelcontextprotocol/sdk`.
 - `dist/channel.js` — channel server entry (also ESM, similar externals).
+- `dist/svg-rasterize-worker.js` — SVG rasterization worker thread, spawned by
+  `cli.js` as a sibling (`new URL('./svg-rasterize-worker.js', import.meta.url)`).
+  `build-sidecar.sh` copies it next to `cli.js`; omitting it makes rasterization
+  fall back to blocking in-process rendering.
 - `dist/client/app.global.js` — IIFE, es2020, minified.
 - `dist/client/history.global.js` — IIFE for the history page.
 - `dist/client/styles.css` — compiled + compressed from SCSS.
