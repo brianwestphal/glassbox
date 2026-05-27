@@ -2,15 +2,20 @@ import { spawnSync } from 'child_process';
 import { appendFileSync,existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { z } from 'zod';
 
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
 
 const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
 const DISMISS_DAYS = 30;
 
+// repoRoot → dismissal timestamp (ms). Validated at read time rather than cast.
+const DismissalsSchema = z.record(z.string(), z.number());
+
 function loadDismissals(): Record<string, number> {
   try {
-    return JSON.parse(readFileSync(DISMISS_FILE, 'utf-8')) as Record<string, number>;
+    const parsed = DismissalsSchema.safeParse(JSON.parse(readFileSync(DISMISS_FILE, 'utf-8')));
+    return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }

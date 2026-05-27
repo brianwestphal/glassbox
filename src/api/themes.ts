@@ -30,6 +30,20 @@ function buildPartialThemeColorsSchema(): z.ZodType<Partial<ThemeColors>> {
 }
 export const PartialThemeColorsSchema = buildPartialThemeColorsSchema();
 
+/** A custom theme as stored on disk in `~/.glassbox/themes/*.json`. Validated
+ *  at the read boundary (see `loadCustomThemes` / `getCustomTheme`) instead of
+ *  blindly cast. `colors` is checked as a string→string map rather than the
+ *  strict `ThemeColorsSchema` on purpose: adding a new theme variable later
+ *  must not invalidate (and silently drop) a user's existing custom themes —
+ *  any missing key just falls back to the `:root` default at apply time. */
+export const StoredCustomThemeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  baseTheme: z.string().optional(),
+  colors: z.record(z.string(), z.string()),
+});
+export type StoredCustomTheme = z.infer<typeof StoredCustomThemeSchema>;
+
 export const ThemeSummarySchema = z.object({
   id: z.string(),
   name: z.string(),

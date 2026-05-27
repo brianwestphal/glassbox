@@ -208,8 +208,11 @@ function saveCollapsedFolders(): void {
 function restoreCollapsedFolders(): void {
   try {
     const stored = localStorage.getItem(storageKey());
-    if (stored !== null) {
-      diffViewStore.actions.update({ collapsedFolders: new Set(JSON.parse(stored) as string[]) });
-    }
-  } catch { /* localStorage unavailable */ }
+    if (stored === null) return;
+    const parsed: unknown = JSON.parse(stored);
+    // Validate the shape rather than trusting it — keep only the strings.
+    if (!Array.isArray(parsed)) return;
+    const folders = parsed.filter((x): x is string => typeof x === 'string');
+    diffViewStore.actions.update({ collapsedFolders: new Set(folders) });
+  } catch { /* localStorage unavailable or malformed JSON */ }
 }

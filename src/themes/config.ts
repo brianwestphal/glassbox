@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
+import { StoredCustomThemeSchema } from '../api/themes.js';
 import { GLOBAL_CONFIG_DIR, readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import type { CustomTheme, Theme, ThemeColors } from './built-in.js';
 import { BUILT_IN_THEMES, DEFAULT_THEME_ID, getBuiltInTheme } from './built-in.js';
@@ -36,11 +37,13 @@ export function loadCustomThemes(): CustomTheme[] {
     const files = readdirSync(THEMES_DIR).filter(f => f.endsWith('.json'));
     for (const file of files) {
       try {
-        const data = JSON.parse(readFileSync(join(THEMES_DIR, file), 'utf-8')) as Partial<CustomTheme>;
-        if (data.id !== undefined && data.id !== '' && data.name !== undefined && data.name !== '' && data.colors !== undefined) {
-          themes.push({ id: data.id, name: data.name, colors: data.colors, builtIn: false, baseTheme: data.baseTheme ?? '' });
-        }
-      } catch { /* skip corrupt theme files */ }
+        const parsed = StoredCustomThemeSchema.safeParse(JSON.parse(readFileSync(join(THEMES_DIR, file), 'utf-8')));
+        if (!parsed.success) continue; // skip malformed theme files
+        const d = parsed.data;
+        // `d.colors` is validated as a string→string map above; the cast to the
+        // exact `ThemeColors` shape is the post-validation tightening.
+        themes.push({ id: d.id, name: d.name, colors: d.colors as unknown as ThemeColors, builtIn: false, baseTheme: d.baseTheme ?? '' });
+      } catch { /* skip corrupt theme files (bad JSON) */ }
     }
   } catch { /* themes dir unreadable */ }
   return themes;
@@ -66,8 +69,10 @@ export function getCustomTheme(id: string): CustomTheme | undefined {
   const filePath = join(THEMES_DIR, `${id}.json`);
   if (!existsSync(filePath)) return undefined;
   try {
-    const data = JSON.parse(readFileSync(filePath, 'utf-8')) as CustomTheme;
-    return { ...data, builtIn: false };
+    const parsed = StoredCustomThemeSchema.safeParse(JSON.parse(readFileSync(filePath, 'utf-8')));
+    if (!parsed.success) return undefined;
+    const d = parsed.data;
+    return { id: d.id, name: d.name, colors: d.colors as unknown as ThemeColors, builtIn: false, baseTheme: d.baseTheme ?? '' };
   } catch {
     return undefined;
   }
