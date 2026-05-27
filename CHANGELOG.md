@@ -2,6 +2,23 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.11.0] - 2026-05-27
+
+
+- Sidebar shows the stale-annotation count, not just a dot.
+
+- Failed background requests now surface an error instead of a silently stuck UI.
+- Fixed the image slice tool's unreachable bottom handle.
+
+- SVGs now rasterize in a worker thread, so rendering no longer freezes the UI.
+- SVG rasterization times out after 15s instead of hanging on a pathological file.
+- Very long diff lines are truncated for display, so huge single-line SVGs don't freeze.
+- Syntax highlighting is skipped on very long lines to avoid freezes on large SVGs.
+
+- Upgraded kerfjs and eslint-plugin-kerfjs to 0.14.0.
+- JSON reads are validated with zod instead of unchecked `as` casts.
+- Path parameters are validated as non-empty, returning a structured 400 on bad input.
+
 ## [0.10.1] - 2026-05-25
 
 
