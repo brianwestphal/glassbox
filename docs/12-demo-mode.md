@@ -14,6 +14,7 @@ Requirements for the built-in demonstration scenarios.
   4. Annotations with different categories
   5. Settings dialog with guided review
 - Invalid demo scenario IDs shall produce an error listing available scenarios.
+- The shared demo file set shall include representative diff kinds: text diffs, a large single-line minified SVG (the GB-821 truncation guard), and a binary **image diff** (so the metadata / difference / slice image-comparison modes are exercisable). The image diff is modeled as a rename between two real repo images; since demo mode resolves to "uncommitted", the old/new bytes are read from git HEAD and the working tree.
 
 ### 12.2 Demo Isolation
 

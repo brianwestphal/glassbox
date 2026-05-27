@@ -143,10 +143,22 @@ function setupMount(container: HTMLElement): void {
 function runPostRender(container: HTMLElement, content: DiffContent): void {
   const { fileId, filePath, kind } = content;
   if (kind === 'empty') return;
-  // Header/toolbar visibility
+  // Header/toolbar visibility. Image diffs lay the container out as a flex
+  // column so the canvas fills the space down to the toolbar (the slice
+  // handles are pinned to the canvas edges, so an overshooting canvas would
+  // hide the bottom handle under the toolbar — GB-823). Text/raw diffs stay
+  // block so they scroll normally. The CSS chain under `:has(.image-diff)`
+  // takes over from here; setting display here (vs CSS) is required because
+  // this inline style would otherwise override it.
   const welcome = document.querySelector<HTMLElement>('.welcome-message');
   if (welcome !== null) welcome.style.display = 'none';
-  container.style.display = 'block';
+  if (kind === 'image') {
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+  } else {
+    container.style.display = 'block';
+    container.style.flexDirection = '';
+  }
   const navBar = document.getElementById('diff-nav-bar');
   if (navBar) navBar.style.display = '';
   const toolbar = document.getElementById('diff-toolbar');

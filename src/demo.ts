@@ -39,7 +39,13 @@ function buildLargeMinifiedSvg(nudge: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-build="${nudge}">${body}</svg>`;
 }
 
-const DEMO_FILES: Array<{ path: string; status: 'added' | 'modified' | 'deleted'; hunks: FileDiff['hunks'] }> = [
+const DEMO_FILES: Array<{
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  hunks: FileDiff['hunks'];
+  isBinary?: boolean;
+  oldPath?: string;
+}> = [
   {
     // Regression guard for GB-821: a large minified SVG must not freeze the
     // UI when selected. The diff viewer renders this as a text diff by
@@ -243,6 +249,22 @@ const DEMO_FILES: Array<{ path: string; status: 'added' | 'modified' | 'deleted'
       ],
     }],
   },
+  {
+    // An image change, so the demo (and the e2e suite) exercises the image
+    // comparison modes — metadata / difference / slice. Modeled as a rename so
+    // the old and new sides resolve to two different real images in the repo
+    // (demo mode resolves to "uncommitted", so the image route reads the old
+    // side from git HEAD and the new side from the working tree), giving a
+    // genuine visual diff. The `src-tauri/icons/` path is deliberate: it sorts
+    // after `package.json` in the folder tree, so the auto-selected first file
+    // stays a text diff. Regression guard for GB-823: the slice tool's bottom
+    // handle must stay above the toolbar and be grabbable.
+    path: 'src-tauri/icons/128x128.png',
+    oldPath: 'src-tauri/icons/64x64.png',
+    status: 'modified',
+    isBinary: true,
+    hunks: [],
+  },
 ];
 
 // --- Guided review notes ---
@@ -415,10 +437,10 @@ export async function setupDemoReview(scenario: number): Promise<{ reviewId: str
   for (const file of DEMO_FILES) {
     const diff: FileDiff = {
       filePath: file.path,
-      oldPath: null,
+      oldPath: file.oldPath ?? null,
       status: file.status,
       hunks: file.hunks,
-      isBinary: false,
+      isBinary: file.isBinary ?? false,
     };
     const rf = await addReviewFile(review.id, file.path, JSON.stringify(diff));
     fileIdMap.set(file.path, rf.id);

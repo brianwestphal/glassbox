@@ -1,4 +1,5 @@
 import { asEl } from '../../dom.js';
+import { cwDist, edgeHandleTransform, edgePos, getEdge, snapToEdge } from './sliceGeometry.js';
 import { getZoomState, onZoomChange, type ZoomState } from './zoom.js';
 
 interface SliceState {
@@ -13,8 +14,6 @@ interface SliceState {
   bx: number; by: number;
   dragging: 'a' | 'b' | null;
 }
-
-type Edge = 'top' | 'right' | 'bottom' | 'left';
 
 export function initSliceTool(canvasEl: Element): void {
   const canvas = asEl(canvasEl);
@@ -62,27 +61,6 @@ function screenToCanvas(e: MouseEvent, canvas: HTMLElement): { x: number; y: num
   };
 }
 
-function getEdge(x: number, y: number): Edge {
-  if (y === 0) return 'top';
-  if (x === 1) return 'right';
-  if (y === 1) return 'bottom';
-  return 'left';
-}
-
-function snapToEdge(x: number, y: number, avoidEdge: Edge): { x: number; y: number } {
-  const cx = Math.max(0, Math.min(1, x));
-  const cy = Math.max(0, Math.min(1, y));
-  const candidates: Array<{ edge: Edge; x: number; y: number; dist: number }> = [
-    { edge: 'top',    x: cx, y: 0, dist: cy },
-    { edge: 'bottom', x: cx, y: 1, dist: 1 - cy },
-    { edge: 'left',   x: 0, y: cy, dist: cx },
-    { edge: 'right',  x: 1, y: cy, dist: 1 - cx },
-  ];
-  candidates.sort((a, b) => a.dist - b.dist);
-  const best = candidates.find(c => c.edge !== avoidEdge) ?? candidates[0];
-  return { x: best.x, y: best.y };
-}
-
 function updateSlice(ss: SliceState): void {
   const cw = ss.canvas.clientWidth;
   const ch = ss.canvas.clientHeight;
@@ -90,8 +68,10 @@ function updateSlice(ss: SliceState): void {
 
   ss.handleA.style.left = `${ss.ax * 100}%`;
   ss.handleA.style.top = `${ss.ay * 100}%`;
+  ss.handleA.style.transform = edgeHandleTransform(getEdge(ss.ax, ss.ay));
   ss.handleB.style.left = `${ss.bx * 100}%`;
   ss.handleB.style.top = `${ss.by * 100}%`;
+  ss.handleB.style.transform = edgeHandleTransform(getEdge(ss.bx, ss.by));
 
   const ax = ss.ax * cw;
   const ay = ss.ay * ch;
@@ -110,18 +90,6 @@ function updateSlice(ss: SliceState): void {
 }
 
 // --- Clip-path geometry ---
-
-function edgePos(x: number, y: number): number {
-  if (y === 0) return x;
-  if (x === 1) return 1 + y;
-  if (y === 1) return 2 + (1 - x);
-  return 3 + (1 - y);
-}
-
-function cwDist(from: number, to: number): number {
-  const d = to - from;
-  return d >= 0 ? d : d + 4;
-}
 
 function canvasToImagePct(cnx: number, cny: number, ss: SliceState, zs: ZoomState): string {
   const cw = ss.canvas.clientWidth;

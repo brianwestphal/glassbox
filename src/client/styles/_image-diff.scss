@@ -59,9 +59,31 @@
 
 // --- Visual Canvas (shared by difference + slice) ---
 
-// Fill the entire area between diff-header (~41px) and bottom toolbar (~39px)
+// Make the canvas fill the space between the diff header and the bottom
+// toolbar exactly. The previous `height: calc(100vh - 80px)` was a viewport
+// guess that overshot the real slot, so the canvas — and the slice handles
+// pinned to its bottom edge — extended under the toolbar, hiding the bottom
+// handle so it couldn't be grabbed (GB-823). We lay the chain out as nested
+// flex columns instead, so flex sizing resolves reliably down to the canvas —
+// unlike percentage heights, which don't resolve against `#diff-container`'s
+// flex-derived height in WebKit. `#diff-container` is switched to `display:
+// flex` imperatively for image diffs (its display is already JS-controlled;
+// see runPostRender), which is why it is not in this list. Scoped with
+// `:has(.image-diff)` so text diffs, which scroll, are untouched.
+// `.diff-header` keeps its auto height; the canvas claims the rest.
+.diff-content:has(.image-diff),
+.diff-view:has(.image-diff),
+.image-diff,
+.image-diff-visual.active {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
 .image-visual-canvas {
-  height: calc(100vh - 80px);
+  flex: 1;
+  min-height: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -119,6 +141,9 @@
   border: 2px solid var(--bg);
   z-index: 11;
   cursor: grab;
+  // The per-edge transform is set in JS (edgeHandleTransform) so the handle
+  // stays fully inside the canvas; this centered default only applies for the
+  // brief moment before the slice tool initializes.
   transform: translate(-50%, -50%);
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 
