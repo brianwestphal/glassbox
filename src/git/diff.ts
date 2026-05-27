@@ -127,13 +127,16 @@ export function parseDiff(raw: string): FileDiff[] {
     if (headerEnd === -1 && !header.includes('Binary')) {
       const pathMatch = chunk.match(/^a\/(.+?) b\/(.+)/m);
       if (pathMatch) {
-        const isBinary = header.includes('Binary');
+        // This branch is only reached for non-binary chunks with no `@@` hunk
+        // (empty new files, pure mode changes, content-less renames), so the
+        // file is never binary here — binary files carry the "Binary files …
+        // differ" header and are handled below.
         files.push({
           filePath: pathMatch[2],
           oldPath: pathMatch[1] !== pathMatch[2] ? pathMatch[1] : null,
           status: header.includes('new file') ? 'added' : header.includes('deleted file') ? 'deleted' : 'modified',
           hunks: [],
-          isBinary,
+          isBinary: false,
         });
       }
       continue;

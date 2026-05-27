@@ -54,6 +54,18 @@ function parseAnalysisTimestamp(updatedAt: string): Date {
   return new Date(updatedAt + 'Z');
 }
 
+/** Resolve a file path to its `review_file` id, failing loudly if the path
+ *  isn't in the map. This should never happen (the map is built from the same
+ *  file list), but a silent `?? ''` fallback would persist an empty
+ *  `reviewFileId` and corrupt the saved scores — fail fast instead. */
+function resolveFileId(fileIdMap: Map<string, string>, filePath: string): string {
+  const id = fileIdMap.get(filePath);
+  if (id === undefined || id === '') {
+    throw new Error(`No review_file id for path: ${filePath}`);
+  }
+  return id;
+}
+
 // Track canceled analysis IDs — checked by batch runner before starting new batches.
 // When a user switches from risk→narrative (or vice versa), the old analysis is added here.
 // Switching to folder mode does NOT cancel anything.
@@ -283,7 +295,7 @@ async function saveBinaryFiles(args: {
   if (binaryFiles.length === 0) return;
   debugLog(`Saving ${String(binaryFiles.length)} binary files with score 0`);
   const binaryScoreEntries = binaryFiles.map((f, idx) => ({
-    reviewFileId: fileIdMap.get(f.file_path) ?? '',
+    reviewFileId: resolveFileId(fileIdMap, f.file_path),
     filePath: f.file_path,
     sortOrder: 99999 + idx, // re-sorted by `updateSortOrders` later
     aggregateScore: analysisType === 'risk' ? 0 : null,
@@ -400,7 +412,7 @@ function riskAnalysisConfig(
       r.aggregate = Math.max(r.aggregate, maxDimension);
     },
     mapResult: (r) => ({
-      reviewFileId: fileIdMap.get(r.filePath) ?? '',
+      reviewFileId: resolveFileId(fileIdMap, r.filePath),
       filePath: r.filePath,
       sortOrder: 0, // Placeholder — final sort happens after all batches
       aggregateScore: r.aggregate,
@@ -429,7 +441,7 @@ function narrativeAnalysisConfig(
       () => mockNarrativeAnalysisBatch(files),
     ),
     mapResult: (r) => ({
-      reviewFileId: fileIdMap.get(r.filePath) ?? '',
+      reviewFileId: resolveFileId(fileIdMap, r.filePath),
       filePath: r.filePath,
       sortOrder: r.position, // Batch-local position — will be re-sorted after merge
       aggregateScore: null,
@@ -459,7 +471,7 @@ function guidedAnalysisConfig(
       return runGuidedAnalysisBatch(files, config, repoRoot, guidedReview);
     },
     mapResult: (r, idx) => ({
-      reviewFileId: fileIdMap.get(r.filePath) ?? '',
+      reviewFileId: resolveFileId(fileIdMap, r.filePath),
       filePath: r.filePath,
       sortOrder: idx,
       aggregateScore: null,

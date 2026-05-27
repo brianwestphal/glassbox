@@ -1,6 +1,11 @@
 import type { ReviewFile } from '../db/queries.js';
-import type { DiffHunk, FileDiff } from '../git/diff.js';
+import type { DiffHunk, DiffLine, FileDiff } from '../git/diff.js';
 import { emptyFileDiff, parseDiffData } from '../git/parseDiffData.js';
+
+/** The leading `+` / `-` / ` ` character for a diff line in plain-text output. */
+function linePrefix(type: DiffLine['type']): string {
+  return type === 'add' ? '+' : type === 'remove' ? '-' : ' ';
+}
 
 export interface FileContext {
   fileId: string;
@@ -18,7 +23,7 @@ function summarizeHunk(hunk: DiffHunk, maxLines: number): string {
   const hunkLines = hunk.lines;
   if (hunkLines.length <= maxLines) {
     for (const line of hunkLines) {
-      const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
+      const prefix = linePrefix(line.type);
       lines.push(prefix + line.content);
     }
   } else {
@@ -26,13 +31,13 @@ function summarizeHunk(hunk: DiffHunk, maxLines: number): string {
     const half = Math.floor(maxLines / 2);
     for (let i = 0; i < half; i++) {
       const line = hunkLines[i];
-      const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
+      const prefix = linePrefix(line.type);
       lines.push(prefix + line.content);
     }
     lines.push(`... (${String(hunkLines.length - maxLines)} lines omitted) ...`);
     for (let i = hunkLines.length - half; i < hunkLines.length; i++) {
       const line = hunkLines[i];
-      const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
+      const prefix = linePrefix(line.type);
       lines.push(prefix + line.content);
     }
   }
@@ -49,7 +54,7 @@ function buildDiffText(diff: FileDiff, charBudget: number): string {
   for (const hunk of diff.hunks) {
     fullLines.push(`@@ -${String(hunk.oldStart)},${String(hunk.oldCount)} +${String(hunk.newStart)},${String(hunk.newCount)} @@`);
     for (const line of hunk.lines) {
-      const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
+      const prefix = linePrefix(line.type);
       fullLines.push(prefix + line.content);
     }
   }
