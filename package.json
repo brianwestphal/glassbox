@@ -56,7 +56,7 @@
   ],
   "dependencies": {
     "@electric-sql/pglite": "^0.4.5",
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^2.0.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@resvg/resvg-wasm": "^2.6.2",
     "hono": "^4.12.2",
