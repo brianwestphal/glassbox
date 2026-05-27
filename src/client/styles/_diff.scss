@@ -25,6 +25,14 @@
   h3 { color: var(--text); }
 }
 
+// Inline message when a file's diff fails to load (see the diff fetch effect).
+.diff-load-error {
+  padding: 24px 32px;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+
 // --- Navigation Bar ---
 
 .diff-nav-bar {

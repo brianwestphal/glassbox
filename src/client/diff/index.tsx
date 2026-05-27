@@ -20,8 +20,14 @@ interface DiffContent {
   fileId: string | null;
   filePath: string | null;
   html: string;
-  kind: 'text' | 'image' | 'empty' | 'raw';
+  kind: 'text' | 'image' | 'empty' | 'raw' | 'error';
 }
+
+// Shown in the diff pane when a `/file/:id` fetch fails outright (server down /
+// network error / non-OK status) instead of silently leaving the previous
+// file's diff in place. See the fetch effect's catch.
+const DIFF_LOAD_ERROR_HTML =
+  '<div class="diff-load-error">Couldn’t load this file — the server may be unavailable, or the file may have changed. Select the file again to retry.</div>';
 
 const diffContentSignal = signal<DiffContent>({ generation: 0, fileId: null, filePath: null, html: '', kind: 'empty' });
 let fetchGen = 0;
@@ -81,11 +87,20 @@ function setupFetchEffect(): void {
 
     const myGen = ++fetchGen;
     void (async () => {
-      const res = await fetch('/file/' + fileId + params);
-      const html = await res.text();
-      if (myGen !== fetchGen) return; // newer fetch in flight
-      const kind: DiffContent['kind'] = html.includes('class="image-diff"') ? 'image' : 'text';
-      diffContentSignal.value = { generation: myGen, fileId, filePath: null, html, kind };
+      try {
+        const res = await fetch('/file/' + fileId + params);
+        if (!res.ok) throw new Error(`/file/${fileId} returned ${String(res.status)}`);
+        const html = await res.text();
+        if (myGen !== fetchGen) return; // newer fetch in flight
+        const kind: DiffContent['kind'] = html.includes('class="image-diff"') ? 'image' : 'text';
+        diffContentSignal.value = { generation: myGen, fileId, filePath: null, html, kind };
+      } catch {
+        if (myGen !== fetchGen) return; // newer fetch in flight — let it win
+        // Surface the failure instead of leaving the prior diff frozen in place.
+        // Clear the dedupe key so re-selecting another file (then this one) retries.
+        lastFetchKey = '';
+        diffContentSignal.value = { generation: myGen, fileId, filePath: null, html: DIFF_LOAD_ERROR_HTML, kind: 'error' };
+      }
     })();
   });
 }
@@ -143,6 +158,17 @@ function setupMount(container: HTMLElement): void {
 function runPostRender(container: HTMLElement, content: DiffContent): void {
   const { fileId, filePath, kind } = content;
   if (kind === 'empty') return;
+  // A failed fetch: just show the inline error message; no toolbar, highlight,
+  // outline, or annotation binding (there's no diff to operate on).
+  if (kind === 'error') {
+    const welcome = document.querySelector<HTMLElement>('.welcome-message');
+    if (welcome !== null) welcome.style.display = 'none';
+    container.style.display = 'block';
+    container.style.flexDirection = '';
+    const toolbar = document.getElementById('diff-toolbar');
+    if (toolbar !== null) toolbar.style.display = 'none';
+    return;
+  }
   // Header/toolbar visibility. Image diffs lay the container out as a flex
   // column so the canvas fills the space down to the toolbar (the slice
   // handles are pinned to the canvas edges, so an overshooting canvas would

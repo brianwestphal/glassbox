@@ -174,6 +174,16 @@ function createActions(deps: ActionDeps): Actions {
   let configTimer: ReturnType<typeof setTimeout> | null = null;
   let appNameTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Surface a transient error when a settings save/remove request fails, so a
+   *  failure isn't silent. Appended to `overlay` (not the mounted modal body)
+   *  so a re-render can't clobber it; auto-dismisses. */
+  function flashSettingsError(message: string): void {
+    overlay.querySelector('.settings-error-toast')?.remove();
+    const toast = toElement(<div className="settings-error-toast">{message}</div>);
+    overlay.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, TOAST_DURATION_MS);
+  }
+
   function saveConfig(): void {
     const cur = ui.value;
     const newTopics = Array.from(cur.guidedTopics);
@@ -182,26 +192,30 @@ function createActions(deps: ActionDeps): Actions {
       || newTopics.some(t => !lastSavedGuidedTopics.has(t));
 
     void (async () => {
-      await saveAIConfig({
-        platform: cur.currentPlatform as AIPlatform,
-        model: cur.currentModel,
-        guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
-      });
+      try {
+        await saveAIConfig({
+          platform: cur.currentPlatform as AIPlatform,
+          model: cur.currentModel,
+          guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
+        });
 
-      const newConfig = await getAIConfig();
-      aiStore.actions.update({
-        aiConfigured: newConfig.keyConfigured,
-        guidedReviewEnabled: cur.guidedEnabled,
-      });
-      configData.guidedReview = { enabled: cur.guidedEnabled, topics: newTopics };
+        const newConfig = await getAIConfig();
+        aiStore.actions.update({
+          aiConfigured: newConfig.keyConfigured,
+          guidedReviewEnabled: cur.guidedEnabled,
+        });
+        configData.guidedReview = { enabled: cur.guidedEnabled, topics: newTopics };
 
-      if (guidedChanged && aiStore.state.value.aiConfigured) {
-        invalidateAnalysisCache();
-        invalidateGuidedAnalysis();
+        if (guidedChanged && aiStore.state.value.aiConfigured) {
+          invalidateAnalysisCache();
+          invalidateGuidedAnalysis();
+        }
+
+        lastSavedGuidedEnabled = cur.guidedEnabled;
+        lastSavedGuidedTopics = new Set(cur.guidedTopics);
+      } catch {
+        flashSettingsError('Couldn’t save settings — please try again.');
       }
-
-      lastSavedGuidedEnabled = cur.guidedEnabled;
-      lastSavedGuidedTopics = new Set(cur.guidedTopics);
     })();
   }
 
@@ -227,27 +241,35 @@ function createActions(deps: ActionDeps): Actions {
     const storageRadio = overlay.querySelector<HTMLInputElement>('input[name="key-storage"]:checked');
     const storage = storageRadio?.value ?? 'config';
     void (async () => {
-      await saveAIKey({
-        platform: ui.value.currentPlatform as AIPlatform,
-        key: keyInput.value.trim(),
-        storage: storage as KeyStorage,
-      });
-      const newStatus = await getAIKeyStatus();
-      keyStatus.status = newStatus.status;
-      const newConfig = await getAIConfig();
-      aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
-      forceRerender();
+      try {
+        await saveAIKey({
+          platform: ui.value.currentPlatform as AIPlatform,
+          key: keyInput.value.trim(),
+          storage: storage as KeyStorage,
+        });
+        const newStatus = await getAIKeyStatus();
+        keyStatus.status = newStatus.status;
+        const newConfig = await getAIConfig();
+        aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
+        forceRerender();
+      } catch {
+        flashSettingsError('Couldn’t save the API key — please try again.');
+      }
     })();
   }
 
   function removeKey(): void {
     void (async () => {
-      await deleteAIKey({ platform: ui.value.currentPlatform as AIPlatform });
-      const newStatus = await getAIKeyStatus();
-      keyStatus.status = newStatus.status;
-      const newConfig = await getAIConfig();
-      aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
-      forceRerender();
+      try {
+        await deleteAIKey({ platform: ui.value.currentPlatform as AIPlatform });
+        const newStatus = await getAIKeyStatus();
+        keyStatus.status = newStatus.status;
+        const newConfig = await getAIConfig();
+        aiStore.actions.update({ aiConfigured: newConfig.keyConfigured });
+        forceRerender();
+      } catch {
+        flashSettingsError('Couldn’t remove the API key — please try again.');
+      }
     })();
   }
 
