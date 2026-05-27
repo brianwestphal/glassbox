@@ -208,8 +208,10 @@ describe('DiffView', () => {
   // Source maps and minified bundles can produce paired remove/add lines
   // 100 KB+ each. charDiff used to build an O(m*n) LCS table over those,
   // which OOM'd the server and bounced the browser back to the welcome
-  // screen as if the file selection had failed.
-  it('renders huge paired remove/add lines without OOMing', () => {
+  // screen as if the file selection had failed. GB-821 then showed that even
+  // the plain (un-char-diffed) giant line froze the browser when it was put
+  // into the DOM in full, so such lines are now truncated for display.
+  it('truncates huge paired remove/add lines instead of rendering them in full', () => {
     const huge = 'a'.repeat(120_000);
     const huger = 'a'.repeat(120_000).replace('aaaa', 'bbbb');
     const lines = [
@@ -226,7 +228,11 @@ describe('DiffView', () => {
     // the pre-fix version exhausted a 4 GB heap before returning.
     expect(Date.now() - start).toBeLessThan(2_000);
     expect(html).toContain('diff-view');
-    expect(html.length).toBeGreaterThan(huge.length);
+    // The giant line is truncated: the full content never reaches the DOM, so
+    // the rendered HTML is far smaller than the input and carries the marker.
+    expect(html.length).toBeLessThan(huge.length);
+    expect(html).toContain('line-truncated');
+    expect(html).toContain('more characters hidden');
   });
 
   it('renders drag handle and action buttons on annotations', () => {

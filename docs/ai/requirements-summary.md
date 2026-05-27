@@ -106,9 +106,13 @@ remembered across files.
 
 Other controls: wrap toggle, ignore-whitespace toggle (regenerates with
 `-w`, persisted in user_preferences), syntax highlighting (auto-detected
-or user-selected; NFR: lines past a length threshold are left unhighlighted
-so a minified/base64/single-line-SVG blob can't freeze the main thread by
-injecting tens of thousands of spans), context expansion (live from working tree), symbol
+or user-selected; NFR: a pathologically long line — minified/base64/single-line-SVG
+blob — is truncated for display server-side (bounded prefix + a `.line-truncated`
+marker) so the DOM never holds a multi-hundred-KB text node whose layout/paint
+freezes the main thread, and such lines are also left unhighlighted; the freeze is
+worst in the desktop WKWebView and is invisible to headless timing tests, so the
+regression guard asserts bounded rendered content, not a time budget),
+context expansion (live from working tree), symbol
 outline (functions/classes/methods) with click-to-navigate, and in-diff
 find (`Cmd/Ctrl+F`) with match nav and Escape dismiss. In Tauri, the
 native Find menu routes to the in-app find bar.

@@ -334,6 +334,15 @@
   &.add .code::before { content: '+'; color: var(--green); margin-right: 4px; }
   &.remove .code::before { content: '-'; color: var(--red); margin-right: 4px; }
 
+  // Marker appended to a line whose content was truncated for display (a
+  // minified bundle, base64 blob, or single-line SVG too long to render in
+  // full — see truncateDiffLine). Rendering the full line froze the UI.
+  .line-truncated {
+    color: var(--text-dim);
+    font-style: italic;
+    user-select: none;
+  }
+
   // Character-level change highlighting within partially modified lines
   &.add .char-change { background: rgba(166,227,161,0.25); border-radius: 2px; }
   &.remove .char-change { background: rgba(243,139,168,0.25); border-radius: 2px; }

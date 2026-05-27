@@ -98,6 +98,10 @@ export function applyHighlighting() {
 
   container.querySelectorAll('.code').forEach(el => {
     const codeEl = asEl(el);
+    // A truncated line (server-side, see `truncateDiffLine`) carries a
+    // `.line-truncated` marker span. Re-rendering its innerHTML here would
+    // fold the marker text back into the highlighted source and destroy it.
+    if (codeEl.querySelector('.line-truncated')) return;
     // Skip pathologically long lines (minified bundles, base64 data URIs,
     // single-line SVGs). Highlighting them is both useless and a main-thread
     // freeze — see MAX_HIGHLIGHT_LINE_LENGTH.
@@ -149,6 +153,9 @@ function clearHighlighting() {
 
   container.querySelectorAll('.code').forEach(el => {
     const codeEl = asEl(el);
+    // Leave truncated lines untouched — collapsing to textContent would turn
+    // the `.line-truncated` marker span into plain text.
+    if (codeEl.querySelector('.line-truncated')) return;
     // Preserve char-change spans when clearing
     const charChangeSpans = codeEl.querySelectorAll('.char-change');
     if (charChangeSpans.length === 0) {

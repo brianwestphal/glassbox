@@ -29,9 +29,9 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
 function buildLargeMinifiedSvg(nudge: string): string {
   let body = '';
   // ~12000 elements ≈ 1 MB on a single line, matching the real-world file that
-  // surfaced this bug (a 1 MB animated/exported SVG). Naive per-line syntax
-  // highlighting on a line this long injects ~100k <span>s whose layout
-  // freezes the main thread for seconds.
+  // surfaced this bug (a 1 MB animated/exported SVG). Putting a line this long
+  // into the DOM in full froze the browser laying it out and painting it; the
+  // viewer now truncates such lines for display (see truncateDiffLine).
   for (let i = 0; i < 12000; i++) {
     const hue = (i * 37) % 360;
     body += `<path d="M${i % 512} ${(i * 3) % 512}l4 0 0 4-4 0z" fill="hsl(${hue} 70% 50%)" opacity="0.${i % 90}"/>`;
@@ -43,9 +43,9 @@ const DEMO_FILES: Array<{ path: string; status: 'added' | 'modified' | 'deleted'
   {
     // Regression guard for GB-821: a large minified SVG must not freeze the
     // UI when selected. The diff viewer renders this as a text diff by
-    // default (svgViewMode = 'code'), so the client must skip syntax
-    // highlighting for the giant single line instead of running highlight.js
-    // synchronously on hundreds of KB.
+    // default (svgViewMode = 'code'), so the server must truncate the giant
+    // single line for display instead of emitting a multi-hundred-KB text
+    // node whose layout/paint locks the main thread.
     path: 'src/assets/icons.min.svg',
     status: 'modified',
     hunks: [{

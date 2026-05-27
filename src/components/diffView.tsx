@@ -5,6 +5,7 @@ import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import { IconEdit, IconReveal, IconTrash } from '../icons.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
+import { truncateDiffLine } from '../utils/lineTruncate.js';
 import { ImageDiff } from './imageDiff.js';
 
 export function DiffView({ file, diff, annotations, mode }: {
@@ -197,6 +198,23 @@ function renderSegments(segments: DiffSegment[]): SafeHtml {
   return <>{segments.map(s => s.changed ? <span className="char-change">{s.text}</span> : <>{s.text}</>)}</>;
 }
 
+/** Render a plain (non-char-diffed) line's content, truncating pathologically
+ *  long lines so the DOM never holds a multi-hundred-KB text node — see
+ *  `truncateDiffLine`. The elided remainder stays in the stored diff. */
+function renderLineContent(content: string): SafeHtml | string {
+  const t = truncateDiffLine(content);
+  if (t === null) return content;
+  return (
+    <>
+      {t.text}
+      <span className="line-truncated"
+        title={`Line too long to display — ${t.fullLength.toLocaleString('en-US')} characters total`}>
+        … ⟨{t.hidden.toLocaleString('en-US')} more characters hidden⟩
+      </span>
+    </>
+  );
+}
+
 /** Get character-highlighted content for a paired remove+add line, or plain content. */
 function renderPairContent(pair: LinePair, side: 'left' | 'right'): SafeHtml | string {
   const line = side === 'left' ? pair.left : pair.right;
@@ -208,7 +226,7 @@ function renderPairContent(pair: LinePair, side: 'left' | 'right'): SafeHtml | s
       return renderSegments(side === 'left' ? diff.oldSegments : diff.newSegments);
     }
   }
-  return line.content;
+  return renderLineContent(line.content);
 }
 
 interface LinePair {
@@ -305,7 +323,7 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
                 >
                   <span className="gutter-old" data-line-number={line.oldNum ?? ''}></span>
                   <span className="gutter-new" data-line-number={line.newNum ?? ''}></span>
-                  <span className="code">{segments ? renderSegments(segments) : line.content}</span>
+                  <span className="code">{segments ? renderSegments(segments) : renderLineContent(line.content)}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}
               </div>
