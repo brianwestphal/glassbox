@@ -187,6 +187,19 @@
   flex-shrink: 0;
 }
 
+// Per-file stale-annotation count badge (FR-8.2). Mirrors `.annotation-count`
+// but in the stale/orange color so it reads as a warning, not a normal count.
+.stale-count {
+  font-size: 11px;
+  color: var(--orange);
+  background: rgba(250,179,135,0.15);
+  padding: 0 5px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 // --- Progress ---
 
 .progress-bar {

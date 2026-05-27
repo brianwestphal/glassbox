@@ -144,7 +144,7 @@ function riskRowJsx(
       )}
       <span className="file-name" title={score.filePath}>{fileName}</span>
       <span className="file-path-dim" title={score.filePath}>{dir}</span>
-      {staleCount > 0 ? <span className="stale-dot"></span> : null}
+      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
       {count > 0 ? <span className="annotation-count">{count}</span> : null}
     </div>
   );
@@ -180,7 +180,7 @@ function narrativeRowJsx(item: NarrativeFileOrder, review: typeof reviewStore.st
       <span className="narrative-position" title={item.rationale}>{item.position}</span>
       <span className="file-name" title={item.filePath}>{fileName}</span>
       <span className="file-path-dim" title={item.filePath}>{dir}</span>
-      {staleCount > 0 ? <span className="stale-dot"></span> : null}
+      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
       {count > 0 ? <span className="annotation-count">{count}</span> : null}
     </div>
   );
@@ -197,7 +197,7 @@ function flatRowJsx(file: typeof reviewStore.state.value['files'][number], revie
       {...ACTIONS.selectFile.attrs} data-file-id={file.id} style="padding-left: 16px">
       <span className="file-name" title={file.file_path}>{fileName}</span>
       <span className="file-path-dim" title={file.file_path}>{dir}</span>
-      {staleCount > 0 ? <span className="stale-dot"></span> : null}
+      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
       {count > 0 ? <span className="annotation-count">{count}</span> : null}
     </div>
   );
@@ -263,7 +263,7 @@ function fileRowJsx(f: typeof reviewStore.state.value['files'][number], depth: n
       <span className={`status-dot ${f.status}`}></span>
       <span className="file-name" title={f.file_path}>{fileName}</span>
       <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>
-      {staleCount > 0 ? <span className="stale-dot"></span> : null}
+      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
       {count > 0 ? <span className="annotation-count">{count}</span> : null}
     </div>
   );
