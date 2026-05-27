@@ -47,6 +47,8 @@ The user's Code/Rendered choice is remembered across file selections.
 - **Syntax highlighting** — Syntax highlighting shall be applied based on auto-detected file language.
 - **Manual language selection** — Users shall be able to manually select a language for syntax highlighting.
 
+**NFR — large lines do not block the UI:** Syntax highlighting emits one nested `<span>` per token, so highlighting a single very long line (a minified bundle, a base64 data-URI, or an SVG/illustration serialized onto one line — commonly hundreds of KB to over 1 MB) injects tens of thousands of elements whose layout freezes the browser's main thread for seconds, locking up file switching. Lines longer than a fixed threshold are therefore left as plain, unhighlighted text — the same way character-level diffing already bails on long lines. Highlighting such lines is also visually useless. See `src/client/diff/highlightLimits.ts` (the threshold + `isHighlightableLength`) and its use in `applyHighlighting()` in `src/client/diff/highlight.ts`.
+
 ### 4.5 Context Expansion
 
 - **Expand beyond hunks** — Users shall be able to expand context beyond the default hunk boundaries to see surrounding lines from the working directory file.

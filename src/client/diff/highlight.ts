@@ -2,6 +2,7 @@ import hljs from 'highlight.js';
 
 import { asEl } from '../dom.js';
 import { diffViewStore } from '../stores/index.js';
+import { isHighlightableLength } from './highlightLimits.js';
 
 const EXT_TO_LANG: Record<string, string> = {
   '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
@@ -97,6 +98,10 @@ export function applyHighlighting() {
 
   container.querySelectorAll('.code').forEach(el => {
     const codeEl = asEl(el);
+    // Skip pathologically long lines (minified bundles, base64 data URIs,
+    // single-line SVGs). Highlighting them is both useless and a main-thread
+    // freeze — see MAX_HIGHLIGHT_LINE_LENGTH.
+    if (!isHighlightableLength(codeEl.textContent || '')) return;
     const charChangeSpans = codeEl.querySelectorAll('.char-change');
 
     if (charChangeSpans.length === 0) {

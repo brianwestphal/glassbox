@@ -18,7 +18,44 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
 
 // --- Fake file diffs ---
 
+/**
+ * Build a large minified single-line SVG, like a generated icon sprite or an
+ * exported illustration that has been run through an optimizer. Real reviews
+ * routinely contain files like this, and they are the pathological case for
+ * the diff viewer: one line hundreds of KB long. `nudge` lets the old and new
+ * sides differ so the file shows as a genuine modification (a remove+add
+ * pair), exercising the worst case — two giant `.code` cells in split mode.
+ */
+function buildLargeMinifiedSvg(nudge: string): string {
+  let body = '';
+  // ~12000 elements ≈ 1 MB on a single line, matching the real-world file that
+  // surfaced this bug (a 1 MB animated/exported SVG). Naive per-line syntax
+  // highlighting on a line this long injects ~100k <span>s whose layout
+  // freezes the main thread for seconds.
+  for (let i = 0; i < 12000; i++) {
+    const hue = (i * 37) % 360;
+    body += `<path d="M${i % 512} ${(i * 3) % 512}l4 0 0 4-4 0z" fill="hsl(${hue} 70% 50%)" opacity="0.${i % 90}"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-build="${nudge}">${body}</svg>`;
+}
+
 const DEMO_FILES: Array<{ path: string; status: 'added' | 'modified' | 'deleted'; hunks: FileDiff['hunks'] }> = [
+  {
+    // Regression guard for GB-821: a large minified SVG must not freeze the
+    // UI when selected. The diff viewer renders this as a text diff by
+    // default (svgViewMode = 'code'), so the client must skip syntax
+    // highlighting for the giant single line instead of running highlight.js
+    // synchronously on hundreds of KB.
+    path: 'src/assets/icons.min.svg',
+    status: 'modified',
+    hunks: [{
+      oldStart: 1, oldCount: 1, newStart: 1, newCount: 1,
+      lines: [
+        { type: 'remove', oldNum: 1, newNum: null, content: buildLargeMinifiedSvg('a') },
+        { type: 'add', oldNum: null, newNum: 1, content: buildLargeMinifiedSvg('b') },
+      ],
+    }],
+  },
   {
     path: 'src/auth/session.ts',
     status: 'modified',
