@@ -5,7 +5,7 @@ import { SetFileStatusBodySchema } from '../../api/files.js';
 import { getAnnotationCountsForReview, getAnnotationsForFile, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
-import { parseBody } from '../../utils/parseBody.js';
+import { parseBody, requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const filesRoutes = new Hono<AppEnv>();
@@ -21,22 +21,28 @@ filesRoutes.get('/files', async (c) => {
 });
 
 filesRoutes.get('/files/:fileId', async (c) => {
-  const file = await getReviewFile(c.req.param('fileId'));
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
+  const file = await getReviewFile(fileId.data);
   if (!file) return c.json({ error: 'Not found' }, 404);
   const annotations = await getAnnotationsForFile(file.id);
   return c.json({ file, annotations });
 });
 
 filesRoutes.patch('/files/:fileId/status', async (c) => {
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
   const parsed = await parseBody(c, SetFileStatusBodySchema);
   if (!parsed.ok) return parsed.response;
 
-  await updateFileStatus(c.req.param('fileId'), parsed.data.status);
+  await updateFileStatus(fileId.data, parsed.data.status);
   return c.json({ ok: true } as const);
 });
 
 filesRoutes.post('/files/:fileId/reveal', async (c) => {
-  const file = await getReviewFile(c.req.param('fileId'));
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
+  const file = await getReviewFile(fileId.data);
   if (!file) return c.json({ error: 'Not found' }, 404);
   const repoRoot = c.get('repoRoot');
   const fullPath = resolve(repoRoot, file.file_path);

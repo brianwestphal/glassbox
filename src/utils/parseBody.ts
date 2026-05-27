@@ -58,6 +58,21 @@ export function parseQuery<T>(c: Context, schema: z.ZodType<T>): ParseResult<T> 
   return { ok: true, data: result.data };
 }
 
+/**
+ * Read a required path parameter and ensure it's a non-empty string before it
+ * is used in a database lookup (FR-14.2). Hono won't route a truly empty `:id`
+ * segment, but this makes the contract explicit and returns a structured 400
+ * for a blank/whitespace value rather than letting it fall through to a
+ * downstream 404 / no-op. Callers pattern-match on `.ok` like `parseBody`.
+ */
+export function requirePathParam(c: Context, name: string): ParseResult<string> {
+  const value = c.req.param(name);
+  if (value === undefined || value.trim() === '') {
+    return { ok: false, response: c.json({ error: `Missing or empty path parameter: ${name}` }, 400) };
+  }
+  return { ok: true, data: value };
+}
+
 /** Build a structured-error JSON response without going through the
  *  parseBody helpers. Used by route handlers that need to reject for
  *  reasons that aren't schema-validation failures (e.g. a referenced

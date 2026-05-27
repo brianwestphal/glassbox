@@ -5,6 +5,7 @@ import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt, gen
 import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js';
 import { updateReviewDiffs } from '../../review-update.js';
 import type { AppEnv } from '../../types.js';
+import { requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const reviewsRoutes = new Hono<AppEnv>();
@@ -70,7 +71,9 @@ reviewsRoutes.post('/review/refresh', async (c) => {
 });
 
 reviewsRoutes.delete('/review/:id', async (c) => {
-  const reviewId = c.req.param('id');
+  const idParam = requirePathParam(c, 'id');
+  if (!idParam.ok) return idParam.response;
+  const reviewId = idParam.data;
   const currentReviewId = c.get('currentReviewId');
   if (reviewId === currentReviewId) {
     return c.json({ error: 'Cannot delete the current review' }, 400);

@@ -5,13 +5,15 @@ import { parseDiffData, parseModeString } from '../../git/diff.js';
 import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isSvgFile } from '../../git/image.js';
 import { rasterizeSvg } from '../../git/svg-rasterize.js';
 import type { AppEnv } from '../../types.js';
+import { requirePathParam } from '../../utils/parseBody.js';
 
 export const imageRoutes = new Hono<AppEnv>();
 
 // Metadata route must come before the :side wildcard route
 imageRoutes.get('/image/:fileId/metadata', async (c) => {
-  const fileId = c.req.param('fileId');
-  const file = await getReviewFile(fileId);
+  const fileIdParam = requirePathParam(c, 'fileId');
+  if (!fileIdParam.ok) return fileIdParam.response;
+  const file = await getReviewFile(fileIdParam.data);
   if (!file) return c.json({ error: 'Not found' }, 404);
 
   const repoRoot = c.get('repoRoot');
@@ -36,11 +38,12 @@ imageRoutes.get('/image/:fileId/metadata', async (c) => {
 });
 
 imageRoutes.get('/image/:fileId/:side', async (c) => {
-  const fileId = c.req.param('fileId');
+  const fileIdParam = requirePathParam(c, 'fileId');
+  if (!fileIdParam.ok) return fileIdParam.response;
   const side = c.req.param('side');
   if (side !== 'old' && side !== 'new') return c.text('Invalid side', 400);
 
-  const file = await getReviewFile(fileId);
+  const file = await getReviewFile(fileIdParam.data);
   if (!file) return c.text('Not found', 404);
 
   const repoRoot = c.get('repoRoot');

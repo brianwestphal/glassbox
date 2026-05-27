@@ -13,7 +13,7 @@ import {
   getAllThemes, resolveTheme, saveCustomTheme, setActiveThemeId,
 } from '../themes/config.js';
 import type { AppEnv } from '../types.js';
-import { parseBody } from '../utils/parseBody.js';
+import { parseBody, requirePathParam } from '../utils/parseBody.js';
 
 export const themeApiRoutes = new Hono<AppEnv>();
 
@@ -78,7 +78,9 @@ themeApiRoutes.post('/', async (c) => {
 
 /** POST /themes/:id/edit — edit a theme; auto-copies built-in themes */
 themeApiRoutes.post('/:id/edit', async (c) => {
-  const id = c.req.param('id');
+  const idParam = requirePathParam(c, 'id');
+  if (!idParam.ok) return idParam.response;
+  const id = idParam.data;
   const parsed = await parseBody(c, EditThemeBodySchema);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
@@ -113,7 +115,9 @@ themeApiRoutes.post('/:id/edit', async (c) => {
 
 /** PATCH /themes/:id — update a custom theme (rename, edit colors) */
 themeApiRoutes.patch('/:id', async (c) => {
-  const id = c.req.param('id');
+  const idParam = requirePathParam(c, 'id');
+  if (!idParam.ok) return idParam.response;
+  const id = idParam.data;
 
   // Built-in themes can't be directly edited
   if (getBuiltInTheme(id)) {
@@ -141,7 +145,9 @@ themeApiRoutes.patch('/:id', async (c) => {
 
 /** DELETE /themes/:id — delete a custom theme */
 themeApiRoutes.delete('/:id', (c) => {
-  const id = c.req.param('id');
+  const idParam = requirePathParam(c, 'id');
+  if (!idParam.ok) return idParam.response;
+  const id = idParam.data;
 
   if (getBuiltInTheme(id)) {
     return c.json({ error: 'Cannot delete built-in theme' }, 400);

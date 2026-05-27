@@ -4,13 +4,15 @@ import { GetContextLinesQuerySchema } from '../../api/context.js';
 import { getReviewFile } from '../../db/queries.js';
 import { getFileContent } from '../../git/diff.js';
 import type { AppEnv } from '../../types.js';
-import { parseQuery } from '../../utils/parseBody.js';
+import { parseQuery, requirePathParam } from '../../utils/parseBody.js';
 
 export const contextRoutes = new Hono<AppEnv>();
 
 contextRoutes.get('/context/:fileId', async (c) => {
   const repoRoot = c.get('repoRoot');
-  const file = await getReviewFile(c.req.param('fileId'));
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
+  const file = await getReviewFile(fileId.data);
   if (!file) return c.json({ error: 'Not found' }, 404);
 
   const parsed = parseQuery(c, GetContextLinesQuerySchema);

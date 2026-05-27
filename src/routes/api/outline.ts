@@ -9,13 +9,16 @@ import { getFileContent, parseDiffData } from '../../git/diff.js';
 import type { OutlineSymbol } from '../../outline/parser.js';
 import { parseOutline } from '../../outline/parser.js';
 import type { AppEnv } from '../../types.js';
+import { requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const outlineRoutes = new Hono<AppEnv>();
 
 outlineRoutes.get('/outline/:fileId', async (c) => {
   const repoRoot = c.get('repoRoot');
-  const file = await getReviewFile(c.req.param('fileId'));
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
+  const file = await getReviewFile(fileId.data);
   if (!file) return c.json({ error: 'Not found' }, 404);
 
   const diff = parseDiffData(file.diff_data);

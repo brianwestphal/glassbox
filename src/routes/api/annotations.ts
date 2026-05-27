@@ -8,7 +8,7 @@ import {
 import { addAnnotation, deleteAnnotation, deleteStaleAnnotations, getAnnotationsForReview, keepAllStaleAnnotations, markAnnotationCurrent, moveAnnotation, updateAnnotation } from '../../db/queries.js';
 import { scheduleAutoExport } from '../../export/auto-export.js';
 import type { AppEnv } from '../../types.js';
-import { parseBody } from '../../utils/parseBody.js';
+import { parseBody, requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const annotationsRoutes = new Hono<AppEnv>();
@@ -31,31 +31,39 @@ annotationsRoutes.post('/annotations', async (c) => {
 });
 
 annotationsRoutes.patch('/annotations/:id', async (c) => {
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
   const parsed = await parseBody(c, UpdateAnnotationBodySchema);
   if (!parsed.ok) return parsed.response;
 
-  await updateAnnotation(c.req.param('id'), parsed.data.content, parsed.data.category);
+  await updateAnnotation(id.data, parsed.data.content, parsed.data.category);
   autoExport(c);
   return c.json({ ok: true } as const);
 });
 
 annotationsRoutes.delete('/annotations/:id', async (c) => {
-  await deleteAnnotation(c.req.param('id'));
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
+  await deleteAnnotation(id.data);
   autoExport(c);
   return c.json({ ok: true } as const);
 });
 
 annotationsRoutes.patch('/annotations/:id/move', async (c) => {
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
   const parsed = await parseBody(c, MoveAnnotationBodySchema);
   if (!parsed.ok) return parsed.response;
 
-  await moveAnnotation(c.req.param('id'), parsed.data.lineNumber, parsed.data.side);
+  await moveAnnotation(id.data, parsed.data.lineNumber, parsed.data.side);
   autoExport(c);
   return c.json({ ok: true } as const);
 });
 
 annotationsRoutes.post('/annotations/:id/keep', async (c) => {
-  await markAnnotationCurrent(c.req.param('id'));
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
+  await markAnnotationCurrent(id.data);
   autoExport(c);
   return c.json({ ok: true } as const);
 });
