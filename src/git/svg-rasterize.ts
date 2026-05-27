@@ -14,7 +14,15 @@ export { parseSvgDimensions, svgUsesExternalFonts } from './svg-rasterize-render
  * the HTTP server responsive while a diff image is rendered, `rasterizeSvg`
  * offloads the work to a long-lived worker thread and only renders in-process
  * as a fallback when a worker cannot be started.
+ *
+ * A render that exceeds {@link RENDER_TIMEOUT_MS} is treated as pathological
+ * (e.g. a huge animated SVG resvg can't handle). Because a synchronous WASM
+ * call can't be interrupted from inside the thread, the only way to abort it is
+ * to terminate the worker — so on timeout we kill it, fail that render, and
+ * re-queue any jobs that were waiting behind it on a fresh worker.
  */
+
+export const RENDER_TIMEOUT_MS = 15_000;
 
 type WorkerResponse =
   | { type: 'ready' }
@@ -25,6 +33,7 @@ interface PendingJob {
   svg: string;
   resolve: (png: Buffer) => void;
   reject: (err: Error) => void;
+  timer?: ReturnType<typeof setTimeout>;
 }
 
 let worker: Worker | null = null;
@@ -47,10 +56,15 @@ function resolveWorkerUrl(): URL {
     : new URL('./svg-rasterize-worker.js', import.meta.url);
 }
 
+function clearJobTimer(job: PendingJob): void {
+  if (job.timer !== undefined) clearTimeout(job.timer);
+}
+
 /** Run every queued job in-process. Used when the worker can't start. */
 function fallbackAllPending(): void {
   for (const [id, job] of pending) {
     pending.delete(id);
+    clearJobTimer(job);
     renderSvgToPng(job.svg).then(job.resolve, job.reject);
   }
 }
@@ -59,6 +73,7 @@ function fallbackAllPending(): void {
 function rejectAllPending(err: Error): void {
   for (const [id, job] of pending) {
     pending.delete(id);
+    clearJobTimer(job);
     job.reject(err);
   }
 }
@@ -70,6 +85,27 @@ function disposeWorker(): void {
   }
   worker = null;
   workerReady = false;
+}
+
+/**
+ * A render took too long. Kill the worker it's stuck in, fail that render, and
+ * re-queue the jobs that were waiting behind it onto a fresh worker.
+ */
+function onJobTimeout(id: number): void {
+  const job = pending.get(id);
+  if (!job) return;
+  pending.delete(id);
+  clearJobTimer(job);
+
+  // Grab the jobs queued behind the stuck one before we tear the worker down.
+  const requeue = [...pending.values()];
+  pending.clear();
+  for (const r of requeue) clearJobTimer(r);
+  disposeWorker();
+
+  job.reject(new Error(`SVG rasterization timed out after ${RENDER_TIMEOUT_MS} ms`));
+
+  for (const r of requeue) submit(r);
 }
 
 function getWorker(): Worker | null {
@@ -93,6 +129,7 @@ function getWorker(): Worker | null {
     const job = pending.get(msg.id);
     if (!job) return;
     pending.delete(msg.id);
+    clearJobTimer(job);
     if (msg.type === 'result') job.resolve(Buffer.from(msg.png));
     else job.reject(new Error(msg.message));
   });
@@ -121,15 +158,23 @@ function getWorker(): Worker | null {
   return spawned;
 }
 
+/** Send one job to the worker (or render in-process if no worker is available). */
+function submit(job: PendingJob): void {
+  const activeWorker = getWorker();
+  if (!activeWorker) {
+    renderSvgToPng(job.svg).then(job.resolve, job.reject);
+    return;
+  }
+  const id = nextJobId++;
+  job.timer = setTimeout(() => { onJobTimeout(id); }, RENDER_TIMEOUT_MS);
+  pending.set(id, job);
+  activeWorker.postMessage({ id, svg: job.svg });
+}
+
 /** Rasterize an SVG buffer to a PNG buffer, off the main thread when possible. */
 export async function rasterizeSvg(svgData: Buffer): Promise<Buffer> {
   const svg = svgData.toString('utf-8');
-  const activeWorker = getWorker();
-  if (!activeWorker) return renderSvgToPng(svg);
-
   return new Promise<Buffer>((resolve, reject) => {
-    const id = nextJobId++;
-    pending.set(id, { svg, resolve, reject });
-    activeWorker.postMessage({ id, svg });
+    submit({ svg, resolve, reject });
   });
 }

@@ -1,5 +1,7 @@
 import type { Mock } from 'vitest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { RENDER_TIMEOUT_MS } from '../../../src/git/svg-rasterize.js';
 
 /**
  * Tests for the public rasterization facade in `svg-rasterize.ts`.
@@ -81,6 +83,16 @@ async function freshManager(): Promise<LoadedManager> {
   };
 }
 
+// Each job arms a real render-timeout timer; fake timers keep those under test
+// control and stop unresolved jobs from leaking a 15 s timer between cases.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
+
 describe('rasterizeSvg — worker offloading', () => {
   it('offloads rendering to a worker instead of running it in-process', async () => {
     const { rasterizeSvg, renderSvgToPng, instances } = await freshManager();
@@ -161,6 +173,54 @@ describe('rasterizeSvg — in-process fallback', () => {
     // permanently falling back.
     void rasterizeSvg(Buffer.from('<svg/>'));
     expect(instances).toHaveLength(2);
+  });
+});
+
+describe('rasterizeSvg — render timeout', () => {
+  it('times out a stuck render, kills the worker, and re-queues jobs behind it', async () => {
+    const { rasterizeSvg, instances } = await freshManager();
+
+    const p1 = rasterizeSvg(Buffer.from('<svg id="1"/>'));
+    const w1 = instances[0];
+    w1.emit('message', { type: 'ready' });
+
+    // Submit the second job a moment later so its deadline is strictly after
+    // p1's — keeps the test deterministic (only p1's timer fires below).
+    await vi.advanceTimersByTimeAsync(1000);
+    const p2 = rasterizeSvg(Buffer.from('<svg id="2"/>'));
+    expect(w1.postMessage).toHaveBeenCalledTimes(2); // both queued on the one worker
+
+    // Attach the rejection expectation *before* advancing, so the catch handler
+    // is registered when the timeout fires p1's reject (no unhandled rejection).
+    const p1TimedOut = expect(p1).rejects.toThrow(/timed out/i);
+
+    // Advance just past p1's deadline (15000) but not p2's (16000).
+    await vi.advanceTimersByTimeAsync(RENDER_TIMEOUT_MS - 1000 + 1);
+
+    await p1TimedOut;
+    expect(w1.terminate).toHaveBeenCalled();
+
+    // A fresh worker is spawned to retry the job that was queued behind it.
+    expect(instances).toHaveLength(2);
+    const w2 = instances[1];
+    const requeuedId = (w2.postMessage.mock.calls[0][0] as { id: number }).id;
+    w2.emit('message', { type: 'ready' });
+    w2.emit('message', { type: 'result', id: requeuedId, png: new Uint8Array([7, 7]) });
+
+    await expect(p2).resolves.toEqual(Buffer.from([7, 7]));
+  });
+
+  it('clears the timer when a render completes normally (no spurious timeout)', async () => {
+    const { rasterizeSvg, instances } = await freshManager();
+
+    const p = rasterizeSvg(Buffer.from('<svg/>'));
+    instances[0].emit('message', { type: 'ready' });
+    instances[0].emit('message', { type: 'result', id: 0, png: new Uint8Array([1]) });
+    await expect(p).resolves.toEqual(Buffer.from([1]));
+
+    // Long after the timeout window, nothing should have fired (worker alive).
+    await vi.advanceTimersByTimeAsync(RENDER_TIMEOUT_MS * 2);
+    expect(instances[0].terminate).not.toHaveBeenCalled();
   });
 });
 
