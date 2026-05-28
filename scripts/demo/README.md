@@ -33,6 +33,23 @@ each beat as SVG via [`domotion-svg`](https://www.npmjs.com/package/domotion-svg
 composites everything, and writes `assets/demo.svg`. Debug screenshots of each
 captured beat land in `scripts/demo/.debug/` (gitignored).
 
+### Stand-alone screenshot regeneration
+
+```bash
+npm run demo:capture-stills
+```
+
+Regenerates all of the *still* screenshots referenced from `README.md`. For
+each `--demo:N` scenario (1–6) the script boots a real server, runs the
+in-app navigation that puts the UI in the showcased state, then captures
+both a **PNG** (Playwright `page.screenshot`) and a stand-alone **SVG**
+(`captureElementTree` + `elementTreeToSvg`). Outputs land in `assets/` as
+`demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
+`demo-annotations`, `demo-settings`, and `demo-direct-comparison` (each
+in both formats). Lives in `capture-stills.ts` and is intentionally
+independent of the animated hero pipeline above — no overlays, no
+composition, no chrome.
+
 ## Requirements
 
 - **Chromium** (Playwright) — installed with the project's dev dependencies.

@@ -510,6 +510,7 @@ Scripts (`package.json`):
 - `dev:server` — dev with `--no-open --strict-port`
 - `tauri:dev` / `tauri:build` — desktop dev / full desktop build
 - `test`, `test:watch`, `test:all`, `test:e2e`, `test:smoke`, `lint`
+- `demo:capture-stills` — regenerate the static README screenshots (`assets/demo-{guided-review,risk-mode,narrative-mode,annotations,settings,direct-comparison}.{png,svg}`). Boots each `--demo:N` scenario in turn, runs a minimal scenario-specific UI setup (open the showcased file, flip a sort mode, open the settings dialog, …), and captures both a Playwright PNG and a `domotion-svg` stand-alone SVG per scenario. Lives in `scripts/demo/capture-stills.ts`. Must run outside the command sandbox (Chromium).
 - `demo:capture` — regenerate the animated README hero `assets/demo.svg` (+
   `.svgz`). Boots a real `--demo:1` server, drives the risk-triage → annotate →
   complete → `/glassbox` loop with Playwright, captures each beat via
