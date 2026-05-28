@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 
 import { GetContextLinesQuerySchema } from '../../api/context.js';
-import { getReviewFile } from '../../db/queries.js';
-import { getFileContent } from '../../git/diff.js';
+import { getReview, getReviewFile } from '../../db/queries.js';
+import { getModeFileContent, parseModeString } from '../../git/diff.js';
 import type { AppEnv } from '../../types.js';
 import { parseQuery, requirePathParam } from '../../utils/parseBody.js';
 
@@ -19,7 +19,10 @@ contextRoutes.get('/context/:fileId', async (c) => {
   if (!parsed.ok) return parsed.response;
   const { start, end } = parsed.data;
 
-  const content = getFileContent(file.file_path, 'working', repoRoot);
+  // Expanded context tracks the new-side line numbers (doc 18, FR-18.5).
+  const review = await getReview(file.review_id);
+  const mode = review ? parseModeString(review.mode) : { type: 'uncommitted' as const };
+  const content = getModeFileContent(mode, file.file_path, 'new', repoRoot);
   const allLines = content.split('\n');
   const clampedStart = Math.max(1, start);
   const clampedEnd = Math.min(allLines.length, end);

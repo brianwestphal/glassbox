@@ -131,7 +131,7 @@ See §6 for the schema itself.
 
 | File | Purpose |
 |------|---------|
-| `diff.ts` | `getFileDiffs(mode, cwd)`, `parseDiff()`, mode → `git` argv builder. Also lists untracked files for uncommitted mode and walks all files for `--all`. |
+| `diff.ts` | `getFileDiffs(mode, cwd)`, `parseDiff()`, mode → `git` argv builder. Also lists untracked files for uncommitted mode, walks all files for `--all`, and runs `git diff --no-index` for the `--diff <A> <B>` direct-comparison mode (doc 18) — `directComparisonRoots(mode)` resolves the per-side display roots and `getModeFileContent(mode, file, 'old'\|'new', cwd)` reads file content for context expansion, branching to disk reads (rootA/rootB) for `--diff` and to git refs for every other mode. |
 | `repo.ts` | `getRepoRoot`, `getRepoName`, `getHeadCommit`, `isGitRepo`. |
 | `types.ts` | `ReviewMode`, `FileDiff`, `DiffHunk`, `DiffLine`. |
 | `image.ts` | Image side retrieval from git (old/new), binary detection, format identification. |
@@ -494,6 +494,7 @@ section explaining category semantics.
 | branch `<name>` | `git diff <name>...HEAD` |
 | files `<patterns>` | `git diff HEAD -- <patterns>` |
 | all | custom walk of all tracked files |
+| diff `<A> <B>` | `git diff --no-index <A> <B>` (doc 18 — works outside a repo) |
 
 All invocations use argv arrays (`spawnSync` / `execFileSync`) — never
 string interpolation into a shell (FR-14.3). Binary detection: git's own

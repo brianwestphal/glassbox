@@ -25,6 +25,7 @@ The CLI shall accept the following options:
 | `--branch <name>` | Review changes on current branch vs the named branch |
 | `--files <patterns>` | Review specific files (comma-separated glob patterns) |
 | `--all` | Review entire codebase |
+| `--diff <pathA> <pathB>` | Compare two arbitrary files or folders by path (no git repo required — see doc 18) |
 | `--port <number>` | Port to run on (default: 4183) |
 | `--resume` | Resume the latest in-progress review for this mode |
 | `--no-open` | Don't open browser automatically |
@@ -40,7 +41,7 @@ The CLI shall accept the following options:
 - **Arg parsing first** — The CLI shall parse arguments and determine the review mode before any git or database operations.
 - **Project dir override** — `--project-dir` shall change the working directory before any git operations (used by Tauri sidecar).
 - **Instance locking** — Instance locking shall be acquired after argument parsing but before database access (see doc 1, section 1.5).
-- **Git repo check** — The CLI shall verify it is running inside a git repository before proceeding (unless in demo mode).
+- **Git repo check** — The CLI shall verify it is running inside a git repository before proceeding (unless in demo mode, or in `--diff` mode per doc 18).
 - **Update check** — An npm update check shall run once per day (or immediately with `--check-for-updates`) before starting the server.
 
 ### 2.4 HTTP Server

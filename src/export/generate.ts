@@ -5,6 +5,7 @@ import { join } from 'path';
 import { z } from 'zod';
 
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
+import { isGitRepo } from '../git/repo.js';
 
 const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
 const DISMISS_DAYS = 30;
@@ -34,6 +35,9 @@ export function isGlassboxGitignored(repoRoot: string): boolean {
 }
 
 export function shouldPromptGitignore(repoRoot: string): boolean {
+  // Direct comparison (doc 18, FR-18.8) can run outside a repo — there's no
+  // .gitignore to manage, so never prompt.
+  if (!isGitRepo(repoRoot)) return false;
   if (isGlassboxGitignored(repoRoot)) return false;
   const dismissals = loadDismissals();
   const dismissed = dismissals[repoRoot];

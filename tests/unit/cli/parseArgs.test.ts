@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import { parseArgs } from '../../../src/cli.js';
 
 // Mock all heavy dependencies so importing cli.ts doesn't trigger side effects
@@ -120,6 +121,19 @@ describe('parseArgs', () => {
     it('parses --all', () => {
       const result = parseArgs(argv('--all'));
       expect(result!.mode).toEqual({ type: 'all' });
+    });
+
+    it('parses --diff into absolute paths', () => {
+      const result = parseArgs(argv('--diff', './before', './after'));
+      expect(result!.mode).toEqual({
+        type: 'diff',
+        pathA: resolve('./before'),
+        pathB: resolve('./after'),
+      });
+    });
+
+    it('exits when --diff is missing its second path', () => {
+      expect(() => parseArgs(argv('--diff', 'only-one'))).toThrow('process.exit');
     });
   });
 

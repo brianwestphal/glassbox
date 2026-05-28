@@ -1,6 +1,6 @@
 import { spawnSync } from 'child_process';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, readFileSync, statSync } from 'fs';
+import { basename, dirname, join, resolve } from 'path';
 
 import { getRepoRoot } from './repo.js';
 import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
@@ -39,10 +39,80 @@ export function getDiffArgs(mode: ReviewMode): string[] {
       return ['diff', 'HEAD', '--', ...mode.patterns];
     case 'all':
       return ['diff', '--no-index', '/dev/null', '.'];
+    case 'diff':
+      return ['diff', '--no-index', mode.pathA, mode.pathB];
   }
 }
 
+/**
+ * Direct comparison (doc 18): the display "root" each side's paths are relative
+ * to. For a folder the root is the folder itself; for a single file it's the
+ * file's parent directory, so the file shows under its basename.
+ */
+export function directComparisonRoots(mode: { pathA: string; pathB: string }): { rootA: string; rootB: string } {
+  const rootOf = (p: string): string => {
+    try {
+      return statSync(p).isDirectory() ? p : dirname(p);
+    } catch {
+      return dirname(p);
+    }
+  };
+  return { rootA: rootOf(mode.pathA), rootB: rootOf(mode.pathB) };
+}
+
+/**
+ * Strip a root prefix off a path captured from a `git diff --no-index` header.
+ * git removes the leading slash and prepends `a/` / `b/`; `parseDiff` returns
+ * the part after that prefix, so the captured path looks like
+ * `Users/foo/dirB/sub/x.ts`. Removing the (slash-stripped) root yields the
+ * display-relative path `sub/x.ts`.
+ */
+function stripRoot(headerPath: string, root: string): string {
+  const norm = root.replace(/^\/+/, '');
+  const prefix = norm.endsWith('/') ? norm : `${norm}/`;
+  return headerPath.startsWith(prefix) ? headerPath.slice(prefix.length) : headerPath;
+}
+
+/**
+ * Rewrite the root-prefixed paths `git diff --no-index` emits into paths
+ * relative to the compared roots. The new side (`filePath`) is normally
+ * b-rooted; for a pure deletion git repeats the a-side path on the b-side, so
+ * fall back to the A root. An old path equal to the new path is not a rename,
+ * so it is dropped.
+ */
+function normalizeDiffPaths(diffs: FileDiff[], rootA: string, rootB: string): FileDiff[] {
+  return diffs.map((d) => {
+    let filePath = stripRoot(d.filePath, rootB);
+    if (filePath === d.filePath) filePath = stripRoot(d.filePath, rootA);
+    const oldRel = d.oldPath !== null ? stripRoot(d.oldPath, rootA) : null;
+    const oldPath = oldRel !== null && oldRel !== filePath ? oldRel : null;
+    // `git diff --no-index` always reports differing header paths (the two
+    // roots differ), so a same-relative-path file arrives as 'renamed'. Once
+    // the roots are stripped and the relative paths match, it's a plain
+    // modification, not a rename.
+    const status = d.status === 'renamed' && oldPath === null ? 'modified' : d.status;
+    return { ...d, filePath, oldPath, status };
+  });
+}
+
+function getDirectComparisonFiles(mode: { pathA: string; pathB: string }, cwd: string): FileDiff[] {
+  const { rootA, rootB } = directComparisonRoots(mode);
+  let rawDiff: string;
+  try {
+    rawDiff = git(['diff', '--no-index', '-U3', mode.pathA, mode.pathB], cwd);
+  } catch {
+    rawDiff = '';
+  }
+  return normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
+}
+
 export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
+  // Direct comparison runs `git diff --no-index` on two arbitrary paths and
+  // never touches a repository, so resolve it before the repo-root lookup.
+  if (mode.type === 'diff') {
+    return getDirectComparisonFiles(mode, cwd);
+  }
+
   const repoRoot = getRepoRoot(cwd);
 
   if (mode.type === 'all') {
@@ -231,6 +301,25 @@ export function getFileContent(filePath: string, ref: string, cwd: string): stri
   }
 }
 
+/**
+ * Read a review file's content for a given side ('old' | 'new'), aware of
+ * direct-comparison mode where the two sides live under two arbitrary roots on
+ * disk (no git refs). Used by context expansion (doc 18, FR-18.5). For all
+ * git-backed modes it falls back to {@link getFileContent}.
+ */
+export function getModeFileContent(mode: ReviewMode, filePath: string, side: 'old' | 'new', cwd: string): string {
+  if (mode.type === 'diff') {
+    const { rootA, rootB } = directComparisonRoots(mode);
+    const abs = join(side === 'old' ? rootA : rootB, filePath);
+    try {
+      return readFileSync(abs, 'utf-8');
+    } catch {
+      return '';
+    }
+  }
+  return getFileContent(filePath, side === 'old' ? 'HEAD' : 'working', cwd);
+}
+
 export function parseModeString(modeStr: string): ReviewMode {
   if (modeStr === 'uncommitted') return { type: 'uncommitted' };
   if (modeStr === 'staged') return { type: 'staged' };
@@ -243,6 +332,15 @@ export function parseModeString(modeStr: string): ReviewMode {
   }
   if (modeStr.startsWith('branch:')) return { type: 'branch', name: modeStr.slice(7) };
   if (modeStr.startsWith('files:')) return { type: 'files', patterns: modeStr.slice(6).split(',') };
+  if (modeStr.startsWith('diff:')) {
+    // JSON-encoded `[pathA, pathB]` so arbitrary path characters round-trip.
+    try {
+      const parsed: unknown = JSON.parse(modeStr.slice(5));
+      if (Array.isArray(parsed) && typeof parsed[0] === 'string' && typeof parsed[1] === 'string') {
+        return { type: 'diff', pathA: parsed[0], pathB: parsed[1] };
+      }
+    } catch { /* fall through to default */ }
+  }
   return { type: 'uncommitted' };
 }
 
@@ -250,6 +348,27 @@ export function parseModeString(modeStr: string): ReviewMode {
 export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: string, extraFlags: string = ''): FileDiff | null {
   if (mode.type === 'all') {
     return createNewFileDiff(filePath, repoRoot);
+  }
+  if (mode.type === 'diff') {
+    // Re-diff just this file's two sides under their roots. `filePath` is the
+    // new-side relative path; for the common modified case the old side shares
+    // it. If either side is missing (added/deleted), there's nothing to
+    // re-collapse for whitespace, so keep the stored diff.
+    const { rootA, rootB } = directComparisonRoots(mode);
+    const oldAbs = join(rootA, filePath);
+    const newAbs = join(rootB, filePath);
+    if (!existsSync(oldAbs) || !existsSync(newAbs)) return null;
+    const args = ['diff', '--no-index', '-U3'];
+    if (extraFlags) args.push(...extraFlags.split(' ').filter(Boolean));
+    args.push(oldAbs, newAbs);
+    let rawDiff: string;
+    try {
+      rawDiff = git(args, repoRoot);
+    } catch {
+      rawDiff = '';
+    }
+    const diffs = normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
+    return diffs[0] ?? null;
   }
   const diffArgs = getDiffArgs(mode);
   const args = [...diffArgs, '-U3'];
@@ -275,6 +394,7 @@ export function getModeString(mode: ReviewMode): string {
     case 'branch': return `branch:${mode.name}`;
     case 'files': return `files:${mode.patterns.join(',')}`;
     case 'all': return 'all';
+    case 'diff': return `diff:${JSON.stringify([mode.pathA, mode.pathB])}`;
   }
 }
 
@@ -284,6 +404,9 @@ export function getModeArgs(mode: ReviewMode): string | undefined {
     case 'range': return `${mode.from}..${mode.to}`;
     case 'branch': return mode.name;
     case 'files': return mode.patterns.join(',');
+    // A short, human-readable label for the sidebar/history. Full path
+    // disambiguation lives in the mode string, so basenames are fine here.
+    case 'diff': return `${basename(mode.pathA)} ↔ ${basename(mode.pathB)}`;
     case 'uncommitted':
     case 'staged':
     case 'unstaged':

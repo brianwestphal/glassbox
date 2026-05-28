@@ -42,5 +42,21 @@ export function formatReviewMode(mode: string, modeArgs: string | null): string 
   if (mode === 'files' || mode.startsWith('files:')) {
     return `files: ${argsFor(mode, 'files:', modeArgs)}`;
   }
+  if (mode === 'diff' || mode.startsWith('diff:')) {
+    // Direct comparison (doc 18). The mode string is `diff:[pathA,pathB]` JSON;
+    // prefer the short `mode_args` label, falling back to path basenames.
+    if (modeArgs !== null && modeArgs !== '') return `compare: ${modeArgs}`;
+    if (mode.startsWith('diff:')) {
+      try {
+        const parsed: unknown = JSON.parse(mode.slice(5));
+        if (Array.isArray(parsed) && typeof parsed[0] === 'string' && typeof parsed[1] === 'string') {
+          const baseA = parsed[0].split('/').pop() ?? parsed[0];
+          const baseB = parsed[1].split('/').pop() ?? parsed[1];
+          return `compare: ${baseA} ↔ ${baseB}`;
+        }
+      } catch { /* fall through */ }
+    }
+    return 'compare';
+  }
   return mode;
 }

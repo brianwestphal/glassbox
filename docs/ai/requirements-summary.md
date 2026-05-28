@@ -447,15 +447,38 @@ server binds to `127.0.0.1`; events carry no data beyond the review file
 path; server only starts when explicitly enabled. All core review
 functionality works regardless of channel state.
 
+## 18a. Direct path comparison (`18-direct-comparison.md`) — **Shipped**
+
+Diffing **two arbitrary files or two arbitrary folders** named by path
+(`glassbox --diff <A> <B>`), independent of git history and usable
+**outside any git repository**. The diff is produced by
+`git diff --no-index <A> <B>` (the same primitive `--all` uses), so it
+needs the `git` binary but no repo. `A` is the old side, `B` the new.
+
+Files must be the same kind (file/file or folder/folder); folder
+comparison recurses and pairs files by relative path (added / deleted /
+modified), with **no `.gitignore` filtering** by default. Image/SVG and
+binary diffs read each side from disk rather than from git refs; hunk
+context expansion reads from the new-side path. The review record uses
+`repo_path` = cwd, a `"A ↔ B"` label for `repo_name`, and `head_commit`
+= null; the markdown export lands under the cwd's `.glassbox/`. Features
+that assume a repo (go-to-definition repo scan, Claude channel, gitignore
+prompt) degrade gracefully; AI analysis works normally.
+
+**Shipped** — CLI + diff engine + context expansion + image/SVG disk
+reads landed together as a single coherent change (the `ReviewMode`
+switches are exhaustive). FR-18.11 was explicitly resolved as
+**CLI-only**: a desktop in-app file/folder picker was considered and
+deferred — the CLI entry point covers the workflow.
+
 ## 19. Implementation-status snapshot
 
-Every current requirements doc (1–17) is **Shipped**: review workflow,
+Every current requirements doc (1–18) is **Shipped**: review workflow,
 CLI/server, git integration, diff viewing, annotations, export, AI
 analysis, UI, data storage, desktop app, build/distribution, demo mode,
-navigation, security, themes, share prompt, Claude channel. No
-design-only or deferred documents at present. When a new feature is
-spec'd before implementation, add a doc and mark the entry here
-**Design only** until the code lands.
+navigation, security, themes, share prompt, Claude channel, direct path
+comparison. When a new feature is spec'd before implementation, add a
+doc and mark the entry here **Design only** until the code lands.
 
 ## 20. Maintenance rules
 
@@ -493,6 +516,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/15-themes.md` → §16
 - `docs/16-share-prompt.md` → §17
 - `docs/17-claude-channel.md` → §18
+- `docs/18-direct-comparison.md` → §18a
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

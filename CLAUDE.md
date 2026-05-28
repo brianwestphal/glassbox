@@ -54,6 +54,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `15-themes.md` — Theme system, built-in themes, custom themes, theme editor
 - `16-share-prompt.md` — Share prompt trigger, share button, Web Share API
 - `17-claude-channel.md` — Claude Code MCP channel integration, channel server, completion modal
+- `18-direct-comparison.md` — Diffing two arbitrary files or folders by path (`--diff`), independent of git history
 
 **Architecture documents** describe system design and setup:
 

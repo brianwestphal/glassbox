@@ -102,6 +102,22 @@ describe('formatReviewMode', () => {
     });
   });
 
+  describe('diff (direct comparison) mode', () => {
+    it('prefers the basename label from mode_args', () => {
+      expect(formatReviewMode('diff:["/x/old.ts","/y/new.ts"]', 'old.ts ↔ new.ts'))
+        .toBe('compare: old.ts ↔ new.ts');
+    });
+
+    it('derives basenames from the JSON mode string when mode_args is absent', () => {
+      expect(formatReviewMode('diff:["/x/old.ts","/y/new.ts"]', null))
+        .toBe('compare: old.ts ↔ new.ts');
+    });
+
+    it('falls back to a bare label on malformed JSON', () => {
+      expect(formatReviewMode('diff:garbage', null)).toBe('compare');
+    });
+  });
+
   describe('unknown mode', () => {
     it('passes through an unrecognized mode unchanged', () => {
       expect(formatReviewMode('weird-mode', null)).toBe('weird-mode');

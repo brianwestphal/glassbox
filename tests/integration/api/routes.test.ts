@@ -43,6 +43,10 @@ vi.mock('../../../src/export/generate.js', () => ({
 // Mock the git/diff module to avoid filesystem access
 vi.mock('../../../src/git/diff.js', () => ({
   getFileContent: vi.fn(() => 'line1\nline2\nline3\nline4\nline5\n'),
+  // Used by the context route to read file content for the review's mode
+  // (direct comparison reads from disk, git modes from a ref). The integration
+  // tests use a synthetic uncommitted-mode review, so a fixed string suffices.
+  getModeFileContent: vi.fn(() => 'line1\nline2\nline3\nline4\nline5\n'),
   parseModeString: vi.fn(() => ({ type: 'uncommitted' })),
   getHeadCommit: vi.fn(() => 'abc123'),
   getFileDiffs: vi.fn(() => []),

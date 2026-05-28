@@ -1,8 +1,9 @@
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { join,resolve } from 'path';
 
 import type { ReviewMode } from './diff.js';
+import { directComparisonRoots } from './diff.js';
 
 // Re-export metadata utilities so existing importers don't break
 export type { ImageMetadata } from './image-metadata.js';
@@ -23,6 +24,7 @@ function getOldRef(mode: ReviewMode): string | null {
     case 'branch': return mode.name;
     case 'files': return 'HEAD';
     case 'all': return null;
+    case 'diff': return null; // direct comparison reads from disk, not a ref
   }
 }
 
@@ -40,6 +42,7 @@ function getNewRef(mode: ReviewMode): string | null {
     case 'branch': return 'HEAD';
     case 'files': return null;
     case 'all': return null;
+    case 'diff': return null; // direct comparison reads from disk, not a ref
   }
 }
 
@@ -65,8 +68,21 @@ export interface ImageSide {
   size: number;
 }
 
+/** Read an image side from an absolute path on disk (direct-comparison mode). */
+function readDiskImage(absPath: string): ImageSide | null {
+  try {
+    const data = readFileSync(absPath);
+    return { data, size: data.length };
+  } catch {
+    return null;
+  }
+}
+
 /** Get the old (A) version of an image file. */
 export function getOldImage(mode: ReviewMode, filePath: string, oldPath: string | null, repoRoot: string): ImageSide | null {
+  if (mode.type === 'diff') {
+    return readDiskImage(join(directComparisonRoots(mode).rootA, oldPath ?? filePath));
+  }
   const ref = getOldRef(mode);
   const path = oldPath ?? filePath;
   if (ref === null) {
@@ -83,6 +99,9 @@ export function getOldImage(mode: ReviewMode, filePath: string, oldPath: string 
 
 /** Get the new (B) version of an image file. */
 export function getNewImage(mode: ReviewMode, filePath: string, repoRoot: string): ImageSide | null {
+  if (mode.type === 'diff') {
+    return readDiskImage(join(directComparisonRoots(mode).rootB, filePath));
+  }
   const ref = getNewRef(mode);
   if (ref === null) {
     // For staged mode, new = index

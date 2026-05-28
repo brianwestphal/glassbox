@@ -47,4 +47,8 @@ export type ReviewMode =
   | { type: 'range'; from: string; to: string }
   | { type: 'branch'; name: string }
   | { type: 'files'; patterns: string[] }
-  | { type: 'all' };
+  | { type: 'all' }
+  // Direct comparison of two arbitrary paths (files or folders), independent
+  // of git history and usable outside a repository (doc 18). `pathA` is the
+  // old/left side, `pathB` the new/right side; both are absolute paths.
+  | { type: 'diff'; pathA: string; pathB: string };

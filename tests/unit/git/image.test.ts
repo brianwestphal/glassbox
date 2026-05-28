@@ -18,7 +18,9 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { spawnSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { mkdirSync,mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('isImageFile', () => {
   it('returns true for supported image extensions', () => {
@@ -604,5 +606,54 @@ describe('getNewImage', () => {
     const result = getNewImage(mode, 'removed.png', repoRoot);
 
     expect(result).toBeNull();
+  });
+});
+
+describe('direct comparison (diff mode) image reads', () => {
+  let root: string;
+  let mode: ReviewMode;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    // Earlier suites stub readFileSync/statSync implementations; clearAllMocks
+    // only clears call history, so restore the real fns for the disk reads.
+    const actual = await vi.importActual<typeof import('fs')>('fs');
+    vi.mocked(readFileSync).mockImplementation(actual.readFileSync);
+    vi.mocked(statSync).mockImplementation(actual.statSync);
+    root = mkdtempSync(join(tmpdir(), 'gb-img-'));
+    mkdirSync(join(root, 'a'));
+    mkdirSync(join(root, 'b'));
+    writeFileSync(join(root, 'a', 'logo.png'), Buffer.from('OLD-BYTES'));
+    writeFileSync(join(root, 'b', 'logo.png'), Buffer.from('NEW-BYTES-LONGER'));
+    mode = { type: 'diff', pathA: join(root, 'a'), pathB: join(root, 'b') };
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reads the old side from rootA on disk (no git ref)', () => {
+    const result = getOldImage(mode, 'logo.png', null, root);
+    expect(spawnSync).not.toHaveBeenCalled();
+    expect(result).not.toBeNull();
+    expect(result!.data.toString()).toBe('OLD-BYTES');
+    expect(result!.size).toBe('OLD-BYTES'.length);
+  });
+
+  it('reads the new side from rootB on disk (no git ref)', () => {
+    const result = getNewImage(mode, 'logo.png', root);
+    expect(spawnSync).not.toHaveBeenCalled();
+    expect(result).not.toBeNull();
+    expect(result!.data.toString()).toBe('NEW-BYTES-LONGER');
+  });
+
+  it('honors an explicit old relative path (rename-shaped entry)', () => {
+    writeFileSync(join(root, 'a', 'old-name.png'), Buffer.from('RENAMED-OLD'));
+    const result = getOldImage(mode, 'new-name.png', 'old-name.png', root);
+    expect(result!.data.toString()).toBe('RENAMED-OLD');
+  });
+
+  it('returns null when a side is missing on disk', () => {
+    expect(getNewImage(mode, 'does-not-exist.png', root)).toBeNull();
   });
 });

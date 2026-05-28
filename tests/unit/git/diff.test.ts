@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { parseDiff, getDiffArgs, getModeString, getModeArgs } from '../../../src/git/diff.js';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { afterAll, beforeAll,describe, it, expect } from 'vitest';
+import { parseDiff, getDiffArgs, getModeString, getModeArgs, getFileDiffs, parseModeString } from '../../../src/git/diff.js';
 import type { ReviewMode, FileDiff } from '../../../src/git/diff.js';
 
 describe('parseDiff', () => {
@@ -457,5 +460,95 @@ describe('getModeArgs', () => {
 
   it('returns undefined for all mode', () => {
     expect(getModeArgs({ type: 'all' })).toBeUndefined();
+  });
+
+  it('returns a basename label for diff mode', () => {
+    expect(getModeArgs({ type: 'diff', pathA: '/x/old.ts', pathB: '/y/new.ts' })).toBe('old.ts ↔ new.ts');
+  });
+});
+
+describe('direct comparison mode (doc 18)', () => {
+  describe('getDiffArgs', () => {
+    it('uses git diff --no-index with the two paths', () => {
+      expect(getDiffArgs({ type: 'diff', pathA: '/a/x', pathB: '/b/y' }))
+        .toEqual(['diff', '--no-index', '/a/x', '/b/y']);
+    });
+  });
+
+  describe('getModeString / parseModeString round-trip', () => {
+    it('JSON-encodes both paths so arbitrary characters survive', () => {
+      const mode: ReviewMode = { type: 'diff', pathA: '/has space, comma/a.ts', pathB: '/b/dir/x.ts' };
+      const str = getModeString(mode);
+      expect(str.startsWith('diff:')).toBe(true);
+      expect(parseModeString(str)).toEqual(mode);
+    });
+
+    it('falls back to uncommitted on a malformed diff: mode string', () => {
+      expect(parseModeString('diff:not json')).toEqual({ type: 'uncommitted' });
+      expect(parseModeString('diff:["only one"]')).toEqual({ type: 'uncommitted' });
+    });
+  });
+
+  describe('getFileDiffs', () => {
+    let root: string;
+
+    beforeAll(() => {
+      root = mkdtempSync(join(tmpdir(), 'gb-diff-'));
+    });
+    afterAll(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    function write(rel: string, content: string): string {
+      const abs = join(root, rel);
+      mkdirSync(join(abs, '..'), { recursive: true });
+      writeFileSync(abs, content, 'utf-8');
+      return abs;
+    }
+
+    it('diffs two files with the same basename as a single modified file', () => {
+      const a = write('fa/file.ts', 'line1\nline2\nline3\n');
+      const b = write('fb/file.ts', 'line1\nCHANGED\nline3\n');
+      const diffs = getFileDiffs({ type: 'diff', pathA: a, pathB: b }, root);
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0].filePath).toBe('file.ts');
+      expect(diffs[0].oldPath).toBeNull();
+      expect(diffs[0].status).toBe('modified');
+      expect(diffs[0].hunks.length).toBeGreaterThan(0);
+    });
+
+    it('treats two differently-named files as a rename-shaped entry', () => {
+      const a = write('na/old.ts', 'alpha\n');
+      const b = write('nb/new.ts', 'beta\n');
+      const diffs = getFileDiffs({ type: 'diff', pathA: a, pathB: b }, root);
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0].filePath).toBe('new.ts');
+      expect(diffs[0].oldPath).toBe('old.ts');
+    });
+
+    it('returns no diffs for two identical files', () => {
+      const a = write('ia/x.ts', 'same\n');
+      const b = write('ib/x.ts', 'same\n');
+      expect(getFileDiffs({ type: 'diff', pathA: a, pathB: b }, root)).toEqual([]);
+    });
+
+    it('compares folders recursively with relative paths and add/delete/modify', () => {
+      write('dirA/sub/keep.ts', 'one\ntwo\nthree\n');
+      write('dirB/sub/keep.ts', 'one\nTWO\nthree\n');
+      write('dirA/onlyA.txt', 'gone\n');
+      write('dirB/onlyB.txt', 'fresh\n');
+      const diffs = getFileDiffs(
+        { type: 'diff', pathA: join(root, 'dirA'), pathB: join(root, 'dirB') },
+        root,
+      );
+      const byPath = new Map(diffs.map((d) => [d.filePath, d]));
+
+      const modified = byPath.get('sub/keep.ts');
+      expect(modified?.status).toBe('modified');
+      expect(modified?.oldPath).toBeNull();
+
+      expect(byPath.get('onlyA.txt')?.status).toBe('deleted');
+      expect(byPath.get('onlyB.txt')?.status).toBe('added');
+    });
   });
 });

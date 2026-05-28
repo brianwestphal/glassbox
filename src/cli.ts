@@ -1,6 +1,6 @@
-import { mkdirSync, realpathSync } from "fs";
+import { existsSync, mkdirSync, realpathSync, statSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { basename, join, resolve } from "path";
 
 import { setDataDir } from "./db/connection.js";
 import { addReviewFile, createReview, getLatestInProgressReview } from "./db/queries.js";
@@ -30,6 +30,7 @@ Modes (pick one):
   --branch <name>     Review changes on current branch vs <name>
   --files <patterns>  Review specific files (glob patterns, comma-separated)
   --all               Review entire codebase
+  --diff <a> <b>      Compare two arbitrary files or folders by path (no git repo required)
 
 Options:
   --port <number>     Port to run on (default: 4183)
@@ -48,6 +49,8 @@ Examples:
   glassbox --branch main
   glassbox --files "src/**/*.ts,lib/*.js"
   glassbox --all --resume
+  glassbox --diff ./before.svg ./after.svg
+  glassbox --diff ./dist-old ./dist-new
 `);
 }
 
@@ -113,6 +116,18 @@ export function parseArgs(
       case "--all":
         mode = { type: "all" };
         break;
+      case "--diff": {
+        // Catch the common slip of forgetting one path: if either slot is
+        // missing or looks like a flag, fail with a clear message instead of
+        // resolving "--foo" into a non-existent path.
+        if (i + 2 >= args.length || args[i + 1].startsWith("-") || args[i + 2].startsWith("-")) {
+          console.error("--diff requires two paths: --diff <pathA> <pathB>");
+          process.exit(1);
+        }
+        // Store absolute paths so the mode is stable regardless of later cwd.
+        mode = { type: "diff", pathA: resolve(args[++i]), pathB: resolve(args[++i]) };
+        break;
+      }
       case "--port":
         port = parseInt(args[++i], 10);
         break;
@@ -235,16 +250,39 @@ async function main() {
     console.log(`AI tool skills created/updated for: ${skillPlatforms.join(', ')}`);
   }
 
-  if (!isGitRepo(cwd)) {
-    console.error("Error: Not a git repository. Run this from inside a git repo.");
-    process.exit(1);
+  // Direct comparison (doc 18) works on two arbitrary paths and does not need a
+  // git repository. All other modes require running inside one.
+  let repoRoot: string;
+  let repoName: string;
+  let headCommit = "";
+
+  if (mode.type === "diff") {
+    const { pathA, pathB } = mode;
+    for (const p of [pathA, pathB]) {
+      if (!existsSync(p)) {
+        console.error(`Error: path does not exist: ${p}`);
+        process.exit(1);
+      }
+    }
+    if (statSync(pathA).isDirectory() !== statSync(pathB).isDirectory()) {
+      console.error("Error: --diff requires two files or two folders, not a mix of both.");
+      process.exit(1);
+    }
+    // No repo: anchor data/export at the working directory, label by basenames.
+    repoRoot = cwd;
+    repoName = `${basename(pathA)} ↔ ${basename(pathB)}`;
+  } else {
+    if (!isGitRepo(cwd)) {
+      console.error("Error: Not a git repository. Run this from inside a git repo.");
+      process.exit(1);
+    }
+    repoRoot = getRepoRoot(cwd);
+    repoName = getRepoName(cwd);
+    headCommit = getHeadCommit(cwd);
   }
 
-  const repoRoot = getRepoRoot(cwd);
-  const repoName = getRepoName(cwd);
   const modeStr = getModeString(mode);
   const modeArgs = getModeArgs(mode);
-  const headCommit = getHeadCommit(cwd);
 
   // Check for existing in-progress review
   const existing = await getLatestInProgressReview(repoRoot, modeStr, modeArgs);
