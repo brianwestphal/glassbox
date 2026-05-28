@@ -26,10 +26,10 @@ import { saveGuidedReviewConfig } from '../../src/ai/config.js';
 import { setupDemoReview } from '../../src/demo.js';
 
 describe('DEMO_SCENARIOS', () => {
-  it('has 5 scenarios with unique ids', () => {
-    expect(DEMO_SCENARIOS).toHaveLength(5);
+  it('has 6 scenarios with unique ids', () => {
+    expect(DEMO_SCENARIOS).toHaveLength(6);
     const ids = DEMO_SCENARIOS.map(s => s.id);
-    expect(new Set(ids).size).toBe(5);
+    expect(new Set(ids).size).toBe(6);
   });
 
   it('each scenario has id and label', () => {

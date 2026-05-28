@@ -60,8 +60,15 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
 
   if (!image) return c.text('Image not available', 404);
 
+  // GB-836: pick whether to rasterize / what content-type to send based on the
+  // side's *own* path. `file.file_path` is always the new-side path, so using
+  // it on the old side broke rename-shaped comparisons across image types
+  // (e.g. `--diff foo.png foo.svg` rasterized the PNG bytes as if they were
+  // SVG and returned 500, leaving the comparison panel empty).
+  const sidePath = side === 'old' ? (oldPath ?? file.file_path) : file.file_path;
+
   // SVGs need rasterization for image comparison modes (difference, slice)
-  if (isSvgFile(file.file_path)) {
+  if (isSvgFile(sidePath)) {
     try {
       const png = await rasterizeSvg(image.data);
       return new Response(new Uint8Array(png), {
@@ -72,7 +79,7 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
     }
   }
 
-  const contentType = getContentType(file.file_path);
+  const contentType = getContentType(sidePath);
   return new Response(new Uint8Array(image.data), {
     headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' },
   });
