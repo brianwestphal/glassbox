@@ -326,13 +326,15 @@ binary in dev.
 
 ## 13. Demo mode (`12-demo-mode.md`) — **Shipped**
 
-`--demo:N` launches pre-configured scenarios. Five scenarios:
+`--demo:N` launches pre-configured scenarios. Six scenarios:
 (1) main UI with guided review notes, (2) risk mode with inline risk
 notes, (3) narrative mode with walkthrough notes, (4) annotations with
-different categories, (5) settings dialog with guided review. Invalid IDs
-error with a list of available scenarios. Demo mode bypasses git
-detection and instance locking; demo data is self-contained and does not
-affect real reviews.
+different categories, (5) settings dialog with guided review, (6) direct
+comparison (`--diff`) of two folders — a fabricated `compare: A ↔ B`
+review for screenshotting doc 18's CLI mode. Invalid IDs error with a
+list of available scenarios. Demo mode bypasses git detection and
+instance locking; demo data is self-contained and does not affect real
+reviews.
 
 ## 14. Navigation (`13-navigation.md`) — **Shipped**
 

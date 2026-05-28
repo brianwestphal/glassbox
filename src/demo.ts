@@ -14,6 +14,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
   { id: 3, label: 'Narrative mode with walkthrough notes' },
   { id: 4, label: 'Annotations with different categories' },
   { id: 5, label: 'Settings dialog with guided review' },
+  { id: 6, label: 'Direct comparison (--diff) of two folders' },
 ];
 
 // --- Fake file diffs ---
@@ -429,8 +430,18 @@ const ANNOTATIONS: Array<{ filePath: string; line: number; side: string; categor
 export async function setupDemoReview(scenario: number): Promise<{ reviewId: string }> {
   const repoRoot = process.cwd();
 
+  // Scenario 6 fakes the `--diff <A> <B>` direct-comparison mode (doc 18) so a
+  // screenshot can show the `compare: A ↔ B` label and the relative-path file
+  // list. The other scenarios use the generic "demo" mode label.
+  const isDiffDemo = scenario === 6;
+  const repoName = isDiffDemo ? 'dist-old ↔ dist-new' : 'demo-project';
+  const mode = isDiffDemo
+    ? `diff:${JSON.stringify(['/Users/you/dist-old', '/Users/you/dist-new'])}`
+    : 'demo';
+  const modeArgs = isDiffDemo ? 'dist-old ↔ dist-new' : `scenario-${String(scenario)}`;
+
   // Create review
-  const review = await createReview(repoRoot, 'demo-project', 'demo', `scenario-${String(scenario)}`);
+  const review = await createReview(repoRoot, repoName, mode, modeArgs);
 
   // Add files
   const fileIdMap = new Map<string, string>();
@@ -479,6 +490,12 @@ export async function setupDemoReview(scenario: number): Promise<{ reviewId: str
 
     case 5: // Settings dialog (just needs guided review enabled)
       saveGuidedReviewConfig({ enabled: true, topics: ['programming', 'codebase', 'typescript', 'javascript'] });
+      await saveUserPreferences({ sort_mode: 'folder' });
+      break;
+
+    case 6: // Direct comparison (--diff) — visible difference is the
+      // `compare: A ↔ B` sidebar label and the lack of git history; reuses
+      // the standard demo files for content.
       await saveUserPreferences({ sort_mode: 'folder' });
       break;
 

@@ -87,11 +87,15 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 
 - **Split and unified diffs** with syntax-colored add/remove/context lines
 - **Line-level annotations** — click any line to add feedback with a category
+- **Image and SVG diffs** — binary images and SVGs render side-by-side with a **difference overlay**, a **swipeable slice tool**, and pixel-precision zoom/pan. SVGs offer a *Code* / *Rendered* toggle so you can review either the source or the rasterized output.
+- **Compare any two paths** — `glassbox --diff <A> <B>` reviews two arbitrary files or two arbitrary folders by path — no git repository required.
 - **Drag and drop** annotations to different lines
 - **Double-click** to edit, click the category badge to reclassify
 - **Collapsible folder tree** in the sidebar with file filter
 - **Resizable sidebar** and word wrap toggle
 - **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
+- **Go-to-definition and a nav stack** — click any symbol to jump to its definition, with back/forward through your trail
+- **Themes** — built-in Dark, Light, High Contrast, Dracula, and Tokyo Night, plus a custom theme editor with live preview
 - **Session persistence** — reviews survive restarts, pick up where you left off
 - **Smart review reuse** — re-running `glassbox` on the same commit updates diffs in place and migrates annotations to their new line positions
 - **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
@@ -129,6 +133,8 @@ For large, multi-file changes, the AI determines the optimal reading order: type
 If you're learning a new language, onboarding to an unfamiliar codebase, or new to programming, Guided Review generates educational annotations inline with the diff. Enable it in Settings and select the topics that apply to you — "Programming," "This codebase," or specific languages. Glassbox runs a separate analysis pass and inserts green "Learn" notes that explain concepts, idioms, and design decisions relevant to your experience level.
 
 Guided Review works in all three sidebar modes (folder, risk, and narrative) and runs independently of risk or narrative analysis. When enabled, risk and narrative analysis also adjust their output to be more detailed and educational.
+
+<img src="assets/demo-guided-review.png" alt="Guided review notes inline with the diff" width="720">
 
 ### How to use it
 
@@ -216,6 +222,9 @@ glassbox --files "src/**/*.ts,lib/*.js"
 # Review entire codebase
 glassbox --all
 
+# Compare two arbitrary files or folders by path (no git repo required)
+glassbox --diff ./dist-old ./dist-new
+
 # Resume a previous review
 glassbox --resume
 ```
@@ -233,6 +242,7 @@ glassbox --resume
 | `--branch <name>`      | Current branch vs the named branch                 |
 | `--files <patterns>`   | Specific files (comma-separated globs)             |
 | `--all`                | Entire codebase (all tracked files)                |
+| `--diff <a> <b>`       | Compare two arbitrary files or folders by path — no git repo required |
 | `--port <number>`      | Port to run on (default: 4183)                     |
 | `--resume`             | Resume the latest in-progress review for this mode |
 | `--browser`            | Open in browser instead of desktop window          |
