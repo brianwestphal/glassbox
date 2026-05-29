@@ -39,7 +39,6 @@ import {
   launchChromium,
   optimizeSvg,
   setRenderTextMode,
-  wrapSvg,
 } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
 
@@ -219,9 +218,11 @@ async function captureOne(scenario: Scenario, port: number): Promise<void> {
     const tree = await captureElementTree(page, 'body', {
       x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height,
     });
-    const inner = elementTreeToSvg(tree, VIEWPORT.width, VIEWPORT.height);
+    // domotion-svg 0.6.0: `elementTreeToSvg` now returns a complete SVG
+    // document (the old inner-markup behavior is `elementTreeToSvgInner`).
+    const svg = elementTreeToSvg(tree, VIEWPORT.width, VIEWPORT.height);
     const svgPath = resolve(OUT_DIR, `demo-${scenario.slug}.svg`);
-    writeFileSync(svgPath, optimizeSvg(wrapSvg(inner, VIEWPORT.width, VIEWPORT.height)));
+    writeFileSync(svgPath, optimizeSvg(svg));
 
     await ctx.close();
   } finally {

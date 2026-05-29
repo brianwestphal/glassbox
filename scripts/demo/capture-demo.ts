@@ -37,7 +37,7 @@ import {
   captureElementTree,
   clearEmbeddedFonts,
   cullElementsOutsideViewBox,
-  elementTreeToSvg,
+  elementTreeToSvgInner,
   generateAnimatedSvg,
   getEmbeddedFontFaceCss,
   gzipSvg,
@@ -412,7 +412,7 @@ async function main(): Promise<void> {
       // embedded-font @font-face is collected once below for the whole SVG.
       return {
         ...j.meta,
-        svgContent: chromeWrap(elementTreeToSvg(tree, CONTENT_W, CONTENT_H, j.prefix, false), {
+        svgContent: chromeWrap(elementTreeToSvgInner(tree, CONTENT_W, CONTENT_H, j.prefix, false), {
           title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
         }),
       };
