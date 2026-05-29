@@ -155,7 +155,7 @@ describe('renderSvgToPng', () => {
   });
 
   it('scales up to 10x base size', async () => {
-    // 100x50 SVG, scale = min(10, 8000/100) = 10, targetWidth = 1000
+    // 100x50 SVG, scale = min(10, 4000/100) = 10, targetWidth = 1000
     const svg = '<svg width="100" height="50"><rect/></svg>';
     await renderSvgToPng(svg);
 
@@ -163,13 +163,26 @@ describe('renderSvgToPng', () => {
     expect(call[1].fitTo.value).toBe(1000); // 100 * 10
   });
 
-  it('caps scale at 8000px max dimension', async () => {
-    // 2000x1000 SVG: maxDim=2000, scale=min(10, 8000/2000)=4, targetWidth=2000*4=8000
+  it('caps scale at MAX_RENDER_DIM (4000px) max dimension', async () => {
+    // 2000x1000 SVG: maxDim=2000, scale=min(10, 4000/2000)=2, targetWidth=4000
     const svg = '<svg width="2000" height="1000"><rect/></svg>';
     await renderSvgToPng(svg);
 
     const call = MockResvgClass.mock.calls[0];
-    expect(call[1].fitTo.value).toBe(8000); // 2000 * 4
+    expect(call[1].fitTo.value).toBe(4000); // 2000 * 2
+  });
+
+  // GB-838 — the 8000px cap was too aggressive for a real demo-annotations.svg
+  // (1280×800 viewBox): rasterizing to 8000×5000 took 10–28s, which exceeded
+  // the worker's 15s per-job timeout for the second image-comparison request.
+  // The 4000 cap keeps the same 1280×800 SVG at 4000×2500 (2.5× scale), which
+  // a warm worker renders in ~2s, leaving budget for concurrent requests.
+  it('renders a 1280x800 viewBox SVG at a queue-friendly target (GB-838)', async () => {
+    const svg = '<svg viewBox="0 0 1280 800"><rect/></svg>';
+    await renderSvgToPng(svg);
+    const call = MockResvgClass.mock.calls[0];
+    // maxDim=1280, scale=min(10, 4000/1280)=3.125, targetWidth=1280*3.125=4000
+    expect(call[1].fitTo.value).toBe(4000);
   });
 
   it('uses viewBox dimensions when width/height are absent', async () => {
@@ -177,7 +190,7 @@ describe('renderSvgToPng', () => {
     await renderSvgToPng(svg);
 
     const call = MockResvgClass.mock.calls[0];
-    // maxDim=400, scale=min(10,8000/400)=10, targetWidth=400*10=4000
+    // maxDim=400, scale=min(10, 4000/400)=10, targetWidth=400*10=4000
     expect(call[1].fitTo.value).toBe(4000);
   });
 

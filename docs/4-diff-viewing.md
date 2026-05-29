@@ -34,7 +34,7 @@ For newly added or deleted images (no A or B side), the toolbar shows "Metadata 
 SVG files support both code and rendered viewing via a "Code | Rendered" toggle in the bottom toolbar:
 
 - **Code mode** (default) — Shows the SVG as a normal text diff with split/unified, wrap, ignore whitespace, and syntax highlighting controls. Annotations are supported.
-- **Rendered mode** — Rasterizes the SVG to PNG using `@resvg/resvg-wasm` (WASM, no native bindings) and shows the same image comparison modes as binary images (metadata, difference, slice). Base size is determined from `width`/`height`/`viewBox` attributes (default 300x150 per HTML spec), scaled to 10x with a maximum of 8000px in the largest dimension.
+- **Rendered mode** — Rasterizes the SVG to PNG using `@resvg/resvg-wasm` (WASM, no native bindings) and shows the same image comparison modes as binary images (metadata, difference, slice). Base size is determined from `width`/`height`/`viewBox` attributes (default 300x150 per HTML spec), scaled to 10x with a maximum of **4000px** in the largest dimension. (The cap used to be 8000px; GB-838 lowered it because a single text-heavy 8000-px-wide render took 10–28s, exceeding the 15s per-job worker timeout and breaking the second concurrent rasterize call — see `MAX_RENDER_DIM` in `src/git/svg-rasterize-render.ts` for the full rationale.)
 
 The user's Code/Rendered choice is remembered across file selections.
 

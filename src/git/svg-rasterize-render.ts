@@ -147,16 +147,37 @@ export function svgUsesExternalFonts(svgData: Buffer): boolean {
 }
 
 /**
- * Rasterize an SVG string to PNG at 10x base size (max 8000px in largest
- * dimension). Synchronous CPU work — call from a worker thread, not the
- * request-handling event loop. Returns a PNG buffer.
+ * Maximum dimension of the rasterized PNG, in pixels. The "10x base" scale is
+ * intended for crisp zoom-in on small icon-style SVGs; the cap stops large
+ * SVGs from being upscaled into multi-tens-of-millions of pixels.
+ *
+ * GB-838 — the cap used to be `8000` (so a 1280×800 SVG rasterized to
+ * 8000×5000 = 40M pixels). `@resvg/resvg-wasm` is happy to attempt that, but
+ * a single render of a text-heavy SVG at that size takes 10–28 s on macOS
+ * arm64, which exceeds the worker's 15 s per-job timeout. Worse, two
+ * concurrent rasterize calls (which happens automatically when the image-
+ * comparison panel mounts both `<img>` layers) serialize on the single
+ * worker thread, so the second job blows past its timer even when the
+ * first succeeds — the user-visible symptom: "old side renders, new side
+ * is broken." Capping at 4000 px keeps the comparison canvas crisp at the
+ * zoom levels people actually use (~6× before pixelation is visible) and
+ * brings a single render down to ~2 s warm, leaving plenty of budget for
+ * queued concurrent requests.
+ */
+export const MAX_RENDER_DIM = 4000;
+
+/**
+ * Rasterize an SVG string to PNG at 10x base size (capped at
+ * {@link MAX_RENDER_DIM} px in the largest dimension). Synchronous CPU work —
+ * call from a worker thread, not the request-handling event loop. Returns a
+ * PNG buffer.
  */
 export async function renderSvgToPng(svgString: string): Promise<Buffer> {
   await ensureRenderInit();
   const { width, height } = parseSvgDimensions(svgString);
 
   const maxDim = Math.max(width, height);
-  const scale = Math.min(10, 8000 / maxDim);
+  const scale = Math.min(10, MAX_RENDER_DIM / maxDim);
   const targetWidth = Math.round(width * scale);
 
   const resvg = new ResvgClass(svgString, {
