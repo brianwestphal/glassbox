@@ -199,7 +199,15 @@ async function captureOne(scenario: Scenario, port: number): Promise<void> {
   try {
     await waitForServer(base);
     browser = await launchChromium();
-    const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    // Record a HAR alongside the PNG + SVG for each scenario. Gitignored
+    // (see `.gitignore`) — useful for debugging the network activity that
+    // produced the screenshot, not as a committed artifact.
+    const harPath = resolve(OUT_DIR, `demo-${scenario.slug}.har`);
+    const ctx = await browser.newContext({
+      viewport: VIEWPORT,
+      deviceScaleFactor: 1,
+      recordHar: { path: harPath },
+    });
     const page = await ctx.newPage();
     await page.goto(base, { waitUntil: 'networkidle' });
 

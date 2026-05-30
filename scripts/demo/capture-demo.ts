@@ -186,7 +186,14 @@ async function main(): Promise<void> {
       body: JSON.stringify({ show_risk_scores: true, risk_sort_dimension: 'aggregate' }),
     });
     browser = await launchChromium();
-    const ctx = await browser.newContext({ viewport: { width: CONTENT_W, height: CONTENT_H }, deviceScaleFactor: 1 });
+    // Record a HAR alongside the animated SVG output. Gitignored (see
+    // `.gitignore`) — useful for debugging the network activity that drove
+    // the storyboard, not as a committed artifact.
+    const ctx = await browser.newContext({
+      viewport: { width: CONTENT_W, height: CONTENT_H },
+      deviceScaleFactor: 1,
+      recordHar: { path: resolve(ROOT, 'assets/demo.har') },
+    });
     const page = await ctx.newPage();
 
     await page.goto(BASE, { waitUntil: 'networkidle' });
@@ -393,6 +400,9 @@ async function main(): Promise<void> {
     const endJobIndex = jobs.length; // appended after render
 
     // === Teardown, then render ============================================
+    // Close the context first so the recorded HAR is flushed to disk
+    // (`browser.close()` alone doesn't reliably write it out).
+    await ctx.close();
     await browser.close();
     browser = null;
     server.kill('SIGTERM');

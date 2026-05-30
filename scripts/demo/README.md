@@ -50,6 +50,13 @@ in both formats). Lives in `capture-stills.ts` and is intentionally
 independent of the animated hero pipeline above — no overlays, no
 composition, no chrome.
 
+Both pipelines also drop a **Playwright HAR** next to their other outputs
+(`assets/demo.har` for the animated capture, `assets/demo-<slug>.har` per
+stills scenario) so any oddity in a capture can be replayed and inspected
+from the recorded network traffic. The HARs are gitignored — multi-MB
+binary churn isn't worth tracking — but they're handy locally and Chrome
+DevTools / VS Code can both open them directly.
+
 ## Requirements
 
 - **Chromium** (Playwright) — installed with the project's dev dependencies.
@@ -57,7 +64,7 @@ composition, no chrome.
   bootstrap ports; a sandbox blocks that with a `mach_port_rendezvous … Permission
   denied` crash.
 - **`domotion-svg`** — pinned to an exact version in `devDependencies`
-  (currently `0.6.0`). The script calls `setRenderTextMode('embedded-font')` so
+  (currently `0.7.0`). The script calls `setRenderTextMode('embedded-font')` so
   the demo is always built in **embedded-font** mode: text is `<text>` rendered
   with an `@font-face` subset embedded in the SVG, so it looks identical on any
   viewer regardless of installed fonts, and it's lighter than the older

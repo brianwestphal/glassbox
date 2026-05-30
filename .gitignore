@@ -15,6 +15,10 @@ test-results/
 scripts/demo/.debug/
 scripts/demo/_*
 
+# HAR network logs captured alongside the demo screenshots — useful for
+# debugging a capture run but not worth tracking (multi-MB binary churn).
+*.har
+
 # Tauri
 src-tauri/target
 src-tauri/binaries
