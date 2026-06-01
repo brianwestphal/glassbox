@@ -1,7 +1,7 @@
 import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
-import { ImageModeSchema, saveAIPreferences } from '../../api/index.js';
+import { ImageModeSchema, saveAIPreferences, ScopeFilterSchema } from '../../api/index.js';
 import { asEl, asInput, toElement } from '../dom.js';
 import { diffViewStore } from '../stores/index.js';
 import { applyHighlighting, getLanguageList } from './highlight.js';
@@ -57,6 +57,15 @@ export function bindToolbar(): void {
     void saveAIPreferences({ ignore_whitespace: ignoreWhitespace });
   });
 
+  // GB-844 — scope filter chips. The store update drives the
+  // `#diff-container` CSS class via the `effect()` in `reflectToolbarState`.
+  void delegate(toolbar, 'click', '[data-scope-filter]', (_e, btn) => {
+    const parsed = ScopeFilterSchema.safeParse(asEl(btn).dataset.scopeFilter);
+    if (!parsed.success) return;
+    diffViewStore.actions.update({ scopeFilter: parsed.data });
+    void saveAIPreferences({ scope_filter: parsed.data });
+  });
+
   void delegate(toolbar, 'click', '[data-image-mode]', (_e, btn) => {
     const mode = asEl(btn).dataset.imageMode ?? '';
     diffViewStore.actions.update({ lastImageMode: mode });
@@ -84,6 +93,16 @@ function reflectToolbarState(): void {
     if (ws !== null) ws.classList.toggle('active', dv.ignoreWhitespace);
     document.querySelectorAll('[data-diff-mode]').forEach(b =>
       b.classList.toggle('active', asEl(b).dataset.diffMode === dv.diffMode));
+    // GB-844 — scope filter chip state + `#diff-container` class.
+    document.querySelectorAll('[data-scope-filter]').forEach(b =>
+      b.classList.toggle('active', asEl(b).dataset.scopeFilter === dv.scopeFilter));
+    const container = document.getElementById('diff-container');
+    if (container !== null) {
+      // Remove any prior scope-* class before setting the new one. Listing
+      // them explicitly is cheaper than a className regex scrub.
+      container.classList.remove('scope-adds', 'scope-removes', 'scope-changed');
+      if (dv.scopeFilter !== 'all') container.classList.add(`scope-${dv.scopeFilter}`);
+    }
   });
 }
 

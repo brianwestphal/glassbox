@@ -641,3 +641,28 @@
   0% { background: rgba(137, 180, 250, 0.3); }
   100% { background: transparent; }
 }
+
+// GB-844 — scope filters. A class on `#diff-container` hides the diff rows
+// that don't match the selected scope. CSS `:has()` lets us hide an entire
+// `.split-row` when none of its children match, so split mode collapses
+// cleanly without leaving empty gutters.
+//
+// Layout note: `display: none` is intentional (not `visibility: hidden`) so
+// the hidden rows don't reserve vertical space and the user actually sees
+// a denser view, which is the whole point of the filter.
+.diff-container {
+  &.scope-adds {
+    .diff-line.remove:not(.split-left, .split-right),
+    .diff-line.context:not(.split-left, .split-right) { display: none; }
+    .split-row:not(:has(.diff-line.add)) { display: none; }
+  }
+  &.scope-removes {
+    .diff-line.add:not(.split-left, .split-right),
+    .diff-line.context:not(.split-left, .split-right) { display: none; }
+    .split-row:not(:has(.diff-line.remove)) { display: none; }
+  }
+  &.scope-changed {
+    .diff-line.context:not(.split-left, .split-right) { display: none; }
+    .split-row:not(:has(.diff-line.add, .diff-line.remove)) { display: none; }
+  }
+}

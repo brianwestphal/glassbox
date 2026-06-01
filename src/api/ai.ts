@@ -180,6 +180,11 @@ export type SvgViewMode = z.infer<typeof SvgViewModeSchema>;
 export const ImageModeSchema = z.enum(['metadata', 'side-by-side', 'difference', 'slice']);
 export type ImageMode = z.infer<typeof ImageModeSchema>;
 
+// GB-844: scope filter — applied as a CSS class on `#diff-container` to hide
+// non-matching `.diff-line` rows. Default is `all` (no filter).
+export const ScopeFilterSchema = z.enum(['all', 'adds', 'removes', 'changed']);
+export type ScopeFilter = z.infer<typeof ScopeFilterSchema>;
+
 /**
  * Stored preferences shape. The GET response uses `z.string()` (not the
  * enum schemas) for fields the DB persists as plain strings, so a row
@@ -194,6 +199,7 @@ export const UserPreferencesShapeSchema = z.object({
   ignore_whitespace: z.boolean().optional(),
   svg_view_mode: z.string().optional(),
   last_image_mode: z.string().optional(),
+  scope_filter: z.string().optional(),
 });
 export type UserPreferencesShape = z.infer<typeof UserPreferencesShapeSchema>;
 
@@ -207,6 +213,7 @@ export const SaveAIPreferencesReqSchema = z.object({
   ignore_whitespace: z.boolean().optional(),
   svg_view_mode: SvgViewModeSchema.optional(),
   last_image_mode: ImageModeSchema.optional(),
+  scope_filter: ScopeFilterSchema.optional(),
 });
 export type SaveAIPreferencesReq = z.infer<typeof SaveAIPreferencesReqSchema>;
 
