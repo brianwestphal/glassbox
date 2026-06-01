@@ -72,6 +72,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 ### Key Directories
 
 - `src/cli.ts` — CLI entry point, arg parsing
+- `src/cli-difftool.ts` — `glassbox-difftool` bin entry (git-difftool bridge). Dereferences symlinks in `git difftool --dir-diff`'s asymmetric snapshot dirs, then exec's `glassbox --diff` on the resolved tree. See README "Use as `git difftool`" for setup.
 - `src/server.ts` — Hono app setup, middleware injection
 - `src/api/` — **Typed API layer (shared by client + server).** Each per-resource module (`annotations.ts`, `reviews.ts`, `themes.ts`, `files.ts`, `context.ts`, `outline.ts`, `image.ts`, `project-settings.ts`, `share-prompt.ts`, `system.ts`, `ai.ts`, `channel.ts`) defines a zod `XReqSchema` / `XRespSchema` for each endpoint and exports the inferred TS types alongside the typed client caller functions. Client callers go through `apiCall(RespSchema, path, ...)` (see `src/api/_runner.ts`) which validates the response against the schema before returning — a bad response fails loudly at the boundary. Server route handlers parse incoming bodies with `parseBody(c, ReqSchema)` and validate non-empty path params with `requirePathParam(c, name)` (both in `src/utils/parseBody.ts`), returning a structured 400 on failure. The schema is the single source of truth; drift fails at compile time AND at runtime.
 - `src/routes/api.ts` — JSON API (annotations CRUD, file status, review management). Handlers consume Req/Resp types from `src/api/`.

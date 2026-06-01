@@ -9,6 +9,7 @@ export default defineConfig([
   {
     entry: {
       cli: 'src/cli.ts',
+      'cli-difftool': 'src/cli-difftool.ts',
       channel: 'src/channel.ts',
       'svg-rasterize-worker': 'src/git/svg-rasterize-worker.ts',
     },

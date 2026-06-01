@@ -46,6 +46,7 @@ glassbox/
 | File | Purpose |
 |------|---------|
 | `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. |
+| `cli-difftool.ts` | Standalone `glassbox-difftool` bin entry — bridges `git difftool --dir-diff` into `glassbox --diff`. Built to `dist/cli-difftool.js` and shipped via `package.json`'s `"bin"` map. Walks both snapshot dirs, dereferences any symlinks into a temp tree (git uses symlinks on the right side of `--dir-diff`), then exec's the bundled `cli.js` with the resolved paths. Temp tree is removed on exit. |
 | `server.ts` | Hono app bootstrap. Middleware for `reviewId`/`currentReviewId`/`repoRoot`. Static asset routes. Registers route groups. |
 | `types.ts` | `AppEnv` (Hono `Env` with typed Variables). |
 | (JSX runtime) | Provided by **kerfjs** (`kerfjs/jsx-runtime`). `SafeHtml` / `raw()` / `Fragment` / `each` / `morph` / `mount` / `delegate` / `signal` / `effect` / `computed` / `defineStore` are all imported from `'kerfjs'`. Auto-escapes string children. Shared between server (SSR via `.toString()`) and client (`mount()`-driven reactivity). |

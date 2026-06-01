@@ -26,6 +26,7 @@ The CLI shall accept the following options:
 | `--files <patterns>` | Review specific files (comma-separated glob patterns) |
 | `--all` | Review entire codebase |
 | `--diff <pathA> <pathB>` | Compare two arbitrary files or folders by path (no git repo required — see doc 18) |
+| `glassbox-difftool <a> <b>` *(separate bin)* | git-difftool bridge — dereferences symlinks in the two `--dir-diff` snapshot dirs, then exec's `glassbox --diff`. See README "Use as `git difftool`" for the config snippet. |
 | `--port <number>` | Port to run on (default: 4183) |
 | `--resume` | Resume the latest in-progress review for this mode |
 | `--no-open` | Don't open browser automatically |

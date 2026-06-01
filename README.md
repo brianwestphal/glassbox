@@ -264,6 +264,37 @@ Create `.glassbox/settings.json` in your project directory to configure per-proj
 |-----|-------------|
 | `appName` | Custom window title and Dock name (defaults to "Glassbox — _folder name_") |
 
+### Use as `git difftool`
+
+Glassbox installs a companion binary, `glassbox-difftool`, that lets you register it as your `git difftool` so `git difftool --dir-diff <refA> <refB>` opens the diff in Glassbox automatically.
+
+```bash
+git config --global diff.tool glassbox
+git config --global difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE"'
+git config --global difftool.prompt false
+```
+
+Then:
+
+```bash
+git difftool --dir-diff HEAD~1 HEAD
+```
+
+**Use `--dir-diff`, not the per-file mode.** Glassbox is a session-based reviewer; the per-file mode would launch a separate Glassbox instance for each changed file (and collide on the instance lock). `--dir-diff` invokes Glassbox once with both snapshots.
+
+**Under the hood:** `git difftool --dir-diff` materializes its two snapshot directories asymmetrically — the right side is symlinks pointing into your working tree, which trips up plain `git diff --no-index`. `glassbox-difftool` dereferences those symlinks into a temp tree before handing the dirs to `glassbox --diff`, then cleans up on exit. Without the wrapper you'd see every modified file show up as a "deleted + added" pair instead of a modified entry.
+
+**Alternative: skip git difftool entirely.** Glassbox's native ref-aware modes already cover the workflows `git difftool` is for and produce cleaner diffs (real `git diff`, not `--no-index`):
+
+```bash
+glassbox --commit <sha>          # review one commit
+glassbox --range <from>..<to>    # review a range
+glassbox --branch main           # current branch vs main
+glassbox                         # uncommitted changes
+```
+
+Most users will find the native modes preferable. The `git difftool` integration exists for muscle memory.
+
 ---
 
 ## AI integration

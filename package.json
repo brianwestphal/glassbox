@@ -25,7 +25,8 @@
     "node": ">=20"
   },
   "bin": {
-    "glassbox": "./dist/cli.js"
+    "glassbox": "./dist/cli.js",
+    "glassbox-difftool": "./dist/cli-difftool.js"
   },
   "scripts": {
     "dev": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts",
