@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = new URL('../../../', import.meta.url).pathname;
 const sidecarScript = readFileSync(join(repoRoot, 'scripts/build-sidecar.sh'), 'utf-8');
 const tauriConf = JSON.parse(readFileSync(join(repoRoot, 'src-tauri/tauri.conf.json'), 'utf-8'));
+const macLauncherShim = readFileSync(join(repoRoot, 'src-tauri/resources/glassbox'), 'utf-8');
 
 describe('build-sidecar.sh', () => {
   it('copies cli.js into the sidecar server dir', () => {
@@ -46,5 +47,16 @@ describe('tauri.conf.json bundle.resources', () => {
     expect(resources).toContain('resources/glassbox-difftool');
     expect(resources).toContain('resources/glassbox-difftool-linux');
     expect(resources).toContain('resources/glassbox-difftool.cmd');
+  });
+});
+
+describe('macOS glassbox launcher shim', () => {
+  it('blocks on the server PID when GLASSBOX_DIFFTOOL_BLOCK is set (GB-855)', () => {
+    // The difftool wrapper sets this env var and relies on the shim waiting for
+    // the review window to close. If this `wait` goes away, the desktop
+    // difftool launch becomes fire-and-forget and tears down its temp snapshot
+    // mid-session.
+    expect(macLauncherShim).toContain('GLASSBOX_DIFFTOOL_BLOCK');
+    expect(macLauncherShim).toMatch(/wait\s+"\$NODE_PID"/);
   });
 });

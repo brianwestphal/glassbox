@@ -288,15 +288,18 @@ git config --global difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE"'
 git config --global difftool.prompt false
 ```
 
-Then:
+Then either:
 
 ```bash
-git difftool --dir-diff HEAD~1 HEAD
+git difftool --dir-diff HEAD~1 HEAD   # whole change set in one review (recommended)
+git difftool HEAD~1 HEAD              # step through changed files one at a time
 ```
 
-**Use `--dir-diff`, not the per-file mode.** Glassbox is a session-based reviewer; the per-file mode would launch a separate Glassbox instance for each changed file (and collide on the instance lock). `--dir-diff` invokes Glassbox once with both snapshots.
+**`--dir-diff` opens the entire change set in a single review** — the recommended mode for a session-based reviewer. **Per-file mode** (without `--dir-diff`) also works: git hands Glassbox one file at a time and waits for each review window to close before opening the next, just like a traditional difftool. The review is labeled with the file under review.
 
-**Under the hood:** `git difftool --dir-diff` materializes its two snapshot directories asymmetrically — the right side is symlinks pointing into your working tree, which trips up plain `git diff --no-index`. `glassbox-difftool` dereferences those symlinks into a temp tree before handing the dirs to `glassbox --diff`, then cleans up on exit. Without the wrapper you'd see every modified file show up as a "deleted + added" pair instead of a modified entry.
+**Desktop vs browser:** if the desktop app is installed, `git difftool` opens the review in the Glassbox window (matching what `glassbox --commit` does from the same folder). Otherwise it opens in your browser. _(The desktop-window launch is currently macOS-only; Linux/Windows desktop installs open the browser.)_
+
+**Under the hood:** `git difftool --dir-diff` materializes its two snapshot directories asymmetrically — the right side is symlinks pointing into your working tree, which trips up plain `git diff --no-index`. `glassbox-difftool` dereferences those symlinks into a temp tree before handing the dirs to `glassbox --diff`, then cleans up once the review window closes. Without the wrapper you'd see every modified file show up as a "deleted + added" pair instead of a modified entry.
 
 **Alternative: skip git difftool entirely.** Glassbox's native ref-aware modes already cover the workflows `git difftool` is for and produce cleaner diffs (real `git diff`, not `--no-index`):
 

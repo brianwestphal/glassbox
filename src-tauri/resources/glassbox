@@ -178,3 +178,12 @@ echo "$SERVER_URL $NODE_PID" > "$SERVER_INFO"
 # Launch the stub app (gives us the custom Dock/Cmd+Tab name)
 STUB_APP="$PROJECT_DIR/.glassbox/$APP_NAME.app"
 open -a "$STUB_APP"
+
+# When invoked by `glassbox-difftool`, block until the review window closes so
+# the caller can clean up its temp snapshot and (for per-file `git difftool`)
+# git advances to the next file only after this one is done. Closing the Tauri
+# window kills the sidecar server (it holds GLASSBOX_SIDECAR_PID), so waiting on
+# the backgrounded server PID is exactly "wait until the window closes".
+if [ -n "$GLASSBOX_DIFFTOOL_BLOCK" ]; then
+  wait "$NODE_PID" 2>/dev/null || true
+fi
