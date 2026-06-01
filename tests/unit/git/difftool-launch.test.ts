@@ -86,10 +86,17 @@ describe('resolveLaunchTarget', () => {
     expect(target).toEqual({ kind: 'browser', cli: '/Users/me/node_modules/glassbox/dist/cli.js' });
   });
 
-  it('falls back to browser on platforms with no verified desktop launch (e.g. win32)', () => {
-    // Windows desktop launch isn't enabled yet; even with files present we
-    // take the browser path until it's verified (GB-856).
-    const target = resolveLaunchTarget('C:/app/server', () => true, 'win32');
+  it('delegates to the Windows launcher .cmd when present (GB-856)', () => {
+    // Windows build layout: cli-difftool.js in <install>\server, launcher at
+    // <install>\resources\glassbox.cmd.
+    const winServerDir = 'C:/app/server';
+    const winLauncher = 'C:/app/resources/glassbox.cmd';
+    const target = resolveLaunchTarget(winServerDir, (p) => p === winLauncher, 'win32');
+    expect(target).toEqual({ kind: 'desktop', launcher: winLauncher });
+  });
+
+  it('falls back to browser on platforms with no launcher mapping (e.g. freebsd)', () => {
+    const target = resolveLaunchTarget('/app/server', () => true, 'freebsd');
     expect(target.kind).toBe('browser');
   });
 

@@ -110,10 +110,17 @@ try {
     // the Tauri window. The block env var tells it to wait for the window to
     // close before returning (so we don't tear down the temp tree early and so
     // per-file mode advances one file at a time).
-    const res = spawnSync(target.launcher, diffArgs, {
-      stdio: 'inherit',
-      env: { ...process.env, [DIFFTOOL_BLOCK_ENV]: '1' },
-    });
+    const env = { ...process.env, [DIFFTOOL_BLOCK_ENV]: '1' };
+    let res;
+    if (process.platform === 'win32') {
+      // A `.cmd` launcher must be run through a shell on Windows (Node refuses
+      // to spawn batch files directly). Pass one quoted command string with
+      // shell:true. Temp paths never contain quotes, so simple quoting is safe.
+      const cmd = [target.launcher, ...diffArgs].map((a) => `"${a}"`).join(' ');
+      res = spawnSync(cmd, { stdio: 'inherit', env, shell: true });
+    } else {
+      res = spawnSync(target.launcher, diffArgs, { stdio: 'inherit', env });
+    }
     process.exit(res.status ?? 0);
   } else {
     // npm install: run cli.js directly (opens the browser). The server runs in

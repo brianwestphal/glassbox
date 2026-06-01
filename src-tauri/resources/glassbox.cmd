@@ -1,6 +1,12 @@
 @echo off
 REM CLI launcher for Glassbox desktop app (Windows).
 REM Add the directory containing this file to your PATH.
+REM
+REM Paths verified against the Windows build layout (GB-856): the shim lives at
+REM <install>\resources\glassbox.cmd, with the binaries one level up
+REM (<install>\glassbox.exe, <install>\glassbox-node.exe) and the Node server in
+REM <install>\server\. So from %~dp0 (= <install>\resources\): node + exe are
+REM "..\", and cli.js is "..\server\".
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_DIR=%CD%"
@@ -19,7 +25,14 @@ goto parse_args
 :done_args
 
 if "%BROWSER_MODE%"=="1" (
-    "%SCRIPT_DIR%..\bin\glassbox-node.exe" "%SCRIPT_DIR%cli.js" --no-open --project-dir "%PROJECT_DIR%" %*
+    "%SCRIPT_DIR%..\glassbox-node.exe" "%SCRIPT_DIR%..\server\cli.js" --no-open --project-dir "%PROJECT_DIR%" %*
 ) else (
-    start "" "%SCRIPT_DIR%..\bin\glassbox.exe" --project-dir "%PROJECT_DIR%" %*
+    if defined GLASSBOX_DIFFTOOL_BLOCK (
+        REM Invoked by glassbox-difftool: run the app in the foreground so the
+        REM caller blocks until the window closes (keeps the difftool temp
+        REM snapshot alive and sequences per-file mode). No `start`.
+        "%SCRIPT_DIR%..\glassbox.exe" --project-dir "%PROJECT_DIR%" %*
+    ) else (
+        start "" "%SCRIPT_DIR%..\glassbox.exe" --project-dir "%PROJECT_DIR%" %*
+    )
 )

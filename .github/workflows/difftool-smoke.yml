@@ -33,7 +33,8 @@ jobs:
         run: |
           DEB=$(find src-tauri/target -name "*.deb" | head -1)
           echo "Installing $DEB"
-          sudo apt-get install -y "$DEB"
+          # `./`-prefix the path so apt treats it as a local file, not a pkg name.
+          sudo apt-get install -y "./$DEB"
       - name: Verify installed shim paths + bundled server (no GUI)
         run: |
           set -euo pipefail
@@ -78,7 +79,7 @@ jobs:
           kill $GUI 2>/dev/null || true
           pkill -f glassbox-node 2>/dev/null || true
 
-  windows-inspect:
+  windows-verify:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -96,15 +97,73 @@ jobs:
       - name: Build app (updater-signing failure after bundling is fine)
         run: npm run tauri build -- --bundles nsis
         continue-on-error: true
-      - name: Dump bundle layout (ground truth for Windows shim paths)
+      - name: Verify shim paths + bundled server (no GUI)
         shell: pwsh
         run: |
-          Write-Host "=== target/release exe + resources ==="
-          Get-ChildItem -Recurse src-tauri/target/release -Include glassbox.exe,glassbox-node.exe,cli.js,cli-difftool.js,*.cmd -ErrorAction SilentlyContinue |
-            ForEach-Object { $_.FullName }
-          Write-Host "=== resources/ tree under target/release ==="
-          Get-ChildItem -Recurse src-tauri/target/release -Directory -Filter resources -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host $_.FullName; Get-ChildItem $_.FullName | ForEach-Object { "  " + $_.Name } }
-          Write-Host "=== server/ tree under target/release ==="
-          Get-ChildItem -Recurse src-tauri/target/release -Directory -Filter server -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host $_.FullName; Get-ChildItem $_.FullName | ForEach-Object { "  " + $_.Name } }
+          $rel = "src-tauri/target/release"
+          $fail = $false
+          function Check($path, $label) {
+            if (Test-Path $path) { Write-Host "  ok   $label -> $path" }
+            else { Write-Host "  FAIL $label -> $path (missing)"; $script:fail = $true }
+          }
+          Write-Host ">>> shim path resolution (build layout = installed layout, relatively)"
+          # glassbox-difftool.cmd lives in resources\; binaries are one level up,
+          # cli-difftool.js is in ..\server\.
+          Check "$rel/glassbox.exe"               "TAURI_BIN (..\glassbox.exe)"
+          Check "$rel/glassbox-node.exe"          "NODE_BIN  (..\glassbox-node.exe)"
+          Check "$rel/server/cli.js"              "CLI_JS    (..\server\cli.js)"
+          Check "$rel/server/cli-difftool.js"     "CLI_DIFFTOOL_JS (..\server\cli-difftool.js)"
+          Check "$rel/resources/glassbox.cmd"     "launcher shim"
+          Check "$rel/resources/glassbox-difftool.cmd" "difftool shim"
+
+          Write-Host ">>> bundled Node serves a --diff review"
+          New-Item -ItemType Directory -Force -Path L,R | Out-Null
+          "a`nb`nc" | Out-File -Encoding ascii L/f.txt
+          "a`nX`nc" | Out-File -Encoding ascii R/f.txt
+          $p = Start-Process -PassThru -NoNewWindow -FilePath "$rel/glassbox-node.exe" `
+            -ArgumentList "$rel/server/cli.js","--diff","L","R","--no-open","--port","4321","--strict-port" `
+            -RedirectStandardOutput srv.log -RedirectStandardError srverr.log
+          $up = $false
+          for ($i=0; $i -lt 80; $i++) {
+            if ((Test-Path srv.log) -and (Select-String -Quiet "running at" srv.log)) { $up = $true; break }
+            Start-Sleep -Milliseconds 250
+          }
+          Get-Content srv.log -ErrorAction SilentlyContinue
+          if ($up) {
+            $code = (Invoke-WebRequest -UseBasicParsing http://localhost:4321/).StatusCode
+            if ($code -eq 200) { Write-Host "  ok   server responded 200" } else { Write-Host "  FAIL HTTP $code"; $fail = $true }
+            $rid = (Select-String -Path srv.log -Pattern "Review ([a-z0-9]+) created").Matches.Groups[1].Value
+            $files = (Invoke-WebRequest -UseBasicParsing "http://localhost:4321/api/files?reviewId=$rid").Content
+            if ($files -match "f.txt") { Write-Host "  ok   diff review contains f.txt" } else { Write-Host "  FAIL diff empty: $($files.Substring(0,[Math]::Min(120,$files.Length)))"; $fail = $true }
+          } else {
+            Write-Host "  FAIL server did not start"; Get-Content srverr.log -ErrorAction SilentlyContinue; $fail = $true
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if ($fail) { Write-Host "FAIL"; exit 1 } else { Write-Host "PASS: Windows difftool paths + server verified" }
+      - name: Best-effort full GUI launch (non-fatal; Windows runners have a desktop)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $rel = "src-tauri/target/release"
+          # Drive the difftool wrapper directly (skip NSIS install): point a git
+          # repo's difftool at glassbox-difftool.cmd via the build-layout paths.
+          $repo = Join-Path $env:RUNNER_TEMP "difftool-repo"
+          New-Item -ItemType Directory -Force -Path $repo | Out-Null
+          Push-Location $repo
+          git init -q; git config user.email t@t; git config user.name t
+          "a`nb" | Out-File -Encoding ascii x.txt; git add -A; git commit -qm one
+          "a`nB" | Out-File -Encoding ascii x.txt; git add -A; git commit -qm two
+          $shim = (Resolve-Path "$env:GITHUB_WORKSPACE/$rel/resources/glassbox-difftool.cmd").Path
+          git config diff.tool glassbox
+          git config difftool.glassbox.cmd "`"$shim`" `$LOCAL `$REMOTE"
+          git config difftool.prompt false
+          $job = Start-Job { git difftool --dir-diff HEAD^ HEAD }
+          $ok = $false
+          for ($i=0; $i -lt 60; $i++) {
+            if (Get-Process glassbox-node -ErrorAction SilentlyContinue) { $ok = $true; break }
+            Start-Sleep -Milliseconds 500
+          }
+          if ($ok) { Write-Host "GUI smoke: glassbox-node sidecar spawned" } else { Write-Host "GUI smoke: sidecar not observed" }
+          Stop-Job $job -ErrorAction SilentlyContinue; Remove-Job $job -Force -ErrorAction SilentlyContinue
+          Get-Process glassbox,glassbox-node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Pop-Location

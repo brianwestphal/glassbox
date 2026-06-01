@@ -82,12 +82,11 @@ export type LaunchTarget =
  * the macOS shim on a Linux box. `null` = no verified desktop launch for this
  * platform yet (falls back to the browser).
  *
- * Windows (`glassbox.cmd`) is intentionally omitted until its launch path is
- * verified — see GB-856 / the cross-platform difftool follow-up.
  */
 function launcherShimName(platform: NodeJS.Platform): string | null {
   if (platform === 'darwin') return 'glassbox';
   if (platform === 'linux') return 'glassbox-linux';
+  if (platform === 'win32') return 'glassbox.cmd';
   return null;
 }
 
