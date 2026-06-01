@@ -118,8 +118,13 @@ jobs:
 
           Write-Host ">>> bundled Node serves a --diff review"
           New-Item -ItemType Directory -Force -Path L,R | Out-Null
-          "a`nb`nc" | Out-File -Encoding ascii L/f.txt
-          "a`nX`nc" | Out-File -Encoding ascii R/f.txt
+          Set-Content -Path L/f.txt -Encoding ascii -Value @('alpha','beta','gamma')
+          Set-Content -Path R/f.txt -Encoding ascii -Value @('alpha','BETA-CHANGED','gamma','delta')
+          Write-Host "--- L/f.txt ---"; Get-Content L/f.txt
+          Write-Host "--- R/f.txt ---"; Get-Content R/f.txt
+          Write-Host "--- raw git diff --no-index (exit code follows) ---"
+          git --no-pager diff --no-index L/f.txt R/f.txt
+          Write-Host "git diff --no-index exit = $LASTEXITCODE"
           $p = Start-Process -PassThru -NoNewWindow -FilePath "$rel/glassbox-node.exe" `
             -ArgumentList "$rel/server/cli.js","--diff","L","R","--no-open","--port","4321","--strict-port" `
             -RedirectStandardOutput srv.log -RedirectStandardError srverr.log
