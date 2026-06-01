@@ -132,7 +132,6 @@ export const UserPreferencesSchema = z.object({
   ignore_whitespace: z.boolean(),
   svg_view_mode: z.string(),
   last_image_mode: z.string(),
-  scope_filter: z.string(),
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 

@@ -209,7 +209,6 @@ export async function getUserPreferences(): Promise<UserPreferences> {
     ignore_whitespace: false,
     svg_view_mode: 'code',
     last_image_mode: 'metadata',
-    scope_filter: 'all',
   };
   if (result.rows.length === 0) return defaults;
   // Some legacy rows may have NULL columns; fall back to defaults per field
@@ -222,7 +221,6 @@ export async function getUserPreferences(): Promise<UserPreferences> {
     ignore_whitespace: typeof raw.ignore_whitespace === 'boolean' ? raw.ignore_whitespace : defaults.ignore_whitespace,
     svg_view_mode: typeof raw.svg_view_mode === 'string' ? raw.svg_view_mode : defaults.svg_view_mode,
     last_image_mode: typeof raw.last_image_mode === 'string' ? raw.last_image_mode : defaults.last_image_mode,
-    scope_filter: typeof raw.scope_filter === 'string' ? raw.scope_filter : defaults.scope_filter,
   };
   return UserPreferencesSchema.parse(merged);
 }
@@ -232,16 +230,15 @@ export async function saveUserPreferences(prefs: Partial<UserPreferences>): Prom
   const current = await getUserPreferences();
   const merged = { ...current, ...prefs };
   await db.query(
-    `INSERT INTO user_preferences (id, sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace, svg_view_mode, last_image_mode, scope_filter)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO user_preferences (id, sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace, svg_view_mode, last_image_mode)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (id) DO UPDATE SET
        sort_mode = EXCLUDED.sort_mode,
        risk_sort_dimension = EXCLUDED.risk_sort_dimension,
        show_risk_scores = EXCLUDED.show_risk_scores,
        ignore_whitespace = EXCLUDED.ignore_whitespace,
        svg_view_mode = EXCLUDED.svg_view_mode,
-       last_image_mode = EXCLUDED.last_image_mode,
-       scope_filter = EXCLUDED.scope_filter`,
-    ['singleton', merged.sort_mode, merged.risk_sort_dimension, merged.show_risk_scores, merged.ignore_whitespace, merged.svg_view_mode, merged.last_image_mode, merged.scope_filter]
+       last_image_mode = EXCLUDED.last_image_mode`,
+    ['singleton', merged.sort_mode, merged.risk_sort_dimension, merged.show_risk_scores, merged.ignore_whitespace, merged.svg_view_mode, merged.last_image_mode]
   );
 }

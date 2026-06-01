@@ -77,14 +77,6 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
                 </div>
                 <button className="toolbar-btn" id="wrap-toggle">Wrap</button>
                 <button className="toolbar-btn" id="whitespace-toggle">Ignore Whitespace</button>
-                {/* GB-844: scope filters — hide non-matching diff rows via a
-                    class on `#diff-container`. CSS-only; no server change. */}
-                <div className="segmented-control diff-toolbar-scope">
-                  <button className="segment active" data-scope-filter="all" title="Show all lines">All</button>
-                  <button className="segment" data-scope-filter="adds" title="Show only added lines">Adds</button>
-                  <button className="segment" data-scope-filter="removes" title="Show only removed lines">Removes</button>
-                  <button className="segment" data-scope-filter="changed" title="Show only changed lines (hide context)">Changed</button>
-                </div>
               </div>
               <div className="diff-toolbar-right">
                 <button className="toolbar-btn" id="language-btn">Plain Text</button>

@@ -5,7 +5,6 @@ import {
   getCurrentReview,
   getSharePromptState,
   refreshReview,
-  ScopeFilterSchema,
   SortModeSchema,
   SvgViewModeSchema,
 } from "../api/index.js";
@@ -43,9 +42,6 @@ async function initAISorting() {
     const svgViewMode = SvgViewModeSchema.safeParse(prefs.svg_view_mode).success
       ? SvgViewModeSchema.parse(prefs.svg_view_mode)
       : 'code';
-    const scopeFilter = ScopeFilterSchema.safeParse(prefs.scope_filter).success
-      ? ScopeFilterSchema.parse(prefs.scope_filter)
-      : 'all';
     aiStore.actions.update({
       sortMode,
       riskSortDimension: prefs.risk_sort_dimension ?? 'aggregate',
@@ -55,7 +51,6 @@ async function initAISorting() {
       ignoreWhitespace: prefs.ignore_whitespace ?? false,
       svgViewMode,
       lastImageMode: prefs.last_image_mode ?? 'metadata',
-      scopeFilter,
     });
 
     // Check if AI is configured

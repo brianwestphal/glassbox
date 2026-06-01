@@ -51,9 +51,6 @@ interface DiffViewState {
   highlightAuto: boolean;
   detectedLang: string;
   collapsedFolders: Set<string>;
-  // GB-844: scope filter — applied as a CSS class on `#diff-container` to
-  // hide non-matching `.diff-line` rows. Persisted in `user_preferences`.
-  scopeFilter: 'all' | 'adds' | 'removes' | 'changed';
 }
 
 export const diffViewStore = defineStore({
@@ -67,7 +64,6 @@ export const diffViewStore = defineStore({
     highlightAuto: true,
     detectedLang: 'plaintext',
     collapsedFolders: new Set(),
-    scopeFilter: 'all',
   }),
   actions: (set, get) => ({
     update: (partial: Partial<DiffViewState>) => { set({ ...get(), ...partial }); },
