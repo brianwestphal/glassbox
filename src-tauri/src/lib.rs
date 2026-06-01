@@ -20,30 +20,17 @@ struct SidecarPid(Mutex<Option<u32>>);
 /// Holds the version string of a pending update, if any.
 struct PendingUpdate(Mutex<Option<String>>);
 
-/// Returns the expected symlink/install path for the CLI on this platform.
-fn cli_install_path() -> PathBuf {
-    #[cfg(target_os = "macos")]
-    {
-        PathBuf::from("/usr/local/bin/glassbox")
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let home = std::env::var("HOME").unwrap_or_default();
-        PathBuf::from(home).join(".local/bin/glassbox")
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let local_app_data =
-            std::env::var("LOCALAPPDATA").unwrap_or_else(|_| "C:\\Users\\Public".to_string());
-        PathBuf::from(local_app_data)
-            .join("Programs")
-            .join("glassbox")
-            .join("glassbox.cmd")
-    }
+/// One CLI binary to install (source script in the bundle + dest on PATH).
+struct CliEntry {
+    source: PathBuf,
+    dest: PathBuf,
 }
 
-/// Returns the path to the CLI script bundled in the app resources.
-fn cli_source_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+/// Returns every CLI we install onto PATH. Currently `glassbox` and (since GB-853)
+/// `glassbox-difftool`. Order matters for `install_cli`'s single osascript prompt
+/// on macOS — both symlinks are created in one elevated shell so the user sees
+/// one auth dialog, not two.
+fn cli_entries(app: &tauri::AppHandle) -> Result<Vec<CliEntry>, String> {
     let resource_dir = app
         .path()
         .resource_dir()
@@ -51,46 +38,100 @@ fn cli_source_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
     #[cfg(target_os = "macos")]
     {
-        Ok(resource_dir.join("resources").join("glassbox"))
+        Ok(vec![
+            CliEntry {
+                source: resource_dir.join("resources").join("glassbox"),
+                dest: PathBuf::from("/usr/local/bin/glassbox"),
+            },
+            CliEntry {
+                source: resource_dir.join("resources").join("glassbox-difftool"),
+                dest: PathBuf::from("/usr/local/bin/glassbox-difftool"),
+            },
+        ])
     }
     #[cfg(target_os = "linux")]
     {
-        Ok(resource_dir.join("resources").join("glassbox-linux"))
+        let home = std::env::var("HOME").unwrap_or_default();
+        let bin_dir = PathBuf::from(home).join(".local/bin");
+        Ok(vec![
+            CliEntry {
+                source: resource_dir.join("resources").join("glassbox-linux"),
+                dest: bin_dir.join("glassbox"),
+            },
+            CliEntry {
+                source: resource_dir
+                    .join("resources")
+                    .join("glassbox-difftool-linux"),
+                dest: bin_dir.join("glassbox-difftool"),
+            },
+        ])
     }
     #[cfg(target_os = "windows")]
     {
-        Ok(resource_dir.join("resources").join("glassbox.cmd"))
+        let local_app_data =
+            std::env::var("LOCALAPPDATA").unwrap_or_else(|_| "C:\\Users\\Public".to_string());
+        let bin_dir = PathBuf::from(local_app_data)
+            .join("Programs")
+            .join("glassbox");
+        Ok(vec![
+            CliEntry {
+                source: resource_dir.join("resources").join("glassbox.cmd"),
+                dest: bin_dir.join("glassbox.cmd"),
+            },
+            CliEntry {
+                source: resource_dir
+                    .join("resources")
+                    .join("glassbox-difftool.cmd"),
+                dest: bin_dir.join("glassbox-difftool.cmd"),
+            },
+        ])
     }
 }
 
-/// Returns the manual command string for installing the CLI.
-fn manual_install_command(source: &PathBuf, dest: &PathBuf) -> String {
+/// Returns the manual command string for installing every CLI entry. One
+/// composite command per platform so the user can paste a single line.
+fn manual_install_command(entries: &[CliEntry]) -> String {
     #[cfg(target_os = "macos")]
     {
-        format!(
-            "sudo sh -c 'mkdir -p \"{}\" && ln -sf \"{}\" \"{}\"'",
-            dest.parent().unwrap_or(dest).display(),
-            source.display(),
-            dest.display()
-        )
+        let parent = entries
+            .first()
+            .and_then(|e| e.dest.parent())
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let links = entries
+            .iter()
+            .map(|e| format!("ln -sf \"{}\" \"{}\"", e.source.display(), e.dest.display()))
+            .collect::<Vec<_>>()
+            .join(" && ");
+        format!("sudo sh -c 'mkdir -p \"{parent}\" && {links}'")
     }
     #[cfg(target_os = "linux")]
     {
-        format!(
-            "mkdir -p \"{}\" && ln -sf \"{}\" \"{}\"",
-            dest.parent().unwrap_or(dest).display(),
-            source.display(),
-            dest.display()
-        )
+        let parent = entries
+            .first()
+            .and_then(|e| e.dest.parent())
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let links = entries
+            .iter()
+            .map(|e| format!("ln -sf \"{}\" \"{}\"", e.source.display(), e.dest.display()))
+            .collect::<Vec<_>>()
+            .join(" && ");
+        format!("mkdir -p \"{parent}\" && {links}")
     }
     #[cfg(target_os = "windows")]
     {
-        format!(
-            "mkdir \"{}\" && copy \"{}\" \"{}\"",
-            dest.parent().unwrap_or(dest).display(),
-            source.display(),
-            dest.display()
-        )
+        let parent = entries
+            .first()
+            .and_then(|e| e.dest.parent())
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let copies = entries
+            .iter()
+            .map(|e| format!("copy \"{}\" \"{}\"", e.source.display(), e.dest.display()))
+            .collect::<Vec<_>>()
+            .join(" && ");
+        format!("mkdir \"{parent}\" && {copies}")
     }
 }
 
@@ -135,10 +176,12 @@ struct CliStatus {
 
 #[tauri::command]
 fn check_cli_installed(app: tauri::AppHandle) -> Result<CliStatus, String> {
-    let dest = cli_install_path();
-    let source = cli_source_path(&app)?;
-    let installed = dest.exists();
-    let manual_command = manual_install_command(&source, &dest);
+    let entries = cli_entries(&app)?;
+    // `installed` is true only when EVERY entry is on PATH — if `glassbox`
+    // is symlinked but `glassbox-difftool` isn't, the UI should still show
+    // "install" so the missing half gets added (GB-853).
+    let installed = entries.iter().all(|e| e.dest.exists());
+    let manual_command = manual_install_command(&entries);
     Ok(CliStatus {
         installed,
         manual_command,
@@ -152,27 +195,46 @@ struct InstallResult {
 
 #[tauri::command]
 fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
-    let source = cli_source_path(&app)?;
-    let dest = cli_install_path();
+    let entries = cli_entries(&app)?;
 
-    if !source.exists() {
-        return Err(format!(
-            "CLI script not found in app bundle: {}",
-            source.display()
-        ));
+    for entry in &entries {
+        if !entry.source.exists() {
+            return Err(format!(
+                "CLI script not found in app bundle: {}",
+                entry.source.display()
+            ));
+        }
     }
+
+    // The first entry's parent directory is the install dir (`/usr/local/bin`,
+    // `~/.local/bin`, etc.). All entries currently share the same parent.
+    let dest = entries
+        .first()
+        .map(|e| e.dest.clone())
+        .ok_or_else(|| "No CLI entries to install".to_string())?;
+    let parent = dest
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| dest.clone());
 
     #[cfg(target_os = "macos")]
     {
-        // Use osascript to get admin privileges — single prompt for both mkdir and symlink
+        // GB-853 — one osascript prompt for the whole install (both `glassbox`
+        // and `glassbox-difftool`). Two prompts would feel like the install
+        // half-failed even when it didn't.
+        let mut shell_cmd = format!("mkdir -p '{}'", parent.display());
+        for entry in &entries {
+            shell_cmd.push_str(&format!(
+                " && ln -sf '{}' '{}'",
+                entry.source.display(),
+                entry.dest.display()
+            ));
+        }
         let status = std::process::Command::new("osascript")
             .args([
                 "-e",
                 &format!(
-                    "do shell script \"mkdir -p '{}' && ln -sf '{}' '{}'\" with administrator privileges",
-                    dest.parent().unwrap_or(&dest).display(),
-                    source.display(),
-                    dest.display()
+                    "do shell script \"{shell_cmd}\" with administrator privileges"
                 ),
             ])
             .status()
@@ -185,26 +247,24 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
 
     #[cfg(target_os = "linux")]
     {
-        // Create ~/.local/bin if needed, then symlink
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+        std::fs::create_dir_all(&parent)
+            .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+        for entry in &entries {
+            // Remove existing symlink/file if present, then create fresh.
+            let _ = std::fs::remove_file(&entry.dest);
+            std::os::unix::fs::symlink(&entry.source, &entry.dest)
+                .map_err(|e| format!("Failed to create symlink for {}: {e}", entry.dest.display()))?;
         }
-        // Remove existing symlink/file if present
-        let _ = std::fs::remove_file(&dest);
-        std::os::unix::fs::symlink(&source, &dest)
-            .map_err(|e| format!("Failed to create symlink: {e}"))?;
     }
 
     #[cfg(target_os = "windows")]
     {
-        // Copy the .cmd file to the install location
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+        std::fs::create_dir_all(&parent)
+            .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+        for entry in &entries {
+            std::fs::copy(&entry.source, &entry.dest)
+                .map_err(|e| format!("Failed to copy {}: {e}", entry.source.display()))?;
         }
-        std::fs::copy(&source, &dest)
-            .map_err(|e| format!("Failed to copy CLI script: {e}"))?;
 
         // Add to user PATH via registry
         let output = std::process::Command::new("reg")

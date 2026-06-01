@@ -53,7 +53,7 @@ User double-clicks Glassbox.app
   → Checks for updates in background
 ```
 
-The welcome screen uses `window.__TAURI__.core.invoke()` to call `check_cli_installed` and `install_cli` Rust commands. These check whether `/usr/local/bin/glassbox` exists and create the symlink (with admin prompt on macOS).
+The welcome screen uses `window.__TAURI__.core.invoke()` to call `check_cli_installed` and `install_cli` Rust commands. Both commands act on the **entire CLI set** — `glassbox` and (since GB-853) `glassbox-difftool` — not just the launcher. `check_cli_installed` reports `installed: true` only when every entry is on PATH; `install_cli` symlinks all of them in a single elevated shell on macOS (one admin prompt, two symlinks) so a partial install is impossible.
 
 ### 2. CLI launch: `glassbox` (macOS — the complex one)
 

@@ -40,7 +40,10 @@
       "server/**/*",
       "resources/glassbox",
       "resources/glassbox-linux",
-      "resources/glassbox.cmd"
+      "resources/glassbox.cmd",
+      "resources/glassbox-difftool",
+      "resources/glassbox-difftool-linux",
+      "resources/glassbox-difftool.cmd"
     ],
     "createUpdaterArtifacts": true,
     "macOS": {

@@ -268,6 +268,8 @@ Create `.glassbox/settings.json` in your project directory to configure per-proj
 
 Glassbox installs a companion binary, `glassbox-difftool`, that lets you register it as your `git difftool` so `git difftool --dir-diff <refA> <refB>` opens the diff in Glassbox automatically.
 
+> Both binaries (`glassbox` + `glassbox-difftool`) are installed onto PATH together — `npm install -g glassbox` ships both via the `bin` map; the desktop app's **Install CLI** affordance symlinks both. If `glassbox` is on PATH but `glassbox-difftool` isn't (e.g. a pre-0.12 desktop install), re-run "Install CLI" from **Settings → General** to add the missing symlink.
+
 The easiest way to register it is to let the CLI do it for you:
 
 ```bash

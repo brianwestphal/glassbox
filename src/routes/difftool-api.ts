@@ -18,7 +18,7 @@ difftoolApiRoutes.get('/status', (c) => {
   return c.json(getDifftoolStatus('global'));
 });
 
-/** POST /difftool/register — { force?: boolean }. */
+// POST /difftool/register — body: { force?: boolean }.
 difftoolApiRoutes.post('/register', async (c) => {
   const parsed = await parseBody(c, RegisterDifftoolReqSchema);
   if (!parsed.ok) return parsed.response;

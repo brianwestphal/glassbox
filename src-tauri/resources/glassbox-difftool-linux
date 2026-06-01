@@ -1,0 +1,21 @@
+#!/bin/bash
+# `glassbox-difftool` — git-difftool bridge for Glassbox (Linux desktop install).
+#
+# Symlinked to PATH by the desktop app's "Install CLI" affordance:
+#   ~/.local/bin/glassbox-difftool -> this script
+#
+# Thin wrapper around `cli-difftool.js` (see `src/cli-difftool.ts` for the why).
+set -e
+
+SCRIPT_PATH="$(readlink -f "$0")"
+RESOURCES_DIR="$(dirname "$SCRIPT_PATH")"
+APP_DIR="$(dirname "$RESOURCES_DIR")"
+NODE_BIN="$APP_DIR/bin/glassbox-node"
+CLI_DIFFTOOL_JS="$RESOURCES_DIR/cli-difftool.js"
+
+# Fallback: same layout fallback as the `glassbox-linux` shim.
+if [ ! -f "$NODE_BIN" ]; then
+  NODE_BIN="$RESOURCES_DIR/../bin/glassbox-node"
+fi
+
+exec "$NODE_BIN" "$CLI_DIFFTOOL_JS" "$@"

@@ -86,6 +86,11 @@ mkdir -p "$SERVER_DIR"
 
 # Copy the built server bundle and client assets
 cp dist/cli.js "$SERVER_DIR/"
+# `glassbox-difftool` wrapper — resolves `cli.js` as a sibling via
+# `import.meta.url`, so it MUST sit next to cli.js. Forgetting this turns
+# `git difftool` into "command not found" for desktop-install users
+# (GB-853).
+cp dist/cli-difftool.js "$SERVER_DIR/"
 # SVG rasterization worker — spawned by cli.js as a sibling worker thread.
 # Must sit next to cli.js so `new URL('./svg-rasterize-worker.js', import.meta.url)`
 # resolves at runtime; forgetting this makes SVG image-diff rasterization fall

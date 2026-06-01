@@ -1,0 +1,23 @@
+#!/bin/bash
+# `glassbox-difftool` — git-difftool bridge for Glassbox (macOS desktop install).
+#
+# Symlinked to your PATH by the desktop app's "Install CLI" affordance:
+#   /usr/local/bin/glassbox-difftool -> this script
+#
+# Invoked by git via the config Glassbox writes (see `glassbox --register-difftool`):
+#   git config --global diff.tool glassbox
+#   git config --global difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE"'
+#
+# Thin wrapper: locate the bundled Node binary + `cli-difftool.js` and exec.
+# `cli-difftool.js` does the heavy lifting (dereferencing the asymmetric symlinks
+# `git difftool --dir-diff` materializes, then exec'ing `cli.js --diff`). See
+# `src/cli-difftool.ts` for the why.
+set -e
+
+SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+# Script lives at: Glassbox.app/Contents/Resources/resources/glassbox-difftool
+CONTENTS_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_PATH")")")"
+NODE_BIN="$CONTENTS_DIR/MacOS/glassbox-node"
+CLI_DIFFTOOL_JS="$CONTENTS_DIR/Resources/server/cli-difftool.js"
+
+exec "$NODE_BIN" "$CLI_DIFFTOOL_JS" "$@"
