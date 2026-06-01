@@ -36,6 +36,7 @@ export * from './ai.js';
 export * from './annotations.js';
 export * from './channel.js';
 export * from './context.js';
+export * from './difftool.js';
 export * from './files.js';
 export * from './image.js';
 export * from './outline.js';

@@ -27,6 +27,10 @@ The CLI shall accept the following options:
 | `--all` | Review entire codebase |
 | `--diff <pathA> <pathB>` | Compare two arbitrary files or folders by path (no git repo required — see doc 18) |
 | `glassbox-difftool <a> <b>` *(separate bin)* | git-difftool bridge — dereferences symlinks in the two `--dir-diff` snapshot dirs, then exec's `glassbox --diff`. See README "Use as `git difftool`" for the config snippet. |
+| `--register-difftool` | Register Glassbox as the current `git difftool` (writes `diff.tool`, `difftool.glassbox.cmd`, `difftool.prompt` at `--global` scope by default). Refuses to overwrite a non-Glassbox tool unless `--force` is also passed. Combine with `--local` to apply only inside the current repo. |
+| `--unregister-difftool` | Remove the Glassbox `git difftool` entries (only touches the keys we set; leaves third-party tools alone). |
+| `--local` | Used with `--register-difftool` / `--unregister-difftool`: scope the change to the current repository (`git config --local`) instead of `--global`. |
+| `--force` | Used with `--register-difftool`: overwrite an existing non-Glassbox `diff.tool` setting. |
 | `--port <number>` | Port to run on (default: 4183) |
 | `--resume` | Resume the latest in-progress review for this mode |
 | `--no-open` | Don't open browser automatically |

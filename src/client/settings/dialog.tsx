@@ -1,7 +1,7 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
-import type { AIPlatform, KeyStorage } from '../../api/index.js';
+import type { AIPlatform, DifftoolStatusResp, KeyStorage } from '../../api/index.js';
 import {
   deleteAIKey,
   disableChannel,
@@ -10,11 +10,14 @@ import {
   getAIKeyStatus,
   getChannelStatus,
   getClaudeCheck,
+  getDifftoolStatus,
   getProjectSettings,
   listAIModels,
   listThemes,
+  registerDifftool,
   saveAIConfig,
   saveAIKey,
+  unregisterDifftool,
   updateProjectSettings,
 } from '../../api/index.js';
 import { asButton, asEl, asInput, asSelect, toElement } from '../dom.js';
@@ -43,11 +46,14 @@ interface SettingsUIState {
   showMoreLangs: boolean;
   appName: string;
   activeThemeId: string;
+  // GB-850 — current `git difftool` registration state. Updated after
+  // register/unregister actions so the General tab's button re-renders.
+  difftoolStatus: DifftoolStatusResp;
 }
 
 export function showSettingsDialog(onClose?: () => void): void {
   void (async () => {
-    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus] = await Promise.all([
+    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus] = await Promise.all([
       getAIKeyStatus(),
       listAIModels(),
       getAIConfig(),
@@ -55,6 +61,7 @@ export function showSettingsDialog(onClose?: () => void): void {
       listThemes(),
       getClaudeCheck(),
       getChannelStatus(),
+      getDifftoolStatus(),
     ]);
 
     const channelState: ChannelState = {
@@ -64,7 +71,7 @@ export function showSettingsDialog(onClose?: () => void): void {
       meetsMinimum: channelCheck.meetsMinimum,
     };
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, onClose);
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, onClose);
   })();
 }
 
@@ -75,6 +82,7 @@ function renderSettingsModal(
   projectSettings: ProjectSettings,
   themesData: ThemesResponse,
   channelState: ChannelState,
+  initialDifftoolStatus: DifftoolStatusResp,
   onClose?: () => void,
 ): void {
   const isTauri = getTauriGlobal() !== undefined;
@@ -92,6 +100,7 @@ function renderSettingsModal(
     showMoreLangs: false,
     appName: projectSettings.appName ?? '',
     activeThemeId: themesData.activeId,
+    difftoolStatus: initialDifftoolStatus,
   });
 
   const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog"></div></div>);
@@ -164,6 +173,8 @@ interface Actions {
   saveKey: () => void;
   removeKey: () => void;
   toggleTopic: (topic: string) => void;
+  registerDifftoolAction: () => void;
+  unregisterDifftoolAction: () => void;
   dispose: () => void;
 }
 
@@ -293,12 +304,69 @@ function createActions(deps: ActionDeps): Actions {
     saveConfigDebounced();
   }
 
+  // GB-850 / GB-852 — register/unregister `glassbox-difftool` at --global
+  // scope. The dialog already shows the current `diff.tool` in its status
+  // row, so when the displayed status is a non-Glassbox tool, the button
+  // sends `force: true` directly (no redundant `window.confirm()` — the row
+  // itself was the confirmation, and we used to rely on the WKWebView
+  // confirm-panel handler which adds a moving part). On any failure we
+  // surface the server's actual error message so the user can act on it
+  // instead of staring at a generic "please try again" toast (GB-852).
+  async function refreshDifftoolStatus(): Promise<void> {
+    try {
+      const s = await getDifftoolStatus();
+      setUi({ difftoolStatus: s });
+    } catch {
+      // Non-fatal — UI just shows the prior status until the next open.
+    }
+  }
+  function registerDifftoolAction(): void {
+    void (async () => {
+      try {
+        const cur = ui.value.difftoolStatus;
+        // Force only when we already know the displayed `diff.tool` belongs to
+        // someone else — that's a deliberate "Replace" click. For a clean slate
+        // (no tool set, or already Glassbox), let the server's conflict guard
+        // run as a safety net in case the value changed since the dialog opened.
+        const force = cur.tool !== null && cur.tool !== 'glassbox';
+        let res = await registerDifftool({ force });
+        // Race: status changed under us between fetch and click. If the server
+        // reports a conflict we didn't anticipate, retry once with force.
+        if (!res.ok && res.reason === 'conflict') {
+          res = await registerDifftool({ force: true });
+        }
+        if (!res.ok) {
+          const detail = res.reason === 'git-failed'
+            ? `Couldn’t register the git difftool — ${res.message}`
+            : `Couldn’t register the git difftool — please try again.`;
+          flashSettingsError(detail);
+          return;
+        }
+        await refreshDifftoolStatus();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'unknown error';
+        flashSettingsError(`Couldn’t register the git difftool — ${msg}`);
+      }
+    })();
+  }
+  function unregisterDifftoolAction(): void {
+    void (async () => {
+      try {
+        await unregisterDifftool();
+        await refreshDifftoolStatus();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'unknown error';
+        flashSettingsError(`Couldn’t unregister the git difftool — ${msg}`);
+      }
+    })();
+  }
+
   function dispose(): void {
     if (configTimer) clearTimeout(configTimer);
     if (appNameTimer) clearTimeout(appNameTimer);
   }
 
-  return { saveConfig, saveConfigDebounced, saveAppNameDebounced, saveKey, removeKey, toggleTopic, dispose };
+  return { saveConfig, saveConfigDebounced, saveAppNameDebounced, saveKey, removeKey, toggleTopic, registerDifftoolAction, unregisterDifftoolAction, dispose };
 }
 
 // --- TabContext construction ---
@@ -325,6 +393,7 @@ function buildContext(args: {
     showMoreLangs: cur.showMoreLangs,
     appName: cur.appName,
     activeThemeId: cur.activeThemeId,
+    difftoolStatus: cur.difftoolStatus,
     saveConfig: args.actions.saveConfig,
     saveKey: args.actions.saveKey,
     removeKey: args.actions.removeKey,
@@ -386,6 +455,8 @@ function setupDelegates(args: {
     setUi({ appName: asInput(input).value });
     actions.saveAppNameDebounced();
   });
+  void delegate(overlay, 'click', '#difftool-register-btn', actions.registerDifftoolAction);
+  void delegate(overlay, 'click', '#difftool-unregister-btn', actions.unregisterDifftoolAction);
 
   // Profile tab
   void delegate(overlay, 'click', '.settings-tag', (_e, tag) => {

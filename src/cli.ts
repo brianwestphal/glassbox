@@ -43,6 +43,10 @@ Options:
   --ai-service-test   Use mock AI responses (no API calls, no tokens used)
   --help              Show this help message
 
+git difftool integration (see README "Use as git difftool"):
+  --register-difftool   Register Glassbox as your git difftool (--global by default; pair with --local for repo-scoped, --force to overwrite an existing tool)
+  --unregister-difftool Remove the Glassbox git difftool registration
+
 Examples:
   glassbox --uncommitted
   glassbox --commit abc123
@@ -68,6 +72,9 @@ export function parseArgs(
   noOpen: boolean;
   strictPort: boolean;
   projectDir: string | null;
+  difftoolAction: 'register' | 'unregister' | null;
+  difftoolLocal: boolean;
+  difftoolForce: boolean;
 } | null {
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
@@ -81,6 +88,9 @@ export function parseArgs(
   let noOpen = false;
   let strictPort = false;
   let projectDir: string | null = null;
+  let difftoolAction: 'register' | 'unregister' | null = null;
+  let difftoolLocal = false;
+  let difftoolForce = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -155,6 +165,18 @@ export function parseArgs(
       case "--project-dir":
         projectDir = args[++i];
         break;
+      case "--register-difftool":
+        difftoolAction = "register";
+        break;
+      case "--unregister-difftool":
+        difftoolAction = "unregister";
+        break;
+      case "--local":
+        difftoolLocal = true;
+        break;
+      case "--force":
+        difftoolForce = true;
+        break;
       default:
         if (arg.startsWith("--demo:")) {
           demo = parseInt(arg.slice(7), 10);
@@ -174,7 +196,7 @@ export function parseArgs(
     mode = { type: "uncommitted" };
   }
 
-  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir };
+  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce };
 }
 
 async function main() {
@@ -184,8 +206,41 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir } = parsed;
+  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce } = parsed;
   let { dataDir } = parsed;
+
+  // GB-850 — `--register-difftool` / `--unregister-difftool` are standalone
+  // CLI actions: run the git config write and exit, without booting the
+  // server or touching the review DB.
+  if (difftoolAction !== null) {
+    const { registerDifftool, unregisterDifftool, getDifftoolStatus } = await import("./git/difftool.js");
+    const scope = difftoolLocal ? 'local' as const : 'global' as const;
+    if (difftoolAction === 'register') {
+      const res = registerDifftool({ scope, force: difftoolForce });
+      if (res.ok) {
+        const replaced = res.replacedTool !== null ? ` (replaced previous tool: ${res.replacedTool})` : '';
+        console.log(`Glassbox registered as git difftool at --${scope} scope.${replaced}`);
+        console.log(`Try it with: git difftool --dir-diff HEAD~1 HEAD`);
+        process.exit(0);
+      }
+      if (res.reason === 'conflict') {
+        console.error(`Error: you currently have '${res.currentTool}' set as your git difftool.`);
+        console.error(`Pass --force to overwrite it with glassbox, or use --local to register only in this repo.`);
+        process.exit(1);
+      }
+      console.error(`Error: ${res.message}`);
+      process.exit(1);
+    }
+    // unregister
+    const status = getDifftoolStatus(scope);
+    const res = unregisterDifftool({ scope });
+    if (res.removed) {
+      console.log(`Glassbox unregistered as git difftool at --${scope} scope.`);
+    } else {
+      console.log(`Nothing to unregister at --${scope} scope (current tool: ${status.tool ?? 'none'}).`);
+    }
+    process.exit(0);
+  }
 
   setDebug(debug);
   setAIServiceTest(aiServiceTest);

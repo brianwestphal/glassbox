@@ -268,6 +268,18 @@ Create `.glassbox/settings.json` in your project directory to configure per-proj
 
 Glassbox installs a companion binary, `glassbox-difftool`, that lets you register it as your `git difftool` so `git difftool --dir-diff <refA> <refB>` opens the diff in Glassbox automatically.
 
+The easiest way to register it is to let the CLI do it for you:
+
+```bash
+glassbox --register-difftool          # writes the three keys at --global scope
+glassbox --register-difftool --local  # only inside the current repo
+glassbox --unregister-difftool        # remove (only touches keys we set)
+```
+
+If you already have a different `diff.tool` configured, `--register-difftool` refuses to clobber it; pass `--force` to overwrite. The same controls live under **Settings → General** in the app (Register / Re-register / Unregister buttons).
+
+If you'd rather wire it up by hand, the equivalent config is:
+
 ```bash
 git config --global diff.tool glassbox
 git config --global difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE"'

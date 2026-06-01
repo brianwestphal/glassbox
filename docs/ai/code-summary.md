@@ -79,6 +79,7 @@ glassbox/
 | `ai.ts` | Config / models / key-status / key / analysis (start/get/status) / preferences / debug. |
 | `themes.ts` | Themes list / active / create / edit / update / delete. |
 | `channel.ts` | Channel status / enable / disable / trigger / claude-check. |
+| `difftool.ts` | `git difftool` registration status / register / unregister. Backs both `glassbox --register-difftool` and the **Settings → General** button. |
 
 How the layer is used:
 - **Client** imports the typed callers — `await createAnnotation({...})` instead of `api<{...inline shape...}>('/annotations', {method: 'POST', body: {...}})`. No call site knows raw URLs anymore. The flat namespace `apis.createAnnotation(...)` is also available.
@@ -141,6 +142,7 @@ See §6 for the schema itself.
 | `svg-rasterize-render.ts` | Shared synchronous render core (`@resvg/resvg-wasm`, font loading, 10x→8000px scale math). Used by both the worker and the in-process fallback. |
 | `svg-rasterize-worker.ts` | Worker-thread entry: initializes WASM, renders SVG→PNG off the main thread. Emitted by tsup as `dist/svg-rasterize-worker.js` and copied next to `cli.js` in the sidecar. `svg-rasterize-worker-boot.mjs` is a dev-only shim that registers the tsx loader so the worker can load TS source. |
 | `parseDiffData.ts` | Pure helper to parse `review_files.diff_data` JSON into `FileDiff` (or `null` for missing/corrupt). Safe to import from both server and client bundles. |
+| `difftool.ts` | `git difftool` registration helpers — `getDifftoolStatus(scope)`, `registerDifftool({scope, force})`, `unregisterDifftool({scope})`. Pure wrappers over `git config`. `registerDifftool` refuses to overwrite a non-Glassbox `diff.tool` unless `force: true`. `unregisterDifftool` only touches keys we set (won't delete a third-party tool just because the cmd happens to match). Called from `cli.ts` (`--register-difftool` / `--unregister-difftool` flags) and from `routes/difftool-api.ts` (settings dialog). |
 
 ### `src/ai/` — AI analysis subsystem
 
@@ -310,6 +312,12 @@ guided-review config endpoints.
 
 `GET /status`, `POST /enable`, `POST /disable`, `POST /trigger`,
 `GET /claude-check`.
+
+### `/api/difftool/*` (`routes/difftool-api.ts`)
+
+`GET /status`, `POST /register`, `POST /unregister`. Always operates at
+`--global` scope (the settings dialog is the "what affects every repo I use"
+surface; `--local` stays CLI-only). Backed by helpers in `src/git/difftool.ts`.
 
 ## 6. Database schema
 

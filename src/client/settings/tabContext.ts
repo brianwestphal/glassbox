@@ -1,6 +1,7 @@
 import type { SafeHtml } from 'kerfjs';
 
 import type {
+  DifftoolStatusResp,
   GetAIKeyStatusResp,
   GetProjectSettingsResp,
   ListAIModelsResp,
@@ -47,6 +48,12 @@ export interface TabContext {
   showMoreLangs: boolean;
   appName: string;
   activeThemeId: string;
+
+  // GB-850 — current `git difftool` registration state at --global scope.
+  // The General tab reads this to render either a "Register" or "Registered"
+  // affordance; the registerDifftool/unregisterDifftool actions refetch and
+  // update it.
+  difftoolStatus: DifftoolStatusResp;
 
   // Cross-tab actions kept for the small number of tabs whose render fn
   // emits inline event handlers (e.g. updates-tab status text). Most tab
