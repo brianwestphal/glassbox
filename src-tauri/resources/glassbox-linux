@@ -5,16 +5,20 @@
 
 set -e
 
+# Resolve paths from this shim's real location. Verified against the Linux .deb
+# layout (GB-856):
+#   <res>/resources/glassbox-linux   <- this script  ($RESOURCES_DIR)
+#   <res>/server/cli.js              <- Node server bundle
+#   /usr/bin/glassbox                <- Tauri binary   (res is /usr/lib/Glassbox,
+#   /usr/bin/glassbox-node           <- Node binary     so the bins are ../../../bin)
+# The same relative shape holds for the AppImage ($APPDIR/usr/{bin,lib/Glassbox}).
 SCRIPT_PATH="$(readlink -f "$0")"
 RESOURCES_DIR="$(dirname "$SCRIPT_PATH")"
-APP_DIR="$(dirname "$RESOURCES_DIR")"
-NODE_BIN="$APP_DIR/bin/glassbox-node"
-CLI_JS="$RESOURCES_DIR/cli.js"
-
-# Fallback: look for node binary in common locations
-if [ ! -f "$NODE_BIN" ]; then
-  NODE_BIN="$RESOURCES_DIR/../bin/glassbox-node"
-fi
+APP_ROOT="$(dirname "$RESOURCES_DIR")"          # .../usr/lib/Glassbox
+BIN_DIR="$(cd "$RESOURCES_DIR/../../../bin" 2>/dev/null && pwd || echo "$APP_ROOT/bin")"
+NODE_BIN="$BIN_DIR/glassbox-node"
+TAURI_BIN="$BIN_DIR/glassbox"
+CLI_JS="$APP_ROOT/server/cli.js"
 
 PROJECT_DIR="$(pwd)"
 BROWSER_MODE=false
@@ -41,10 +45,10 @@ done
 if [ "$BROWSER_MODE" = true ]; then
   exec "$NODE_BIN" "$CLI_JS" "${PASSTHROUGH_ARGS[@]}"
 else
-  # Find the Tauri binary
-  TAURI_BIN="$APP_DIR/bin/glassbox"
-  if [ ! -f "$TAURI_BIN" ]; then
-    TAURI_BIN="$APP_DIR/glassbox"
-  fi
+  # exec the Tauri binary directly. Because exec replaces this process, a caller
+  # that waits on the shim (e.g. `glassbox-difftool`) blocks until the window
+  # closes — no separate GLASSBOX_DIFFTOOL_BLOCK handling needed on Linux. The
+  # Tauri app spawns its own sidecar from the passed-through args (incl. --diff,
+  # which it forwards to cli.js — see src-tauri/src/lib.rs, GB-856).
   exec "$TAURI_BIN" --project-dir "$PROJECT_DIR" "${PASSTHROUGH_ARGS[@]}"
 fi

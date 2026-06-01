@@ -4,18 +4,18 @@
 # Symlinked to PATH by the desktop app's "Install CLI" affordance:
 #   ~/.local/bin/glassbox-difftool -> this script
 #
-# Thin wrapper around `cli-difftool.js` (see `src/cli-difftool.ts` for the why).
+# Thin wrapper around `cli-difftool.js` (see src/cli-difftool.ts for the why).
+# Paths verified against the Linux .deb layout (GB-856):
+#   <res>/resources/glassbox-difftool-linux  <- this script ($RESOURCES_DIR)
+#   <res>/server/cli-difftool.js             <- the wrapper
+#   /usr/bin/glassbox-node                   <- Node binary (../../../bin)
 set -e
 
 SCRIPT_PATH="$(readlink -f "$0")"
 RESOURCES_DIR="$(dirname "$SCRIPT_PATH")"
-APP_DIR="$(dirname "$RESOURCES_DIR")"
-NODE_BIN="$APP_DIR/bin/glassbox-node"
-CLI_DIFFTOOL_JS="$RESOURCES_DIR/cli-difftool.js"
-
-# Fallback: same layout fallback as the `glassbox-linux` shim.
-if [ ! -f "$NODE_BIN" ]; then
-  NODE_BIN="$RESOURCES_DIR/../bin/glassbox-node"
-fi
+APP_ROOT="$(dirname "$RESOURCES_DIR")"          # .../usr/lib/Glassbox
+BIN_DIR="$(cd "$RESOURCES_DIR/../../../bin" 2>/dev/null && pwd || echo "$APP_ROOT/bin")"
+NODE_BIN="$BIN_DIR/glassbox-node"
+CLI_DIFFTOOL_JS="$APP_ROOT/server/cli-difftool.js"
 
 exec "$NODE_BIN" "$CLI_DIFFTOOL_JS" "$@"

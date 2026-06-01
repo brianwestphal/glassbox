@@ -568,6 +568,20 @@ pub fn run() {
                             sidecar_args.push(dir.clone());
                         }
                     }
+                    // GB-856 — forward `--diff <a> <b>` so the Linux/Windows
+                    // `git difftool` path (where the launcher execs this binary,
+                    // and the app spawns its own sidecar) actually renders the
+                    // diff. Without this the window would open on the project's
+                    // default mode instead of the requested comparison. macOS
+                    // doesn't hit this branch (its launcher pre-starts the
+                    // server and we connect via GLASSBOX_SERVER_URL).
+                    if let Some(i) = app_args.iter().position(|a| a == "--diff") {
+                        if let (Some(a), Some(b)) = (app_args.get(i + 1), app_args.get(i + 2)) {
+                            sidecar_args.push("--diff".to_string());
+                            sidecar_args.push(a.clone());
+                            sidecar_args.push(b.clone());
+                        }
+                    }
 
                     let sidecar = app
                         .shell()

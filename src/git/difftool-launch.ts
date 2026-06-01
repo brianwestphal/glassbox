@@ -76,21 +76,46 @@ export type LaunchTarget =
   | { kind: 'browser'; cli: string };
 
 /**
- * Pick the launch target based on the wrapper's own location.
+ * The per-platform desktop launcher-shim filename, as bundled under the app's
+ * `resources/` directory. The bundle ships *all* platforms' shims, so we must
+ * pick by the running platform — probing a bare `glassbox` would wrongly match
+ * the macOS shim on a Linux box. `null` = no verified desktop launch for this
+ * platform yet (falls back to the browser).
  *
- * In a desktop bundle the layout is
- *   App/Contents/Resources/server/cli-difftool.js   (selfDir)
- *   App/Contents/Resources/resources/glassbox       (launcher shim)
- * so the launcher is `selfDir/../resources/glassbox`. If that shim exists we
- * delegate to it (Tauri). Otherwise we run the sibling `cli.js` (browser) — the
+ * Windows (`glassbox.cmd`) is intentionally omitted until its launch path is
+ * verified — see GB-856 / the cross-platform difftool follow-up.
+ */
+function launcherShimName(platform: NodeJS.Platform): string | null {
+  if (platform === 'darwin') return 'glassbox';
+  if (platform === 'linux') return 'glassbox-linux';
+  return null;
+}
+
+/**
+ * Pick the launch target based on the wrapper's own location and platform.
+ *
+ * In every desktop bundle the layout is
+ *   <resourceDir>/server/cli-difftool.js   (selfDir)
+ *   <resourceDir>/resources/<launcher>     (launcher shim)
+ * (verified: macOS `Contents/Resources/{server,resources}`, Linux deb
+ * `/usr/lib/Glassbox/{server,resources}`). So the launcher is
+ * `selfDir/../resources/<launcher>`. If the platform's shim exists we delegate
+ * to it (Tauri); otherwise we run the sibling `cli.js` (browser) — the
  * `npm install` layout, where `cli.js` is right next to this file.
  *
- * `exists` is injected so the decision is unit-testable without a real FS.
+ * `exists` and `platform` are injected so the decision is unit-testable.
  */
-export function resolveLaunchTarget(selfDir: string, exists: (p: string) => boolean): LaunchTarget {
-  const launcher = join(selfDir, '..', 'resources', 'glassbox');
-  if (exists(launcher)) {
-    return { kind: 'desktop', launcher };
+export function resolveLaunchTarget(
+  selfDir: string,
+  exists: (p: string) => boolean,
+  platform: NodeJS.Platform,
+): LaunchTarget {
+  const shim = launcherShimName(platform);
+  if (shim !== null) {
+    const launcher = join(selfDir, '..', 'resources', shim);
+    if (exists(launcher)) {
+      return { kind: 'desktop', launcher };
+    }
   }
   return { kind: 'browser', cli: join(selfDir, 'cli.js') };
 }

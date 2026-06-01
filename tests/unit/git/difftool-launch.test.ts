@@ -57,20 +57,44 @@ describe('resolveLaunchTarget', () => {
   const macBundleServerDir = '/Applications/Glassbox.app/Contents/Resources/server';
   const macLauncher = '/Applications/Glassbox.app/Contents/Resources/resources/glassbox';
 
-  it('delegates to the desktop launcher shim when running in a bundle (GB-855)', () => {
-    const target = resolveLaunchTarget(macBundleServerDir, (p) => p === macLauncher);
+  it('delegates to the macOS launcher shim when running in a macOS bundle (GB-855)', () => {
+    const target = resolveLaunchTarget(macBundleServerDir, (p) => p === macLauncher, 'darwin');
     expect(target).toEqual({ kind: 'desktop', launcher: macLauncher });
+  });
+
+  it('delegates to the Linux launcher shim from the verified .deb layout (GB-856)', () => {
+    // Linux deb: cli-difftool.js at /usr/lib/Glassbox/server, launcher at
+    // /usr/lib/Glassbox/resources/glassbox-linux.
+    const linuxServerDir = '/usr/lib/Glassbox/server';
+    const linuxLauncher = '/usr/lib/Glassbox/resources/glassbox-linux';
+    const target = resolveLaunchTarget(linuxServerDir, (p) => p === linuxLauncher, 'linux');
+    expect(target).toEqual({ kind: 'desktop', launcher: linuxLauncher });
+  });
+
+  it('does NOT match the macOS shim on Linux even though the bundle ships it (GB-856)', () => {
+    // The bundle includes every platform's shim. On Linux we must pick
+    // glassbox-linux, not the bare `glassbox` (the macOS shim, which uses
+    // `open -a` and would fail). Here both files "exist"; platform decides.
+    const linuxServerDir = '/usr/lib/Glassbox/server';
+    const target = resolveLaunchTarget(linuxServerDir, () => true, 'linux');
+    expect(target).toEqual({ kind: 'desktop', launcher: '/usr/lib/Glassbox/resources/glassbox-linux' });
   });
 
   it('falls back to the sibling cli.js for an npm install (no launcher shim)', () => {
     const npmDist = '/Users/me/node_modules/glassbox/dist';
-    const target = resolveLaunchTarget(npmDist, () => false);
+    const target = resolveLaunchTarget(npmDist, () => false, 'darwin');
     expect(target).toEqual({ kind: 'browser', cli: '/Users/me/node_modules/glassbox/dist/cli.js' });
   });
 
+  it('falls back to browser on platforms with no verified desktop launch (e.g. win32)', () => {
+    // Windows desktop launch isn't enabled yet; even with files present we
+    // take the browser path until it's verified (GB-856).
+    const target = resolveLaunchTarget('C:/app/server', () => true, 'win32');
+    expect(target.kind).toBe('browser');
+  });
+
   it('falls back to browser when the probed launcher path does not exist', () => {
-    // A dev running dist/cli-difftool.js directly: no top-level resources/ shim.
-    const target = resolveLaunchTarget('/repo/dist', () => false);
+    const target = resolveLaunchTarget('/repo/dist', () => false, 'linux');
     expect(target.kind).toBe('browser');
   });
 });

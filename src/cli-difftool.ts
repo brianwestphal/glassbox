@@ -97,7 +97,11 @@ try {
   }
 
   const here = dirname(fileURLToPath(import.meta.url));
-  const target = resolveLaunchTarget(here, (p) => { try { statSync(p); return true; } catch { return false; } });
+  const target = resolveLaunchTarget(
+    here,
+    (p) => { try { statSync(p); return true; } catch { return false; } },
+    process.platform,
+  );
 
   const diffArgs = ['--diff', plan.leftArg, plan.rightArg, ...extra];
 

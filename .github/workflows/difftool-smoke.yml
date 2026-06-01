@@ -1,0 +1,110 @@
+name: difftool cross-platform smoke
+
+# GB-856 — verify the `git difftool` desktop launch on Linux and discover the
+# Windows bundle layout. Manual / branch-scoped; not part of the release flow.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'gb-856-**'
+
+jobs:
+  linux-verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+      - run: npm ci
+      - name: Build sidecar
+        run: bash scripts/build-sidecar.sh x86_64-unknown-linux-gnu
+      - name: Build .deb (updater-signing failure after bundling is fine)
+        run: npm run tauri build -- --bundles deb || true
+      - name: Install the .deb
+        run: |
+          DEB=$(find src-tauri/target -name "*.deb" | head -1)
+          echo "Installing $DEB"
+          sudo apt-get install -y "$DEB"
+      - name: Verify installed shim paths + bundled server (no GUI)
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/glassbox && echo "ok glassbox bin"
+          test -x /usr/bin/glassbox-node && echo "ok glassbox-node bin"
+          test -f /usr/lib/Glassbox/server/cli.js && echo "ok cli.js"
+          test -f /usr/lib/Glassbox/server/cli-difftool.js && echo "ok cli-difftool.js"
+          test -f /usr/lib/Glassbox/resources/glassbox-difftool-linux && echo "ok difftool shim"
+          # Bundled node serves a --diff review from the installed layout.
+          mkdir -p /tmp/L /tmp/R
+          printf 'a\nb\nc\n' > /tmp/L/f.txt
+          printf 'a\nX\nc\n' > /tmp/R/f.txt
+          /usr/bin/glassbox-node /usr/lib/Glassbox/server/cli.js --diff /tmp/L /tmp/R --no-open --port 4321 --strict-port > /tmp/srv.log 2>&1 &
+          for i in $(seq 1 80); do grep -q "running at" /tmp/srv.log && break; sleep 0.25; done
+          cat /tmp/srv.log
+          RID=$(grep -oE "Review [a-z0-9]+ created" /tmp/srv.log | awk '{print $2}' | head -1)
+          curl -s "http://localhost:4321/api/files?reviewId=$RID" | grep -q "f.txt" && echo "ok diff review contains f.txt"
+      - name: Best-effort full GUI launch under xvfb (non-fatal)
+        continue-on-error: true
+        run: |
+          set -x
+          # Register the difftool against the installed wrapper, then drive it.
+          # The launch blocks (waits for the window), so background + timeout.
+          mkdir -p ~/.local/bin
+          ln -sf /usr/lib/Glassbox/resources/glassbox-difftool-linux ~/.local/bin/glassbox-difftool
+          export PATH="$HOME/.local/bin:$PATH"
+          R=$(mktemp -d); cd "$R"; git init -q; git config user.email t@t; git config user.name t
+          printf 'a\nb\n' > x.txt; git add -A; git commit -qm one
+          printf 'a\nB\n' > x.txt; git add -A; git commit -qm two
+          git config diff.tool glassbox
+          git config difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE"'
+          git config difftool.prompt false
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          timeout 45 xvfb-run -a git difftool --dir-diff HEAD^ HEAD &
+          GUI=$!
+          ok=0
+          for i in $(seq 1 60); do
+            if pgrep -f "cli.js.*--diff" >/dev/null; then ok=1; break; fi
+            sleep 0.5
+          done
+          if [ "$ok" = 1 ]; then echo "GUI smoke: sidecar with --diff spawned"; else echo "GUI smoke: sidecar not observed (webkit headless may have failed)"; fi
+          kill $GUI 2>/dev/null || true
+          pkill -f glassbox-node 2>/dev/null || true
+
+  windows-inspect:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - name: Build sidecar
+        run: bash scripts/build-sidecar.sh x86_64-pc-windows-msvc
+        shell: bash
+      - name: Build app (updater-signing failure after bundling is fine)
+        run: npm run tauri build -- --bundles nsis
+        continue-on-error: true
+      - name: Dump bundle layout (ground truth for Windows shim paths)
+        shell: pwsh
+        run: |
+          Write-Host "=== target/release exe + resources ==="
+          Get-ChildItem -Recurse src-tauri/target/release -Include glassbox.exe,glassbox-node.exe,cli.js,cli-difftool.js,*.cmd -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.FullName }
+          Write-Host "=== resources/ tree under target/release ==="
+          Get-ChildItem -Recurse src-tauri/target/release -Directory -Filter resources -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host $_.FullName; Get-ChildItem $_.FullName | ForEach-Object { "  " + $_.Name } }
+          Write-Host "=== server/ tree under target/release ==="
+          Get-ChildItem -Recurse src-tauri/target/release -Directory -Filter server -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host $_.FullName; Get-ChildItem $_.FullName | ForEach-Object { "  " + $_.Name } }
