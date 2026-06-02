@@ -473,14 +473,42 @@ switches are exhaustive). FR-18.11 was explicitly resolved as
 **CLI-only**: a desktop in-app file/folder picker was considered and
 deferred — the CLI entry point covers the workflow.
 
+## 18b. Git difftool integration (`19-difftool-integration.md`) — **Design only**
+
+Using Glassbox as a registered **`git difftool`** via the `glassbox-difftool`
+companion binary. Registration (`--register-difftool` / Settings → General) and
+`--dir-diff` (whole change set in one review) already work; this doc specifies
+the **per-file** experience.
+
+Per git's per-file model, git invokes the tool once per changed file and waits
+for each to exit before the next — historically causing browser-mode hangs.
+The spec replaces that with a **thin-client wrapper + single accumulating
+server** (Kaleidoscope model): each invocation reads the `$LOCAL`/`$REMOTE`
+content (before git deletes the temp files), finds-or-starts one detached
+server, appends the file to a single live review, and exits — so git advances
+and all files land in **one** tab/window. git exposes
+`GIT_DIFF_PATH_COUNTER`/`GIT_DIFF_PATH_TOTAL`, so the wrapper detects the **last**
+file and **holds** the `git difftool` command open until the user clicks
+**"Done"** (clean exit) or presses **Ctrl-C** (fallback); the held connection
+bounds the server's lifetime, so nothing is orphaned. Browser tab-close and
+desktop window-close are equivalent end signals. A new typed append endpoint
+takes raw old/new content; the sidebar grows as files arrive. Singleton server
+(concurrent runs merge, by design); `--dir-diff` stays a supported optimization.
+
+**Design only** — no implementation yet; follow-up tickets cover the wrapper +
+detached server, append API + live file list, desktop accumulation, lifecycle
+teardown, tests, and the README sync.
+
 ## 19. Implementation-status snapshot
 
-Every current requirements doc (1–18) is **Shipped**: review workflow,
+Every requirements doc 1–18 is **Shipped**: review workflow,
 CLI/server, git integration, diff viewing, annotations, export, AI
 analysis, UI, data storage, desktop app, build/distribution, demo mode,
 navigation, security, themes, share prompt, Claude channel, direct path
-comparison. When a new feature is spec'd before implementation, add a
-doc and mark the entry here **Design only** until the code lands.
+comparison. Doc **19** (git difftool integration) is **Design only** —
+spec written, implementation pending. When a new feature is spec'd before
+implementation, add a doc and mark the entry here **Design only** until the
+code lands.
 
 ## 20. Maintenance rules
 
@@ -519,6 +547,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/16-share-prompt.md` → §17
 - `docs/17-claude-channel.md` → §18
 - `docs/18-direct-comparison.md` → §18a
+- `docs/19-difftool-integration.md` → §18b
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

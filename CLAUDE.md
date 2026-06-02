@@ -55,6 +55,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `16-share-prompt.md` — Share prompt trigger, share button, Web Share API
 - `17-claude-channel.md` — Claude Code MCP channel integration, channel server, completion modal
 - `18-direct-comparison.md` — Diffing two arbitrary files or folders by path (`--diff`), independent of git history
+- `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
 
 **Architecture documents** describe system design and setup:
 

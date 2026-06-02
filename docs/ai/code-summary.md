@@ -26,7 +26,7 @@ specific files only when you need detail beyond what is here.
 glassbox/
 ├── src/                    # TypeScript source (server + client)
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
-├── docs/                   # Requirements (1-17) + ARCHITECTURE, tauri-*
+├── docs/                   # Requirements (1-19) + ARCHITECTURE, tauri-*
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
 ├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture)
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
@@ -677,5 +677,5 @@ two documents intentionally overlap.
 - `docs/ARCHITECTURE.md` — higher-level architecture narrative.
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive.
 - `docs/tauri-setup.md` — certificates, signing keys, GitHub secrets.
-- `docs/1-review-workflow.md` … `docs/17-claude-channel.md` — numbered
+- `docs/1-review-workflow.md` … `docs/19-difftool-integration.md` — numbered
   functional / non-functional requirements.
