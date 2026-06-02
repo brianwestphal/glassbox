@@ -117,16 +117,16 @@ jobs:
           Check "$rel/resources/glassbox-difftool.cmd" "difftool shim"
 
           Write-Host ">>> bundled Node serves a --diff review"
-          New-Item -ItemType Directory -Force -Path L,R | Out-Null
-          Set-Content -Path L/f.txt -Encoding ascii -Value @('alpha','beta','gamma')
-          Set-Content -Path R/f.txt -Encoding ascii -Value @('alpha','BETA-CHANGED','gamma','delta')
-          Write-Host "--- L/f.txt ---"; Get-Content L/f.txt
-          Write-Host "--- R/f.txt ---"; Get-Content R/f.txt
-          Write-Host "--- raw git diff --no-index (exit code follows) ---"
-          git --no-pager diff --no-index L/f.txt R/f.txt
-          Write-Host "git diff --no-index exit = $LASTEXITCODE"
+          # IMPORTANT: the two trees must live OUTSIDE the workspace git repo —
+          # `git diff --no-index` on dirs inside a repo doesn't recurse the way
+          # it does on standalone dirs (this matches real difftool usage, where
+          # git's snapshot dirs are in the system temp).
+          $L = Join-Path $env:RUNNER_TEMP "L"; $R = Join-Path $env:RUNNER_TEMP "R"
+          New-Item -ItemType Directory -Force -Path $L,$R | Out-Null
+          Set-Content -Path "$L/f.txt" -Encoding ascii -Value @('alpha','beta','gamma')
+          Set-Content -Path "$R/f.txt" -Encoding ascii -Value @('alpha','BETA-CHANGED','gamma','delta')
           $p = Start-Process -PassThru -NoNewWindow -FilePath "$rel/glassbox-node.exe" `
-            -ArgumentList "$rel/server/cli.js","--diff","L","R","--no-open","--port","4321","--strict-port" `
+            -ArgumentList "$rel/server/cli.js","--diff","$L","$R","--no-open","--port","4321","--strict-port" `
             -RedirectStandardOutput srv.log -RedirectStandardError srverr.log
           $up = $false
           for ($i=0; $i -lt 80; $i++) {
