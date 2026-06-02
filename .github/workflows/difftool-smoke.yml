@@ -125,6 +125,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path $L,$R | Out-Null
           Set-Content -Path "$L/f.txt" -Encoding ascii -Value @('alpha','beta','gamma')
           Set-Content -Path "$R/f.txt" -Encoding ascii -Value @('alpha','BETA-CHANGED','gamma','delta')
+          Write-Host "--- exact dir-diff the CLI runs: git diff --no-index -U3 <L> <R> ---"
+          git --no-pager diff --no-index -U3 "$L" "$R"
+          Write-Host "dir-diff exit = $LASTEXITCODE"
+          Write-Host "--- with forward slashes ---"
+          git --no-pager diff --no-index -U3 ($L -replace '\\','/') ($R -replace '\\','/')
+          Write-Host "fwd-slash dir-diff exit = $LASTEXITCODE"
           $p = Start-Process -PassThru -NoNewWindow -FilePath "$rel/glassbox-node.exe" `
             -ArgumentList "$rel/server/cli.js","--diff","$L","$R","--no-open","--port","4321","--strict-port" `
             -RedirectStandardOutput srv.log -RedirectStandardError srverr.log
