@@ -43,6 +43,28 @@ index abc1234..def5678 100644
     expect(hunk.lines[4]).toEqual({ type: 'context', oldNum: 3, newNum: 4, content: 'const d = 5;' });
   });
 
+  it('parses a --no-index header with absolute, forward-slashed Windows-style paths (GB-856)', () => {
+    // On Windows we hand git forward-slashed paths so it emits this plain
+    // (unquoted) header form. A backslash path would instead produce a quoted
+    // `diff --git "a/D:\\..." "b/..."` header, which this parser does not
+    // recognize — see toGitArg in src/git/diff.ts.
+    const raw = `diff --git a/D:/a/_temp/L/f.txt b/D:/a/_temp/R/f.txt
+index 85c3040..9973c97 100644
+--- a/D:/a/_temp/L/f.txt
++++ b/D:/a/_temp/R/f.txt
+@@ -1,3 +1,4 @@
+ alpha
+-beta
++BETA-CHANGED
+ gamma
++delta
+`;
+    const result = parseDiff(raw);
+    expect(result).toHaveLength(1);
+    expect(result[0].filePath).toBe('D:/a/_temp/R/f.txt');
+    expect(result[0].hunks).toHaveLength(1);
+  });
+
   it('parses a new file', () => {
     const raw = `diff --git a/new-file.ts b/new-file.ts
 new file mode 100644

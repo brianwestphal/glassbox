@@ -10,6 +10,19 @@ export { parseDiffData } from './parseDiffData.js';
 export { getHeadCommit,getRepoName, getRepoRoot, isGitRepo } from './repo.js';
 export type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 
+/**
+ * Normalize a path to forward slashes for `git diff --no-index` on Windows.
+ *
+ * git-for-windows, handed a backslash path, emits a *quoted, backslash-escaped*
+ * diff header — `diff --git "a/D:\\dir/f.txt" "b/..."` — which `parseDiff`
+ * doesn't recognize (it expects the plain `a/path b/path` form), so every file
+ * silently vanished and `--diff` reported "no changes" (GB-856). Passing
+ * forward slashes makes git emit the standard unquoted header. No-op off
+ * Windows, so unix filenames that legitimately contain backslashes are
+ * untouched.
+ */
+const toGitArg = (p: string): string => (process.platform === 'win32' ? p.replace(/\\/g, '/') : p);
+
 function git(args: string[], cwd: string): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
   if (result.status === 0) return result.stdout;
@@ -68,7 +81,9 @@ export function directComparisonRoots(mode: { pathA: string; pathB: string }): {
  * display-relative path `sub/x.ts`.
  */
 function stripRoot(headerPath: string, root: string): string {
-  const norm = root.replace(/^\/+/, '');
+  // The header path arrives forward-slashed (git emits `a/<root>/<rel>`); on
+  // Windows the root is backslashed, so normalize before comparing (GB-856).
+  const norm = root.replace(/\\/g, '/').replace(/^\/+/, '');
   const prefix = norm.endsWith('/') ? norm : `${norm}/`;
   return headerPath.startsWith(prefix) ? headerPath.slice(prefix.length) : headerPath;
 }
@@ -99,7 +114,7 @@ function getDirectComparisonFiles(mode: { pathA: string; pathB: string }, cwd: s
   const { rootA, rootB } = directComparisonRoots(mode);
   let rawDiff: string;
   try {
-    rawDiff = git(['diff', '--no-index', '-U3', mode.pathA, mode.pathB], cwd);
+    rawDiff = git(['diff', '--no-index', '-U3', toGitArg(mode.pathA), toGitArg(mode.pathB)], cwd);
   } catch {
     rawDiff = '';
   }
@@ -360,7 +375,7 @@ export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: 
     if (!existsSync(oldAbs) || !existsSync(newAbs)) return null;
     const args = ['diff', '--no-index', '-U3'];
     if (extraFlags) args.push(...extraFlags.split(' ').filter(Boolean));
-    args.push(oldAbs, newAbs);
+    args.push(toGitArg(oldAbs), toGitArg(newAbs));
     let rawDiff: string;
     try {
       rawDiff = git(args, repoRoot);
