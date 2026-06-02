@@ -297,7 +297,7 @@ git difftool HEAD~1 HEAD              # step through changed files one at a time
 
 **`--dir-diff` opens the entire change set in a single review** — the recommended mode for a session-based reviewer. **Per-file mode** (without `--dir-diff`) also works: git hands Glassbox one file at a time and waits for each review window to close before opening the next, just like a traditional difftool. The review is labeled with the file under review.
 
-**Desktop vs browser:** if the desktop app is installed, `git difftool` opens the review in the Glassbox window (matching what `glassbox --commit` does from the same folder). Otherwise it opens in your browser. _(The desktop-window launch works on macOS and Linux; Windows desktop installs open the browser for now.)_
+**Desktop vs browser:** if the desktop app is installed, `git difftool` opens the review in the Glassbox window (matching what `glassbox --commit` does from the same folder) on macOS, Linux, and Windows. Otherwise it opens in your browser.
 
 **Under the hood:** `git difftool --dir-diff` materializes its two snapshot directories asymmetrically — the right side is symlinks pointing into your working tree, which trips up plain `git diff --no-index`. `glassbox-difftool` dereferences those symlinks into a temp tree before handing the dirs to `glassbox --diff`, then cleans up once the review window closes. Without the wrapper you'd see every modified file show up as a "deleted + added" pair instead of a modified entry.
 

@@ -121,16 +121,12 @@ jobs:
           # `git diff --no-index` on dirs inside a repo doesn't recurse the way
           # it does on standalone dirs (this matches real difftool usage, where
           # git's snapshot dirs are in the system temp).
+          # Trees must live OUTSIDE the workspace git repo (matches real difftool
+          # usage, where git's snapshot dirs are in the system temp).
           $L = Join-Path $env:RUNNER_TEMP "L"; $R = Join-Path $env:RUNNER_TEMP "R"
           New-Item -ItemType Directory -Force -Path $L,$R | Out-Null
           Set-Content -Path "$L/f.txt" -Encoding ascii -Value @('alpha','beta','gamma')
           Set-Content -Path "$R/f.txt" -Encoding ascii -Value @('alpha','BETA-CHANGED','gamma','delta')
-          Write-Host "--- exact dir-diff the CLI runs: git diff --no-index -U3 <L> <R> ---"
-          git --no-pager diff --no-index -U3 "$L" "$R"
-          Write-Host "dir-diff exit = $LASTEXITCODE"
-          Write-Host "--- with forward slashes ---"
-          git --no-pager diff --no-index -U3 ($L -replace '\\','/') ($R -replace '\\','/')
-          Write-Host "fwd-slash dir-diff exit = $LASTEXITCODE"
           $p = Start-Process -PassThru -NoNewWindow -FilePath "$rel/glassbox-node.exe" `
             -ArgumentList "$rel/server/cli.js","--diff","$L","$R","--no-open","--port","4321","--strict-port" `
             -RedirectStandardOutput srv.log -RedirectStandardError srverr.log
@@ -150,7 +146,7 @@ jobs:
             Write-Host "  FAIL server did not start"; Get-Content srverr.log -ErrorAction SilentlyContinue; $fail = $true
           }
           Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-          if ($fail) { Write-Host "FAIL"; exit 1 } else { Write-Host "PASS: Windows difftool paths + server verified" }
+          if ($fail) { Write-Host "FAIL"; exit 1 } else { Write-Host "PASS: Windows difftool paths + server verified"; exit 0 }
       - name: Best-effort full GUI launch (non-fatal; Windows runners have a desktop)
         continue-on-error: true
         shell: pwsh
