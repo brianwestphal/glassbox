@@ -135,6 +135,27 @@ jobs:
       - run: npx playwright install chromium
       - run: npm run test:e2e
 
+  # Windows-native e2e (x64 runner, so Playwright's bundled Chromium runs without
+  # emulation — no PW_CHANNEL needed here). Not in the publish gate yet: it's
+  # newly enabled and Windows timing can flake, so it runs as a visible signal
+  # without blocking a release. Promote into `publish`'s `needs` once it's proven
+  # steady. (The harness was made Windows-portable to enable this — npx.cmd spawn,
+  # Node mkdir in config + build:client, favicon 204, and the GB-868 keychain fix.)
+  test-e2e-windows:
+    name: E2E Tests (Windows)
+    needs: [lint, typecheck, test-unit, audit]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:client
+      - run: npx playwright install chromium
+      - run: npm run test:e2e
+
   npm-pack:
     name: npm Pack (Dry Run)
     needs: [lint, typecheck, test-unit, audit]
