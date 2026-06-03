@@ -84,7 +84,10 @@ test.beforeAll(async () => {
     ['tsx', 'src/cli.ts', '--difftool-serve', '--no-open', '--strict-port', '--port', String(PORT), '--data-dir', dataDir],
     { stdio: 'ignore', env: { ...process.env } },
   );
-  await waitForReady(30_000);
+  // Generous ceiling: the `--difftool-serve` server (PGLite init + review
+  // create) can take >30s to answer on a slow/constrained machine. This is just
+  // an upper bound — it resolves as soon as the server is ready.
+  await waitForReady(60_000);
 });
 
 test.afterAll(() => {
