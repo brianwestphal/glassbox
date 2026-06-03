@@ -1,3 +1,4 @@
+import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -8,6 +9,13 @@ import { defineConfig } from '@playwright/test';
 // developer's real Glassbox state. A pid-scoped tmpdir gives each playwright
 // invocation a fresh review.
 const DIFF_WORK_DIR = join(tmpdir(), `glassbox-e2e-diff-${process.pid}`);
+
+// Create the work dir here (config eval runs before the webServers) rather than
+// via a shell `mkdir -p` in the webServer command — the CLI chdirs into
+// `--project-dir` before creating anything itself, so the dir must exist first.
+// Doing it in Node keeps it cross-platform (`mkdir -p` isn't valid on Windows
+// `cmd`, where it spuriously creates a `-p` dir and then errors on reruns).
+mkdirSync(DIFF_WORK_DIR, { recursive: true });
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -37,10 +45,9 @@ export default defineConfig({
       // Direct-comparison E2E server (doc 18). Boots `--diff` against the
       // checked-in fixture folders under `tests/fixtures/diff/{old,new}` and
       // anchors its `.glassbox/` data + export under a pid-scoped tmpdir so
-      // each playwright run starts from a clean slate. The `mkdir -p` runs
-      // first because the CLI chdirs into `--project-dir` before creating
-      // anything itself.
-      command: `mkdir -p ${JSON.stringify(DIFF_WORK_DIR)} && npx tsx src/cli.ts --diff tests/fixtures/diff/old tests/fixtures/diff/new --no-open --strict-port --port 4184 --data-dir ${JSON.stringify(join(DIFF_WORK_DIR, '.glassbox'))} --project-dir ${JSON.stringify(DIFF_WORK_DIR)}`,
+      // each playwright run starts from a clean slate. `DIFF_WORK_DIR` is
+      // created at config-eval time (above) so the command is just the server.
+      command: `npx tsx src/cli.ts --diff tests/fixtures/diff/old tests/fixtures/diff/new --no-open --strict-port --port 4184 --data-dir ${JSON.stringify(join(DIFF_WORK_DIR, '.glassbox'))} --project-dir ${JSON.stringify(DIFF_WORK_DIR)}`,
       port: 4184,
       reuseExistingServer: false,
       timeout: 15000,
