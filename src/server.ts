@@ -66,6 +66,10 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
     const js = readFileSync(join(distDir, 'history.global.js'), 'utf-8');
     return c.text(js, 200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
   });
+  // Browsers auto-request /favicon.ico. We don't ship one, so answer 204 rather
+  // than let it 404 — keeps the page console clean (and stops browsers that
+  // request it, e.g. full Chrome, from tripping the e2e page-error guard).
+  app.get('/favicon.ico', (c) => c.body(null, 204));
 
   // API routes
   app.route('/api', apiRoutes);
