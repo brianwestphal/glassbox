@@ -75,6 +75,7 @@ export function parseArgs(
   difftoolAction: 'register' | 'unregister' | null;
   difftoolLocal: boolean;
   difftoolForce: boolean;
+  difftoolServe: boolean;
 } | null {
   const args = argv.slice(2);
   let mode: ReviewMode | null = null;
@@ -91,6 +92,7 @@ export function parseArgs(
   let difftoolAction: 'register' | 'unregister' | null = null;
   let difftoolLocal = false;
   let difftoolForce = false;
+  let difftoolServe = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -171,6 +173,11 @@ export function parseArgs(
       case "--unregister-difftool":
         difftoolAction = "unregister";
         break;
+      case "--difftool-serve":
+        // Internal: started detached by the `glassbox-difftool` wrapper to host
+        // the accumulating session (doc 19). Not advertised in --help.
+        difftoolServe = true;
+        break;
       case "--local":
         difftoolLocal = true;
         break;
@@ -196,7 +203,7 @@ export function parseArgs(
     mode = { type: "uncommitted" };
   }
 
-  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce };
+  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce, difftoolServe };
 }
 
 async function main() {
@@ -206,7 +213,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce } = parsed;
+  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce, difftoolServe } = parsed;
   let { dataDir } = parsed;
 
   // GB-850 — `--register-difftool` / `--unregister-difftool` are standalone
@@ -259,6 +266,36 @@ async function main() {
   // Resolve data directory default after any chdir
   if (dataDir === null) {
     dataDir = join(process.cwd(), '.glassbox');
+  }
+
+  // Detached accumulating `git difftool` server (doc 19). Started by the
+  // `glassbox-difftool` wrapper; hosts a single review that grows as the
+  // wrapper appends files. It deliberately does NOT take the single-instance
+  // lock — it coexists with a normal `glassbox` run and manages its own
+  // lifetime via the session hold + discovery lockfile.
+  if (difftoolServe) {
+    const { initDifftoolSession } = await import("./difftool/session.js");
+    const { writeDiscovery, clearDiscovery, releaseStartingLock } = await import("./git/difftool-discovery.js");
+    mkdirSync(dataDir, { recursive: true });
+    setDataDir(dataDir);
+    const repoRoot = process.cwd();
+    const review = await createReview(repoRoot, "git difftool", "difftool");
+    const { port: actualPort, server } = await startServer(port, review.id, repoRoot, { noOpen, strictPort });
+    initDifftoolSession({
+      reviewId: review.id,
+      repoRoot,
+      shutdown: () => {
+        try { server.close(); } catch { /* already closing */ }
+        clearDiscovery();
+        releaseStartingLock();
+        process.exit(0);
+      },
+    });
+    // Record the port for the wrapper's discover-or-start loop, then release the
+    // start election so waiting invocations append instead of starting another.
+    writeDiscovery(actualPort);
+    releaseStartingLock();
+    return;
   }
 
   // Demo mode: use a fresh temp directory

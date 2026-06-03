@@ -29,7 +29,14 @@ pageRoutes.get('/', async (c) => {
     getAnnotationCountsForReview(reviewId),
   ]);
 
-  const footer = (
+  // A difftool session (doc 19) is a transient viewing session, not a tracked
+  // review to export: it offers a session-ending "Done" instead of "Complete".
+  const isDifftool = review.mode === 'difftool';
+  const footer = isDifftool ? (
+    <>
+      <button className="btn btn-primary" id="difftool-done">Done</button>
+    </>
+  ) : (
     <>
       <button className="btn btn-primary btn-complete" id="complete-review">Complete Review</button>
       <a href="/history" className="btn btn-sm btn-link">Review History</a>
@@ -37,7 +44,7 @@ pageRoutes.get('/', async (c) => {
   );
 
   const html = (
-    <Layout title={`Glassbox - ${review.repo_name}`} reviewId={reviewId}>
+    <Layout title={`Glassbox - ${review.repo_name}`} reviewId={reviewId} difftool={isDifftool}>
       <ReviewShell reviewId={reviewId} review={review} files={files} annotationCounts={annotationCounts} staleCounts={{}} footer={footer} />
     </Layout>
   );

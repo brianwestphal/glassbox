@@ -3,9 +3,26 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DIFFTOOL_BLOCK_ENV,
+  parseGitDiffCounter,
   planSnapshot,
   resolveLaunchTarget,
+  shouldHoldForSession,
 } from '../../../src/git/difftool-launch.js';
+
+// node:path.join produces native separators (backslashes on Windows); these
+// tests assert the path *logic*, not the separator style, so normalize before
+// comparing. Production code keeps native separators on purpose — that's what
+// cpSync / existsSync want.
+const norm = (p: string): string => p.replace(/\\/g, '/');
+const normPlan = (p: ReturnType<typeof planSnapshot>) => ({
+  leftArg: norm(p.leftArg),
+  rightArg: norm(p.rightArg),
+  copies: p.copies.map((c) => ({ from: norm(c.from), to: norm(c.to) })),
+});
+const normTarget = (t: ReturnType<typeof resolveLaunchTarget>) =>
+  t.kind === 'desktop'
+    ? { kind: t.kind, launcher: norm(t.launcher) }
+    : { kind: t.kind, cli: norm(t.cli) };
 
 // GB-854 / GB-855 — the wrapper's two decisions, tested without spawning a
 // real review: where to dereference (dir-diff vs per-file) and what to launch
@@ -14,12 +31,14 @@ import {
 describe('planSnapshot', () => {
   it('uses bare left/right roots for --dir-diff (directory inputs)', () => {
     const plan = planSnapshot('/git/left', '/git/right', '/work', false, basename);
-    expect(plan.leftArg).toBe('/work/left');
-    expect(plan.rightArg).toBe('/work/right');
-    expect(plan.copies).toEqual([
-      { from: '/git/left', to: '/work/left' },
-      { from: '/git/right', to: '/work/right' },
-    ]);
+    expect(normPlan(plan)).toEqual({
+      leftArg: '/work/left',
+      rightArg: '/work/right',
+      copies: [
+        { from: '/git/left', to: '/work/left' },
+        { from: '/git/right', to: '/work/right' },
+      ],
+    });
   });
 
   it('preserves the filename for a per-file invocation (GB-854)', () => {
@@ -32,24 +51,26 @@ describe('planSnapshot', () => {
       true,
       basename,
     );
-    expect(plan.leftArg).toBe('/work/left/strings.ts');
-    expect(plan.rightArg).toBe('/work/right/strings.ts');
-    expect(plan.copies).toEqual([
-      { from: '/tmp/git-blob-aaa/strings.ts', to: '/work/left/strings.ts' },
-      { from: '/tmp/git-blob-bbb/strings.ts', to: '/work/right/strings.ts' },
-    ]);
+    expect(normPlan(plan)).toEqual({
+      leftArg: '/work/left/strings.ts',
+      rightArg: '/work/right/strings.ts',
+      copies: [
+        { from: '/tmp/git-blob-aaa/strings.ts', to: '/work/left/strings.ts' },
+        { from: '/tmp/git-blob-bbb/strings.ts', to: '/work/right/strings.ts' },
+      ],
+    });
   });
 
   it('takes the per-file name from the remote (working-tree) side across a rename', () => {
     const plan = planSnapshot('/a/old-name.ts', '/b/new-name.ts', '/work', true, basename);
-    expect(plan.leftArg).toBe('/work/left/new-name.ts');
-    expect(plan.rightArg).toBe('/work/right/new-name.ts');
+    expect(norm(plan.leftArg)).toBe('/work/left/new-name.ts');
+    expect(norm(plan.rightArg)).toBe('/work/right/new-name.ts');
   });
 
   it('falls back to a literal "file" name when basenames are empty', () => {
     const plan = planSnapshot('/', '/', '/work', true, basename);
-    expect(plan.leftArg).toBe('/work/left/file');
-    expect(plan.rightArg).toBe('/work/right/file');
+    expect(norm(plan.leftArg)).toBe('/work/left/file');
+    expect(norm(plan.rightArg)).toBe('/work/right/file');
   });
 });
 
@@ -58,8 +79,8 @@ describe('resolveLaunchTarget', () => {
   const macLauncher = '/Applications/Glassbox.app/Contents/Resources/resources/glassbox';
 
   it('delegates to the macOS launcher shim when running in a macOS bundle (GB-855)', () => {
-    const target = resolveLaunchTarget(macBundleServerDir, (p) => p === macLauncher, 'darwin');
-    expect(target).toEqual({ kind: 'desktop', launcher: macLauncher });
+    const target = resolveLaunchTarget(macBundleServerDir, (p) => norm(p) === macLauncher, 'darwin');
+    expect(normTarget(target)).toEqual({ kind: 'desktop', launcher: macLauncher });
   });
 
   it('delegates to the Linux launcher shim from the verified .deb layout (GB-856)', () => {
@@ -67,8 +88,8 @@ describe('resolveLaunchTarget', () => {
     // /usr/lib/Glassbox/resources/glassbox-linux.
     const linuxServerDir = '/usr/lib/Glassbox/server';
     const linuxLauncher = '/usr/lib/Glassbox/resources/glassbox-linux';
-    const target = resolveLaunchTarget(linuxServerDir, (p) => p === linuxLauncher, 'linux');
-    expect(target).toEqual({ kind: 'desktop', launcher: linuxLauncher });
+    const target = resolveLaunchTarget(linuxServerDir, (p) => norm(p) === linuxLauncher, 'linux');
+    expect(normTarget(target)).toEqual({ kind: 'desktop', launcher: linuxLauncher });
   });
 
   it('does NOT match the macOS shim on Linux even though the bundle ships it (GB-856)', () => {
@@ -77,13 +98,13 @@ describe('resolveLaunchTarget', () => {
     // `open -a` and would fail). Here both files "exist"; platform decides.
     const linuxServerDir = '/usr/lib/Glassbox/server';
     const target = resolveLaunchTarget(linuxServerDir, () => true, 'linux');
-    expect(target).toEqual({ kind: 'desktop', launcher: '/usr/lib/Glassbox/resources/glassbox-linux' });
+    expect(normTarget(target)).toEqual({ kind: 'desktop', launcher: '/usr/lib/Glassbox/resources/glassbox-linux' });
   });
 
   it('falls back to the sibling cli.js for an npm install (no launcher shim)', () => {
     const npmDist = '/Users/me/node_modules/glassbox/dist';
     const target = resolveLaunchTarget(npmDist, () => false, 'darwin');
-    expect(target).toEqual({ kind: 'browser', cli: '/Users/me/node_modules/glassbox/dist/cli.js' });
+    expect(normTarget(target)).toEqual({ kind: 'browser', cli: '/Users/me/node_modules/glassbox/dist/cli.js' });
   });
 
   it('delegates to the Windows launcher .cmd when present (GB-856)', () => {
@@ -91,8 +112,8 @@ describe('resolveLaunchTarget', () => {
     // <install>\resources\glassbox.cmd.
     const winServerDir = 'C:/app/server';
     const winLauncher = 'C:/app/resources/glassbox.cmd';
-    const target = resolveLaunchTarget(winServerDir, (p) => p === winLauncher, 'win32');
-    expect(target).toEqual({ kind: 'desktop', launcher: winLauncher });
+    const target = resolveLaunchTarget(winServerDir, (p) => norm(p) === winLauncher, 'win32');
+    expect(normTarget(target)).toEqual({ kind: 'desktop', launcher: winLauncher });
   });
 
   it('falls back to browser on platforms with no launcher mapping (e.g. freebsd)', () => {
@@ -103,6 +124,43 @@ describe('resolveLaunchTarget', () => {
   it('falls back to browser when the probed launcher path does not exist', () => {
     const target = resolveLaunchTarget('/repo/dist', () => false, 'linux');
     expect(target.kind).toBe('browser');
+  });
+});
+
+describe('parseGitDiffCounter', () => {
+  it('parses a valid 1-based counter/total pair', () => {
+    expect(parseGitDiffCounter({ GIT_DIFF_PATH_COUNTER: '2', GIT_DIFF_PATH_TOTAL: '3' }))
+      .toEqual({ counter: 2, total: 3 });
+  });
+
+  it('returns null when either var is missing (older git — FR-19.10)', () => {
+    expect(parseGitDiffCounter({ GIT_DIFF_PATH_TOTAL: '3' })).toBeNull();
+    expect(parseGitDiffCounter({ GIT_DIFF_PATH_COUNTER: '1' })).toBeNull();
+    expect(parseGitDiffCounter({})).toBeNull();
+  });
+
+  it('returns null for non-integer or out-of-range values', () => {
+    expect(parseGitDiffCounter({ GIT_DIFF_PATH_COUNTER: 'x', GIT_DIFF_PATH_TOTAL: '3' })).toBeNull();
+    expect(parseGitDiffCounter({ GIT_DIFF_PATH_COUNTER: '0', GIT_DIFF_PATH_TOTAL: '3' })).toBeNull();
+    // counter past total is nonsensical
+    expect(parseGitDiffCounter({ GIT_DIFF_PATH_COUNTER: '4', GIT_DIFF_PATH_TOTAL: '3' })).toBeNull();
+  });
+});
+
+describe('shouldHoldForSession', () => {
+  it('holds only on the last file (counter == total)', () => {
+    expect(shouldHoldForSession({ GIT_DIFF_PATH_COUNTER: '3', GIT_DIFF_PATH_TOTAL: '3' })).toBe(true);
+    expect(shouldHoldForSession({ GIT_DIFF_PATH_COUNTER: '1', GIT_DIFF_PATH_TOTAL: '3' })).toBe(false);
+    expect(shouldHoldForSession({ GIT_DIFF_PATH_COUNTER: '2', GIT_DIFF_PATH_TOTAL: '3' })).toBe(false);
+  });
+
+  it('never holds when the counter is unavailable (FR-19.10 — rely on Done/tab-close)', () => {
+    expect(shouldHoldForSession({})).toBe(false);
+    expect(shouldHoldForSession({ GIT_DIFF_PATH_TOTAL: '1' })).toBe(false);
+  });
+
+  it('holds for a single-file run (1 of 1)', () => {
+    expect(shouldHoldForSession({ GIT_DIFF_PATH_COUNTER: '1', GIT_DIFF_PATH_TOTAL: '1' })).toBe(true);
   });
 });
 

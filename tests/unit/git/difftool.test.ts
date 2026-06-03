@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 
 import {
   DIFFTOOL_CMD,
+  DIFFTOOL_CMD_LEGACY,
   getDifftoolStatus,
   registerDifftool,
   unregisterDifftool,
@@ -67,6 +68,13 @@ describe('git difftool helpers', () => {
       const s = getDifftoolStatus('local', repo);
       expect(s.isGlassbox).toBe(false);
     });
+
+    it('still recognizes the legacy two-arg cmd as ours (FR-19.13 / GB-864)', () => {
+      git(['config', '--local', 'diff.tool', 'glassbox'], repo);
+      git(['config', '--local', 'difftool.glassbox.cmd', DIFFTOOL_CMD_LEGACY], repo);
+      const s = getDifftoolStatus('local', repo);
+      expect(s.isGlassbox).toBe(true);
+    });
   });
 
   describe('registerDifftool', () => {
@@ -85,6 +93,17 @@ describe('git difftool helpers', () => {
       const res = registerDifftool({ scope: 'local', cwd: repo });
       expect(res.ok).toBe(true);
       if (res.ok) expect(res.replacedTool).toBeNull();
+    });
+
+    it('upgrades a legacy two-arg registration to the $MERGED cmd (GB-864)', () => {
+      git(['config', '--local', 'diff.tool', 'glassbox'], repo);
+      git(['config', '--local', 'difftool.glassbox.cmd', DIFFTOOL_CMD_LEGACY], repo);
+      // Not a conflict (it's recognized as ours), and re-registering rewrites
+      // the cmd to the new form rather than no-op'ing on the stale one.
+      const res = registerDifftool({ scope: 'local', cwd: repo });
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.replacedTool).toBeNull();
+      expect(readLocal('difftool.glassbox.cmd', repo)).toBe(DIFFTOOL_CMD);
     });
 
     it('refuses to overwrite a non-glassbox tool without force', () => {

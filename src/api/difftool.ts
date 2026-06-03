@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ReviewFileSchema } from '../db/schemas.js';
 import { apiCall } from './_runner.js';
 
 export const DifftoolStatusRespSchema = z.object({
@@ -33,8 +34,54 @@ export const UnregisterDifftoolRespSchema = z.object({
 });
 export type UnregisterDifftoolResp = z.infer<typeof UnregisterDifftoolRespSchema>;
 
+// --- Accumulating difftool session (doc 19) ---
+
+/**
+ * Append one file to the active difftool review. Content is base64-encoded so
+ * the wire shape carries arbitrary bytes (text and binary alike) through JSON;
+ * the server diffs the raw content with the `--diff` engine (FR-19.7). The
+ * server resolves the target review from the running session, so no reviewId is
+ * needed — the wrapper posts this without one.
+ */
+export const AppendDifftoolFileReqSchema = z.object({
+  path: z.string().min(1),
+  oldContentB64: z.string(),
+  newContentB64: z.string(),
+});
+export type AppendDifftoolFileReq = z.infer<typeof AppendDifftoolFileReqSchema>;
+
+export const AppendDifftoolFileRespSchema = z.object({
+  ok: z.literal(true),
+  fileId: z.string(),
+});
+export type AppendDifftoolFileResp = z.infer<typeof AppendDifftoolFileRespSchema>;
+
+/** Live-list poll (FR-19.8): the current file set plus an `active` flag the
+ *  client uses to detect end-of-session. */
+export const DifftoolPollRespSchema = z.object({
+  active: z.boolean(),
+  files: z.array(ReviewFileSchema),
+  annotationCounts: z.record(z.string(), z.number()),
+  staleCounts: z.record(z.string(), z.number()),
+});
+export type DifftoolPollResp = z.infer<typeof DifftoolPollRespSchema>;
+
+export const DifftoolEndRespSchema = z.object({ ok: z.literal(true) });
+export type DifftoolEndResp = z.infer<typeof DifftoolEndRespSchema>;
+
 export async function getDifftoolStatus(): Promise<DifftoolStatusResp> {
   return apiCall(DifftoolStatusRespSchema, '/difftool/status');
+}
+
+/** Client live-list poll. Returns `active: false` once the session has ended. */
+export async function pollDifftool(): Promise<DifftoolPollResp> {
+  return apiCall(DifftoolPollRespSchema, '/difftool/poll');
+}
+
+/** End the difftool session from the UI ("Done"): releases the held wrapper so
+ *  `git difftool` returns cleanly, then the server tears itself down. */
+export async function endDifftool(): Promise<DifftoolEndResp> {
+  return apiCall(DifftoolEndRespSchema, '/difftool/end', { method: 'POST' });
 }
 
 export async function registerDifftool(req: RegisterDifftoolReq = {}): Promise<RegisterDifftoolResp> {

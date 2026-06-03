@@ -1,4 +1,4 @@
-import { serve } from '@hono/node-server';
+import { serve, type ServerType } from '@hono/node-server';
 import { existsSync,readFileSync } from 'fs';
 import { Hono } from 'hono';
 import { dirname,join } from 'path';
@@ -15,7 +15,7 @@ import { themeApiRoutes } from './routes/theme-api.js';
 import type { AppEnv } from './types.js';
 import { openOS } from './utils/openOS.js';
 
-function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<number> {
+function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<{ port: number; server: ServerType }> {
   return new Promise((resolve, reject) => {
     // Framework-bridging cast: Hono's `fetch` is typed against an Env
     // generic parameter (`object`), but `@hono/node-server`'s `serve()`
@@ -24,18 +24,18 @@ function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<number
     // | Promise<Response>`), so `as never` here is the right tool — there
     // is no runtime invariant we could check that would make this safer.
     const server = serve({ fetch: appFetch as never, port, hostname: '127.0.0.1' });
-    server.on('listening', () => { resolve(port); });
-    server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        reject(err);
-      } else {
-        reject(err);
-      }
-    });
+    server.on('listening', () => { resolve({ port, server }); });
+    server.on('error', (err: NodeJS.ErrnoException) => { reject(err); });
   });
 }
 
-export async function startServer(port: number, reviewId: string, repoRoot: string, options?: { noOpen?: boolean; strictPort?: boolean }) {
+/**
+ * Start the review server. Returns the live `server` handle and the port it
+ * actually bound to (which may differ from `port` after the in-use fallback) —
+ * the detached difftool session (doc 19) uses both to record its port and to
+ * shut itself down on end-of-session.
+ */
+export async function startServer(port: number, reviewId: string, repoRoot: string, options?: { noOpen?: boolean; strictPort?: boolean }): Promise<{ port: number; server: ServerType }> {
   const app = new Hono<AppEnv>();
 
   // Inject context
@@ -78,12 +78,13 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   app.route('/', pageRoutes);
 
   let actualPort = port;
+  let server: ServerType | null = null;
   if (options?.strictPort === true) {
-    actualPort = await tryServe(app.fetch, port);
+    ({ port: actualPort, server } = await tryServe(app.fetch, port));
   } else {
     for (let attempt = 0; attempt < 20; attempt++) {
       try {
-        actualPort = await tryServe(app.fetch, port + attempt);
+        ({ port: actualPort, server } = await tryServe(app.fetch, port + attempt));
         break;
       } catch (err: unknown) {
         if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'EADDRINUSE' && attempt < 19) {
@@ -93,6 +94,7 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
       }
     }
   }
+  if (server === null) throw new Error(`Could not bind a port starting at ${port}`);
 
   if (actualPort !== port) {
     console.log(`  Port ${port} in use, using ${actualPort} instead.`);
@@ -114,4 +116,6 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   if (options?.noOpen !== true) {
     try { openOS(url, 'url'); } catch { /* best-effort */ }
   }
+
+  return { port: actualPort, server };
 }

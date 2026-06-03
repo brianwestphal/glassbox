@@ -1,5 +1,6 @@
 import { spawnSync } from 'child_process';
-import { existsSync, readFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
 
 import { getRepoRoot } from './repo.js';
@@ -119,6 +120,64 @@ function getDirectComparisonFiles(mode: { pathA: string; pathB: string }, cwd: s
     rawDiff = '';
   }
   return normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
+}
+
+/**
+ * Produce a {@link FileDiff} from two raw file contents — no git refs and no
+ * caller-managed on-disk paths. Used by the accumulating `git difftool` append
+ * endpoint (doc 19, FR-19.7): the wrapper reads `$LOCAL` / `$REMOTE` into memory
+ * before git deletes the temp files, then hands the bytes here.
+ *
+ * Reuses the same `git diff --no-index` engine (and git's own binary detection)
+ * as direct comparison (doc 18) by writing the two sides into a throwaway
+ * `<tmp>/a/<path>` + `<tmp>/b/<path>` pair and stripping those roots back off, so
+ * the entry is labeled with `displayPath`. The temp tree is removed before
+ * returning — nothing is left on disk.
+ */
+export function diffRawContent(displayPath: string, oldContent: Buffer, newContent: Buffer): FileDiff {
+  // Normalize to a forward-slash relative path and neutralize absolute /
+  // parent-escaping segments so we only ever write inside the temp tree
+  // (doc 14, FR-14.3 — never trust an externally supplied path).
+  const rel = displayPath
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/(^|\/)\.\.(?=\/|$)/g, '$1_');
+  const safeRel = rel === '' ? 'file' : rel;
+
+  const work = mkdtempSync(join(tmpdir(), 'glassbox-difftool-append-'));
+  const rootA = join(work, 'a');
+  const rootB = join(work, 'b');
+  const oldAbs = join(rootA, safeRel);
+  const newAbs = join(rootB, safeRel);
+  try {
+    mkdirSync(dirname(oldAbs), { recursive: true });
+    mkdirSync(dirname(newAbs), { recursive: true });
+    writeFileSync(oldAbs, oldContent);
+    writeFileSync(newAbs, newContent);
+
+    let rawDiff: string;
+    try {
+      rawDiff = git(['diff', '--no-index', '-U3', toGitArg(oldAbs), toGitArg(newAbs)], work);
+    } catch {
+      rawDiff = '';
+    }
+    const diffs = normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
+    if (diffs.length === 0) {
+      // git emits nothing for identical content; still surface the file so it
+      // appears in the accumulating review (as an unchanged entry).
+      return { filePath: safeRel, oldPath: null, status: 'modified', hunks: [], isBinary: false };
+    }
+    const diff = diffs[0];
+    // Both sides are always written, so `git diff --no-index` reports every file
+    // as modified/renamed. Recover the add/delete status from content emptiness
+    // (git difftool passes an empty temp file for the absent side).
+    let status = diff.status;
+    if (oldContent.length === 0 && newContent.length > 0) status = 'added';
+    else if (newContent.length === 0 && oldContent.length > 0) status = 'deleted';
+    return { ...diff, filePath: safeRel, oldPath: null, status };
+  } finally {
+    try { rmSync(work, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
 }
 
 export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {

@@ -16,6 +16,7 @@ import { initDiffView, invalidateDiffCache, setRawDiffContent, updateNavFilePath
 import { getVisibleScrollLine, navBack, navForward, navUpdateScroll, setNavigating } from "./diff/navStack.js";
 import { selectFile } from "./diff/selection.js";
 import { bindToolbar } from "./diff/toolbar.js";
+import { initDifftoolSession } from "./difftool/session.js";
 import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
@@ -252,6 +253,9 @@ async function init() {
   bindCompleteButton();
   bindReopenButton();
   initProgress();
+  // Accumulating git difftool session (doc 19): live file list + Done +
+  // tab-close teardown. No-op unless this page was served for a difftool review.
+  initDifftoolSession();
   document.addEventListener("dragend", () => {
     dragStore.actions.setAnnotation(null);
     document.querySelectorAll(".diff-line.drag-over").forEach((d) => {

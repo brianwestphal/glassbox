@@ -15,8 +15,16 @@
  */
 import { spawnSync } from 'node:child_process';
 
-/** The git config value we write to `difftool.glassbox.cmd`. */
-export const DIFFTOOL_CMD = 'glassbox-difftool "$LOCAL" "$REMOTE"';
+/** The git config value we write to `difftool.glassbox.cmd`. `$MERGED` is git's
+ *  repo-relative path of the file under diff; the wrapper uses it to label the
+ *  appended file with its full path (`src/app.ts`) instead of a bare basename
+ *  (GB-864). */
+export const DIFFTOOL_CMD = 'glassbox-difftool "$LOCAL" "$REMOTE" "$MERGED"';
+
+/** The pre-GB-864 two-argument cmd. Still recognized as "ours" so an existing
+ *  registration keeps working (FR-19.13) — it falls back to a basename label —
+ *  and is upgraded to {@link DIFFTOOL_CMD} on the next `--register-difftool`. */
+export const DIFFTOOL_CMD_LEGACY = 'glassbox-difftool "$LOCAL" "$REMOTE"';
 
 export type DifftoolScope = 'global' | 'local';
 
@@ -64,7 +72,7 @@ export function getDifftoolStatus(scope: DifftoolScope = 'global', cwd?: string)
   const tool = readConfig('diff.tool', scope, cwd);
   if (tool === null) return { tool: null, cmd: null, isGlassbox: false };
   const cmd = readConfig(`difftool.${tool}.cmd`, scope, cwd);
-  const isGlassbox = tool === 'glassbox' && cmd === DIFFTOOL_CMD;
+  const isGlassbox = tool === 'glassbox' && (cmd === DIFFTOOL_CMD || cmd === DIFFTOOL_CMD_LEGACY);
   return { tool, cmd, isGlassbox };
 }
 
@@ -79,8 +87,10 @@ export function registerDifftool(opts: { scope?: DifftoolScope; force?: boolean;
   const scope = opts.scope ?? 'global';
   const status = getDifftoolStatus(scope, opts.cwd);
 
-  // Already correctly registered → no-op success.
-  if (status.isGlassbox) return { ok: true, replacedTool: null };
+  // Already registered with the current cmd → no-op success. A legacy cmd is
+  // recognized as ours (so it's not a "conflict") but still rewritten below, so
+  // re-registering upgrades it to the `$MERGED` form (GB-864).
+  if (status.tool === 'glassbox' && status.cmd === DIFFTOOL_CMD) return { ok: true, replacedTool: null };
 
   // Something else is configured; require `force` to overwrite.
   if (status.tool !== null && status.tool !== 'glassbox' && opts.force !== true) {

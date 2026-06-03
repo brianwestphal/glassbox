@@ -46,7 +46,7 @@ glassbox/
 | File | Purpose |
 |------|---------|
 | `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. |
-| `cli-difftool.ts` | Standalone `glassbox-difftool` bin entry — bridges `git difftool` into `glassbox --diff`. Built to `dist/cli-difftool.js` and shipped via `package.json`'s `"bin"` map. Dereferences git's symlinked snapshot dirs into a temp tree (git uses symlinks on the right side of `--dir-diff`), then launches a review. Handles both `--dir-diff` (two directory snapshots → one review) and per-file mode (single files → a per-file review labeled with the filename). Launch is **blocking**: when a desktop bundle is detected it delegates to the bundled `glassbox` launcher shim (Tauri window) with `GLASSBOX_DIFFTOOL_BLOCK=1`; otherwise it runs the sibling `cli.js` (browser). Blocking keeps the temp tree alive for the whole session and makes per-file mode step through files one at a time. Decision logic lives in `src/git/difftool-launch.ts`. |
+| `cli-difftool.ts` | Standalone `glassbox-difftool` bin entry — bridges `git difftool` into a Glassbox review. Built to `dist/cli-difftool.js` and shipped via `package.json`'s `"bin"` map. **`--dir-diff` (any target) + per-file desktop:** the original **blocking** path — dereferences git's symlinked snapshot dirs into a temp tree (git uses symlinks on the right side of `--dir-diff`) and launches `glassbox --diff` (desktop launcher shim with `GLASSBOX_DIFFTOOL_BLOCK=1`, or sibling `cli.js`); blocking keeps the temp tree alive and sequences per-file desktop one window at a time. **Per-file browser (doc 19, accumulating):** a **thin client** — reads `$LOCAL`/`$REMOTE` content into memory (before git deletes the temp files), discovers-or-starts a single detached server (`src/git/difftool-client.ts`), appends the file (labeled by git's repo-relative `$MERGED` path when the registered cmd passes it, else the working-tree basename — GB-864), and returns immediately, except on the last file (`GIT_DIFF_PATH_COUNTER == GIT_DIFF_PATH_TOTAL`) where it holds so `git difftool` stays attached until "Done"/tab-close. Pure decisions live in `src/git/difftool-launch.ts`. |
 | `server.ts` | Hono app bootstrap. Middleware for `reviewId`/`currentReviewId`/`repoRoot`. Static asset routes. Registers route groups. |
 | `types.ts` | `AppEnv` (Hono `Env` with typed Variables). |
 | (JSX runtime) | Provided by **kerfjs** (`kerfjs/jsx-runtime`). `SafeHtml` / `raw()` / `Fragment` / `each` / `morph` / `mount` / `delegate` / `signal` / `effect` / `computed` / `defineStore` are all imported from `'kerfjs'`. Auto-escapes string children. Shared between server (SSR via `.toString()`) and client (`mount()`-driven reactivity). |
@@ -133,7 +133,7 @@ See §6 for the schema itself.
 
 | File | Purpose |
 |------|---------|
-| `diff.ts` | `getFileDiffs(mode, cwd)`, `parseDiff()`, mode → `git` argv builder. Also lists untracked files for uncommitted mode, walks all files for `--all`, and runs `git diff --no-index` for the `--diff <A> <B>` direct-comparison mode (doc 18) — `directComparisonRoots(mode)` resolves the per-side display roots and `getModeFileContent(mode, file, 'old'\|'new', cwd)` reads file content for context expansion, branching to disk reads (rootA/rootB) for `--diff` and to git refs for every other mode. |
+| `diff.ts` | `getFileDiffs(mode, cwd)`, `parseDiff()`, mode → `git` argv builder. Also lists untracked files for uncommitted mode, walks all files for `--all`, and runs `git diff --no-index` for the `--diff <A> <B>` direct-comparison mode (doc 18) — `directComparisonRoots(mode)` resolves the per-side display roots and `getModeFileContent(mode, file, 'old'\|'new', cwd)` reads file content for context expansion, branching to disk reads (rootA/rootB) for `--diff` and to git refs for every other mode. `diffRawContent(displayPath, oldBuf, newBuf)` produces a `FileDiff` from two raw buffers (no git refs / no caller-managed paths) by running `git diff --no-index` against a throwaway temp pair — used by the doc-19 difftool append endpoint. |
 | `repo.ts` | `getRepoRoot`, `getRepoName`, `getHeadCommit`, `isGitRepo`. |
 | `types.ts` | `ReviewMode`, `FileDiff`, `DiffHunk`, `DiffLine`. |
 | `image.ts` | Image side retrieval from git (old/new), binary detection, format identification. |
@@ -142,7 +142,9 @@ See §6 for the schema itself.
 | `svg-rasterize-render.ts` | Shared synchronous render core (`@resvg/resvg-wasm`, font loading, 10x→8000px scale math). Used by both the worker and the in-process fallback. |
 | `svg-rasterize-worker.ts` | Worker-thread entry: initializes WASM, renders SVG→PNG off the main thread. Emitted by tsup as `dist/svg-rasterize-worker.js` and copied next to `cli.js` in the sidecar. `svg-rasterize-worker-boot.mjs` is a dev-only shim that registers the tsx loader so the worker can load TS source. |
 | `parseDiffData.ts` | Pure helper to parse `review_files.diff_data` JSON into `FileDiff` (or `null` for missing/corrupt). Safe to import from both server and client bundles. |
-| `difftool-launch.ts` | Pure, unit-tested decision logic for the `glassbox-difftool` wrapper: `planSnapshot()` (dir-diff vs per-file dereference layout, preserving the filename in per-file mode) and `resolveLaunchTarget(selfDir, exists, platform)` (platform-aware desktop-bundle launcher-shim detection — `glassbox` on macOS, `glassbox-linux` on Linux, `glassbox.cmd` on Windows; browser fallback otherwise). Exports `DIFFTOOL_BLOCK_ENV` (the `GLASSBOX_DIFFTOOL_BLOCK` contract honored by the macOS + Windows launcher shims; on Linux the shim `exec`s Tauri so blocking is inherent). The launcher opens the Tauri window and the app forwards `--diff` to its self-spawned sidecar (`src-tauri/src/lib.rs`). Windows `.cmd` shims are spawned via a shell with quoted args. Note: `git diff --no-index` needs forward-slash paths on Windows or it emits an unparseable quoted header — see `toGitArg` in `git/diff.ts`. |
+| `difftool-launch.ts` | Pure, unit-tested decision logic for the `glassbox-difftool` wrapper: `planSnapshot()` (dir-diff vs per-file dereference layout, preserving the filename in per-file mode) and `resolveLaunchTarget(selfDir, exists, platform)` (platform-aware desktop-bundle launcher-shim detection — `glassbox` on macOS, `glassbox-linux` on Linux, `glassbox.cmd` on Windows; browser fallback otherwise). Exports `DIFFTOOL_BLOCK_ENV` (the `GLASSBOX_DIFFTOOL_BLOCK` contract honored by the macOS + Windows launcher shims; on Linux the shim `exec`s Tauri so blocking is inherent). The launcher opens the Tauri window and the app forwards `--diff` to its self-spawned sidecar (`src-tauri/src/lib.rs`). Windows `.cmd` shims are spawned via a shell with quoted args. Note: `git diff --no-index` needs forward-slash paths on Windows or it emits an unparseable quoted header — see `toGitArg` in `git/diff.ts`. Also exports the doc-19 pure decisions `parseGitDiffCounter(env)` / `shouldHoldForSession(env)` (last-file detection from `GIT_DIFF_PATH_COUNTER`/`TOTAL`, with a counter-unavailable fallback). |
+| `difftool-discovery.ts` | doc 19 — rendezvous between the wrapper and the detached accumulating server via `~/.glassbox/difftool.lock` (records the server port) and `difftool-starting.lock` (a stale-aware start election so a multi-file burst doesn't race into N servers). `parseDiscovery()` is a pure, unit-tested parse. |
+| `difftool-client.ts` | doc 19 thin-client IO for the per-file browser path: `discoverOrStartServer()` (find a running server or win the election + spawn one detached, probe-with-retry), `appendFile()` (POST raw base64 content; throws on failure so no file is silently dropped), `holdUntilEnd()` (hold the last-file connection until the session ends). All over `127.0.0.1`. |
 | `difftool.ts` | `git difftool` registration helpers — `getDifftoolStatus(scope)`, `registerDifftool({scope, force})`, `unregisterDifftool({scope})`. Pure wrappers over `git config`. `registerDifftool` refuses to overwrite a non-Glassbox `diff.tool` unless `force: true`. `unregisterDifftool` only touches keys we set (won't delete a third-party tool just because the cmd happens to match). Called from `cli.ts` (`--register-difftool` / `--unregister-difftool` flags) and from `routes/difftool-api.ts` (settings dialog). |
 
 ### `src/ai/` — AI analysis subsystem
@@ -316,9 +318,19 @@ guided-review config endpoints.
 
 ### `/api/difftool/*` (`routes/difftool-api.ts`)
 
-`GET /status`, `POST /register`, `POST /unregister`. Always operates at
-`--global` scope (the settings dialog is the "what affects every repo I use"
-surface; `--local` stays CLI-only). Backed by helpers in `src/git/difftool.ts`.
+**Registration:** `GET /status`, `POST /register`, `POST /unregister`. Always
+operates at `--global` scope (the settings dialog is the "what affects every
+repo I use" surface; `--local` stays CLI-only). Backed by helpers in
+`src/git/difftool.ts`.
+
+**Accumulating session (doc 19, browser):** `GET /ping` (wrapper readiness
+probe), `POST /append` (append one file from raw base64 `{path, oldContentB64,
+newContentB64}` → diffed via `diffRawContent()` in `git/diff.ts`, de-duped by
+path), `GET /poll` (live file list + `active` flag for the client sidebar),
+`GET /hold` (the last-file wrapper holds this open so `git difftool` stays
+attached; resolves on session end), `POST /end` ("Done" / tab-close
+`sendBeacon`). Session state + lifecycle live in `src/difftool/session.ts`;
+the detached server is started by `glassbox --difftool-serve`.
 
 ## 6. Database schema
 

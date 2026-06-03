@@ -473,7 +473,7 @@ switches are exhaustive). FR-18.11 was explicitly resolved as
 **CLI-only**: a desktop in-app file/folder picker was considered and
 deferred — the CLI entry point covers the workflow.
 
-## 18b. Git difftool integration (`19-difftool-integration.md`) — **Design only**
+## 18b. Git difftool integration (`19-difftool-integration.md`) — **Partially built**
 
 Using Glassbox as a registered **`git difftool`** via the `glassbox-difftool`
 companion binary. Registration (`--register-difftool` / Settings → General) and
@@ -495,9 +495,15 @@ desktop window-close are equivalent end signals. A new typed append endpoint
 takes raw old/new content; the sidebar grows as files arrive. Singleton server
 (concurrent runs merge, by design); `--dir-diff` stays a supported optimization.
 
-**Design only** — no implementation yet; follow-up tickets cover the wrapper +
-detached server, append API + live file list, desktop accumulation, lifecycle
-teardown, tests, and the README sync.
+**Partially built** — the **browser** path is shipped and tested end-to-end:
+the thin-client wrapper (`src/cli-difftool.ts` + `src/git/difftool-client.ts`),
+the detached accumulating server (`glassbox --difftool-serve`), the typed
+append/poll/hold/end API (`src/routes/difftool-api.ts`, `src/difftool/session.ts`),
+the live sidebar + "Done" affordance, registration, and `$MERGED` repo-relative
+labeling (FR-19.1–19.8, 19.10–19.13). **Still open:** desktop (Tauri) single-window
+accumulation (FR-19.9 — per-file desktop still opens one window per file; `--dir-diff`
+gives the single-window desktop experience today) and image/SVG visual comparison
+inside a difftool session (the append path stores no persistent blobs yet).
 
 ## 19. Implementation-status snapshot
 
@@ -505,10 +511,12 @@ Every requirements doc 1–18 is **Shipped**: review workflow,
 CLI/server, git integration, diff viewing, annotations, export, AI
 analysis, UI, data storage, desktop app, build/distribution, demo mode,
 navigation, security, themes, share prompt, Claude channel, direct path
-comparison. Doc **19** (git difftool integration) is **Design only** —
-spec written, implementation pending. When a new feature is spec'd before
-implementation, add a doc and mark the entry here **Design only** until the
-code lands.
+comparison. Doc **19** (git difftool integration) is **Partially built** —
+the browser accumulating model is shipped and tested; desktop (Tauri)
+single-window accumulation (FR-19.9) and in-session image/SVG comparison
+remain open. When a new feature is spec'd before implementation, add a doc and
+mark the entry here **Design only** until the code lands, then **Partially
+built** / **Shipped** as it progresses.
 
 ## 20. Maintenance rules
 

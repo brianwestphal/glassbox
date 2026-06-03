@@ -119,6 +119,39 @@ export function resolveLaunchTarget(
   return { kind: 'browser', cli: join(selfDir, 'cli.js') };
 }
 
+export interface GitDiffCounter {
+  /** 1-based index of the file git is currently showing. */
+  counter: number;
+  /** Total number of files in this `git difftool` run. */
+  total: number;
+}
+
+/**
+ * Parse git's per-file position env vars (`GIT_DIFF_PATH_COUNTER` /
+ * `GIT_DIFF_PATH_TOTAL`). Returns `null` when either is absent or not a
+ * positive integer — an older or differently-configured git that doesn't set
+ * them (doc 19, FR-19.10), in which case the wrapper falls back to append+exit
+ * with no terminal hold.
+ */
+export function parseGitDiffCounter(env: Record<string, string | undefined>): GitDiffCounter | null {
+  const counter = Number(env.GIT_DIFF_PATH_COUNTER);
+  const total = Number(env.GIT_DIFF_PATH_TOTAL);
+  if (!Number.isInteger(counter) || !Number.isInteger(total)) return null;
+  if (counter < 1 || total < 1 || counter > total) return null;
+  return { counter, total };
+}
+
+/**
+ * Whether this per-file invocation is the final file of the session, so the
+ * wrapper should HOLD the terminal open after appending (doc 19, FR-19.5).
+ * False when the counter is unavailable — the session then relies purely on the
+ * server-side end signals (Done / tab close), per FR-19.10.
+ */
+export function shouldHoldForSession(env: Record<string, string | undefined>): boolean {
+  const c = parseGitDiffCounter(env);
+  return c !== null && c.counter === c.total;
+}
+
 /** Env var the wrapper sets to tell the desktop launcher shim to block until
  *  the review window closes (instead of its usual fire-and-forget exit). The
  *  shim `wait`s on the backgrounded server; closing the Tauri window kills the

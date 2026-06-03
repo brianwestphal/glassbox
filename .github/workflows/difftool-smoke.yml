@@ -1,7 +1,10 @@
 name: difftool cross-platform smoke
 
-# GB-856 — verify the `git difftool` desktop launch on Linux and discover the
-# Windows bundle layout. Manual / branch-scoped; not part of the release flow.
+# Two kinds of difftool smoke, manual / branch-scoped (not part of the release
+# flow): the GB-856 desktop launch + bundle layout on Linux/Windows, and the
+# doc-19 accumulating per-file browser model (`accumulate-verify`) — the latter
+# is Node-only and cross-platform. The doc-19 unit/integration/e2e tests run in
+# the normal test workflow; this is the real-binary, real-server smoke on top.
 on:
   workflow_dispatch:
   push:
@@ -9,6 +12,27 @@ on:
       - 'gb-856-**'
 
 jobs:
+  # doc 19 — the accumulating per-file browser model: real built wrapper binary
+  # against a real `--difftool-serve` server over loopback HTTP. Node-only (no
+  # Tauri build), so it's fast and cross-platform.
+  accumulate-verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Accumulating difftool smoke
+        shell: bash
+        run: bash tests/smoke/difftool-accumulate.sh
+
   linux-verify:
     runs-on: ubuntu-22.04
     steps:

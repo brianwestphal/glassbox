@@ -4,7 +4,7 @@
  * Invoked as `git difftool --dir-diff <refA> <refB>` (or per-file, see below)
  * via:
  *   git config --global diff.tool glassbox
- *   git config --global difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE"'
+ *   git config --global difftool.glassbox.cmd 'glassbox-difftool "$LOCAL" "$REMOTE" "$MERGED"'
  *   git config --global difftool.prompt false
  *
  * Why this is more than a one-line forwarder
@@ -27,29 +27,34 @@
  *
  * Two modes
  * ---------
- *  - **`--dir-diff`** (recommended): one invocation, two directory snapshots.
+ *  - **`--dir-diff`** (recommended): one invocation, two directory snapshots —
+ *    dereferenced into a temp tree and handed to `glassbox --diff`.
  *  - **per-file** (`git difftool <a> <b>` with no `--dir-diff`): git invokes us
  *    once per changed file with two single files, waiting for each to exit
- *    before the next. We open a one-file review per invocation; the launch
- *    blocks until the window closes so git steps through files one at a time
- *    (like a traditional difftool). See `git/difftool-launch.ts`.
+ *    before the next. In a **browser** install this wrapper is a thin client
+ *    (doc 19): it reads the two files' content, forwards them to a single
+ *    long-lived accumulating server, and returns at once so all files pile into
+ *    one review/tab. See `git/difftool-client.ts`. In a **desktop** install the
+ *    per-file path still uses the blocking one-window-per-file launch below
+ *    (single-window desktop accumulation is tracked separately).
  *
  * Desktop vs browser
  * ------------------
  * When this wrapper runs from a desktop bundle it delegates to the bundled
  * `glassbox` launcher shim so the review opens in the Tauri window — matching
- * what `glassbox --commit` does from the same folder. From an `npm install`
- * it runs `cli.js` directly, opening the browser. Either way the launch is
- * blocking, which both keeps the dereferenced temp tree alive for the whole
- * session and sequences per-file mode correctly.
+ * what `glassbox --commit` does from the same folder. From an `npm install` it
+ * runs `cli.js` directly (browser); per-file browser mode goes through the
+ * accumulating thin client, while `--dir-diff` and desktop launches stay
+ * blocking so the dereferenced temp tree survives for the whole session.
  */
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DIFFTOOL_BLOCK_ENV, planSnapshot, resolveLaunchTarget } from './git/difftool-launch.js';
+import { appendFile, discoverOrStartServer, holdUntilEnd } from './git/difftool-client.js';
+import { DIFFTOOL_BLOCK_ENV, planSnapshot, resolveLaunchTarget, shouldHoldForSession } from './git/difftool-launch.js';
 
 const args = process.argv.slice(2);
 if (args.length < 2 || args[0].startsWith('-') || args[1].startsWith('-')) {
@@ -57,7 +62,7 @@ if (args.length < 2 || args[0].startsWith('-') || args[1].startsWith('-')) {
   console.error('');
   console.error('Configure as a git difftool:');
   console.error('  git config --global diff.tool glassbox');
-  console.error("  git config --global difftool.glassbox.cmd 'glassbox-difftool \"$LOCAL\" \"$REMOTE\"'");
+  console.error("  git config --global difftool.glassbox.cmd 'glassbox-difftool \"$LOCAL\" \"$REMOTE\" \"$MERGED\"'");
   console.error('  git config --global difftool.prompt false');
   console.error('');
   console.error('Then either:');
@@ -66,68 +71,116 @@ if (args.length < 2 || args[0].startsWith('-') || args[1].startsWith('-')) {
   process.exit(1);
 }
 
-const [local, remote, ...extra] = args;
+// Registered cmd is `glassbox-difftool "$LOCAL" "$REMOTE" "$MERGED"`. `merged`
+// is git's repo-relative path of the file under diff (per-file mode); it's empty
+// for `--dir-diff` and absent for a legacy two-arg registration. Anything beyond
+// it is forwarded to `glassbox --diff` (the historical "extra args" escape hatch).
+const [local, remote, merged, ...extra] = args;
 
 // `--dir-diff` hands us directories; per-file mode hands us single files.
-// `planSnapshot` preserves the filename in the per-file case so the review
-// isn't labeled "left ↔ right".
 let localIsFile = false;
 try { localIsFile = statSync(local).isFile(); } catch { /* treat as dir */ }
 
-// One temp tree per invocation, removed on exit.
-const work = mkdtempSync(join(tmpdir(), 'glassbox-difftool-'));
-const plan = planSnapshot(local, remote, work, localIsFile, basename);
+const here = dirname(fileURLToPath(import.meta.url));
+const target = resolveLaunchTarget(
+  here,
+  (p) => { try { statSync(p); return true; } catch { return false; } },
+  process.platform,
+);
 
-function cleanup(): void {
-  try { rmSync(work, { recursive: true, force: true }); } catch { /* best-effort */ }
+/** Read a file into memory, tolerating the absent side of an add/delete (git
+ *  passes an empty temp file or /dev/null). */
+function readFileOrEmpty(p: string): Buffer {
+  try { return readFileSync(p); } catch { return Buffer.alloc(0); }
 }
 
-// If the wrapper is killed mid-flight (Ctrl-C, etc.), still try to drop the
-// temp tree. The launch below is blocking and propagates signals to the child,
-// so the wrapper usually exits via the finally; these handlers cover edge cases.
-const signalExit = (code: number) => () => { cleanup(); process.exit(code); };
-process.on('SIGINT', signalExit(130));
-process.on('SIGTERM', signalExit(143));
+/**
+ * Browser per-file accumulating path (doc 19): read both sides NOW (git deletes
+ * the temp files the instant we exit), forward to the singleton server, and
+ * return immediately — except on the final file, where we hold so `git difftool`
+ * stays attached until the user clicks "Done" or closes the tab.
+ */
+async function runThinClient(cliPath: string): Promise<void> {
+  const oldContent = readFileOrEmpty(local);
+  const newContent = readFileOrEmpty(remote);
+  // Prefer git's repo-relative `$MERGED` path so the sidebar shows `src/app.ts`,
+  // not a bare `app.ts` (GB-864). Fall back to the working-tree basename (the
+  // name that wins across a rename) for a legacy two-arg registration or when
+  // git doesn't provide `$MERGED`.
+  // `merged` is typed `string` by array destructuring but is empty for
+  // `--dir-diff` and absent (undefined at runtime) for a legacy two-arg
+  // registration — the `||` chain falls through to the basename in both cases.
+  const displayPath = merged || basename(remote) || basename(local) || 'file';
 
-try {
-  // `dereference: true` follows symlinks and copies the resolved content.
-  // This is the whole point of the wrapper.
-  for (const { from, to } of plan.copies) {
-    cpSync(from, to, { recursive: true, dereference: true });
+  const port = await discoverOrStartServer(cliPath, process.cwd());
+  await appendFile(port, displayPath, oldContent, newContent);
+  if (shouldHoldForSession(process.env)) {
+    await holdUntilEnd(port);
   }
+}
 
-  const here = dirname(fileURLToPath(import.meta.url));
-  const target = resolveLaunchTarget(
-    here,
-    (p) => { try { statSync(p); return true; } catch { return false; } },
-    process.platform,
-  );
+/**
+ * Blocking launch for `--dir-diff` (any target) and per-file desktop: build the
+ * dereferenced temp tree and hand the two roots to `glassbox --diff`. The launch
+ * blocks for the whole session, keeping the temp tree alive and sequencing
+ * per-file desktop one file at a time.
+ */
+function runBlockingLaunch(): never {
+  // `planSnapshot` preserves the filename in the per-file case so the review
+  // isn't labeled "left ↔ right".
+  const work = mkdtempSync(join(tmpdir(), 'glassbox-difftool-'));
+  const plan = planSnapshot(local, remote, work, localIsFile, basename);
 
-  const diffArgs = ['--diff', plan.leftArg, plan.rightArg, ...extra];
+  const cleanup = (): void => {
+    try { rmSync(work, { recursive: true, force: true }); } catch { /* best-effort */ }
+  };
+  // If killed mid-flight (Ctrl-C, etc.), still drop the temp tree.
+  const signalExit = (code: number) => (): void => { cleanup(); process.exit(code); };
+  process.on('SIGINT', signalExit(130));
+  process.on('SIGTERM', signalExit(143));
 
-  if (target.kind === 'desktop') {
-    // Delegate to the bundled launcher shim, which starts the server and opens
-    // the Tauri window. The block env var tells it to wait for the window to
-    // close before returning (so we don't tear down the temp tree early and so
-    // per-file mode advances one file at a time).
-    const env = { ...process.env, [DIFFTOOL_BLOCK_ENV]: '1' };
-    let res;
-    if (process.platform === 'win32') {
-      // A `.cmd` launcher must be run through a shell on Windows (Node refuses
-      // to spawn batch files directly). Pass one quoted command string with
-      // shell:true. Temp paths never contain quotes, so simple quoting is safe.
-      const cmd = [target.launcher, ...diffArgs].map((a) => `"${a}"`).join(' ');
-      res = spawnSync(cmd, { stdio: 'inherit', env, shell: true });
-    } else {
-      res = spawnSync(target.launcher, diffArgs, { stdio: 'inherit', env });
+  try {
+    // `dereference: true` follows symlinks and copies the resolved content.
+    for (const { from, to } of plan.copies) {
+      cpSync(from, to, { recursive: true, dereference: true });
     }
-    process.exit(res.status ?? 0);
-  } else {
-    // npm install: run cli.js directly (opens the browser). The server runs in
-    // the foreground, so spawnSync blocks for the whole session.
+
+    const diffArgs = ['--diff', plan.leftArg, plan.rightArg, ...extra];
+
+    if (target.kind === 'desktop') {
+      // Delegate to the bundled launcher shim, which starts the server and opens
+      // the Tauri window. The block env var tells it to wait for the window to
+      // close before returning.
+      const env = { ...process.env, [DIFFTOOL_BLOCK_ENV]: '1' };
+      let res;
+      if (process.platform === 'win32') {
+        // A `.cmd` launcher must be run through a shell on Windows (Node refuses
+        // to spawn batch files directly). Pass one quoted command string with
+        // shell:true. Temp paths never contain quotes, so simple quoting is safe.
+        const cmd = [target.launcher, ...diffArgs].map((a) => `"${a}"`).join(' ');
+        res = spawnSync(cmd, { stdio: 'inherit', env, shell: true });
+      } else {
+        res = spawnSync(target.launcher, diffArgs, { stdio: 'inherit', env });
+      }
+      process.exit(res.status ?? 0);
+    }
+    // npm install: run cli.js directly (opens the browser), blocking for the
+    // whole session.
     const res = spawnSync(process.execPath, [target.cli, ...diffArgs], { stdio: 'inherit' });
     process.exit(res.status ?? 0);
+  } finally {
+    cleanup();
   }
-} finally {
-  cleanup();
+}
+
+if (localIsFile && target.kind === 'browser') {
+  runThinClient(target.cli).then(
+    () => { process.exit(0); },
+    (err: unknown) => {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    },
+  );
+} else {
+  runBlockingLaunch();
 }
