@@ -582,6 +582,18 @@ pub fn run() {
                             sidecar_args.push(b.clone());
                         }
                     }
+                    // doc 19 / GB-861 — accumulating per-file DESKTOP mode. The
+                    // `glassbox-difftool` wrapper launches the app with
+                    // `--difftool-serve`; the app then spawns ONE long-lived
+                    // accumulating server and shows a single window, and later
+                    // per-file invocations append to that running session instead
+                    // of opening another window. Closing the window kills the
+                    // sidecar (RunEvent::Exit below), ending the session. macOS
+                    // doesn't reach this branch — its launcher pre-starts the
+                    // serve-mode server and we connect via GLASSBOX_SERVER_URL.
+                    if app_args.iter().any(|a| a == "--difftool-serve") {
+                        sidecar_args.push("--difftool-serve".to_string());
+                    }
 
                     let sidecar = app
                         .shell()

@@ -31,21 +31,22 @@
  *    dereferenced into a temp tree and handed to `glassbox --diff`.
  *  - **per-file** (`git difftool <a> <b>` with no `--dir-diff`): git invokes us
  *    once per changed file with two single files, waiting for each to exit
- *    before the next. In a **browser** install this wrapper is a thin client
- *    (doc 19): it reads the two files' content, forwards them to a single
- *    long-lived accumulating server, and returns at once so all files pile into
- *    one review/tab. See `git/difftool-client.ts`. In a **desktop** install the
- *    per-file path still uses the blocking one-window-per-file launch below
- *    (single-window desktop accumulation is tracked separately).
+ *    before the next. This wrapper is a thin client (doc 19): it reads the two
+ *    files' content, forwards them to a single long-lived accumulating server,
+ *    and returns at once so all files pile into one review — in **one browser
+ *    tab** (npm install) or **one desktop window** (Tauri install, GB-861). See
+ *    `git/difftool-client.ts`.
  *
  * Desktop vs browser
  * ------------------
- * When this wrapper runs from a desktop bundle it delegates to the bundled
- * `glassbox` launcher shim so the review opens in the Tauri window — matching
- * what `glassbox --commit` does from the same folder. From an `npm install` it
- * runs `cli.js` directly (browser); per-file browser mode goes through the
- * accumulating thin client, while `--dir-diff` and desktop launches stay
- * blocking so the dereferenced temp tree survives for the whole session.
+ * Per-file mode accumulates the same way in both: the only difference is how the
+ * single accumulating server is started. In a **browser** install the wrapper
+ * spawns `cli.js --difftool-serve` directly. In a **desktop** install it
+ * launches the bundled launcher shim in `--difftool-serve` mode so the review
+ * opens in a Tauri window (matching what `glassbox --commit` does from the same
+ * folder); closing that window ends the session. `--dir-diff` (either target)
+ * stays the original blocking launch so the dereferenced temp tree survives for
+ * the whole session.
  */
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -53,7 +54,14 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { appendFile, discoverOrStartServer, holdUntilEnd } from './git/difftool-client.js';
+import {
+  appendFile,
+  DESKTOP_DISCOVER_TIMEOUT_MS,
+  discoverOrStartServer,
+  holdUntilEnd,
+  launchDetachedDesktopSession,
+  spawnDetachedBrowserServer,
+} from './git/difftool-client.js';
 import { DIFFTOOL_BLOCK_ENV, planSnapshot, resolveLaunchTarget, shouldHoldForSession } from './git/difftool-launch.js';
 
 const args = process.argv.slice(2);
@@ -95,12 +103,14 @@ function readFileOrEmpty(p: string): Buffer {
 }
 
 /**
- * Browser per-file accumulating path (doc 19): read both sides NOW (git deletes
- * the temp files the instant we exit), forward to the singleton server, and
- * return immediately — except on the final file, where we hold so `git difftool`
- * stays attached until the user clicks "Done" or closes the tab.
+ * Per-file accumulating path (doc 19): read both sides NOW (git deletes the temp
+ * files the instant we exit), discover-or-start the single accumulating session
+ * via `start`, append the file, and return immediately — except on the final
+ * file, where we hold so `git difftool` stays attached until the user clicks
+ * "Done" or closes the tab/window. `start` differs only by target: spawn the
+ * browser server, or launch the desktop window (GB-861).
  */
-async function runThinClient(cliPath: string): Promise<void> {
+async function runThinClient(start: () => void, timeoutMs?: number): Promise<void> {
   const oldContent = readFileOrEmpty(local);
   const newContent = readFileOrEmpty(remote);
   // Prefer git's repo-relative `$MERGED` path so the sidebar shows `src/app.ts`,
@@ -112,7 +122,7 @@ async function runThinClient(cliPath: string): Promise<void> {
   // registration — the `||` chain falls through to the basename in both cases.
   const displayPath = merged || basename(remote) || basename(local) || 'file';
 
-  const port = await discoverOrStartServer(cliPath, process.cwd());
+  const port = await discoverOrStartServer(start, timeoutMs);
   await appendFile(port, displayPath, oldContent, newContent);
   if (shouldHoldForSession(process.env)) {
     await holdUntilEnd(port);
@@ -173,14 +183,27 @@ function runBlockingLaunch(): never {
   }
 }
 
+const onThinClientDone = (): never => process.exit(0);
+const onThinClientError = (err: unknown): never => {
+  console.error(err instanceof Error ? err.message : String(err));
+  return process.exit(1);
+};
+
+// Per-file mode (single files) accumulates into one session for both targets;
+// only the "start the session" step differs. `--dir-diff` (directories) keeps
+// the original blocking launch so its dereferenced temp tree survives.
 if (localIsFile && target.kind === 'browser') {
-  runThinClient(target.cli).then(
-    () => { process.exit(0); },
-    (err: unknown) => {
-      console.error(err instanceof Error ? err.message : String(err));
-      process.exit(1);
-    },
+  const cliPath = target.cli;
+  void runThinClient(() => { spawnDetachedBrowserServer(cliPath, process.cwd()); }).then(
+    onThinClientDone,
+    onThinClientError,
   );
+} else if (localIsFile && target.kind === 'desktop') {
+  const launcher = target.launcher;
+  void runThinClient(
+    () => { launchDetachedDesktopSession(launcher, process.cwd()); },
+    DESKTOP_DISCOVER_TIMEOUT_MS,
+  ).then(onThinClientDone, onThinClientError);
 } else {
   runBlockingLaunch();
 }

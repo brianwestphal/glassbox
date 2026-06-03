@@ -115,6 +115,14 @@ The Node.js server process must be cleaned up when the Tauri window closes:
   - Windows: `taskkill /PID ... /T /F` — `/T` kills the process tree
 - **Graceful exit only**: This cleanup runs on Cmd+Q or window close. Force-killing the Tauri process (e.g., `kill -9`) will orphan the Node server. PGLite's lock file (`postmaster.pid`) must then be manually removed before the next launch.
 
+## Git difftool accumulating sessions (doc 19, GB-861)
+
+Per-file `git difftool` accumulates every changed file into **one** desktop window, reusing the sidecar machinery above. The `glassbox-difftool` wrapper (`src/cli-difftool.ts`) runs once per file; the first invocation starts the session, the rest append to it:
+
+- **Start (first file)**: the wrapper launches the platform launcher shim in `--difftool-serve` mode, detached and **without** `GLASSBOX_DIFFTOOL_BLOCK`. On macOS the shim pre-starts a `cli.js --difftool-serve` server and the app connects via `GLASSBOX_SERVER_URL` (the path above); on Linux/Windows the shim execs the Tauri binary, which spawns the sidecar — `lib.rs` forwards `--difftool-serve` to it the same way it forwards `--diff`. Either way the sidecar is one long-lived **accumulating** server (it records its port in `~/.glassbox/difftool.lock`).
+- **Append (later files)**: the wrapper discovers the running server via the lockfile and POSTs the file content; no new window opens.
+- **Lifecycle**: the accumulating server's PID is the sidecar PID, so closing the window runs the `RunEvent::Exit` cleanup above, kills the server, and ends the session — which releases the last file's held `git difftool` invocation. `--dir-diff` mode is unchanged (one blocking launch, the GB-856 path).
+
 ## Dev mode vs production
 
 |                   | Dev (`tauri:dev`)                                     | Production (`tauri:build`)                       |
