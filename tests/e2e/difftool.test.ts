@@ -76,12 +76,15 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   dataDir = mkdtempSync(join(tmpdir(), 'gb-difftool-e2e-'));
-  // `npx` is `npx.cmd` on Windows; Node's `spawn` without a shell can't resolve
-  // the bare name, so pick the platform binary.
-  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  // Run the server via `node` on tsx's CLI entry rather than the `npx`/`tsx`
+  // bin: those are `.cmd` shims on Windows, and Node's `spawn` rejects `.cmd`
+  // files with EINVAL unless `shell: true` (CVE-2024-27980 hardening) — and a
+  // bare `npx` gives ENOENT. Invoking node on tsx's entry avoids the shim
+  // entirely and works on every platform.
+  const tsxCli = join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
   server = spawn(
-    npx,
-    ['tsx', 'src/cli.ts', '--difftool-serve', '--no-open', '--strict-port', '--port', String(PORT), '--data-dir', dataDir],
+    process.execPath,
+    [tsxCli, 'src/cli.ts', '--difftool-serve', '--no-open', '--strict-port', '--port', String(PORT), '--data-dir', dataDir],
     { stdio: 'ignore', env: { ...process.env } },
   );
   // Generous ceiling: the `--difftool-serve` server (PGLite init + review
