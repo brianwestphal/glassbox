@@ -17,6 +17,13 @@ const DIFF_WORK_DIR = join(tmpdir(), `glassbox-e2e-diff-${process.pid}`);
 // `cmd`, where it spuriously creates a `-p` dir and then errors on reruns).
 mkdirSync(DIFF_WORK_DIR, { recursive: true });
 
+// Optionally launch a branded, system-installed browser instead of Playwright's
+// bundled Chromium. Unset by default (CI/dev use the bundled build); set
+// `PW_CHANNEL=chrome` (or `msedge`) to run against the installed browser — the
+// way to run this suite on Windows-on-ARM, where Playwright ships no native
+// arm64 Chromium and the bundled x64 build would run under slow emulation.
+const channel = process.env.PW_CHANNEL || undefined;
+
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30000,
@@ -24,6 +31,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4183',
     headless: true,
+    channel,
     viewport: { width: 1280, height: 720 },
   },
   webServer: process.env.SKIP_WEBSERVER ? undefined : [
