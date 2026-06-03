@@ -1,0 +1,31 @@
+name: Windows e2e (manual)
+
+# Run the Playwright e2e suite on a native x64 Windows runner, on demand. The
+# same suite also runs on every release candidate via the `test-e2e-windows` job
+# in release-candidate.yml; this standalone workflow lets you verify Windows e2e
+# without cutting an RC. Trigger it from the Actions tab ("Run workflow") or by
+# pushing a branch under `ci-windows-e2e/`.
+#
+# windows-latest is x64, so Playwright's bundled Chromium runs natively — no
+# PW_CHANNEL needed (that's only for ARM Windows, where Playwright ships no
+# native browser).
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'ci-windows-e2e/**'
+
+jobs:
+  e2e-windows:
+    name: e2e (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:client
+      - run: npx playwright install chromium
+      - run: npm run test:e2e
