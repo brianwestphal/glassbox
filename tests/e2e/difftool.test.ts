@@ -76,8 +76,11 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   dataDir = mkdtempSync(join(tmpdir(), 'gb-difftool-e2e-'));
+  // `npx` is `npx.cmd` on Windows; Node's `spawn` without a shell can't resolve
+  // the bare name, so pick the platform binary.
+  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   server = spawn(
-    'npx',
+    npx,
     ['tsx', 'src/cli.ts', '--difftool-serve', '--no-open', '--strict-port', '--port', String(PORT), '--data-dir', dataDir],
     { stdio: 'ignore', env: { ...process.env } },
   );
