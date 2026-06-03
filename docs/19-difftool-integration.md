@@ -190,6 +190,12 @@ For each per-file invocation, `glassbox-difftool` shall:
   content using the existing diff machinery (the same parsing used for
   `--diff`, doc 18), including binary/image handling where the two sides are
   binary.
+- **Image/SVG bytes persisted for visual comparison** — because a difftool
+  review has no git refs or working tree for the image-comparison routes to
+  re-read, the append shall persist the raw old/new bytes of binary and SVG
+  files so the metadata / difference / slice modes and the SVG rendered view
+  work the same as in any other review. The persisted bytes shall be scoped to
+  the session and removed when it ends.
 - **Typed and validated** — the endpoint shall follow the project's typed API
   conventions (a zod request/response schema in `src/api/`, body validation on
   the server) like every other endpoint.

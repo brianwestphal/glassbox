@@ -18,15 +18,20 @@ import type { AppEnv } from '../../../src/types.js';
 let testDb: PGlite;
 const REVIEW_ID = 'difftool-review-001';
 const REPO_ROOT = `${tmpdir()}/glassbox-difftool-test`;
+// Data dir the difftool image blobs (GB-863) are written to / read from.
+const BLOB_DATA_DIR = `${tmpdir()}/glassbox-difftool-blob-test`;
 
 vi.mock('../../../src/db/connection.js', () => ({
   getDb: async () => testDb,
+  getDataDir: () => BLOB_DATA_DIR,
 }));
 
 // Import after the DB mock is registered (vi.mock is hoisted). The difftool
 // routes pull in the real session module + real git/diff (intentionally — we
 // want diffRawContent's actual behavior).
 import { difftoolApiRoutes } from '../../../src/routes/difftool-api.js';
+import { imageRoutes } from '../../../src/routes/api/image.js';
+import { clearDifftoolBlobs } from '../../../src/difftool/blob-store.js';
 import {
   endDifftoolSession,
   getDifftoolSession,
@@ -43,6 +48,7 @@ function createApp(): Hono<AppEnv> {
     await next();
   });
   app.route('/api/difftool', difftoolApiRoutes);
+  app.route('/api', imageRoutes);
   return app;
 }
 
@@ -65,6 +71,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   resetDifftoolSessionForTest();
+  clearDifftoolBlobs(BLOB_DATA_DIR);
   shutdown.mockClear();
   await testDb.query('DELETE FROM review_files WHERE review_id = $1', [REVIEW_ID]);
   await testDb.query('DELETE FROM reviews WHERE id = $1', [REVIEW_ID]);
@@ -83,6 +90,25 @@ async function append(path: string, oldContent: string, newContent: string): Pro
     body: JSON.stringify({ path, oldContentB64: b64(oldContent), newContentB64: b64(newContent) }),
   });
 }
+
+/** Append raw binary bytes (e.g. an image) the way the wrapper does. */
+async function appendBinary(path: string, oldBytes: Buffer, newBytes: Buffer): Promise<Response> {
+  return app.request('/api/difftool/append', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path,
+      oldContentB64: oldBytes.toString('base64'),
+      newContentB64: newBytes.toString('base64'),
+    }),
+  });
+}
+
+// A minimal valid 1×1 PNG, so the metadata parser finds real dimensions.
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+  'base64',
+);
 
 describe('GET /api/difftool/ping', () => {
   it('reports the live session', async () => {
@@ -149,5 +175,40 @@ describe('POST /api/difftool/end', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(getDifftoolSession()).toBeNull();
+  });
+});
+
+// GB-863 — a difftool review has no git refs / working tree, so the image route
+// must serve binary bytes from the blobs persisted at append time.
+describe('image comparison for a difftool session', () => {
+  async function appendImageAndGetId(path: string): Promise<string> {
+    const res = await appendBinary(path, Buffer.alloc(0), PNG_1X1);
+    expect(res.status).toBe(200);
+    return (await res.json() as { fileId: string }).fileId;
+  }
+
+  it('serves the appended image bytes from the blob store', async () => {
+    const fileId = await appendImageAndGetId('assets/icon.png');
+    const res = await app.request(`/api/image/${fileId}/new`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(PNG_1X1);
+  });
+
+  it('reports image metadata for the appended file', async () => {
+    const fileId = await appendImageAndGetId('assets/icon.png');
+    const res = await app.request(`/api/image/${fileId}/metadata`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { old: unknown; new: unknown };
+    // Added image → no old side, new side carries parsed PNG metadata.
+    expect(body.old).toBeNull();
+    expect(body.new).toBeTruthy();
+  });
+
+  it('404s when no blob was stored (e.g. session torn down)', async () => {
+    const fileId = await appendImageAndGetId('assets/icon.png');
+    clearDifftoolBlobs(BLOB_DATA_DIR);
+    const res = await app.request(`/api/image/${fileId}/new`);
+    expect(res.status).toBe(404);
   });
 });

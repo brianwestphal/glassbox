@@ -55,6 +55,23 @@ async function append(path: string, oldText: string, newText: string): Promise<v
   if (!res.ok) throw new Error(`append ${path} failed: ${String(res.status)}`);
 }
 
+// A minimal valid 1×1 PNG, appended as an added binary file (empty old side).
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+  'base64',
+);
+
+/** Append a binary image and return its server-assigned fileId. */
+async function appendImage(path: string): Promise<string> {
+  const res = await fetch(`${BASE}/api/difftool/append`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, oldContentB64: '', newContentB64: PNG_1X1.toString('base64') }),
+  });
+  if (!res.ok) throw new Error(`append image failed: ${String(res.status)}`);
+  return (await res.json() as { fileId: string }).fileId;
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
@@ -80,22 +97,32 @@ test('accumulates appended files live, then "Done" ends the session (doc 19)', a
   // The session-only "Done" affordance renders for a difftool review (FR-19.5).
   await expect(page.locator('#difftool-done')).toBeVisible();
 
-  // Simulate the per-file wrapper handing three files into the live review.
-  // Append de-dupes by path, so this is idempotent across a test retry.
+  // Simulate the per-file wrapper handing four files into the live review (three
+  // text + one binary image). Append de-dupes by path, so this is idempotent
+  // across a test retry.
   await append('src/alpha.ts', 'const a = 1;\n', 'const a = 2;\n');
   await append('src/beta.ts', '', 'export const beta = true;\n');
   await append('README.md', '# Old\n', '# New\n');
+  const imageFileId = await appendImage('assets/icon.png');
 
   // FR-19.8 — the sidebar grows live (polling, no reload), and each file is
   // labeled with its full repo-relative path (GB-864), not a bare basename.
-  await expect(page.locator('.file-item')).toHaveCount(3, { timeout: 5_000 });
+  await expect(page.locator('.file-item')).toHaveCount(4, { timeout: 5_000 });
   await expect(page.locator('.file-name[title="src/alpha.ts"]')).toHaveCount(1);
   await expect(page.locator('.file-name[title="src/beta.ts"]')).toHaveCount(1);
   await expect(page.locator('.file-name[title="README.md"]')).toHaveCount(1);
+  await expect(page.locator('.file-name[title="assets/icon.png"]')).toHaveCount(1);
 
   // The first file auto-selects and its diff renders (the append-produced
   // FileDiff flows through the normal diff view).
   await expect(page.locator('#diff-container')).not.toBeEmpty({ timeout: 5_000 });
+
+  // GB-863 — the image route serves the appended binary from the on-disk blob
+  // store (a difftool session has no git refs / working tree to re-read).
+  const img = await page.request.get(`${BASE}/api/image/${imageFileId}/new`);
+  expect(img.status()).toBe(200);
+  expect(img.headers()['content-type']).toBe('image/png');
+  expect(Buffer.from(await img.body())).toEqual(PNG_1X1);
 
   // FR-19.5 — "Done" ends the session: the client clears its poll timer and
   // shows a terminal overlay, then the detached server exits on its own.

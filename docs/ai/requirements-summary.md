@@ -500,10 +500,13 @@ the thin-client wrapper (`src/cli-difftool.ts` + `src/git/difftool-client.ts`),
 the detached accumulating server (`glassbox --difftool-serve`), the typed
 append/poll/hold/end API (`src/routes/difftool-api.ts`, `src/difftool/session.ts`),
 the live sidebar + "Done" affordance, registration, and `$MERGED` repo-relative
-labeling (FR-19.1–19.8, 19.10–19.13). **Still open:** desktop (Tauri) single-window
-accumulation (FR-19.9 — per-file desktop still opens one window per file; `--dir-diff`
-gives the single-window desktop experience today) and image/SVG visual comparison
-inside a difftool session (the append path stores no persistent blobs yet).
+labeling (FR-19.1–19.8, 19.10–19.13). Image/SVG visual comparison works too: the
+append endpoint persists each binary/SVG file's raw bytes to an on-disk blob
+store (`src/difftool/blob-store.ts`, under the session data dir, cleared on
+teardown) and the `/image` route reads from there for a difftool review (GB-863).
+**Still open:** desktop (Tauri) single-window accumulation (FR-19.9 — per-file
+desktop still opens one window per file; `--dir-diff` gives the single-window
+desktop experience today).
 
 ## 19. Implementation-status snapshot
 
@@ -512,9 +515,9 @@ CLI/server, git integration, diff viewing, annotations, export, AI
 analysis, UI, data storage, desktop app, build/distribution, demo mode,
 navigation, security, themes, share prompt, Claude channel, direct path
 comparison. Doc **19** (git difftool integration) is **Partially built** —
-the browser accumulating model is shipped and tested; desktop (Tauri)
-single-window accumulation (FR-19.9) and in-session image/SVG comparison
-remain open. When a new feature is spec'd before implementation, add a doc and
+the browser accumulating model and in-session image/SVG comparison are shipped
+and tested; only desktop (Tauri) single-window accumulation (FR-19.9) remains
+open. When a new feature is spec'd before implementation, add a doc and
 mark the entry here **Design only** until the code lands, then **Partially
 built** / **Shipped** as it progresses.
 

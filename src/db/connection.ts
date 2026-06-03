@@ -6,6 +6,7 @@ import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './schema.js';
 
 let db: PGlite | null = null;
 let currentDbPath: string | null = null;
+let currentDataDir: string | null = null;
 
 // PGLite ≤0.3.x stored the working tables in the `template1` database (its
 // historical default). PGLite 0.4.0 changed the default working database to
@@ -19,9 +20,17 @@ let currentDbPath: string | null = null;
 const DB_OPTIONS = { database: 'template1' } as const;
 
 export function setDataDir(dataDir: string) {
+  currentDataDir = dataDir;
   const dbDir = join(dataDir, 'data');
   mkdirSync(dbDir, { recursive: true });
   currentDbPath = join(dbDir, 'reviews');
+}
+
+/** The active data directory (the parent of `data/`), or null before
+ *  `setDataDir`. Used by the difftool blob store to locate where to persist the
+ *  appended image bytes (GB-863). */
+export function getDataDir(): string | null {
+  return currentDataDir;
 }
 
 export async function getDb(): Promise<PGlite> {

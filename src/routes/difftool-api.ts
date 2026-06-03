@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 
 import { AppendDifftoolFileReqSchema, RegisterDifftoolReqSchema } from '../api/index.js';
+import { getDataDir } from '../db/connection.js';
 import { addReviewFile, getAnnotationCountsForReview, getReviewFiles, updateFileDiff } from '../db/queries.js';
+import { writeDifftoolBlob } from '../difftool/blob-store.js';
 import {
   addDifftoolHold,
   endDifftoolSession,
@@ -10,6 +12,7 @@ import {
 } from '../difftool/session.js';
 import { diffRawContent } from '../git/diff.js';
 import { getDifftoolStatus, registerDifftool, unregisterDifftool } from '../git/difftool.js';
+import { isSvgFile } from '../git/image.js';
 import type { AppEnv } from '../types.js';
 import { errorResponse, parseBody } from '../utils/parseBody.js';
 
@@ -75,6 +78,19 @@ difftoolApiRoutes.post('/append', async (c) => {
     const file = await addReviewFile(session.reviewId, diff.filePath, diffData);
     fileId = file.id;
   }
+
+  // GB-863 — persist the raw bytes for image/SVG files so the /image route can
+  // serve them. A difftool review has no git refs / working tree to re-read, so
+  // without this the visual comparison (metadata/difference/slice, SVG rendered)
+  // has no source bytes. Text diffs render from diff_data and need nothing here.
+  if (diff.isBinary || isSvgFile(diff.filePath)) {
+    const dataDir = getDataDir();
+    if (dataDir !== null) {
+      writeDifftoolBlob(dataDir, fileId, 'old', oldContent);
+      writeDifftoolBlob(dataDir, fileId, 'new', newContent);
+    }
+  }
+
   return c.json({ ok: true, fileId });
 });
 

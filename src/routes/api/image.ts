@@ -1,13 +1,28 @@
 import { Hono } from 'hono';
 
+import { getDataDir } from '../../db/connection.js';
 import { getReview, getReviewFile } from '../../db/queries.js';
+import { readDifftoolBlob } from '../../difftool/blob-store.js';
 import { parseDiffData, parseModeString } from '../../git/diff.js';
+import type { ImageSide } from '../../git/image.js';
 import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isSvgFile } from '../../git/image.js';
 import { rasterizeSvg } from '../../git/svg-rasterize.js';
 import type { AppEnv } from '../../types.js';
 import { requirePathParam } from '../../utils/parseBody.js';
 
 export const imageRoutes = new Hono<AppEnv>();
+
+/**
+ * A difftool review (doc 19) has no git refs or working tree, so its image bytes
+ * come from the blobs persisted at append time (GB-863) rather than
+ * `getOldImage`/`getNewImage`. Returns null if nothing was stored for this side.
+ */
+function difftoolImageSide(fileId: string, side: 'old' | 'new'): ImageSide | null {
+  const dataDir = getDataDir();
+  if (dataDir === null) return null;
+  const bytes = readDifftoolBlob(dataDir, fileId, side);
+  return bytes !== null ? { data: bytes, size: bytes.length } : null;
+}
 
 // Metadata route must come before the :side wildcard route
 imageRoutes.get('/image/:fileId/metadata', async (c) => {
@@ -24,9 +39,14 @@ imageRoutes.get('/image/:fileId/metadata', async (c) => {
   const diff = parseDiffData(file.diff_data);
   const oldPath: string | null = diff?.oldPath ?? null;
   const status = diff?.status ?? 'modified';
+  const isDifftool = review.mode === 'difftool';
 
-  const oldImage = status !== 'added' ? getOldImage(mode, file.file_path, oldPath, repoRoot) : null;
-  const newImage = status !== 'deleted' ? getNewImage(mode, file.file_path, repoRoot) : null;
+  const oldImage = status === 'added' ? null
+    : isDifftool ? difftoolImageSide(fileIdParam.data, 'old')
+    : getOldImage(mode, file.file_path, oldPath, repoRoot);
+  const newImage = status === 'deleted' ? null
+    : isDifftool ? difftoolImageSide(fileIdParam.data, 'new')
+    : getNewImage(mode, file.file_path, repoRoot);
 
   const oldMeta = oldImage !== null ? extractMetadata(oldImage.data, oldPath ?? file.file_path) : null;
   const newMeta = newImage !== null ? extractMetadata(newImage.data, file.file_path) : null;
@@ -54,9 +74,11 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
   const diff = parseDiffData(file.diff_data);
   const oldPath: string | null = diff?.oldPath ?? null;
 
-  const image = side === 'old'
-    ? getOldImage(mode, file.file_path, oldPath, repoRoot)
-    : getNewImage(mode, file.file_path, repoRoot);
+  const image = review.mode === 'difftool'
+    ? difftoolImageSide(fileIdParam.data, side)
+    : side === 'old'
+      ? getOldImage(mode, file.file_path, oldPath, repoRoot)
+      : getNewImage(mode, file.file_path, repoRoot);
 
   if (!image) return c.text('Image not available', 404);
 

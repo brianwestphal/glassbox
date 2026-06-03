@@ -276,8 +276,15 @@ async function main() {
   if (difftoolServe) {
     const { initDifftoolSession } = await import("./difftool/session.js");
     const { writeDiscovery, clearDiscovery, releaseStartingLock } = await import("./git/difftool-discovery.js");
+    const { clearDifftoolBlobs } = await import("./difftool/blob-store.js");
     mkdirSync(dataDir, { recursive: true });
     setDataDir(dataDir);
+    // Capture as a const so the shutdown closure below sees a non-null string
+    // (TS won't narrow the captured `let dataDir`).
+    const sessionDataDir = dataDir;
+    // Clear any image blobs left by a previous session that was hard-killed
+    // (e.g. desktop window force-close) before it could run teardown (GB-863).
+    clearDifftoolBlobs(sessionDataDir);
     const repoRoot = process.cwd();
     const review = await createReview(repoRoot, "git difftool", "difftool");
     const { port: actualPort, server } = await startServer(port, review.id, repoRoot, { noOpen, strictPort });
@@ -286,6 +293,7 @@ async function main() {
       repoRoot,
       shutdown: () => {
         try { server.close(); } catch { /* already closing */ }
+        clearDifftoolBlobs(sessionDataDir);
         clearDiscovery();
         releaseStartingLock();
         process.exit(0);

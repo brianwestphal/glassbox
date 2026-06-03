@@ -98,7 +98,7 @@ How the layer is used:
 | `api/outline.ts` | `/outline/:fileId` and `/symbol-definition` go-to-definition repo scan. |
 | `api/context.ts` | `/context/:fileId` line-range fetch for hunk expansion. |
 | `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`). |
-| `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side` with SVG rasterization. |
+| `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side` with SVG rasterization. For a difftool review (doc 19) the bytes come from the persisted blob store (`src/difftool/blob-store.ts`) instead of git refs / disk — a difftool session has neither (GB-863). |
 | `api/share-prompt.ts` | Share prompt state / dismiss / tick (uses `global-config.ts`). |
 | `api/system.ts` | `POST /open-external` — opens a validated http(s) URL via `openOS` (same OS-open path as file reveal). |
 | `ai-api.ts` | Router that mounts ai-config + ai-analysis handlers under `/api/ai/*`. |
@@ -330,7 +330,11 @@ path), `GET /poll` (live file list + `active` flag for the client sidebar),
 `GET /hold` (the last-file wrapper holds this open so `git difftool` stays
 attached; resolves on session end), `POST /end` ("Done" / tab-close
 `sendBeacon`). Session state + lifecycle live in `src/difftool/session.ts`;
-the detached server is started by `glassbox --difftool-serve`.
+the detached server is started by `glassbox --difftool-serve`. On append, an
+image/SVG file's raw old/new bytes are persisted by `src/difftool/blob-store.ts`
+(content under `<dataDir>/difftool-blobs/`, keyed by `fileId`+side, cleared on
+session start + teardown) so the `/image` route can serve them — a difftool
+review has no git refs / working tree to re-read (GB-863).
 
 ## 6. Database schema
 
