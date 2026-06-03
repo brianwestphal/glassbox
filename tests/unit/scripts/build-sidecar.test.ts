@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // GB-853 — guard against the desktop sidecar dropping `cli-difftool.js`.
@@ -10,7 +11,10 @@ import { describe, expect, it } from 'vitest';
 // `src-tauri/server/`, and that `tauri.conf.json` ships the corresponding
 // shim resources. A future "cleanup pass" that drops one of these lines
 // will fail loudly here.
-const repoRoot = new URL('../../../', import.meta.url).pathname;
+// fileURLToPath, not `new URL(...).pathname`: on Windows the latter yields
+// `/C:/...` (a spurious leading slash before the drive letter), which every
+// readFileSync below would then reject.
+const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const sidecarScript = readFileSync(join(repoRoot, 'scripts/build-sidecar.sh'), 'utf-8');
 const tauriConf = JSON.parse(readFileSync(join(repoRoot, 'src-tauri/tauri.conf.json'), 'utf-8'));
 const macLauncherShim = readFileSync(join(repoRoot, 'src-tauri/resources/glassbox'), 'utf-8');

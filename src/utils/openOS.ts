@@ -1,31 +1,34 @@
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { resolve } from 'path';
 
 /**
  * Platform-aware "open" helper.
  *
  * - `mode: 'url'` opens a URL (or any target) in the user's default handler:
- *   `open` (macOS) / `start` (Windows) / `xdg-open` (Linux).
+ *   `open` (macOS) / `start` (Windows) / `xdg-open` (Linux). Synchronous; throws
+ *   on spawn failure so the call site can swallow it.
  * - `mode: 'reveal'` opens the OS file browser focused on the given path:
  *   `open -R` (macOS Finder) / `explorer /select,PATH` (Windows) /
  *   `xdg-open <parent dir>` (Linux — no widely-supported "select" equivalent,
- *   so falls back to opening the containing directory).
+ *   so falls back to opening the containing directory). Launched detached and
+ *   NON-BLOCKING: Windows `explorer.exe` does not return promptly to the
+ *   spawning process, so a synchronous wait would hang the caller — and the HTTP
+ *   request behind it. Reveal is best-effort, so spawn errors are swallowed.
  *
- * Uses `execFileSync` (not `exec`) so argv is passed without shell
- * interpolation. Throws on spawn failure; the call site decides whether
- * to swallow (e.g. reveal for a not-yet-existing added file is best-effort).
+ * Both paths pass argv without shell interpolation (no `exec`), so a path or URL
+ * containing spaces or shell metacharacters is safe.
  */
 export function openOS(target: string, mode: 'url' | 'reveal'): void {
   if (mode === 'reveal') {
     if (process.platform === 'darwin') {
-      execFileSync('open', ['-R', target]);
+      launchDetached('open', ['-R', target]);
     } else if (process.platform === 'win32') {
       // `explorer.exe /select,PATH` is documented Windows shell syntax: the
-      // comma is a separator, not part of the path. `execFileSync` doesn't
+      // comma is a separator, not part of the path. `spawn` doesn't
       // shell-interpolate, so the joined string is passed verbatim as argv[1].
-      execFileSync('explorer', ['/select,' + target]);
+      launchDetached('explorer', ['/select,' + target]);
     } else {
-      execFileSync('xdg-open', [resolve(target, '..')]);
+      launchDetached('xdg-open', [resolve(target, '..')]);
     }
     return;
   }
@@ -38,4 +41,17 @@ export function openOS(target: string, mode: 'url' | 'reveal'): void {
   } else {
     execFileSync('xdg-open', [target]);
   }
+}
+
+/**
+ * Fire-and-forget child launch: returns immediately and never blocks the caller.
+ * Used for "reveal in file manager", where the file-manager process — notably
+ * Windows `explorer.exe` — may not hand control back to the spawner promptly. The
+ * child is detached with no stdio and `unref`'d so it can outlive the request;
+ * spawn errors are swallowed asynchronously (the action is best-effort).
+ */
+function launchDetached(command: string, args: string[]): void {
+  const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+  child.on('error', () => { /* best-effort: ignore (command missing, etc.) */ });
+  child.unref();
 }

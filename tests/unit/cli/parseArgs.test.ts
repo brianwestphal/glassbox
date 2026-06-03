@@ -145,7 +145,10 @@ describe('parseArgs', () => {
 
     it('parses --data-dir as absolute path', () => {
       const result = parseArgs(argv('--data-dir', '/tmp/test-data'));
-      expect(result!.dataDir).toBe('/tmp/test-data');
+      // parseArgs resolves the data dir to an absolute path; on Windows that
+      // anchors to the current drive (C:\tmp\test-data), so compare against
+      // resolve() rather than the raw POSIX literal.
+      expect(result!.dataDir).toBe(resolve('/tmp/test-data'));
     });
 
     it('parses --resume', () => {

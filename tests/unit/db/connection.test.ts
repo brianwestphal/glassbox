@@ -1,3 +1,5 @@
+import { join } from 'path';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock fs
@@ -52,7 +54,7 @@ describe('connection', () => {
     const { setDataDir } = await import('../../../src/db/connection.js');
     setDataDir('/tmp/test-glassbox');
 
-    expect(mockMkdirSync).toHaveBeenCalledWith('/tmp/test-glassbox/data', { recursive: true });
+    expect(mockMkdirSync).toHaveBeenCalledWith(join('/tmp/test-glassbox', 'data'), { recursive: true });
   });
 
   it('getDb throws if setDataDir was not called', async () => {
@@ -73,7 +75,7 @@ describe('connection', () => {
     // database and the user's reviews would appear to vanish. Guard against a
     // regression that drops it.
     expect(mockPGliteConstructor).toHaveBeenCalledWith(
-      '/tmp/test-glassbox/data/reviews',
+      join('/tmp/test-glassbox', 'data', 'reviews'),
       { database: 'template1' },
     );
   });

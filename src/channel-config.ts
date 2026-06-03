@@ -33,9 +33,11 @@ function getChannelServerPath(): { command: string; args: string[] } {
   return { command: process.execPath, args: [distPath] };
 }
 
-/** Get the project root directory (parent of .glassbox/) */
+/** Get the project root directory (parent of .glassbox/). Accepts either path
+ *  separator — on Windows `dataDir` is backslashed, so a forward-slash-only
+ *  match would leave `.glassbox` in place and write `.mcp.json` into it. */
 function projectRoot(dataDir: string): string {
-  return dataDir.replace(/\/.glassbox\/?$/, '');
+  return dataDir.replace(/[/\\]\.glassbox[/\\]?$/, '');
 }
 
 /** Register the channel server in .mcp.json for a specific project */
