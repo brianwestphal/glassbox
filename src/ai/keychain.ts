@@ -60,8 +60,11 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
       // helper via `Add-Type` (~3s). When no key is stored — the common case,
       // and what makes the Settings dialog read all 3 platforms in ~9s — skip
       // the expensive read entirely and return immediately.
+      // `cmdkey /list:<target>` echoes the requested target in its header even
+      // when nothing is stored, so detect the empty marker ("* NONE *") rather
+      // than the target name. Present marker / non-zero status → no credential.
       const list = spawnSync('cmdkey', ['/list:' + target], { encoding: 'utf-8' });
-      if (list.status !== 0 || !(list.stdout || '').includes(target)) return null;
+      if (list.status !== 0 || (list.stdout || '').includes('* NONE *')) return null;
       const script = WIN_CRED_READ_PS + `Write-Output ([CredHelper]::Read('${target}'))`;
       const r = spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' });
       const result = r.stdout.trim();
