@@ -55,6 +55,13 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
 
     if (os === 'win32') {
       const target = winCredTarget(platform);
+      // Fast existence gate (GB-868): `cmdkey` is a native command, whereas the
+      // `CredRead` path below spins up PowerShell AND compiles a C# P/Invoke
+      // helper via `Add-Type` (~3s). When no key is stored — the common case,
+      // and what makes the Settings dialog read all 3 platforms in ~9s — skip
+      // the expensive read entirely and return immediately.
+      const list = spawnSync('cmdkey', ['/list:' + target], { encoding: 'utf-8' });
+      if (list.status !== 0 || !(list.stdout || '').includes(target)) return null;
       const script = WIN_CRED_READ_PS + `Write-Output ([CredHelper]::Read('${target}'))`;
       const r = spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' });
       const result = r.stdout.trim();
