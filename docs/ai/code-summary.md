@@ -134,7 +134,7 @@ See §6 for the schema itself.
 | File | Purpose |
 |------|---------|
 | `diff.ts` | `getFileDiffs(mode, cwd)`, `parseDiff()`, mode → `git` argv builder. Also lists untracked files for uncommitted mode, walks all files for `--all`, and runs `git diff --no-index` for the `--diff <A> <B>` direct-comparison mode (doc 18) — `directComparisonRoots(mode)` resolves the per-side display roots and `getModeFileContent(mode, file, 'old'\|'new', cwd)` reads file content for context expansion, branching to disk reads (rootA/rootB) for `--diff` and to git refs for every other mode. `diffRawContent(displayPath, oldBuf, newBuf)` produces a `FileDiff` from two raw buffers (no git refs / no caller-managed paths) by running `git diff --no-index` against a throwaway temp pair — used by the doc-19 difftool append endpoint. |
-| `repo.ts` | `getRepoRoot`, `getRepoName`, `getHeadCommit`, `isGitRepo`. |
+| `repo.ts` | `getRepoRoot`, `getRepoName`, `getHeadCommit`, `isGitRepo`. Also exports `scrubbedGitEnv()` — the env every internal git subprocess runs with, with `git difftool`'s leaked `GIT_EXTERNAL_DIFF` / `GIT_DIFF_PATH_COUNTER` / `GIT_DIFF_PATH_TOTAL` stripped (used by `repo.ts`, `diff.ts`, and `image.ts`'s `git show`). Left in place those would make Glassbox's own `git diff`/`git show` re-invoke the difftool helper → recursion + empty diff ("No changes found"). See doc 19 NFR-19.12. |
 | `types.ts` | `ReviewMode`, `FileDiff`, `DiffHunk`, `DiffLine`. |
 | `image.ts` | Image side retrieval from git (old/new), binary detection, format identification. |
 | `image-metadata.ts` | Parse image headers (PNG IHDR, JPEG SOF/JFIF, GIF, WebP VP8/VP8L/VP8X) — no native deps. |

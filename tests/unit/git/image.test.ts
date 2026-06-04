@@ -454,6 +454,34 @@ describe('getOldImage', () => {
 
     expect(result).toBeNull();
   });
+
+  it('runs `git show` with git difftool env scrubbed (no recursion via GIT_EXTERNAL_DIFF)', () => {
+    // `git show` honors GIT_EXTERNAL_DIFF just like `git diff`. If a difftool
+    // session leaked it into our environment, an unscrubbed `git show` would
+    // re-invoke the difftool helper. Assert the spawned env strips it.
+    const savedExt = process.env.GIT_EXTERNAL_DIFF;
+    process.env.GIT_EXTERNAL_DIFF = 'git-difftool--helper';
+    try {
+      vi.mocked(spawnSync).mockReturnValue({
+        status: 0,
+        stdout: imageData,
+        stderr: Buffer.alloc(0),
+        pid: 1,
+        output: [],
+        signal: null,
+      });
+
+      getOldImage({ type: 'uncommitted' }, 'logo.png', null, repoRoot);
+
+      const call = vi.mocked(spawnSync).mock.calls.at(-1);
+      const opts = call?.[2] as { env?: NodeJS.ProcessEnv } | undefined;
+      expect(opts?.env).toBeDefined();
+      expect(opts!.env!.GIT_EXTERNAL_DIFF).toBeUndefined();
+    } finally {
+      if (savedExt === undefined) delete process.env.GIT_EXTERNAL_DIFF;
+      else process.env.GIT_EXTERNAL_DIFF = savedExt;
+    }
+  });
 });
 
 describe('getNewImage', () => {
