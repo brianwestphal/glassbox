@@ -4,6 +4,7 @@ import { join,resolve } from 'path';
 
 import type { ReviewMode } from './diff.js';
 import { directComparisonRoots } from './diff.js';
+import { scrubbedGitEnv } from './repo.js';
 
 // Re-export metadata utilities so existing importers don't break
 export type { ImageMetadata } from './image-metadata.js';
@@ -49,7 +50,7 @@ function getNewRef(mode: ReviewMode): string | null {
 /** Read a file at a specific git ref. Returns null if the file doesn't exist at that ref. */
 function gitShowFile(ref: string, filePath: string, repoRoot: string): Buffer | null {
   const spec = ref === ':' ? `:${filePath}` : `${ref}:${filePath}`;
-  const result = spawnSync('git', ['show', spec], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+  const result = spawnSync('git', ['show', spec], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024, env: scrubbedGitEnv() });
   if (result.status !== 0 || result.stdout.length === 0) return null;
   return result.stdout;
 }

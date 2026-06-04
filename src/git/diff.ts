@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
 
-import { getRepoRoot } from './repo.js';
+import { getRepoRoot, scrubbedGitEnv } from './repo.js';
 import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 
 // Re-export types and repo functions so existing importers don't break
@@ -25,7 +25,7 @@ export type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 const toGitArg = (p: string): string => (process.platform === 'win32' ? p.replace(/\\/g, '/') : p);
 
 function git(args: string[], cwd: string): string {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+  const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, env: scrubbedGitEnv() });
   if (result.status === 0) return result.stdout;
   if (result.stdout !== '') return result.stdout;
   const err: Error & { stdout?: string; stderr?: string; status?: number | null } = new Error(result.stderr);

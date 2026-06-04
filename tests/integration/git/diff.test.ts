@@ -455,3 +455,62 @@ index abc1234..def5678 100644
     expect(appDiff!.hunks).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// getFileDiffs — survives git difftool's leaked environment
+//
+// When Glassbox runs as a registered `git difftool`, git exports
+// GIT_EXTERNAL_DIFF (plus GIT_DIFF_PATH_COUNTER / GIT_DIFF_PATH_TOTAL) into the
+// tool's environment. Inherited by Glassbox's own `git diff --no-index`, that
+// var makes the inner git call the external diff driver instead of emitting a
+// textual patch — so the diff came back empty and the review reported "No
+// changes found for the specified mode". The git() helper scrubs these vars; a
+// stand-in external-diff program (`true`, which emits nothing) lets us assert
+// that without spawning the real difftool helper (which would recurse).
+// ---------------------------------------------------------------------------
+
+describe('getFileDiffs — git difftool environment is scrubbed', () => {
+  let cleanup: (() => void) | undefined;
+  const saved = {
+    ext: process.env.GIT_EXTERNAL_DIFF,
+    counter: process.env.GIT_DIFF_PATH_COUNTER,
+    total: process.env.GIT_DIFF_PATH_TOTAL,
+  };
+
+  afterAll(() => {
+    cleanup?.();
+    // Restore the ambient environment so other suites are unaffected.
+    if (saved.ext === undefined) delete process.env.GIT_EXTERNAL_DIFF;
+    else process.env.GIT_EXTERNAL_DIFF = saved.ext;
+    if (saved.counter === undefined) delete process.env.GIT_DIFF_PATH_COUNTER;
+    else process.env.GIT_DIFF_PATH_COUNTER = saved.counter;
+    if (saved.total === undefined) delete process.env.GIT_DIFF_PATH_TOTAL;
+    else process.env.GIT_DIFF_PATH_TOTAL = saved.total;
+  });
+
+  it('still produces a textual diff for --diff when GIT_EXTERNAL_DIFF is set', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glassbox-difftool-env-'));
+    cleanup = () => rmSync(dir, { recursive: true, force: true });
+
+    const pathA = join(dir, 'left.txt');
+    const pathB = join(dir, 'right.txt');
+    writeFileSync(pathA, 'line1\nline2\nline3\n');
+    writeFileSync(pathB, 'line1\nCHANGED\nline3\n');
+
+    // Simulate exactly what `git difftool` exports into the tool's env.
+    // `true` is a harmless stand-in for the difftool helper: it emits no patch,
+    // so an unscrubbed inner `git diff` would yield zero changes.
+    process.env.GIT_EXTERNAL_DIFF = 'true';
+    process.env.GIT_DIFF_PATH_COUNTER = '1';
+    process.env.GIT_DIFF_PATH_TOTAL = '1';
+
+    const diffs = getFileDiffs({ type: 'diff', pathA, pathB }, dir);
+
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].hunks.length).toBeGreaterThan(0);
+    const changed = diffs[0].hunks[0].lines.find(
+      l => l.type === 'add' && l.content === 'CHANGED',
+    );
+    expect(changed).toBeDefined();
+  });
+});

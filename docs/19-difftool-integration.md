@@ -261,6 +261,20 @@ For each per-file invocation, `glassbox-difftool` shall:
 - **No dropped files** — every file git hands over shall appear in the review;
   if appending a file fails, the failure shall be surfaced rather than silently
   skipped.
+- **Difftool environment isolation** — when git invokes a tool under
+  `git difftool` it exports `GIT_EXTERNAL_DIFF=git-difftool--helper` (plus the
+  per-file `GIT_DIFF_PATH_COUNTER` / `GIT_DIFF_PATH_TOTAL`) into the tool's
+  environment, and those variables are inherited by every child process. Because
+  Glassbox builds its diffs by running git itself (`git diff --no-index`,
+  `git show`), every internal git subprocess shall run with these variables
+  scrubbed from its environment. Left in place, the inner git call honors
+  `GIT_EXTERNAL_DIFF` and re-invokes the difftool helper — which re-launches
+  `glassbox` — instead of emitting a textual patch, producing runaway recursion
+  and an empty diff (the review then reports "No changes found for the specified
+  mode", with a desktop install also surfacing "Error: Server failed to start"
+  from the nested launch). The scrub lives in the shared low-level git helper
+  (`scrubbedGitEnv()` in `src/git/repo.ts`) so it applies uniformly regardless of
+  how Glassbox was invoked.
 
 ### 19.13 Backward compatibility
 

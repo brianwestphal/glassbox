@@ -267,7 +267,7 @@ describe('getOldImage', () => {
     const mode: ReviewMode = { type: 'uncommitted' };
     const result = getOldImage(mode, 'logo.png', null, repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:logo.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:logo.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
     expect(result!.data).toBe(imageData);
     expect(result!.size).toBe(imageData.length);
@@ -286,7 +286,7 @@ describe('getOldImage', () => {
     const mode: ReviewMode = { type: 'staged' };
     const result = getOldImage(mode, 'icon.png', null, repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:icon.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:icon.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -346,7 +346,7 @@ describe('getOldImage', () => {
     const mode: ReviewMode = { type: 'commit', sha: 'abc123' };
     const result = getOldImage(mode, 'img.png', null, repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'abc123~1:img.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'abc123~1:img.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -363,7 +363,7 @@ describe('getOldImage', () => {
     const mode: ReviewMode = { type: 'range', from: 'main', to: 'feature' };
     const result = getOldImage(mode, 'banner.png', null, repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'main:banner.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'main:banner.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -380,7 +380,7 @@ describe('getOldImage', () => {
     const mode: ReviewMode = { type: 'branch', name: 'develop' };
     const result = getOldImage(mode, 'logo.svg', null, repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'develop:logo.svg'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'develop:logo.svg'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -397,7 +397,7 @@ describe('getOldImage', () => {
     const mode: ReviewMode = { type: 'uncommitted' };
     const result = getOldImage(mode, 'new-name.png', 'old-name.png', repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:old-name.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:old-name.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -490,7 +490,7 @@ describe('getNewImage', () => {
 
     // staged new side: getNewRef returns null, but code checks mode.type === 'staged'
     // and uses git show with ':' prefix (index)
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', ':icon.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', ':icon.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -517,7 +517,7 @@ describe('getNewImage', () => {
     const mode: ReviewMode = { type: 'commit', sha: 'def456' };
     const result = getNewImage(mode, 'img.png', repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'def456:img.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'def456:img.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -534,7 +534,7 @@ describe('getNewImage', () => {
     const mode: ReviewMode = { type: 'range', from: 'v1', to: 'v2' };
     const result = getNewImage(mode, 'banner.png', repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'v2:banner.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'v2:banner.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
@@ -551,7 +551,7 @@ describe('getNewImage', () => {
     const mode: ReviewMode = { type: 'branch', name: 'feature' };
     const result = getNewImage(mode, 'logo.png', repoRoot);
 
-    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:logo.png'], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:logo.png'], expect.objectContaining({ cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 }));
     expect(result).not.toBeNull();
   });
 
