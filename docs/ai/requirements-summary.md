@@ -473,7 +473,7 @@ switches are exhaustive). FR-18.11 was explicitly resolved as
 **CLI-only**: a desktop in-app file/folder picker was considered and
 deferred — the CLI entry point covers the workflow.
 
-## 18b. Git difftool integration (`19-difftool-integration.md`) — **Partially built**
+## 18b. Git difftool integration (`19-difftool-integration.md`) — **Shipped**
 
 Using Glassbox as a registered **`git difftool`** via the `glassbox-difftool`
 companion binary. Registration (`--register-difftool` / Settings → General) and
