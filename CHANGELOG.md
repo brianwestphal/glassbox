@@ -2,6 +2,19 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.12.0] - 2026-06-04
+
+
+- New `glassbox --diff <A> <B>` mode: compare any two files or folders outside git history
+- Use Glassbox as a `git difftool`: register the `glassbox-difftool` bridge and review diffs in the browser
+- Register `glassbox-difftool` directly from the CLI or the Settings dialog
+- Per-file difftool mode accumulates each file into a single, growing browser session
+- `git difftool` launches the native desktop window with single-window accumulation
+- Desktop install now bundles `glassbox-difftool` (shim + symlink), ready to register
+- Image and SVG visual comparison now work inside difftool sessions
+- Full `git difftool` support across macOS, Linux, and Windows
+- Various bug fixes
+
 ## [0.11.0] - 2026-05-27
 
 
