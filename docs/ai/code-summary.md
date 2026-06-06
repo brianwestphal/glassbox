@@ -544,7 +544,7 @@ Scripts (`package.json`):
   window chrome with captions + an animated cursor. Lives in `scripts/demo/`
   (`capture-demo.ts` orchestrator, `scenes.ts` terminal/markdown/end-card,
   `chrome.ts` window-chrome compositing); see `scripts/demo/README.md`.
-  `domotion-svg` is pinned to 0.8.0 and forced to embedded-font text mode
+  `domotion-svg` is pinned to 0.11.0 and forced to embedded-font text mode
   (`setRenderTextMode`). Must run outside the command sandbox (Chromium).
 - `release` — version bump + publish stable (see `scripts/release.sh`)
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.

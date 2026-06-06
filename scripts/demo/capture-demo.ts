@@ -24,8 +24,9 @@
  * and silently falls back to CSS `<text>` (tofu); rendering once everything else
  * is gone makes path mode reliable, and we assert it at the end.
  *
- * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.3.3 for path-mode
- * text). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
+ * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.11.0; this script
+ * renders in embedded-font mode — see `setRenderTextMode('embedded-font')`
+ * below). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
  */
 
 import { spawn } from 'node:child_process';
