@@ -28,7 +28,7 @@ glassbox/
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
 ├── docs/                   # Requirements (1-19) + ARCHITECTURE, tauri-*
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
-├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture)
+├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT)
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
 ├── assets/                 # Static assets shipped with the app
 ├── CLAUDE.md               # Project rules for AI sessions
@@ -544,7 +544,7 @@ Scripts (`package.json`):
   window chrome with captions + an animated cursor. Lives in `scripts/demo/`
   (`capture-demo.ts` orchestrator, `scenes.ts` terminal/markdown/end-card,
   `chrome.ts` window-chrome compositing); see `scripts/demo/README.md`.
-  `domotion-svg` is pinned to 0.11.0 and forced to embedded-font text mode
+  `domotion-svg` is pinned to 0.12.0 and forced to embedded-font text mode
   (`setRenderTextMode`). Must run outside the command sandbox (Chromium).
 - `release` — version bump + publish stable (see `scripts/release.sh`)
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
@@ -641,7 +641,13 @@ CI workflows:
   GH Release with Tauri bundles. No auto-promote; users opt in via
   `npm install glassbox@beta` or the GH Release page.
 - `release-desktop.yml` — `v[0-9]*` tags excluding `-rc.*` and `-beta.*` →
-  signed/notarized stable desktop bundles.
+  signed/notarized stable desktop bundles. Its `create-release` step builds the
+  release body's per-platform **Download** summary, and a `rename-assets` job
+  renames the macOS `.dmg`s to friendly names — both driven by
+  `scripts/release/release-assets.mjs` (single source of truth, so a download
+  link never 404s against a mismatched asset name). `publish-release` flips the
+  draft → published only after `rename-assets`, guarded by
+  `tests/unit/scripts/release-assets.test.ts`.
 
 ## 17. Maintenance rules
 

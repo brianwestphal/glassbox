@@ -320,6 +320,16 @@ releases stay invisible to the Tauri updater and the in-CLI upgrade nudge
 because both consult `releases/latest` / npm `latest`, which skip
 prereleases.
 
+The stable release's GitHub Releases page carries a per-platform
+**Download** summary (grouped install links + an `npm install` line) and
+renames the macOS `.dmg`s to friendly dash-separated names
+(`Glassbox-<version>-macOS-Apple-Silicon.dmg` / `-macOS-Intel.dmg`); only
+`.dmg`s are renamed since `latest.json` references the other installers by
+their original names. The summary links and the rename rules share one
+source of truth (`scripts/release/release-assets.mjs`) so a link can never
+404 against a mismatched asset, and the draft→published flip waits for the
+rename job (§11.3.2).
+
 Dev: `npm run dev` (tsx), `npm run tauri:dev` (both). A sidecar stub
 script is created so Tauri's build system doesn't require the real Node
 binary in dev.

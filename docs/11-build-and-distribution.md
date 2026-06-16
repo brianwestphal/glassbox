@@ -42,6 +42,12 @@ Requirements for building, packaging, and distributing the application.
 - On a resumed release run, the script shall skip the AI draft entirely if saved release notes already exist in the state file and re-open the editor with the saved content — so a re-run never wastes a model call or overwrites in-progress edits.
 - When the `claude` CLI is not installed, the script shall fall back to a blank editor with the same `#`-prefixed guidance comments.
 
+### 11.3.2 GitHub Releases Page
+
+- The stable desktop release (`release-desktop.yml`) shall publish a GitHub Release whose body contains a per-platform **Download** summary — a grouped list (macOS / Linux / Windows) that links each installer directly, with a short plain-language note per option (e.g. "M-series Macs", "older Macs", AppImage "runs on most distros") plus an `npm install -g glassbox@<version>` line. The body shall never fall back to a generic "see the assets below" stub when the tag carries no annotation; the Download summary stands on its own. Any user-authored tag annotation is prepended above the summary.
+- The release shall rename the user-facing macOS installers from Tauri's raw filenames (`Glassbox_<version>_aarch64.dmg`, `Glassbox_<version>_x64.dmg`) to friendly, dash-separated names (`Glassbox-<version>-macOS-Apple-Silicon.dmg`, `Glassbox-<version>-macOS-Intel.dmg`). Only `.dmg` assets shall be renamed — the Tauri updater's `latest.json` references the `.exe` / `.msi` / `.deb` / `.AppImage` / `.rpm` assets by their original filenames, and macOS updates use the `.app.tar.gz`, so renaming those would break auto-update.
+- The download links in the release body and the asset-rename rules shall come from a single source of truth (`scripts/release/release-assets.mjs`) so a linked filename can never drift from the name actually shipped (a mismatch would 404 on the releases page). The rename shall run as a dedicated job after every platform build completes, and the draft→published flip shall depend on it, so the release becomes public only once every embedded download link resolves.
+
 ### 11.4 Update Checking (npm)
 
 - For npm installs, the system shall check for newer versions once per day by querying the npm registry's `latest` dist-tag.

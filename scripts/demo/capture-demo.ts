@@ -24,7 +24,7 @@
  * and silently falls back to CSS `<text>` (tofu); rendering once everything else
  * is gone makes path mode reliable, and we assert it at the end.
  *
- * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.11.0; this script
+ * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.12.0; this script
  * renders in embedded-font mode — see `setRenderTextMode('embedded-font')`
  * below). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
  */
@@ -46,7 +46,7 @@ import {
   optimizeSvg,
   setRenderTextMode,
 } from 'domotion-svg';
-import type { AnimationFrame, CursorEvent, Overlay } from 'domotion-svg';
+import type { AnimationFrame, CursorEvent, TypingOverlay } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
 
 import {
@@ -277,7 +277,7 @@ async function main(): Promise<void> {
     typeEnd = baseDelay + FEEDBACK.length * TYPING_SPEED;
     // One typing overlay: domotion wraps to bgWidth like a textarea (DM-840) and
     // renders a blinking insertion caret (DM-870) — no manual line-splitting.
-    const typingOverlay: Overlay = {
+    const typingOverlay: TypingOverlay = {
       kind: 'typing', text: FEEDBACK,
       x: field.x + OX, y: field.y + OY + field.fontSize * 0.9,
       fontSize: field.fontSize, color: field.color, speed: TYPING_SPEED,
