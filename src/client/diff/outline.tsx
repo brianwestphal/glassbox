@@ -217,7 +217,7 @@ function scrollToLine(lineNum: number) {
 }
 
 function bindScrollTracking() {
-  const container = document.getElementById('diff-container') as OutlineContainer | null;
+  const container: OutlineContainer | null = document.getElementById('diff-container');
   if (container === null) return;
 
   const prev = container._outlineScrollHandler;

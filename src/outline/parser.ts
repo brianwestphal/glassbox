@@ -165,7 +165,6 @@ function parseBraces(content: string, lang: string): OutlineSymbol[] {
           if (m && m[1] && !SKIP_NAMES.has(m[1])) {
             const sym: OutlineSymbol = { name: m[1], kind: 'function', line: lineNum, endLine: lineNum, children: [] };
             pushSymbol(root, stack, sym, currentDepth);
-            matched = true;
             break;
           }
         }

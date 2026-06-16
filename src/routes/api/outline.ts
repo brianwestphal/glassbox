@@ -54,7 +54,7 @@ outlineRoutes.get('/symbol-definition', async (c) => {
     searchedPaths.add(file.file_path);
     const diff = parseDiffData(file.diff_data);
     const isDeleted = diff?.status === 'deleted';
-    let content = '';
+    let content: string;
     try {
       content = isDeleted
         ? getFileContent(file.file_path, 'HEAD', repoRoot)

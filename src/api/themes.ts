@@ -26,7 +26,7 @@ export const ThemeColorsSchema = buildThemeColorsSchema();
 function buildPartialThemeColorsSchema(): z.ZodType<Partial<ThemeColors>> {
   const shape: Record<string, z.ZodOptional<z.ZodString>> = {};
   for (const key of THEME_VARIABLES) shape[key] = z.string().optional();
-  return z.object(shape).partial() as unknown as z.ZodType<Partial<ThemeColors>>;
+  return z.object(shape).partial();
 }
 export const PartialThemeColorsSchema = buildPartialThemeColorsSchema();
 

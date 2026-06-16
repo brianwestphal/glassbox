@@ -7,10 +7,10 @@ export function checkEnum<T extends readonly string[]>(
   name: string,
   allowed: T,
 ): { ok: T[number] } | { error: string } {
-  if (typeof value !== 'string' || !allowed.includes(value as T[number])) {
+  if (typeof value !== 'string' || !allowed.includes(value)) {
     return { error: `${name} must be one of: ${allowed.join(', ')}` };
   }
-  return { ok: value as T[number] };
+  return { ok: value };
 }
 
 /**

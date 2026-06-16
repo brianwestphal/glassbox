@@ -17,13 +17,7 @@ import { openOS } from './utils/openOS.js';
 
 function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<{ port: number; server: ServerType }> {
   return new Promise((resolve, reject) => {
-    // Framework-bridging cast: Hono's `fetch` is typed against an Env
-    // generic parameter (`object`), but `@hono/node-server`'s `serve()`
-    // expects `unknown`. Both sides are correct individually and the
-    // runtime contract holds (Hono's fetch IS `(req: Request) => Response
-    // | Promise<Response>`), so `as never` here is the right tool — there
-    // is no runtime invariant we could check that would make this safer.
-    const server = serve({ fetch: appFetch as never, port, hostname: '127.0.0.1' });
+    const server = serve({ fetch: appFetch, port, hostname: '127.0.0.1' });
     server.on('listening', () => { resolve({ port, server }); });
     server.on('error', (err: NodeJS.ErrnoException) => { reject(err); });
   });
