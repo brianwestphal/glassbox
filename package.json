@@ -48,6 +48,8 @@
     "demo:capture": "npm run build:client && tsx scripts/demo/capture-demo.ts",
     "demo:capture-stills": "npm run build:client && tsx scripts/demo/capture-stills.ts",
     "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
     "release:beta": "bash scripts/release.sh --beta",

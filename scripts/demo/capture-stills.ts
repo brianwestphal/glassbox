@@ -27,9 +27,10 @@
  * Chromium needs Mach ports / IPC the sandbox blocks.
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -159,7 +160,7 @@ function waitForServer(base: string): Promise<void> {
   })();
 }
 
-function spawnDemoServer(scenarioId: number, port: number): ChildProcessWithoutNullStreams {
+function spawnDemoServer(scenarioId: number, port: number): ChildProcessByStdio<null, Readable, Readable> {
   const tsxBin = resolve(ROOT, 'node_modules/.bin/tsx');
   const server = spawn(
     tsxBin,
@@ -179,7 +180,7 @@ function spawnDemoServer(scenarioId: number, port: number): ChildProcessWithoutN
   return server;
 }
 
-async function killServer(server: ChildProcessWithoutNullStreams): Promise<void> {
+async function killServer(server: ChildProcessByStdio<null, Readable, Readable>): Promise<void> {
   if (server.killed) return;
   await new Promise<void>((done) => {
     server.once('exit', () => { done(); });
@@ -221,7 +222,7 @@ async function captureOne(scenario: Scenario, port: number): Promise<void> {
     // Embedded-font glyph state must be cleared between scenarios; otherwise a
     // later capture inherits an earlier scenario's glyph defs.
     clearEmbeddedFonts();
-    setRenderTextMode('path');
+    setRenderTextMode('paths');
 
     const tree = await captureElementTree(page, 'body', {
       x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height,

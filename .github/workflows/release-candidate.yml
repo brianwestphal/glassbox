@@ -74,6 +74,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      # The scripts/ tree is outside the base tsconfig and runs via tsx, which
+      # erases `import type` without checking — so type-level drift in a
+      # script-only dependency would otherwise reach a release undetected.
+      - run: npm run typecheck:scripts
 
   test-unit:
     name: Unit Tests

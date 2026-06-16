@@ -1,0 +1,22 @@
+{
+  // Type-check the `scripts/` tree (demo capture, etc.) without emitting.
+  // The base tsconfig only includes `src/**`, and the scripts run via tsx,
+  // which erases `import type` without validating — so type-level API drift
+  // in a script-only dependency (e.g. a renamed `domotion-svg` export) goes
+  // undetected. This config covers that gap; `npm run typecheck:scripts`
+  // wires it into CI. The scripts still RUN via tsx; this is `--noEmit` only.
+  //
+  // `DOM` libs are added on top of the base because the demo scripts pass
+  // browser-context callbacks to Playwright's `page.evaluate(() => …)`, whose
+  // bodies reference `document` / `window`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
