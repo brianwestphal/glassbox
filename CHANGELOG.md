@@ -2,6 +2,35 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.14.0] - 2026-06-17
+
+
+
+- Right-click any sidebar file to open a themeable context menu of actions
+- Context menu: reveal a file in Finder / File Explorer / your file manager
+- Context menu: copy a file's absolute path, or repo-relative path with Option/Alt held
+- Context menu: mark a file reviewed or pending directly from the menu
+- Context menu: open a file in its default editor or GUI application
+- AI model lists are now discovered live from Anthropic, OpenAI, and Google APIs
+- Saved AI models no longer go stale — the list refreshes from your provider
+
+
+- Consolidated two overlapping share banners into one "Love Glassbox?" section
+- Share prompt now appears after real usage and stays hidden for 30 days once dismissed
+- Copy-path menu label updates live to show absolute vs. relative path as you hold Alt
+- Platform-aware "Reveal" label matches your OS file manager
+- AI default models updated to current Opus 4.8, Sonnet 4.6, and Haiku 4.5
+
+
+- "Open in Default Editor" now actually opens files instead of silently doing nothing
+- Fixed AI analysis failing with a 404 from a retired default Anthropic model snapshot
+- Stale AI model IDs in your config now self-heal to the current same-tier model
+- Fixed the Claude MCP channel failing to launch in desktop (Tauri) builds
+- Silent I/O failures no longer masquerade as "No changes found" (logged under --debug)
+
+
+- Bounded the go-to-definition repo scan so a missed symbol can't read the whole repo
+
 ## [0.13.3] - 2026-06-17
 
 
