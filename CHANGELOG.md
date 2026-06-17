@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.3] - 2026-06-17
+
+
+No changes
+
 ## [0.13.2] - 2026-06-17
 
 
