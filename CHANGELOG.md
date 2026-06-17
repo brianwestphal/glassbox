@@ -5,6 +5,12 @@ All notable changes to Glassbox are documented here. Format follows [Keep a Chan
 ## [0.13.2] - 2026-06-17
 
 
+Maintenance release. No user-facing changes — this release only corrects an
+internal desktop release-workflow script so packaged builds publish correctly.
+
+## [0.13.2] - 2026-06-17
+
+
 
 - Desktop app now shuts the dev server down cleanly on quit, no lingering process.
 - Fixed app commands not reaching the localhost WebView in the desktop app.
