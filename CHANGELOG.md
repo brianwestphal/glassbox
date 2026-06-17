@@ -2,6 +2,22 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.0] - 2026-06-17
+
+
+
+- Added a download section to the release page for grabbing desktop builds.
+
+
+- Desktop app: granted app commands to the localhost WebView so in-app actions work reliably.
+- Desktop app: the dev server is now killed cleanly on quit instead of lingering.
+
+
+- Refreshed demo-mode assets via the domotion-svg upgrade for cleaner sample diffs.
+
+
+- Cleared all dependency audit advisories and bumped dev dependencies and security patches.
+
 ## [0.12.0] - 2026-06-04
 
 
