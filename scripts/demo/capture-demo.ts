@@ -24,7 +24,7 @@
  * and silently falls back to CSS `<text>` (tofu); rendering once everything else
  * is gone makes path mode reliable, and we assert it at the end.
  *
- * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.12.0; this script
+ * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.13.3; this script
  * renders in embedded-font mode — see `setRenderTextMode('embedded-font')`
  * below). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
  */
