@@ -57,6 +57,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `18-direct-comparison.md` — Diffing two arbitrary files or folders by path (`--diff`), independent of git history
 - `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
 - `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (design only)
+- `21-sidebar-context-menu.md` — Right-click context menu on sidebar file rows; the cross-platform "reveal in file manager" action
 
 **Architecture documents** describe system design and setup:
 

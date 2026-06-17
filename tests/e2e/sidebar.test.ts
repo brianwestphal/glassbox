@@ -124,3 +124,144 @@ test.describe('Sort mode control', () => {
     await expect(folderBtn).toHaveClass(/active/);
   });
 });
+
+test.describe('File context menu (GB-884)', () => {
+  test('right-click a file shows a menu whose action POSTs to the reveal endpoint', async ({ page }) => {
+    // Intercept the OS-open hand-off so the test machine never actually opens a
+    // file manager, and capture which file was revealed.
+    let revealedPath: string | null = null;
+    await page.route('**/files/*/reveal*', async (route) => {
+      revealedPath = new URL(route.request().url()).pathname;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    const firstFile = page.locator('.file-item').first();
+    const fileId = await firstFile.getAttribute('data-file-id');
+    expect(fileId).toBeTruthy();
+
+    // The native context menu is suppressed; our custom menu appears instead.
+    await firstFile.click({ button: 'right' });
+    const menu = page.locator('.context-menu');
+    await expect(menu).toBeVisible();
+    const item = menu.locator('[data-action="reveal"]');
+    await expect(item).toBeVisible();
+
+    await item.click();
+
+    // The action reveals the right file and the menu closes.
+    await expect.poll(() => revealedPath, { timeout: 3000 }).toBe(`/api/files/${fileId ?? ''}/reveal`);
+    await expect(menu).toHaveCount(0);
+  });
+
+  test('Escape and outside-click dismiss the menu without revealing', async ({ page }) => {
+    let revealCalled = false;
+    await page.route('**/files/*/reveal*', async (route) => {
+      revealCalled = true;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    const firstFile = page.locator('.file-item').first();
+
+    // Escape closes the menu.
+    await firstFile.click({ button: 'right' });
+    await expect(page.locator('.context-menu')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.context-menu')).toHaveCount(0);
+
+    // Outside-click closes the menu.
+    await firstFile.click({ button: 'right' });
+    await expect(page.locator('.context-menu')).toBeVisible();
+    await page.locator('#diff-container').click({ position: { x: 5, y: 5 } });
+    await expect(page.locator('.context-menu')).toHaveCount(0);
+
+    // Neither dismissal triggered a reveal.
+    expect(revealCalled).toBe(false);
+  });
+
+  test('Copy Path copies the absolute path by default and the relative path with Option/Alt (GB-891)', async ({ page }) => {
+    // Stub clipboard writeText so we can read what was copied without needing
+    // clipboard permissions.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __copied: string[] };
+      w.__copied = [];
+      const stub = (t: string): Promise<void> => { w.__copied.push(t); return Promise.resolve(); };
+      try {
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: stub }, configurable: true });
+      } catch { /* fall back to assigning the method directly */ }
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    const firstFile = page.locator('.file-item').first();
+    const fileId = await firstFile.getAttribute('data-file-id');
+
+    // The real server resolves both paths; fetch them so we can assert exactly.
+    const paths = await page.evaluate(async (id) => {
+      const rid = document.body.dataset.reviewId ?? '';
+      const res = await fetch(`/api/files/${id ?? ''}/path?reviewId=${rid}`);
+      return res.json() as Promise<{ relativePath: string; absolutePath: string }>;
+    }, fileId);
+
+    const copied = () => page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
+
+    // Default click → absolute path.
+    await firstFile.click({ button: 'right' });
+    await page.locator('.context-menu [data-action="copy-path"]').click();
+    await expect.poll(copied, { timeout: 3000 }).toEqual([paths.absolutePath]);
+
+    // Option/Alt held → relative path.
+    await firstFile.click({ button: 'right' });
+    await page.locator('.context-menu [data-action="copy-path"]').click({ modifiers: ['Alt'] });
+    await expect.poll(copied, { timeout: 3000 }).toEqual([paths.absolutePath, paths.relativePath]);
+  });
+
+  test('Mark reviewed/pending toggles the file status (GB-891)', async ({ page }) => {
+    let patched: { status?: string } | null = null;
+    await page.route('**/files/*/status*', async (route) => {
+      patched = route.request().postDataJSON() as { status?: string };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    // Use a non-active row so we're not racing the auto-select-first-file mark.
+    const row = page.locator('.file-item').nth(2);
+    const dot = row.locator('.status-dot');
+    const wasReviewed = await dot.evaluate((el) => el.classList.contains('reviewed'));
+
+    patched = null; // ignore any PATCH from the load-time auto-select
+    await row.click({ button: 'right' });
+    await page.locator('.context-menu [data-action="toggle-status"]').click();
+
+    const expectedNext = wasReviewed ? 'pending' : 'reviewed';
+    await expect.poll(() => patched, { timeout: 3000 }).toEqual({ status: expectedNext });
+    if (expectedNext === 'reviewed') {
+      await expect(dot).toHaveClass(/reviewed/);
+    } else {
+      await expect(dot).not.toHaveClass(/reviewed/);
+    }
+  });
+
+  test('Open in Default Editor POSTs to the open endpoint (GB-891)', async ({ page }) => {
+    let openedPath: string | null = null;
+    await page.route('**/files/*/open*', async (route) => {
+      openedPath = new URL(route.request().url()).pathname;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    const firstFile = page.locator('.file-item').first();
+    const fileId = await firstFile.getAttribute('data-file-id');
+
+    await firstFile.click({ button: 'right' });
+    await page.locator('.context-menu [data-action="open-editor"]').click();
+    await expect.poll(() => openedPath, { timeout: 3000 }).toBe(`/api/files/${fileId ?? ''}/open`);
+  });
+});

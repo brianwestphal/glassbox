@@ -38,6 +38,9 @@ export const reviewStore = defineStore({
     setStaleCount: (fileId: string, count: number) => {
       set({ ...get(), staleCounts: { ...get().staleCounts, [fileId]: count } });
     },
+    setFileStatus: (fileId: string, status: string) => {
+      set({ ...get(), files: get().files.map(f => (f.id === fileId ? { ...f, status } : f)) });
+    },
   }),
 });
 

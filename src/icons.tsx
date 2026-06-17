@@ -27,6 +27,10 @@ export function IconCheck(): SafeHtml {
   return <svg {...S14}><path d="M20 6 9 17l-5-5"/></svg>;
 }
 
+export function IconCircle(): SafeHtml {
+  return <svg {...S14}><circle cx="12" cy="12" r="10"/></svg>;
+}
+
 export function IconReveal(): SafeHtml {
   return <svg {...S12}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 11 15 14"/></svg>;
 }

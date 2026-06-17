@@ -15,12 +15,9 @@ export async function selectFile(fileId: string): Promise<void> {
   // Mark as reviewed on first visit
   if (file !== undefined && file.status === 'pending') {
     await setFileStatus({ fileId, status: 'reviewed' });
-    const files = reviewStore.state.value.files.map(f =>
-      f.id === fileId ? { ...f, status: 'reviewed' } : f,
-    );
-    reviewStore.actions.update({ files });
     // Progress bar is reactive — the effect in `review/progress.tsx` fires
-    // automatically on the store update above.
+    // automatically on this store update.
+    reviewStore.actions.setFileStatus(fileId, 'reviewed');
   }
 }
 

@@ -6,6 +6,7 @@ import { asEl, asElement, asInput, asSelect, toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { aiStore, diffViewStore, reviewStore, visibleFileOrder } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
+import { bindFileContextMenu } from './contextMenu.js';
 import { fileListJsx } from './fileListView.js';
 import { showRiskPopover } from './riskPopover.js';
 import { sortControlJsx } from './sortControl.js';
@@ -21,6 +22,7 @@ export function initSidebar(): void {
   mountSortControl(sidebar);
   mountFileList(sidebar);
   bindDelegatedEvents(sidebar);
+  bindFileContextMenu(sidebar);
   bindSidebarResize();
   bindKeyboardNav();
   bindAutoScroll(sidebar);

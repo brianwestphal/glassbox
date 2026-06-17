@@ -560,6 +560,24 @@ other-orchestrator) obligation induces the AI to produce notes as part of its
 process. Phased P1–P5 plus a cross-cutting inbound AI-instructions contract; no
 code yet.
 
+## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
+
+Right-clicking a sidebar file row opens a custom (themeable, viewport-clamped)
+context menu anchored at the cursor, suppressing the native menu. It works across
+all sort modes (every `.file-item` carries `data-file-id`; one delegated
+`contextmenu` handler in `src/client/sidebar/contextMenu.tsx`, with pure label
+logic split into `contextMenuLabels.ts`). Each item has a Lucide icon. Actions:
+**Reveal** in the OS file manager (`POST /files/:id/reveal` → `openOS(…,
+'reveal')`; platform-aware label — Finder / File Explorer / containing folder);
+**Copy Path** (modifier-aware like Finder — absolute by default, repo-relative
+when Option/Alt is held, with a live-updating label; absolute resolves via `GET
+/files/:id/path`); **Mark reviewed/pending** (`PATCH /files/:id/status`, reactive
+status dot + progress); and **Open in Default Editor** (`POST /files/:id/open` →
+`openOS(…, 'edit')`, prefers `$VISUAL`/`$EDITOR` argv-spawned, else OS
+default-open). All server actions are best-effort (failures swallowed,
+`--debug`-logged). The menu dismisses on item-select, Escape, outside
+click/right-click, scroll, or blur.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -569,9 +587,11 @@ navigation, security, themes, share prompt, Claude channel, direct path
 comparison. Doc **19** (git difftool integration) is **Shipped** — the
 accumulating per-file model works for both browser and desktop, plus in-session
 image/SVG comparison (GB-863). Doc **20** (AI-authored review notes) is
-**Design only** — spec agreed, no code yet. When a new feature is spec'd before
-implementation, add a doc and mark the entry here **Design only** until the code
-lands, then **Partially built** / **Shipped** as it progresses.
+**Design only** — spec agreed, no code yet. Doc **21** (sidebar context menu)
+is **Shipped** — right-click a file to reveal it in the OS file manager. When a
+new feature is spec'd before implementation, add a doc and mark the entry here
+**Design only** until the code lands, then **Partially built** / **Shipped** as
+it progresses.
 
 ## 20. Maintenance rules
 
@@ -612,6 +632,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/18-direct-comparison.md` → §18a
 - `docs/19-difftool-integration.md` → §18b
 - `docs/20-ai-review-notes.md` → §18c
+- `docs/21-sidebar-context-menu.md` → §18d
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

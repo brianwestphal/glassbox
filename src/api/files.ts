@@ -39,6 +39,19 @@ export type RevealFileReq = z.infer<typeof RevealFileReqSchema>;
 export type RevealFileResp = z.infer<typeof OkResponseSchema>;
 export const RevealFileRespSchema = OkResponseSchema;
 
+export const GetFilePathReqSchema = z.object({ fileId: z.string() });
+export type GetFilePathReq = z.infer<typeof GetFilePathReqSchema>;
+export const GetFilePathRespSchema = z.object({
+  relativePath: z.string(),
+  absolutePath: z.string(),
+});
+export type GetFilePathResp = z.infer<typeof GetFilePathRespSchema>;
+
+export const OpenFileReqSchema = z.object({ fileId: z.string() });
+export type OpenFileReq = z.infer<typeof OpenFileReqSchema>;
+export type OpenFileResp = z.infer<typeof OkResponseSchema>;
+export const OpenFileRespSchema = OkResponseSchema;
+
 export async function listFiles(): Promise<ListFilesResp> {
   return apiCall(ListFilesRespSchema, '/files');
 }
@@ -56,4 +69,12 @@ export async function setFileStatus(req: SetFileStatusReq): Promise<SetFileStatu
 
 export async function revealFile(req: RevealFileReq): Promise<RevealFileResp> {
   return apiCall(RevealFileRespSchema, `/files/${req.fileId}/reveal`, { method: 'POST' });
+}
+
+export async function getFilePath(req: GetFilePathReq): Promise<GetFilePathResp> {
+  return apiCall(GetFilePathRespSchema, `/files/${req.fileId}/path`);
+}
+
+export async function openFileInEditor(req: OpenFileReq): Promise<OpenFileResp> {
+  return apiCall(OpenFileRespSchema, `/files/${req.fileId}/open`, { method: 'POST' });
 }

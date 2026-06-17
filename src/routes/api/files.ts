@@ -57,3 +57,28 @@ filesRoutes.post('/files/:fileId/reveal', async (c) => {
   }
   return c.json({ ok: true } as const);
 });
+
+filesRoutes.get('/files/:fileId/path', async (c) => {
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
+  const file = await getReviewFile(fileId.data);
+  if (!file) return c.json({ error: 'Not found' }, 404);
+  const repoRoot = c.get('repoRoot');
+  return c.json({ relativePath: file.file_path, absolutePath: resolve(repoRoot, file.file_path) } as const);
+});
+
+filesRoutes.post('/files/:fileId/open', async (c) => {
+  const fileId = requirePathParam(c, 'fileId');
+  if (!fileId.ok) return fileId.response;
+  const file = await getReviewFile(fileId.data);
+  if (!file) return c.json({ error: 'Not found' }, 404);
+  const repoRoot = c.get('repoRoot');
+  const fullPath = resolve(repoRoot, file.file_path);
+  try {
+    openOS(fullPath, 'edit');
+  } catch (err) {
+    // Best-effort — log under --debug so a broken editor launch is diagnosable.
+    debugLog(`open-in-editor failed for ${fullPath}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return c.json({ ok: true } as const);
+});
