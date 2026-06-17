@@ -127,14 +127,16 @@ Per-file `git difftool` accumulates every changed file into **one** desktop wind
 
 |                   | Dev (`tauri:dev`)                                     | Production (`tauri:build`)                       |
 | ----------------- | ----------------------------------------------------- | ------------------------------------------------ |
-| Node server       | Spawned by Rust via `npx tsx` (auto port selection)   | Bundled sidecar (downloaded Node.js binary)      |
+| Node server       | Spawned by Rust via `node --import tsx` (auto port selection) | Bundled sidecar (downloaded Node.js binary)      |
 | Frontend          | Loading screen, then navigated to server URL          | Loading screen, then navigated to server URL     |
 | Sidecar binary    | Stub placeholder (from `ensure-sidecar-stub.sh`)      | Real Node.js binary (from `build-sidecar.sh`)    |
 | Server code       | Source TypeScript via tsx                             | Bundled `cli.js` in `server/` resource dir       |
 | Port selection    | Automatic (tries 4183, increments if in use)          | Automatic (same behavior)                        |
 | Release-only code | Skipped (`#[cfg(not(debug_assertions))]`)             | Active (welcome screen, updater)                 |
 
-In dev mode, the Rust `setup` callback (`#[cfg(debug_assertions)]`) spawns the Node server via `npx tsx src/cli.ts --no-open`, parses the server URL from stdout ("running at ..."), and navigates the webview — the same pattern production uses with the sidecar. This enables automatic port selection in dev mode, avoiding failures when port 4183 is already in use. The `beforeDevCommand` only builds client assets (CSS/JS). The sidecar binary is never used — `ensure-sidecar-stub.sh` creates a no-op placeholder so Tauri's build system doesn't complain.
+In dev mode, the Rust `setup` callback (`#[cfg(debug_assertions)]`) spawns the Node server via `node --import tsx src/cli.ts --no-open` (with `TSX_TSCONFIG_PATH=tsconfig.json`), parses the server URL from stdout ("running at ..."), and navigates the webview — the same pattern production uses with the sidecar. This enables automatic port selection in dev mode, avoiding failures when port 4183 is already in use. The `beforeDevCommand` only builds client assets (CSS/JS). The sidecar binary is never used — `ensure-sidecar-stub.sh` creates a no-op placeholder so Tauri's build system doesn't complain.
+
+The launch form (`node --import tsx`, not `npx tsx`) matters for quit: `npx tsx` is a wrapper (`npx` → `node .bin/tsx` → `node src/cli.ts`), so the stored child PID was the npx wrapper, two levels above the real server. The quit-time `kill(pid)` only reached the wrapper and the `kill(-pid)` group kill missed the server's group, orphaning the `cli.ts` server (it kept the port + lockfile, so the next launch fought a stale instance). `node --import tsx` runs `cli.ts` *in* the spawned process, so the stored PID is the server itself and the SIGTERM lands on its handler. The pure `build_dev_server_args` helper in `lib.rs` is unit-tested to pin this launch form.
 
 ## Build pipeline
 

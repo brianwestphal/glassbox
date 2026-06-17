@@ -695,7 +695,7 @@ two documents intentionally overlap.
 | Tweak go-to-definition | `src/outline/parser.ts` (regex rules) and `src/client/diff/goToDefinition.tsx` (wiring). |
 | Add a SCSS partial | Create `src/client/styles/_thing.scss`, `@use` it from `src/client/styles.scss`. |
 | Add client state | `src/client/stores/index.ts` — pick the matching store (`reviewStore` / `diffViewStore` / `aiStore` / `dragStore`) or add a new one. Types in `state.ts`. |
-| Add a Tauri command | `src-tauri/src/lib.rs` (`#[tauri::command]` + `invoke_handler`). Call from `src/client/tauri.ts`. |
+| Add a Tauri command | `src-tauri/src/lib.rs` (`#[tauri::command]` + `invoke_handler`). Call from `src/client/tauri.ts`. **Also** register it in `src-tauri/build.rs` (`AppManifest::new().commands([...])`) and grant the generated `allow-<cmd>` (kebab-case) in `src-tauri/capabilities/remote-localhost.json` — the frontend is served over `http://localhost:*`, a "remote" origin, and Tauri 2.11 rejects ungranted app commands there with `<cmd> not allowed. Plugin not found`. |
 | Change the sidecar build | `scripts/build-sidecar.sh` + `tsup.config.ts` + CLAUDE.md external-deps list. |
 | Add an MCP-channel capability | `src/channel.ts` (MCP handler), `src/channel-config.ts` (if `.mcp.json` shape changes), `src/routes/channel-api.ts` (UI-facing endpoint). Update `docs/17-claude-channel.md`. |
 

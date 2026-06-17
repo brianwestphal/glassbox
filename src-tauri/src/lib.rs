@@ -350,6 +350,37 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Build the argument vector for the dev-mode Node server launch.
+///
+/// We launch the server as `node --import tsx src/cli.ts …` rather than the old
+/// `npx tsx …` form. The distinction matters for quit: `npx tsx` is a wrapper
+/// (npx → node .bin/tsx → node src/cli.ts), so `child.id()` was the npx wrapper
+/// PID, two levels above the real server. The quit-time `kill(pid)` only reached
+/// the wrapper, and the `kill(-pid)` group kill targeted a process group the
+/// server didn't lead, so the real `cli.ts` server orphaned and held the port +
+/// lockfile. `node --import tsx` runs `cli.ts` IN the spawned process, so the
+/// stored PID IS the server and the SIGTERM lands on its handler.
+/// `TSX_TSCONFIG_PATH=tsconfig.json` (set on the spawn) replaces the old
+/// `--tsconfig` CLI flag, which the loader form doesn't accept.
+///
+/// Note: no `--replace` — dev intentionally uses automatic port selection so a
+/// still-running prior instance doesn't block a fresh launch.
+#[cfg(debug_assertions)]
+fn build_dev_server_args(app_args: &[String]) -> Vec<String> {
+    let mut server_args = vec![
+        "--import".to_string(),
+        "tsx".to_string(),
+        "src/cli.ts".to_string(),
+        "--no-open".to_string(),
+    ];
+    // Skip argv[0] (binary name) and pass through any glassbox flags forwarded
+    // from `tauri dev -- --all` etc.
+    for arg in app_args.iter().skip(1) {
+        server_args.push(arg.clone());
+    }
+    server_args
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -439,27 +470,23 @@ pub fn run() {
                     .expect("CARGO_MANIFEST_DIR has no parent")
                     .to_path_buf();
 
-                // Forward CLI args (e.g. --all, --staged) from `tauri dev -- --all`
+                // Forward CLI args (e.g. --all, --staged) from `tauri dev -- --all`.
+                // Launch as `node --import tsx` (NOT `npx tsx`) so the spawned
+                // child IS the cli.ts server and is directly killable on quit;
+                // see `build_dev_server_args`.
                 let app_args: Vec<String> = std::env::args().collect();
-                let mut cli_args = vec![
-                    "tsx".to_string(),
-                    "--tsconfig".to_string(),
-                    "tsconfig.json".to_string(),
-                    "src/cli.ts".to_string(),
-                    "--no-open".to_string(),
-                ];
-                // Skip argv[0] (binary name) and pass through any glassbox flags
-                for arg in app_args.iter().skip(1) {
-                    cli_args.push(arg.clone());
-                }
+                let server_args = build_dev_server_args(&app_args);
 
-                let mut child = std::process::Command::new("npx")
-                    .args(&cli_args)
+                let mut child = std::process::Command::new("node")
+                    .args(&server_args)
                     .current_dir(&project_root)
+                    // tsx-as-loader reads the tsconfig (jsx / jsxImportSource /
+                    // paths) from here instead of the old `--tsconfig` CLI flag.
+                    .env("TSX_TSCONFIG_PATH", "tsconfig.json")
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::inherit())
                     .spawn()
-                    .expect("Failed to spawn dev server (npx tsx)");
+                    .expect("Failed to spawn dev server (node --import tsx)");
 
                 let pid = child.id();
                 *app.state::<SidecarPid>().0.lock().unwrap() = Some(pid);
@@ -735,5 +762,46 @@ mod tests {
             2,
             "expected two copies: {cmd}"
         );
+    }
+}
+
+// Dev-mode server launch must spawn the cli.ts server IN-process
+// (`node --import tsx`) so its PID is directly killable on quit, NOT via an
+// `npx`/`tsx`-CLI wrapper whose real server is an unreachable grandchild that
+// orphans on quit and holds the port + lockfile. Gated to debug builds because
+// `build_dev_server_args` only exists there (it's the dev-only launch path).
+// `cargo test` is a debug build, so this runs in CI.
+#[cfg(all(test, debug_assertions))]
+mod dev_server_args_tests {
+    use super::build_dev_server_args;
+
+    #[test]
+    fn launches_cli_via_node_import_tsx_not_npx_wrapper() {
+        let args = build_dev_server_args(&["glassbox".to_string()]);
+        // node flags first: `--import tsx` runs cli.ts in THIS process, so the
+        // spawned child PID is the server the quit-time SIGTERM must reach.
+        assert_eq!(args[0], "--import");
+        assert_eq!(args[1], "tsx");
+        assert_eq!(args[2], "src/cli.ts");
+        assert!(args.iter().any(|a| a == "--no-open"));
+        // Guard against a regression to the old wrapper form, where the child
+        // PID was `npx`/`tsx`-CLI and the server was an unkillable grandchild.
+        assert!(!args.iter().any(|a| a == "npx"));
+        assert_ne!(args[0], "tsx");
+        // tsconfig is now passed via TSX_TSCONFIG_PATH env, not the CLI flag.
+        assert!(!args.iter().any(|a| a == "--tsconfig"));
+    }
+
+    #[test]
+    fn forwards_glassbox_flags_after_the_cli_entry() {
+        let args = build_dev_server_args(&[
+            "glassbox".to_string(),
+            "--all".to_string(),
+            "--staged".to_string(),
+        ]);
+        // argv[0] (the binary name) is dropped; the real flags are forwarded.
+        assert!(args.iter().any(|a| a == "--all"));
+        assert!(args.iter().any(|a| a == "--staged"));
+        assert!(!args.iter().any(|a| a == "glassbox"));
     }
 }

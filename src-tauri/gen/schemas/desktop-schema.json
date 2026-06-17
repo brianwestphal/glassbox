@@ -387,6 +387,66 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the check_cli_installed command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-check-cli-installed",
+          "markdownDescription": "Enables the check_cli_installed command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the check_for_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-check-for-update",
+          "markdownDescription": "Enables the check_for_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_pending_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-get-pending-update",
+          "markdownDescription": "Enables the get_pending_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the install_cli command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-install-cli",
+          "markdownDescription": "Enables the install_cli command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the install_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-install-update",
+          "markdownDescription": "Enables the install_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the check_cli_installed command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-check-cli-installed",
+          "markdownDescription": "Denies the check_cli_installed command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the check_for_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-check-for-update",
+          "markdownDescription": "Denies the check_for_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_pending_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-get-pending-update",
+          "markdownDescription": "Denies the get_pending_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the install_cli command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-install-cli",
+          "markdownDescription": "Denies the install_cli command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the install_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-install-update",
+          "markdownDescription": "Denies the install_update command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",
