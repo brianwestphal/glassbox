@@ -4,7 +4,11 @@ use std::sync::Mutex;
 #[cfg(not(debug_assertions))]
 use serde::Deserialize;
 use serde::Serialize;
-use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
+use tauri::menu::{MenuBuilder, MenuItem, SubmenuBuilder};
+// PredefinedMenuItem is only referenced in the macOS-specific Window menu below;
+// importing it unconditionally trips `-D unused-imports` on Linux/Windows.
+#[cfg(target_os = "macos")]
+use tauri::menu::PredefinedMenuItem;
 use tauri::{Emitter, Manager};
 
 #[cfg(not(debug_assertions))]
