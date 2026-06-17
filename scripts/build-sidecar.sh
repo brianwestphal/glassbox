@@ -96,13 +96,24 @@ cp dist/cli-difftool.js "$SERVER_DIR/"
 # resolves at runtime; forgetting this makes SVG image-diff rasterization fall
 # back to blocking in-process rendering.
 cp dist/svg-rasterize-worker.js "$SERVER_DIR/"
+# Claude Code MCP channel server — spawned by Claude Code via `.mcp.json`.
+# `channel-config.ts` (bundled into cli.js) resolves it as a sibling of cli.js
+# via `import.meta.url`, so it MUST sit next to cli.js. Forgetting this makes the
+# Claude channel toggle write a `.mcp.json` pointing at a non-existent file, so
+# the channel silently fails to launch in desktop installs (GB-887).
+cp dist/channel.js "$SERVER_DIR/"
 mkdir -p "$SERVER_DIR/client"
 cp dist/client/app.global.js "$SERVER_DIR/client/"
 cp dist/client/history.global.js "$SERVER_DIR/client/"
 cp dist/client/styles.css "$SERVER_DIR/client/"
 
-# Copy only the external runtime dependencies (PGLite, Hono, @hono, resvg)
-for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm kerfjs @preact/signals-core; do
+# Copy only the external runtime dependencies (those kept external by tsup's
+# noExternal regex). Must stay in sync with that regex and CLAUDE.md's
+# external-deps list — see tests/unit/build-sidecar-externals.test.ts, which
+# fails if a tsup-external package is missing here. @modelcontextprotocol/sdk is
+# required by the channel server (dist/channel.js); @preact/signals-core is a
+# transitive dep of kerfjs.
+for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm @modelcontextprotocol/sdk kerfjs @preact/signals-core; do
   dest="$SERVER_DIR/node_modules/$pkg"
   mkdir -p "$(dirname "$dest")"
   cp -R "node_modules/$pkg" "$dest"

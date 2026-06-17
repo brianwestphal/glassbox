@@ -1,22 +1,10 @@
 import { getAnalysis, getAnalysisStatus, startAnalysis } from '../api/index.js';
+import { friendlyError } from './aiError.js';
 import { clientLog } from './api.js';
 import { aiStore } from './stores/index.js';
 import { ANALYSIS_POLL_INTERVAL_MS } from './timing.js';
 
 let pollGeneration = 0;
-
-function friendlyError(raw: string): string {
-  if (raw.includes('429') || raw.toLowerCase().includes('rate_limit') || raw.toLowerCase().includes('rate limit')) {
-    return 'Rate limit exceeded. Please wait a moment and try again.';
-  }
-  if (raw.includes('401') || raw.toLowerCase().includes('unauthorized')) {
-    return 'Invalid API key. Check your AI settings.';
-  }
-  if (/\b(500|502|503|504)\b/.test(raw)) {
-    return 'AI service temporarily unavailable. Try again later.';
-  }
-  return raw.length > 120 ? raw.slice(0, 120) + '...' : raw;
-}
 
 export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
   const ai = aiStore.state.value;

@@ -1,14 +1,12 @@
 import {
-  dismissSharePrompt as apiDismissSharePrompt,
   getAIConfig,
   getAIPreferences,
   getCurrentReview,
-  getSharePromptState,
   refreshReview,
   SortModeSchema,
   SvgViewModeSchema,
 } from "../api/index.js";
-import { IconGear, IconHeart, IconRefresh } from "../icons.js";
+import { IconGear, IconRefresh } from "../icons.js";
 import { initDebug } from "./api.js";
 import { bindFind } from "./diff/find.js";
 import { bindGoToDefinition } from "./diff/goToDefinition.js";
@@ -21,13 +19,13 @@ import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
 import { initProgress } from "./review/progress.js";
-import { initSharePrompt, triggerShare } from "./share.js";
+import { initSharePrompt } from "./share.js";
 import { loadFiles } from "./sidebar/fileTree.js";
 import { initSidebar } from "./sidebar/index.js";
 import { loadAnalysisResults, triggerAnalysis } from "./sidebar/sortMode.js";
 import { aiStore, diffViewStore, dragStore, reviewStore, visibleFileOrder } from "./stores/index.js";
 // --- Tauri update notification ---
-import { getTauriInvoke, openExternalUrl, showUpdateBanner } from "./tauri.js";
+import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
 
 async function initAISorting() {
   try {
@@ -116,43 +114,9 @@ async function initAISorting() {
     sidebarHeader.appendChild(gearBtn);
   }
 
-  // Share section above the footer
-  const shareContainer = document.getElementById("sidebar-share");
-  if (shareContainer) {
-    // Check if share section was dismissed
-    void getSharePromptState().then((state) => {
-      if (state.dismissedAt !== null) {
-        const elapsed = Date.now() - state.dismissedAt;
-        if (elapsed < 30 * 24 * 60 * 60 * 1000) return; // within 30-day cooldown
-      }
-      const shareSection = toElement(
-        <div className="sidebar-share-section">
-          <button className="sidebar-share-dismiss" id="share-dismiss-btn" title="Dismiss">&times;</button>
-          <p className="sidebar-share-label">Love Glassbox?</p>
-          <div className="sidebar-share-actions">
-            <button className="btn btn-share" id="share-glassbox-btn">Share</button>
-            <a className="btn btn-sponsor" id="sponsor-glassbox-btn" href="https://github.com/sponsors/brianwestphal" target="_blank" rel="noopener noreferrer"><IconHeart />Sponsor</a>
-          </div>
-        </div>
-      );
-      shareSection.querySelector("#share-glassbox-btn")?.addEventListener("click", () => {
-        void triggerShare();
-      });
-      // In the Tauri desktop shell, `target="_blank"` never reaches a real
-      // browser, so route the Sponsor link through the OS default browser.
-      // In a plain browser this is a no-op and the anchor opens normally.
-      shareSection.querySelector("#sponsor-glassbox-btn")?.addEventListener("click", (e) => {
-        if (openExternalUrl("https://github.com/sponsors/brianwestphal")) {
-          e.preventDefault();
-        }
-      });
-      shareSection.querySelector("#share-dismiss-btn")?.addEventListener("click", () => {
-        shareSection.remove();
-        void apiDismissSharePrompt();
-      });
-      shareContainer.appendChild(shareSection);
-    }).catch(() => { /* ignore */ });
-  }
+  // The share section (#sidebar-share) is populated by the time-gated share
+  // prompt in `share.tsx` once the user has spent ~5 min in Glassbox — see
+  // `initSharePrompt()`. It is intentionally NOT shown immediately on launch.
 }
 
 async function navigateToEntry(entry: { fileId: string | null; filePath: string | null; scrollLine: number }) {

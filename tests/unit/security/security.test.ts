@@ -15,10 +15,19 @@ describe('FR-14.1.1: Server binds to 127.0.0.1 only', () => {
 });
 
 describe('FR-14.3: Shell command safety', () => {
-  it('git/diff.ts uses spawnSync instead of exec with interpolation', () => {
-    const content = readFileSync(join(SRC_ROOT, 'git', 'diff.ts'), 'utf-8');
+  it('git/spawn.ts runs git via spawnSync (the shared git() helper)', () => {
+    // The shared `git()` / `scrubbedGitEnv()` helpers used by diff.ts and repo.ts
+    // live here (GB-889 consolidation). This is where the argv-array spawn lives.
+    const content = readFileSync(join(SRC_ROOT, 'git', 'spawn.ts'), 'utf-8');
     expect(content).toContain('spawnSync');
-    // Should not use exec with string interpolation for git commands
+    expect(content).not.toMatch(/exec\(`git\s/);
+    expect(content).not.toMatch(/execSync\(`git\s/);
+  });
+
+  it('git/diff.ts does not run git via exec with string interpolation', () => {
+    // diff.ts now spawns git through the shared `git()` helper from spawn.ts,
+    // but it must never reintroduce a shell-interpolated git command.
+    const content = readFileSync(join(SRC_ROOT, 'git', 'diff.ts'), 'utf-8');
     expect(content).not.toMatch(/exec\(`git\s/);
     expect(content).not.toMatch(/execSync\(`git\s/);
   });

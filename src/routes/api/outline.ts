@@ -5,6 +5,7 @@ import { resolve } from 'path';
 
 import type { SymbolDef } from '../../api/index.js';
 import { getReviewFile, getReviewFiles } from '../../db/queries.js';
+import { debugLog } from '../../debug.js';
 import { getFileContent, parseDiffData } from '../../git/diff.js';
 import type { OutlineSymbol } from '../../outline/parser.js';
 import { parseOutline } from '../../outline/parser.js';
@@ -13,6 +14,16 @@ import { requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const outlineRoutes = new Hono<AppEnv>();
+
+/**
+ * Upper bound on how many repo files the go-to-definition fallback will read +
+ * parse when the symbol wasn't found in the review files. The scan is
+ * synchronous (`readFileSync`) and runs on the HTTP event loop, so on a miss
+ * (unknown symbol / typo) an uncapped scan of a large repo would stall every
+ * other request. Capping trades completeness on huge repos for responsiveness;
+ * the scan already stops at the first match, so this only bites the miss case.
+ */
+const MAX_REPO_SCAN_FILES = 2000;
 
 outlineRoutes.get('/outline/:fileId', async (c) => {
   const repoRoot = c.get('repoRoot');
@@ -71,16 +82,23 @@ outlineRoutes.get('/symbol-definition', async (c) => {
     try {
       const allFiles = spawnSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf-8' })
         .stdout.trim().split('\n').filter(Boolean);
+      let scanned = 0;
       for (const filePath of allFiles) {
         if (searchedPaths.has(filePath)) continue;
         // Only search files the outline parser supports
         const ext = filePath.slice(filePath.lastIndexOf('.'));
         if (!/\.(js|mjs|cjs|jsx|ts|tsx|mts|cts|java|go|rs|c|h|cpp|cc|cxx|hpp|cs|swift|php|kt|kts|scala|dart|groovy|py|rb)$/i.test(ext)) continue;
 
+        if (scanned >= MAX_REPO_SCAN_FILES) {
+          debugLog(`outline: repo scan hit ${String(MAX_REPO_SCAN_FILES)}-file budget for "${name}" without a match, stopping early`);
+          break;
+        }
+
         let content = '';
         try {
           content = readFileSync(resolve(repoRoot, filePath), 'utf-8');
         } catch { continue; }
+        scanned++;
         if (!content) continue;
 
         const symbols = parseOutline(content, filePath);

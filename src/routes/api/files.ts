@@ -3,6 +3,7 @@ import { resolve } from 'path';
 
 import { SetFileStatusBodySchema } from '../../api/files.js';
 import { getAnnotationCountsForReview, getAnnotationsForFile, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
+import { debugLog } from '../../debug.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -48,6 +49,11 @@ filesRoutes.post('/files/:fileId/reveal', async (c) => {
   const fullPath = resolve(repoRoot, file.file_path);
   try {
     openOS(fullPath, 'reveal');
-  } catch { /* ignore errors (e.g. file doesn't exist yet for added files) */ }
+  } catch (err) {
+    // Best-effort (e.g. file doesn't exist yet for added files) — but log under
+    // --debug so a genuinely broken reveal (missing `open`/`explorer`, sandbox)
+    // is diagnosable instead of silently doing nothing.
+    debugLog(`reveal failed for ${fullPath}: ${err instanceof Error ? err.message : String(err)}`);
+  }
   return c.json({ ok: true } as const);
 });

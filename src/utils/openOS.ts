@@ -1,6 +1,8 @@
 import { execFileSync, spawn } from 'child_process';
 import { resolve } from 'path';
 
+import { debugLog } from '../debug.js';
+
 /**
  * Platform-aware "open" helper.
  *
@@ -52,6 +54,10 @@ export function openOS(target: string, mode: 'url' | 'reveal'): void {
  */
 function launchDetached(command: string, args: string[]): void {
   const child = spawn(command, args, { detached: true, stdio: 'ignore' });
-  child.on('error', () => { /* best-effort: ignore (command missing, etc.) */ });
+  child.on('error', (err) => {
+    // Best-effort (command missing, etc.) — log under --debug so a broken
+    // reveal isn't completely invisible.
+    debugLog(`launchDetached(${command}) failed: ${err.message}`);
+  });
   child.unref();
 }

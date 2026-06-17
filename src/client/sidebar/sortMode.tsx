@@ -1,4 +1,5 @@
 import { getAnalysis, getAnalysisStatus, saveAIPreferences, startAnalysis } from '../../api/index.js';
+import { friendlyError } from '../aiError.js';
 import { clientLog } from '../api.js';
 import type { SortMode } from '../state.js';
 import { aiStore, getAnalysisModeState } from '../stores/index.js';
@@ -46,27 +47,6 @@ export function switchSortMode(mode: SortMode): void {
   triggerAnalysis(mode);
 }
 
-function friendlyError(raw: string): string {
-  if (raw.includes('429') || raw.toLowerCase().includes('rate_limit') || raw.toLowerCase().includes('rate limit')) {
-    return 'Rate limit exceeded. Please wait a moment and try again.';
-  }
-  if (raw.includes('401') || raw.toLowerCase().includes('unauthorized')) {
-    return 'Invalid API key. Check your AI settings.';
-  }
-  if (raw.includes('403') || raw.toLowerCase().includes('forbidden')) {
-    return 'Access denied. Check your API key permissions.';
-  }
-  if (/\b(500|502|503|504)\b/.test(raw)) {
-    return 'AI service temporarily unavailable. Try again later.';
-  }
-  if (raw.toLowerCase().includes('fetch failed') || raw.toLowerCase().includes('network')) {
-    return 'Network error. Check your internet connection.';
-  }
-  if (raw.toLowerCase().includes('timed out')) {
-    return 'Analysis timed out. Try again.';
-  }
-  return raw.length > 120 ? raw.slice(0, 120) + '...' : raw;
-}
 
 export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boolean = false): void {
   const modeState = getAnalysisModeState(mode);

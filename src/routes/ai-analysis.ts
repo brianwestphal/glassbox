@@ -40,6 +40,10 @@ import { resolveReviewId } from '../utils/resolveReviewId.js';
 
 export const aiAnalysisRoutes = new Hono<AppEnv>();
 
+/** How long a still-`running` analysis row is reused before it's treated as
+ *  stale (the worker presumably died) and a fresh run is started. */
+const ANALYSIS_REUSE_TIMEOUT_MS = 15 * 60 * 1000;
+
 /** Parse the `updated_at` timestamp on an analysis row. PGLite returns
  *  raw `TIMESTAMP` columns in the server's local time; the previous
  *  implementation appended `Z` to coerce them to UTC. The DB-row schema
@@ -128,7 +132,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
     if (existing !== undefined && existing.status === 'running') {
       const ageMs = Date.now() - parseAnalysisTimestamp(existing.updated_at).getTime();
       debugLog(`POST /analyze: existing analysis age=${String(Math.round(ageMs / 1000))}s`);
-      if (ageMs < 15 * 60 * 1000) {
+      if (ageMs < ANALYSIS_REUSE_TIMEOUT_MS) {
         // Still recent, reuse it
         debugLog('POST /analyze: reusing existing running analysis');
         return c.json({ analysisId: existing.id, status: 'running' as const });
@@ -146,6 +150,10 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
 
   // Kick off the long-running work in the background — `void` is intentional
   // so the HTTP response returns immediately while batches stream results.
+  // `executeAnalysis` already records failures on the analysis row via its own
+  // try/catch; the trailing `.catch` is a belt-and-suspenders guard against the
+  // failure-recording path *itself* throwing (e.g. a DB write error), so it can
+  // never surface as an unhandled promise rejection.
   void executeAnalysis({
     analysisId: analysis.id,
     analysisType,
@@ -155,6 +163,8 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
     repoRoot,
     guidedReview,
     invalidateCache,
+  }).catch((err: unknown) => {
+    debugLog(`executeAnalysis dispatch rejected for ${analysis.id}: ${err instanceof Error ? err.message : String(err)}`);
   });
 
   return c.json({ analysisId: analysis.id, status: 'running' as const });

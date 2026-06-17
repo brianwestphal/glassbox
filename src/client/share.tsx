@@ -6,9 +6,12 @@
 import { delegate } from 'kerfjs';
 
 import { dismissSharePrompt, getSharePromptState } from '../api/index.js';
+import { IconHeart } from '../icons.js';
 import { toElement } from './dom.js';
+import { openExternalUrl } from './tauri.js';
 
 const SHARE_URL = 'https://www.npmjs.com/package/glassbox';
+const SPONSOR_URL = 'https://github.com/sponsors/brianwestphal';
 const SESSION_THRESHOLD_MS = 60_000;    // 1 minute in current session
 const TOTAL_THRESHOLD_MS = 300_000;     // 5 minutes cumulative
 const DISMISS_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -54,40 +57,63 @@ function dismissPrompt(): void {
   void dismissSharePrompt();
 }
 
-/** Show the share prompt banner. */
+/**
+ * Show the share section once the trigger thresholds are met (see
+ * {@link initSharePrompt}). Renders the "Love Glassbox?" Share + Sponsor
+ * section into the `#sidebar-share` container near the sidebar footer.
+ *
+ * This is the single share banner: it is time-gated (so it never nags on first
+ * launch) and carries the Sponsor link. The permanent always-available share
+ * entry lives in Settings → General.
+ */
 function showPrompt() {
   if (prompted) return;
+  const container = document.getElementById('sidebar-share');
+  if (container === null) return;
   prompted = true;
 
-  const banner = toElement(
-    <div className="share-prompt">
-      <span className="share-prompt-text">Enjoying Glassbox? Share it with others!</span>
-      <button className="btn btn-xs btn-primary share-prompt-share">Share</button>
-      <button className="btn btn-xs share-prompt-dismiss">No thanks</button>
+  const section = toElement(
+    <div className="sidebar-share-section">
+      <button className="sidebar-share-dismiss" id="share-dismiss-btn" title="Dismiss">&times;</button>
+      <p className="sidebar-share-label">Love Glassbox?</p>
+      <div className="sidebar-share-actions">
+        <button className="btn btn-share" id="share-glassbox-btn">Share</button>
+        <a className="btn btn-sponsor" id="sponsor-glassbox-btn" href={SPONSOR_URL} target="_blank" rel="noopener noreferrer"><IconHeart />Sponsor</a>
+      </div>
     </div>
   );
 
-  void delegate(banner, 'click', '.share-prompt-share', () => {
+  // Sharing or dismissing silences the prompt for 30 days (FR-16.2).
+  void delegate(section, 'click', '#share-glassbox-btn', () => {
     void triggerShare();
-    banner.remove();
+    section.remove();
+    dismissPrompt();
+  });
+  // In the Tauri desktop shell `target="_blank"` reaches no real browser, so
+  // route the Sponsor link through the OS default browser; a no-op in a plain
+  // browser, where the anchor opens normally.
+  void delegate(section, 'click', '#sponsor-glassbox-btn', (e) => {
+    if (openExternalUrl(SPONSOR_URL)) e.preventDefault();
+  });
+  void delegate(section, 'click', '#share-dismiss-btn', () => {
+    section.remove();
     dismissPrompt();
   });
 
-  void delegate(banner, 'click', '.share-prompt-dismiss', () => {
-    banner.remove();
-    dismissPrompt();
-  });
-
-  // Insert at top of sidebar, after the header
-  const sidebar = document.querySelector('.sidebar');
-  const header = document.querySelector('.sidebar-header');
-  if (sidebar && header) {
-    header.after(banner);
-  }
+  container.appendChild(section);
 }
 
 /** Initialize share prompt tracking. Call once on app init. */
 export function initSharePrompt(isDemoMode: boolean) {
+  // Test seam: `?__forceSharePrompt=1` renders the section immediately,
+  // bypassing both the demo-mode suppression and the time gate, so the
+  // Sponsor-link e2e (GB-808) can exercise the click wiring without waiting out
+  // the 5-minute threshold. Harmless in production — it only shows the banner.
+  if (new URLSearchParams(window.location.search).has('__forceSharePrompt')) {
+    showPrompt();
+    return;
+  }
+
   if (isDemoMode) return;
 
   sessionStartMs = Date.now();

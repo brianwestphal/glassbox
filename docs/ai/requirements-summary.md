@@ -98,8 +98,9 @@ headers (no native deps); difference mode uses CSS `mix-blend-mode:
 difference`; slice mode overlays center-to-center with a draggable cut
 line at any angle. Added/deleted images show metadata + zoom/pan viewer
 only. **SVGs** get a Code/Rendered toggle; Rendered rasterizes via
-`@resvg/resvg-wasm` at 10× (max 8000 px in largest dimension), default
-300×150 per HTML spec. Rasterization runs in a worker thread so the
+`@resvg/resvg-wasm` at 10× (max 4000 px in largest dimension — GB-838
+lowered it from 8000 to stay under the 15s per-job worker timeout),
+default 300×150 per HTML spec. Rasterization runs in a worker thread so the
 synchronous WASM render never blocks the HTTP event loop (falls back to
 in-process if a worker can't start). The user's Code/Rendered choice is
 remembered across files.
@@ -418,18 +419,27 @@ build is not affected).
 
 ## 17. Share prompt (`16-share-prompt.md`) — **Shipped**
 
-Non-modal banner appears when cumulative open time ≥ 5 min **and**
-current session ≥ 1 min. Cumulative time tracked in
-`~/.glassbox/config.json`. Offers "Share" and dismiss; after any
-interaction, silenced 30 days. Share uses `navigator.share()` with
-`https://www.npmjs.com/package/glassbox`; falls back to clipboard copy
+A single, non-modal "Love Glassbox?" section appears in the sidebar footer
+(`#sidebar-share`) once cumulative open time ≥ 5 min **and** current
+session ≥ 1 min (time-gated — never shown immediately on launch).
+Cumulative time tracked in `~/.glassbox/config.json`. It offers a
+**Share** button and a **Sponsor** link (GitHub Sponsors; routed through
+the OS browser under Tauri), plus a **×** dismiss; sharing or dismissing
+silences it for 30 days. Share uses `navigator.share()` with
+`https://www.npmjs.com/package/glassbox`, falling back to clipboard copy
 with a toast.
 
-A permanent share button sits in the sidebar header toolbar between
-refresh and the settings gear. Icon: Lucide "share" on Apple platforms,
-"share-2" elsewhere. Dismiss state stored under `sharePrompt` in config
-(`dismissedAt`, `totalOpenMs`). Non-intrusive by design; never appears
-in demo mode.
+Permanent share access (independent of the time-gated prompt) is the
+**Settings → General** share link ("Know someone who'd love this? Share
+Glassbox", always available, never dismissed). The originally-spec'd
+permanent *toolbar* button (between refresh and the settings gear,
+platform-specific Lucide "share"/"share-2" icons) was **never built and
+was intentionally dropped** as redundant with the Settings link; the
+`IconShareApple`/`IconShareGeneric` icons in `src/icons.tsx` are the
+unused leftovers. Dismiss state stored under `sharePrompt` in config
+(`dismissedAt`, `totalOpenMs`). Non-intrusive by design; never appears in
+demo mode. (GB-890 consolidated an earlier second, immediate-on-launch
+banner into this one time-gated section.)
 
 ## 18. Claude channel (`17-claude-channel.md`) — **Shipped**
 

@@ -34,7 +34,11 @@ test.describe('GB-808: Sponsor link opens externally under Tauri', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
     });
 
-    await page.goto('/');
+    // `?__forceSharePrompt=1` renders the time-gated share section immediately
+    // (it lives in `share.tsx`'s `showPrompt()` now — GB-890 consolidation —
+    // and is otherwise demo-suppressed + time-gated, so it never appears in a
+    // normal demo-mode e2e run).
+    await page.goto('/?__forceSharePrompt=1');
     const sponsor = page.locator('#sponsor-glassbox-btn');
     await expect(sponsor).toBeVisible({ timeout: 5000 });
 
@@ -53,7 +57,11 @@ test.describe('GB-808: Sponsor link opens externally under Tauri', () => {
   test('Sponsor anchor keeps a real href for the plain-browser fallback', async ({ page }) => {
     // No Tauri stub here: this is the regular browser path, where the anchor's
     // own `target="_blank"` is the correct behavior and must stay intact.
-    await page.goto('/');
+    // `?__forceSharePrompt=1` renders the time-gated share section immediately
+    // (it lives in `share.tsx`'s `showPrompt()` now — GB-890 consolidation —
+    // and is otherwise demo-suppressed + time-gated, so it never appears in a
+    // normal demo-mode e2e run).
+    await page.goto('/?__forceSharePrompt=1');
     const sponsor = page.locator('#sponsor-glassbox-btn');
     await expect(sponsor).toBeVisible({ timeout: 5000 });
     await expect(sponsor).toHaveAttribute('href', SPONSOR_URL);

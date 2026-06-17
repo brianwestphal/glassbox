@@ -289,22 +289,7 @@
   }
 }
 
-// --- Share Prompt ---
-
-.share-prompt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-hover);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text);
-}
-
-.share-prompt-text {
-  flex: 1;
-}
+// --- Share toast ---
 
 .share-toast {
   position: fixed;

@@ -1,9 +1,10 @@
-import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
 
-import { getRepoRoot, scrubbedGitEnv } from './repo.js';
+import { debugLog } from '../debug.js';
+import { getRepoRoot } from './repo.js';
+import { git } from './spawn.js';
 import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
 
 // Re-export types and repo functions so existing importers don't break
@@ -24,15 +25,21 @@ export type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
  */
 const toGitArg = (p: string): string => (process.platform === 'win32' ? p.replace(/\\/g, '/') : p);
 
-function git(args: string[], cwd: string): string {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, env: scrubbedGitEnv() });
-  if (result.status === 0) return result.stdout;
-  if (result.stdout !== '') return result.stdout;
-  const err: Error & { stdout?: string; stderr?: string; status?: number | null } = new Error(result.stderr);
-  err.stdout = result.stdout;
-  err.stderr = result.stderr;
-  err.status = result.status;
-  throw err;
+/**
+ * Run git for a diff-collection path, degrading to an empty string if it fails
+ * rather than throwing — but logging the failure under `--debug` first. Several
+ * diff paths intentionally treat a git error as "no diff"; without this log a
+ * genuine failure (bad ref, invalid range, scrubbed-env regression) is
+ * indistinguishable from a legitimately empty diff and surfaces only as the
+ * misleading "No changes found for the specified mode".
+ */
+function gitOrEmpty(args: string[], cwd: string): string {
+  try {
+    return git(args, cwd);
+  } catch (err) {
+    debugLog(`git ${args.join(' ')} failed (treating as empty diff): ${err instanceof Error ? err.message : String(err)}`);
+    return '';
+  }
 }
 
 export function getDiffArgs(mode: ReviewMode): string[] {
@@ -113,12 +120,7 @@ function normalizeDiffPaths(diffs: FileDiff[], rootA: string, rootB: string): Fi
 
 function getDirectComparisonFiles(mode: { pathA: string; pathB: string }, cwd: string): FileDiff[] {
   const { rootA, rootB } = directComparisonRoots(mode);
-  let rawDiff: string;
-  try {
-    rawDiff = git(['diff', '--no-index', '-U3', toGitArg(mode.pathA), toGitArg(mode.pathB)], cwd);
-  } catch {
-    rawDiff = '';
-  }
+  const rawDiff = gitOrEmpty(['diff', '--no-index', '-U3', toGitArg(mode.pathA), toGitArg(mode.pathB)], cwd);
   return normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
 }
 
@@ -155,12 +157,7 @@ export function diffRawContent(displayPath: string, oldContent: Buffer, newConte
     writeFileSync(oldAbs, oldContent);
     writeFileSync(newAbs, newContent);
 
-    let rawDiff: string;
-    try {
-      rawDiff = git(['diff', '--no-index', '-U3', toGitArg(oldAbs), toGitArg(newAbs)], work);
-    } catch {
-      rawDiff = '';
-    }
+    const rawDiff = gitOrEmpty(['diff', '--no-index', '-U3', toGitArg(oldAbs), toGitArg(newAbs)], work);
     const diffs = normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
     if (diffs.length === 0) {
       // git emits nothing for identical content; still surface the file so it
@@ -194,12 +191,7 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
   }
 
   const diffArgs = getDiffArgs(mode);
-  let rawDiff: string;
-  try {
-    rawDiff = git([...diffArgs, '-U3'], repoRoot);
-  } catch {
-    rawDiff = '';
-  }
+  const rawDiff = gitOrEmpty([...diffArgs, '-U3'], repoRoot);
 
   const diffs = parseDiff(rawDiff);
 
@@ -435,12 +427,7 @@ export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: 
     const args = ['diff', '--no-index', '-U3'];
     if (extraFlags) args.push(...extraFlags.split(' ').filter(Boolean));
     args.push(toGitArg(oldAbs), toGitArg(newAbs));
-    let rawDiff: string;
-    try {
-      rawDiff = git(args, repoRoot);
-    } catch {
-      rawDiff = '';
-    }
+    const rawDiff = gitOrEmpty(args, repoRoot);
     const diffs = normalizeDiffPaths(parseDiff(rawDiff), rootA, rootB);
     return diffs[0] ?? null;
   }
@@ -448,12 +435,7 @@ export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: 
   const args = [...diffArgs, '-U3'];
   if (extraFlags) args.push(...extraFlags.split(' ').filter(Boolean));
   args.push('--', filePath);
-  let rawDiff: string;
-  try {
-    rawDiff = git(args, repoRoot);
-  } catch {
-    rawDiff = '';
-  }
+  const rawDiff = gitOrEmpty(args, repoRoot);
   const diffs = parseDiff(rawDiff);
   return diffs[0] ?? null;
 }
