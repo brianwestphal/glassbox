@@ -2,6 +2,13 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.2] - 2026-06-17
+
+
+
+- Desktop app: grant app commands to the localhost WebView so they work reliably.
+- Desktop app: the dev server now shuts down cleanly when you quit.
+
 ## [0.13.0] - 2026-06-17
 
 
