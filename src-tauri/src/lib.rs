@@ -8,9 +8,9 @@ use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
 #[cfg(not(debug_assertions))]
-use tauri_plugin_shell::ShellExt;
-#[cfg(not(debug_assertions))]
 use tauri_plugin_shell::process::CommandEvent;
+#[cfg(not(debug_assertions))]
+use tauri_plugin_shell::ShellExt;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_updater::UpdaterExt;
 
@@ -79,9 +79,7 @@ fn cli_entries(app: &tauri::AppHandle) -> Result<Vec<CliEntry>, String> {
                 dest: bin_dir.join("glassbox.cmd"),
             },
             CliEntry {
-                source: resource_dir
-                    .join("resources")
-                    .join("glassbox-difftool.cmd"),
+                source: resource_dir.join("resources").join("glassbox-difftool.cmd"),
                 dest: bin_dir.join("glassbox-difftool.cmd"),
             },
         ])
@@ -233,9 +231,7 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
         let status = std::process::Command::new("osascript")
             .args([
                 "-e",
-                &format!(
-                    "do shell script \"{shell_cmd}\" with administrator privileges"
-                ),
+                &format!("do shell script \"{shell_cmd}\" with administrator privileges"),
             ])
             .status()
             .map_err(|e| format!("Failed to run osascript: {e}"))?;
@@ -252,8 +248,9 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
         for entry in &entries {
             // Remove existing symlink/file if present, then create fresh.
             let _ = std::fs::remove_file(&entry.dest);
-            std::os::unix::fs::symlink(&entry.source, &entry.dest)
-                .map_err(|e| format!("Failed to create symlink for {}: {e}", entry.dest.display()))?;
+            std::os::unix::fs::symlink(&entry.source, &entry.dest).map_err(|e| {
+                format!("Failed to create symlink for {}: {e}", entry.dest.display())
+            })?;
         }
     }
 
@@ -268,12 +265,7 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
 
         // Add to user PATH via registry
         let output = std::process::Command::new("reg")
-            .args([
-                "query",
-                "HKCU\\Environment",
-                "/v",
-                "Path",
-            ])
+            .args(["query", "HKCU\\Environment", "/v", "Path"])
             .output();
 
         if let Ok(output) = output {
@@ -346,10 +338,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     {
         *app.state::<PendingUpdate>().0.lock().unwrap() = None;
         let updater = app.updater().map_err(|e| format!("{e}"))?;
-        let update = updater
-            .check()
-            .await
-            .map_err(|e| format!("{e}"))?;
+        let update = updater.check().await.map_err(|e| format!("{e}"))?;
         if let Some(update) = update {
             update
                 .download_and_install(|_, _| {}, || {})
@@ -402,31 +391,33 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             let menu = MenuBuilder::new(app_handle)
-                .item(&SubmenuBuilder::new(app_handle, "Glassbox")
-                    .about(None)
-                    .separator()
-                    .services()
-                    .separator()
-                    .hide()
-                    .hide_others()
-                    .show_all()
-                    .separator()
-                    .quit()
-                    .build()?)
+                .item(
+                    &SubmenuBuilder::new(app_handle, "Glassbox")
+                        .about(None)
+                        .separator()
+                        .services()
+                        .separator()
+                        .hide()
+                        .hide_others()
+                        .show_all()
+                        .separator()
+                        .quit()
+                        .build()?,
+                )
                 .item(&edit_menu)
-                .item(&SubmenuBuilder::new(app_handle, "Window")
-                    .minimize()
-                    .item(&PredefinedMenuItem::maximize(app_handle, None)?)
-                    .close_window()
-                    .separator()
-                    .fullscreen()
-                    .build()?)
+                .item(
+                    &SubmenuBuilder::new(app_handle, "Window")
+                        .minimize()
+                        .item(&PredefinedMenuItem::maximize(app_handle, None)?)
+                        .close_window()
+                        .separator()
+                        .fullscreen()
+                        .build()?,
+                )
                 .build()?;
 
             #[cfg(not(target_os = "macos"))]
-            let menu = MenuBuilder::new(app_handle)
-                .item(&edit_menu)
-                .build()?;
+            let menu = MenuBuilder::new(app_handle).item(&edit_menu).build()?;
 
             app.set_menu(menu)?;
 
@@ -462,7 +453,7 @@ pub fn run() {
                     cli_args.push(arg.clone());
                 }
 
-                let child = std::process::Command::new("npx")
+                let mut child = std::process::Command::new("npx")
                     .args(&cli_args)
                     .current_dir(&project_root)
                     .stdout(std::process::Stdio::piped())
@@ -478,10 +469,13 @@ pub fn run() {
                     .expect("main window not found");
 
                 // Read stdout in a background thread to find the server URL,
-                // then keep draining so the pipe doesn't block the child process
+                // then keep draining so the pipe doesn't block the child process.
+                // The whole `child` is moved in (not just its stdout) so we can
+                // reap it with `wait()` once the dev server exits — otherwise it
+                // lingers as a zombie (clippy::zombie_processes).
                 std::thread::spawn(move || {
                     use std::io::{BufRead, BufReader};
-                    let stdout = child.stdout.expect("stdout not captured");
+                    let stdout = child.stdout.take().expect("stdout not captured");
                     let reader = BufReader::new(stdout);
                     for line in reader.lines() {
                         let Ok(line) = line else { break };
@@ -493,6 +487,7 @@ pub fn run() {
                             }
                         }
                     }
+                    let _ = child.wait();
                 });
 
                 return Ok(());
@@ -519,8 +514,7 @@ pub fn run() {
                         let Ok(Some(update)) = updater.check().await else {
                             return;
                         };
-                        *handle.state::<PendingUpdate>().0.lock().unwrap() =
-                            Some(update.version);
+                        *handle.state::<PendingUpdate>().0.lock().unwrap() = Some(update.version);
                     });
 
                     return Ok(());
@@ -617,8 +611,7 @@ pub fn run() {
                                 if !navigated {
                                     let line_str = String::from_utf8_lossy(&line);
                                     if let Some(idx) = line_str.find("running at ") {
-                                        let url =
-                                            line_str[idx + "running at ".len()..].trim();
+                                        let url = line_str[idx + "running at ".len()..].trim();
                                         if let Ok(parsed) = url.parse() {
                                             let _ = window.navigate(parsed);
                                             navigated = true;
@@ -639,8 +632,7 @@ pub fn run() {
                     let Ok(Some(update)) = updater.check().await else {
                         return;
                     };
-                    *handle.state::<PendingUpdate>().0.lock().unwrap() =
-                        Some(update.version);
+                    *handle.state::<PendingUpdate>().0.lock().unwrap() = Some(update.version);
                 });
             }
 
@@ -673,4 +665,75 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{manual_install_command, CliEntry};
+    use std::path::PathBuf;
+
+    fn sample_entries() -> Vec<CliEntry> {
+        vec![
+            CliEntry {
+                source: PathBuf::from("/bundle/resources/glassbox"),
+                dest: PathBuf::from("/dest/bin/glassbox"),
+            },
+            CliEntry {
+                source: PathBuf::from("/bundle/resources/glassbox-difftool"),
+                dest: PathBuf::from("/dest/bin/glassbox-difftool"),
+            },
+        ]
+    }
+
+    // The command must install BOTH CLIs in one pasteable line (one elevation
+    // prompt), under the parent dir of the first entry's destination.
+    #[test]
+    fn manual_install_command_covers_every_entry() {
+        let cmd = manual_install_command(&sample_entries());
+        assert!(
+            cmd.contains("glassbox-difftool"),
+            "difftool CLI missing from command: {cmd}"
+        );
+        // The destination's parent directory is created first.
+        assert!(
+            cmd.contains("/dest/bin"),
+            "destination parent missing from command: {cmd}"
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn manual_install_command_macos_shape() {
+        let cmd = manual_install_command(&sample_entries());
+        assert_eq!(
+            cmd,
+            "sudo sh -c 'mkdir -p \"/dest/bin\" && \
+             ln -sf \"/bundle/resources/glassbox\" \"/dest/bin/glassbox\" && \
+             ln -sf \"/bundle/resources/glassbox-difftool\" \"/dest/bin/glassbox-difftool\"'"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn manual_install_command_linux_shape() {
+        let cmd = manual_install_command(&sample_entries());
+        assert_eq!(
+            cmd,
+            "mkdir -p \"/dest/bin\" && \
+             ln -sf \"/bundle/resources/glassbox\" \"/dest/bin/glassbox\" && \
+             ln -sf \"/bundle/resources/glassbox-difftool\" \"/dest/bin/glassbox-difftool\""
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn manual_install_command_windows_shape() {
+        let cmd = manual_install_command(&sample_entries());
+        assert!(cmd.starts_with("mkdir "), "missing mkdir: {cmd}");
+        assert_eq!(
+            cmd.matches("copy ").count(),
+            2,
+            "expected two copies: {cmd}"
+        );
+    }
 }

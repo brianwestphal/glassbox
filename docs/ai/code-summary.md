@@ -230,7 +230,7 @@ See §6 for the schema itself.
 | File | Purpose |
 |------|---------|
 | `main.rs` | Entry; calls `glassbox_lib::run()`. |
-| `lib.rs` | Everything: setup, sidecar spawn + PID tracking + exit cleanup, CLI install/check commands (macOS symlink / Linux symlink / Windows .cmd + PATH), updater commands, native Find menu wiring. See `docs/tauri-architecture.md` for the full picture. |
+| `lib.rs` | Everything: setup, sidecar spawn + PID tracking + exit cleanup, CLI install/check commands (macOS symlink / Linux symlink / Windows .cmd + PATH), updater commands, native Find menu wiring. Has a `#[cfg(test)] mod tests` covering the pure `manual_install_command` (the only Rust unit test today — `cargo test` runs it in CI's `rust` job). See `docs/tauri-architecture.md` for the full picture. |
 
 Also: `tauri.conf.json`, `Cargo.toml`, `Entitlements.plist`, `loading/` (spinner + welcome HTML), `resources/` (CLI launcher scripts), `binaries/` (downloaded Node.js per target), `server/` (bundled server + client + `node_modules`).
 
@@ -633,6 +633,14 @@ release on a high/critical advisory in a *shipped* dependency; it gates every
 downstream publish job. `.github/dependabot.yml` (weekly npm, dev-deps grouped
 into one PR) keeps the tree fresh between releases so the gate rarely has
 anything to block on.
+
+The same validation phase also has a `rust` gate (Tauri shell, `src-tauri/`):
+`cargo fmt --check` + `cargo clippy --all-targets -- -D warnings` + `cargo test`,
+on Linux with the webkit2gtk dev headers (the `glassbox` crate links tauri/webkit
+even for `clippy`). It gates every downstream publish job alongside `audit`. This
+is the *only* Rust test/lint gate — the other workflows that install Rust merely
+`tauri build` (compile) the app; `difftool-smoke.yml` additionally runs the built
+`glassbox-difftool` binary end-to-end.
 
 CI workflows:
 - `release-candidate.yml` — `v*-rc.*` tags → validate → npm@beta → smoke →

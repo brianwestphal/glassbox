@@ -120,13 +120,42 @@ jobs:
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=high
 
+  # Rust (Tauri) gate — the desktop shell ships in every release, so its
+  # source is held to the same fast-check bar as the TypeScript: formatting
+  # (cargo fmt), lints as errors (cargo clippy -D warnings), and unit tests
+  # (cargo test). Linux runner needs the webkit2gtk dev headers because the
+  # `glassbox` crate links tauri/webkit even for `clippy`/`check`. Everything
+  # the crate compiles against (loading/, capabilities/, Cargo.lock) is
+  # committed, so no client build is required here.
+  rust:
+    name: Rust (fmt / clippy / test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
   # ══════════════════════════════════════════════════════════════
   # Phase 1b: Expensive checks — only run if fast checks pass
   # ══════════════════════════════════════════════════════════════
 
   test-e2e:
     name: E2E Tests
-    needs: [lint, typecheck, test-unit, audit]
+    needs: [lint, typecheck, test-unit, audit, rust]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +176,7 @@ jobs:
   # Node mkdir in config + build:client, favicon 204, and the GB-868 keychain fix.)
   test-e2e-windows:
     name: E2E Tests (Windows)
-    needs: [lint, typecheck, test-unit, audit]
+    needs: [lint, typecheck, test-unit, audit, rust]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -162,7 +191,7 @@ jobs:
 
   npm-pack:
     name: npm Pack (Dry Run)
-    needs: [lint, typecheck, test-unit, audit]
+    needs: [lint, typecheck, test-unit, audit, rust]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -184,7 +213,7 @@ jobs:
     # discarded; the real signed beta bundles come from the `build` phase
     # below which DOES do the bump and therefore needs the MSI-skip conditional.
     name: Build Tauri (${{ matrix.friendly }})
-    needs: [lint, typecheck, test-unit, audit]
+    needs: [lint, typecheck, test-unit, audit, rust]
     strategy:
       fail-fast: true
       matrix:
