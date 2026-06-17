@@ -56,6 +56,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `17-claude-channel.md` — Claude Code MCP channel integration, channel server, completion modal
 - `18-direct-comparison.md` — Diffing two arbitrary files or folders by path (`--diff`), independent of git history
 - `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
+- `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (design only)
 
 **Architecture documents** describe system design and setup:
 

@@ -523,6 +523,33 @@ git subprocesses run with `git difftool`'s leaked `GIT_EXTERNAL_DIFF` /
 own `git diff`/`git show` can't recurse into the difftool helper (NFR-19.12,
 GB-869). Covers FR-19.1–19.13.
 
+## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Design only**
+
+A line-anchored "review companion" the *generating* AI emits as it writes code:
+structured notes explaining why each non-obvious change is the way it is and what
+proves it correct, anchored to file + line range, so a reviewer reads the
+author's reasoning at the exact line instead of reconstructing it from a ticket
+or commit message. Notes are stored as committed **SARIF 2.1.0** files in a
+dedicated top-level **`.pr-notes/`** directory (deliberately *not* under
+`.glassbox/`, which users commonly gitignore; the tool must never auto-ignore
+`.pr-notes/`). SARIF is reused rather than invented for its region anchoring,
+`partialFingerprints` (re-anchoring across edits — reuses Glassbox's existing
+stale-matcher), `versionControlProvenance` (baseline commit), attachments, and
+broad tooling support; positive rationale/proof is modeled via
+`result.kind: informational` plus property bags, with the caveat that
+third-party SARIF viewers won't render it as a review companion (Glassbox builds
+that view). Authoring is live-plus-coalesce: the AI emits notes via an MCP
+channel tool as it edits, revises them, then runs a final consolidation pass to
+cut verbosity and surface cross-cutting links. Artifacts split by type — diagram
+*source* (Mermaid/Graphviz/PlantUML), logs, and test output commit as text;
+screenshots go through **Git LFS** under `.pr-notes/artifacts/`, referenced by
+uri + sha-256, never inlined — keeping repo history lean. Glassbox renders notes
+review-comment-style in the diff, styled distinctly as AI-authored (guided-review
+precedent), with threading and artifact rendering. A corresponding Hot Sheet (and
+other-orchestrator) obligation induces the AI to produce notes as part of its
+process. Phased P1–P5 plus a cross-cutting inbound AI-instructions contract; no
+code yet.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -531,7 +558,8 @@ analysis, UI, data storage, desktop app, build/distribution, demo mode,
 navigation, security, themes, share prompt, Claude channel, direct path
 comparison. Doc **19** (git difftool integration) is **Shipped** — the
 accumulating per-file model works for both browser and desktop, plus in-session
-image/SVG comparison (GB-863). When a new feature is spec'd before
+image/SVG comparison (GB-863). Doc **20** (AI-authored review notes) is
+**Design only** — spec agreed, no code yet. When a new feature is spec'd before
 implementation, add a doc and mark the entry here **Design only** until the code
 lands, then **Partially built** / **Shipped** as it progresses.
 
@@ -573,6 +601,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/17-claude-channel.md` → §18
 - `docs/18-direct-comparison.md` → §18a
 - `docs/19-difftool-integration.md` → §18b
+- `docs/20-ai-review-notes.md` → §18c
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets
