@@ -52,6 +52,12 @@ jobs:
 
           echo "body<<ENDOFNOTES" >> "$GITHUB_OUTPUT"
           cat /tmp/release-notes.md >> "$GITHUB_OUTPUT"
+          # /tmp/release-notes.md ends with `release-assets.mjs download-section`,
+          # whose stdout has no trailing newline (it returns lines.join('\n')).
+          # Without this explicit newline the closing delimiter glues onto the
+          # last notes line, so GitHub never sees a standalone `ENDOFNOTES` and
+          # rejects the step output with "Matching delimiter not found".
+          echo "" >> "$GITHUB_OUTPUT"
           echo "ENDOFNOTES" >> "$GITHUB_OUTPUT"
 
       # GB-779 — always create as a draft. A non-draft release is immediately
