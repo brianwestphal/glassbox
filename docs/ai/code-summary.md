@@ -151,7 +151,8 @@ See §6 for the schema itself.
 
 | File | Purpose |
 |------|---------|
-| `models.ts` | Curated platform/model list. **Keep current daily** (Anthropic/OpenAI/Google releases). Context windows, ENV var names. |
+| `models.ts` | Static platform/model list — now the **fallback** for live discovery (`list-models.ts`); also defaults + context windows + ENV var names. `resolveModelId(platform, id)` best-effort-maps a stale/older id to the current same-tier model (GB-893). |
+| `list-models.ts` | **Live model discovery** (GB-894): `fetchAvailableModels(platform, key)` hits each provider's models API (Anthropic `/v1/models`, OpenAI `/v1/models` filtered to chat, Google `/v1beta/models` filtered to `generateContent`), zod-validates, maps to `{id,name,contextWindow}`; returns `null` on failure so the caller falls back to the static list. |
 | `config.ts` | Load/save `~/.glassbox/config.json` (platform, model, guided settings, share prompt, channel enabled, cumulative open time). |
 | `api-keys.ts` | Key resolution chain: env var → OS keychain → base64 in config file. Save/delete, source detection. |
 | `keychain.ts` | OS keychain wrappers: macOS `security`, Linux `secret-tool`, Windows `cmdkey`. |
@@ -687,7 +688,8 @@ two documents intentionally overlap.
 | Change the DB schema | `src/db/schema.ts` (tables/indexes) + a migration in `src/db/connection.ts` (`addColumnIfMissing` pattern). Query code in `src/db/queries.ts` or `ai-queries.ts`. |
 | Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api/annotations.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
 | Add a CLI option | `src/cli.ts` `parseArgs()` switch; document in `docs/2-cli-and-server.md`. |
-| Add an AI platform | `src/ai/models.ts` (platform + models + env key), `src/ai/client.ts` (HTTP dispatch), `src/ai/api-keys.ts` (key source mapping), `src/ai/keychain.ts` (if new keychain conventions). Update `docs/7-ai-analysis.md`. |
+| Add an AI platform | `src/ai/models.ts` (platform + fallback models + env key), `src/ai/list-models.ts` (live-discovery fetch+map for the new provider), `src/ai/client.ts` (HTTP dispatch), `src/ai/api-keys.ts` (key source mapping), `src/ai/keychain.ts` (if new keychain conventions). Update `docs/7-ai-analysis.md`. |
+| Update / discover AI models | Models are discovered live per provider in `src/ai/list-models.ts` (used by `GET /api/ai/models`); `src/ai/models.ts` holds the static fallback + `resolveModelId` old→new mapping. |
 | Add a theme | `src/themes/built-in.ts` (built-in), or create `~/.glassbox/themes/*.json` (custom). All vars from `ThemeColors` must be present. |
 | Change export format | `src/export/generate.ts`. Update `docs/6-export.md`. |
 | Add a diff mode/view | `src/client/diff/` (new module), wire into `src/client/diff/index.tsx` (mount + delegates) and `toolbar.tsx`. Server rendering lives in `src/components/diffView.tsx`. |

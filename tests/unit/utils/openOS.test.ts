@@ -1,10 +1,12 @@
 /**
- * GB-891 — "Open in Default Editor" (sidebar context menu) shells out to the
- * user's editor. These tests pin the doc-14 FR-14.3 contract: the editor is
- * spawned with argv arrays, never a shell-interpolated string, and the file
- * path is always a separate trailing argument (so a path with spaces or shell
- * metacharacters is safe). They also cover `$VISUAL`/`$EDITOR` precedence and
- * the per-OS default-open fallback.
+ * GB-892 — "Open in Default Editor" (sidebar context menu) appeared to do
+ * nothing. Root cause: it honored `$EDITOR`/`$VISUAL`, which are usually
+ * *terminal* editors (e.g. `nano`/`vim`); spawned detached with no controlling
+ * terminal they silently no-op. The fix routes the file through the OS
+ * "open with the default GUI application" handler instead — and explicitly
+ * IGNORES `$EDITOR`/`$VISUAL`, which these tests lock in so the broken behavior
+ * can't regress. The path is always a separate argv (doc 14 FR-14.3), so a path
+ * with spaces or shell metacharacters is safe.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,52 +24,44 @@ function setPlatform(p: NodeJS.Platform): void {
 }
 
 beforeEach(() => {
-  // The test machine may have $EDITOR/$VISUAL set; clear them so the fallback
-  // cases are deterministic.
-  delete process.env.VISUAL;
-  delete process.env.EDITOR;
+  // A terminal editor in the env must NOT change behavior — set both to prove
+  // the fix ignores them (this is exactly what caused the GB-892 no-op).
+  process.env.EDITOR = 'nano -w';
+  process.env.VISUAL = 'vim';
 });
 
 afterEach(() => {
   spawnMock.mockClear();
+  delete process.env.EDITOR;
+  delete process.env.VISUAL;
   Object.defineProperty(process, 'platform', { value: origPlatform, configurable: true });
 });
 
-describe("openOS(path, 'edit') (GB-891)", () => {
-  it('spawns $VISUAL with embedded flags split into argv and the path appended separately', () => {
-    process.env.VISUAL = 'code --wait';
-    openOS('/repo/src/a b.ts', 'edit');
-    expect(spawnMock).toHaveBeenCalledWith('code', ['--wait', '/repo/src/a b.ts'], { detached: true, stdio: 'ignore' });
-  });
-
-  it('prefers $VISUAL over $EDITOR', () => {
-    process.env.VISUAL = 'subl';
-    process.env.EDITOR = 'vim';
-    openOS('/x.ts', 'edit');
-    expect(spawnMock).toHaveBeenCalledWith('subl', ['/x.ts'], { detached: true, stdio: 'ignore' });
-  });
-
-  it('uses $EDITOR when $VISUAL is unset', () => {
-    process.env.EDITOR = 'nano';
-    openOS('/x.ts', 'edit');
-    expect(spawnMock).toHaveBeenCalledWith('nano', ['/x.ts'], { detached: true, stdio: 'ignore' });
-  });
-
-  it('falls back to macOS `open` when no editor env is set', () => {
+describe("openOS(path, 'edit') (GB-892)", () => {
+  it('opens via macOS `open` with the path as a separate argv, ignoring $EDITOR/$VISUAL', () => {
     setPlatform('darwin');
-    openOS('/x.ts', 'edit');
-    expect(spawnMock).toHaveBeenCalledWith('open', ['/x.ts'], { detached: true, stdio: 'ignore' });
+    openOS('/repo/src/a b.ts', 'edit');
+    expect(spawnMock).toHaveBeenCalledWith('open', ['/repo/src/a b.ts'], { detached: true, stdio: 'ignore' });
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to `xdg-open` on Linux', () => {
+  it('opens via `xdg-open` on Linux, ignoring $EDITOR/$VISUAL', () => {
     setPlatform('linux');
     openOS('/x.ts', 'edit');
     expect(spawnMock).toHaveBeenCalledWith('xdg-open', ['/x.ts'], { detached: true, stdio: 'ignore' });
   });
 
-  it('falls back to `cmd /c start` on Windows', () => {
+  it('opens via `cmd /c start` on Windows, ignoring $EDITOR/$VISUAL', () => {
     setPlatform('win32');
     openOS('/x.ts', 'edit');
     expect(spawnMock).toHaveBeenCalledWith('cmd', ['/c', 'start', '', '/x.ts'], { detached: true, stdio: 'ignore' });
+  });
+
+  it('never spawns the terminal editor named in $EDITOR/$VISUAL', () => {
+    setPlatform('darwin');
+    openOS('/x.ts', 'edit');
+    const commands = spawnMock.mock.calls.map(call => (call as unknown[])[0]);
+    expect(commands).not.toContain('nano');
+    expect(commands).not.toContain('vim');
   });
 });

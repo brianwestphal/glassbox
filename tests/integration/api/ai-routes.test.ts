@@ -22,7 +22,7 @@ vi.mock('../../../src/db/connection.js', () => ({
 vi.mock('../../../src/ai/config.js', () => ({
   loadAIConfig: vi.fn(() => ({
     platform: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     apiKey: null,
     keySource: null,
   })),
@@ -135,7 +135,7 @@ describe('POST /api/ai/config', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         platform: 'anthropic',
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         guidedReview: { enabled: true, topics: ['typescript'] },
       }),
     });
@@ -364,7 +364,7 @@ describe('POST /api/ai/analyze (additional cases)', () => {
     const { loadAIConfig } = await import('../../../src/ai/config.js');
     vi.mocked(loadAIConfig).mockReturnValue({
       platform: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       apiKey: 'sk-test-key',
       keySource: 'config',
     });
@@ -381,7 +381,7 @@ describe('POST /api/ai/analyze (additional cases)', () => {
     // Restore the mock
     vi.mocked(loadAIConfig).mockReturnValue({
       platform: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       apiKey: null,
       keySource: null,
     });
@@ -417,7 +417,7 @@ describe('POST /api/ai/analyze (additional cases)', () => {
     const { loadAIConfig } = await import('../../../src/ai/config.js');
     vi.mocked(loadAIConfig).mockReturnValue({
       platform: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       apiKey: 'sk-test-key',
       keySource: 'config',
     });
@@ -435,7 +435,7 @@ describe('POST /api/ai/analyze (additional cases)', () => {
     // Restore
     vi.mocked(loadAIConfig).mockReturnValue({
       platform: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       apiKey: null,
       keySource: null,
     });
@@ -445,7 +445,7 @@ describe('POST /api/ai/analyze (additional cases)', () => {
     const { loadAIConfig } = await import('../../../src/ai/config.js');
     vi.mocked(loadAIConfig).mockReturnValue({
       platform: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       apiKey: 'sk-test-key',
       keySource: 'config',
     });
@@ -473,7 +473,7 @@ describe('POST /api/ai/analyze (additional cases)', () => {
     // Restore
     vi.mocked(loadAIConfig).mockReturnValue({
       platform: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       apiKey: null,
       keySource: null,
     });

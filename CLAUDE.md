@@ -86,7 +86,8 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/db/schemas.ts` — Zod schemas for every DB row shape (`Review`, `ReviewFile`, `Annotation`, `AIAnalysis`, `AIFileScore`, `UserPreferences`) plus `parseRow` / `parseRows` / `parseJsonColumn` helpers. The SSOT for runtime row validation; `queries.ts` and `ai-queries.ts` route every PGLite result through these.
 - `src/db/queries.ts` — All database operations
 - `src/db/ai-queries.ts` — AI analysis and preferences database operations
-- `src/ai/models.ts` — Curated AI model lists per platform (CHECK DAILY: keep model IDs and names up to date with latest releases from Anthropic, OpenAI, and Google)
+- `src/ai/models.ts` — Static AI model lists per platform — now the **fallback** for live discovery (see `list-models.ts`); also holds defaults, context windows, and `resolveModelId()` (best-effort old→new id mapping). Keep reasonably current as a fallback, but live discovery means it no longer needs daily updates.
+- `src/ai/list-models.ts` — Live model discovery from each provider's models API (`fetchAvailableModels`), with the static list as fallback; powers `GET /api/ai/models`
 - `src/ai/config.ts` — API key resolution (env → keychain → config file) and config management
 - `src/ai/client.ts` — Unified HTTP client for Anthropic, OpenAI, and Google AI APIs
 - `src/ai/context-builder.ts` — Builds diff context payloads for AI analysis

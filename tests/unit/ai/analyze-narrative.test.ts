@@ -10,7 +10,7 @@ import { runNarrativeAnalysisBatch, mergeNarrativeOrders } from '../../../src/ai
 import type { NarrativeFileResult } from '../../../src/ai/analyze-narrative.js';
 import type { ReviewFile } from '../../../src/db/queries.js';
 
-const mockConfig = { platform: 'anthropic' as const, model: 'claude-sonnet-4-20250514', apiKey: 'test-key' };
+const mockConfig = { platform: 'anthropic' as const, model: 'claude-sonnet-4-6', apiKey: 'test-key' };
 
 function makeFiles(n: number): ReviewFile[] {
   return Array.from({ length: n }, (_, i) => ({

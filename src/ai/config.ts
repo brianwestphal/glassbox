@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_PATH, readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import { resolveAPIKey as _resolveAPIKey } from './api-keys.js';
 import type { AIPlatform } from './models.js';
-import { AIPlatformSchema, getDefaultModel } from './models.js';
+import { AIPlatformSchema, getDefaultModel, resolveModelId } from './models.js';
 
 export interface AIConfig {
   platform: AIPlatform;
@@ -51,7 +51,10 @@ export function loadAIConfig(): AIConfig {
   const platform = AIPlatformSchema.safeParse(platformRaw).success
     ? AIPlatformSchema.parse(platformRaw)
     : 'anthropic';
-  const model = config.ai?.model ?? getDefaultModel(platform);
+  // Resolve a saved preference that may point at a retired/older model id
+  // (e.g. a `claude-sonnet-4-*` snapshot) to a currently-offered model so
+  // analysis doesn't 404 on a stale config (GB-893).
+  const model = resolveModelId(platform, config.ai?.model ?? getDefaultModel(platform));
 
   const { key, source } = _resolveAPIKey(platform);
 

@@ -12,7 +12,8 @@ import {
   saveAPIKey,
   saveGuidedReviewConfig,
 } from '../ai/config.js';
-import type { AIPlatform } from '../ai/models.js';
+import { fetchAvailableModels } from '../ai/list-models.js';
+import type { AIModel, AIPlatform } from '../ai/models.js';
 import { AIPlatformSchema, MODELS, PLATFORMS } from '../ai/models.js';
 import type { AIKeyStatusEntry, GetAIKeyStatusResp } from '../api/index.js';
 import { SaveAIConfigReqSchema, SaveAIKeyReqSchema } from '../api/index.js';
@@ -45,8 +46,23 @@ aiConfigRoutes.post('/config', async (c) => {
   return c.json({ ok: true } as const);
 });
 
-aiConfigRoutes.get('/models', (c) => {
-  return c.json({ platforms: PLATFORMS, models: MODELS });
+aiConfigRoutes.get('/models', async (c) => {
+  // Discover the live model list per platform when a key is configured, so the
+  // dropdown reflects what the provider currently offers rather than a static
+  // list that goes stale on retirement (GB-894). Falls back to the static
+  // `MODELS` list per platform on no-key / failure. Skipped under
+  // `--ai-service-test` so the e2e suite stays hermetic (no outbound calls).
+  const platforms: AIPlatform[] = ['anthropic', 'openai', 'google'];
+  const models = { anthropic: MODELS.anthropic, openai: MODELS.openai, google: MODELS.google } as Record<AIPlatform, AIModel[]>;
+  if (!isAIServiceTest() && getDemoMode() === null) {
+    await Promise.all(platforms.map(async (platform) => {
+      const { key } = resolveAPIKey(platform);
+      if (key === null) return;
+      const live = await fetchAvailableModels(platform, key);
+      if (live !== null && live.length > 0) models[platform] = live;
+    }));
+  }
+  return c.json({ platforms: PLATFORMS, models });
 });
 
 aiConfigRoutes.get('/key-status', (c) => {

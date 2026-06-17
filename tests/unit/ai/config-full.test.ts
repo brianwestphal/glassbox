@@ -291,7 +291,7 @@ describe('loadAIConfig', () => {
     const config = loadAIConfig();
 
     expect(config.platform).toBe('anthropic');
-    expect(config.model).toBe('claude-sonnet-4-20250514');
+    expect(config.model).toBe('claude-sonnet-4-6');
     expect(config.apiKey).toBeNull();
     expect(config.keySource).toBeNull();
 
@@ -380,7 +380,7 @@ describe('saveAIConfigPreferences', () => {
   });
 
   it('sets file permissions to 0o600', () => {
-    saveAIConfigPreferences('anthropic', 'claude-sonnet-4-20250514');
+    saveAIConfigPreferences('anthropic', 'claude-sonnet-4-6');
 
     expect(fsMocks.chmodSync).toHaveBeenCalledWith(
       expect.stringContaining('config.json'),

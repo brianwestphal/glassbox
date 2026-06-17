@@ -9,7 +9,7 @@ import { sendAIRequest } from '../../../src/ai/client.js';
 import { runGuidedAnalysisBatch } from '../../../src/ai/analyze-guided.js';
 import type { ReviewFile } from '../../../src/db/queries.js';
 
-const mockConfig = { platform: 'anthropic' as const, model: 'claude-sonnet-4-20250514', apiKey: 'test-key' };
+const mockConfig = { platform: 'anthropic' as const, model: 'claude-sonnet-4-6', apiKey: 'test-key' };
 const guidedConfig = { enabled: true, topics: ['typescript', 'codebase'] as string[] };
 
 function makeFiles(n: number): ReviewFile[] {

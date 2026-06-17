@@ -154,6 +154,18 @@ the existing export.
 Optional; app is fully functional without any AI configured. Three
 platforms: Anthropic (Claude), OpenAI (GPT), Google (Gemini).
 
+**Model discovery** is **live** (GB-894): when a platform's key is
+configured, `src/ai/list-models.ts` fetches the current model list from
+the provider's models API (Anthropic `/v1/models`, OpenAI `/v1/models`
+filtered to chat models, Google `/v1beta/models` filtered to
+`generateContent`), zod-validated and mapped to `{id,name,contextWindow}`;
+the static `src/ai/models.ts` list is the fallback (no key / failure /
+demo / `--ai-service-test`). Because providers return only
+currently-available models, retired ids never appear. A stale/older saved
+model id is best-effort resolved to the current same-tier model
+(`resolveModelId` — e.g. `claude-sonnet-4-5` → `claude-sonnet-4-6`) so it
+never 404s (GB-893).
+
 **Risk** — six dimensions scored 0.0–1.0 (security, correctness,
 error-handling, maintainability, architecture, performance). Files
 ranked by the **max** dimension (not averaged). Each file gets a
@@ -573,8 +585,9 @@ logic split into `contextMenuLabels.ts`). Each item has a Lucide icon. Actions:
 when Option/Alt is held, with a live-updating label; absolute resolves via `GET
 /files/:id/path`); **Mark reviewed/pending** (`PATCH /files/:id/status`, reactive
 status dot + progress); and **Open in Default Editor** (`POST /files/:id/open` →
-`openOS(…, 'edit')`, prefers `$VISUAL`/`$EDITOR` argv-spawned, else OS
-default-open). All server actions are best-effort (failures swallowed,
+`openOS(…, 'edit')` = OS default-open `open`/`start`/`xdg-open`; deliberately
+ignores `$EDITOR`/`$VISUAL` since terminal editors spawned detached silently
+no-op — GB-892). All server actions are best-effort (failures swallowed,
 `--debug`-logged). The menu dismisses on item-select, Escape, outside
 click/right-click, scroll, or blur.
 

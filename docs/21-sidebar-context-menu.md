@@ -61,12 +61,14 @@ logged only under `--debug`, never surfaced to the user.
 
 #### 21.2.4 Open in Default Editor
 
-- Opens the file in the user's editor via `POST /api/files/:fileId/open` →
-  `openOS(path, 'edit')`. The server prefers `$VISUAL` / `$EDITOR` (spawned with
-  the path as a separate argv — never shell-interpolated, see doc 14 FR-14.3),
-  falling back to the OS "open with default application" handler when neither is
-  set. A terminal-only editor (e.g. `vim`) in `$EDITOR` cannot be GUI-launched
-  and will no-op.
+- Opens the file in its default GUI application — for a source file that's
+  typically the user's code editor — via `POST /api/files/:fileId/open` →
+  `openOS(path, 'edit')` (`open` / `start` / `xdg-open`, path passed as a
+  separate argv per doc 14 FR-14.3).
+- It deliberately does **not** honor `$EDITOR` / `$VISUAL`: those are commonly
+  *terminal* editors (vim/nano) which, spawned detached with no controlling
+  terminal, silently do nothing — so the action appeared to do nothing at all
+  (GB-892). Routing through the OS default-open handler always reaches a GUI app.
 
 ### 21.3 Dismissal & Placement
 

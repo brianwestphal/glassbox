@@ -21,7 +21,7 @@ Requirements for network security, input validation, and safe system interaction
 - The application shall not use `execSync()` or `exec()` with string interpolation for constructing shell commands.
 - All external process invocations shall use `spawnSync()`, `execFileSync()`, or equivalent functions that accept argument arrays, avoiding shell interpretation of arguments.
 - File paths, git refs, and user-provided values shall never be interpolated into shell command strings.
-- The "Open in Default Editor" action (doc 21) honors the `$VISUAL` / `$EDITOR` environment variable: the command is split into an argv array and the file path is appended as a separate trailing argument, spawned without a shell (`openOS(path, 'edit')`). The path is never interpolated into a command string, so a path containing spaces or shell metacharacters is safe. The editor command itself comes from the user's own environment (the local machine is the trust boundary), not from any network input.
+- The "Open in Default Editor" action (doc 21) opens the file through the OS default-open handler (`open` / `start` / `xdg-open`) via `openOS(path, 'edit')`, with the file path passed as a separate argv (never interpolated into a shell command string), so a path containing spaces or shell metacharacters is safe.
 
 ### 14.4 API Key Storage
 

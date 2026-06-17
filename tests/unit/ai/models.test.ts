@@ -1,4 +1,4 @@
-import { getDefaultModel, getModelContextWindow, MODELS, PLATFORMS, ENV_KEY_NAMES } from '../../../src/ai/models.js';
+import { getDefaultModel, getModelContextWindow, MODELS, PLATFORMS, ENV_KEY_NAMES, resolveModelId } from '../../../src/ai/models.js';
 import type { AIPlatform } from '../../../src/ai/models.js';
 
 describe('MODELS', () => {
@@ -23,6 +23,19 @@ describe('MODELS', () => {
         expect(model.contextWindow).toBeGreaterThan(0);
         expect(typeof model.isDefault).toBe('boolean');
       }
+    }
+  });
+
+  // GB-893 — the default Anthropic model was a dated snapshot
+  // (`claude-sonnet-4-20250514`) that hit its scheduled retirement and started
+  // returning 404 on every analysis. Anthropic publishes bare *aliases*
+  // (`claude-sonnet-4-6`) that don't carry a retirement date; the dated
+  // `-YYYYMMDD` snapshots do. Enforce the alias form so a snapshot ID can't be
+  // reintroduced and silently 404 once it's retired.
+  it('uses bare Anthropic model aliases, not dated snapshot IDs (GB-893)', () => {
+    for (const model of MODELS.anthropic) {
+      expect(model.id, `${model.id} looks like a dated snapshot — use the bare alias`)
+        .not.toMatch(/-20\d{6}$/);
     }
   });
 });
@@ -51,6 +64,35 @@ describe('getDefaultModel', () => {
       expect(model).toBeDefined();
       expect(model!.isDefault).toBe(true);
     }
+  });
+});
+
+describe('resolveModelId (GB-893 — best-effort version matching)', () => {
+  it('returns a currently-offered id unchanged', () => {
+    expect(resolveModelId('anthropic', 'claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
+  });
+
+  it('maps a retired dated snapshot to the current same-tier model', () => {
+    // The exact id from the GB-893 404.
+    expect(resolveModelId('anthropic', 'claude-sonnet-4-20250514')).toBe('claude-sonnet-4-6');
+  });
+
+  it('best-effort matches an older version to the newer one (sonnet 4.5 → 4.6)', () => {
+    expect(resolveModelId('anthropic', 'claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
+  });
+
+  it('matches by tier across families (opus stays opus, haiku stays haiku)', () => {
+    expect(resolveModelId('anthropic', 'claude-opus-4-1')).toBe('claude-opus-4-8');
+    expect(resolveModelId('anthropic', 'claude-haiku-4-20250514')).toBe('claude-haiku-4-5');
+  });
+
+  it('matches Google tiers (older gemini pro/flash → current)', () => {
+    expect(resolveModelId('google', 'gemini-1.5-pro')).toBe('gemini-2.5-pro');
+    expect(resolveModelId('google', 'gemini-1.5-flash')).toBe('gemini-2.5-flash');
+  });
+
+  it('falls back to the platform default when no family matches', () => {
+    expect(resolveModelId('anthropic', 'some-unknown-model')).toBe(getDefaultModel('anthropic'));
   });
 });
 
