@@ -1,6 +1,6 @@
 import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
 
-import { moveAnnotation, revealFile } from '../../api/index.js';
+import { discardReviewNote, moveAnnotation, revealFile } from '../../api/index.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
 import { asEl, asElement } from '../dom.js';
@@ -369,6 +369,28 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const line = parseInt(btnEl.dataset.line ?? '', 10);
     if (noteRow === null || guid === '' || isNaN(line)) return;
     showAnnotationForm(asEl(noteRow), line, 'new', guid);
+  });
+
+  // Keep an outdated (stale) review note — dismiss its flag for this session
+  // (doc 20 §20.3, GB-907). Re-anchoring re-evaluates it on the next load.
+  void delegate(container, 'click', '.ai-note-keep-btn', (e, btn) => {
+    e.stopPropagation();
+    const row = asEl(btn).closest('.ai-note-row');
+    if (row === null) return;
+    row.classList.remove('ai-note-stale');
+    row.querySelector('.ai-note-stale-tag')?.remove();
+    row.querySelector('.ai-note-stale-actions')?.remove();
+  });
+
+  // Discard an outdated review note — remove it from `.pr-notes/` and the DOM.
+  void delegate(container, 'click', '.ai-note-discard-btn', (e, btn) => {
+    e.stopPropagation();
+    const row = asEl(btn).closest('.ai-note-row');
+    if (row === null) return;
+    const guid = row.getAttribute('data-note-id') ?? '';
+    const file = container.querySelector('.diff-view')?.getAttribute('data-file-path') ?? '';
+    row.remove(); // optimistic — the row goes regardless of the on-disk result
+    if (guid !== '' && file !== '') void discardReviewNote({ guid, file });
   });
 
   // Drag-and-drop annotation onto a different line

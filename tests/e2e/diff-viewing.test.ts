@@ -385,6 +385,28 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1);
   });
 
+  test('Keep dismisses the outdated flag on a stale review note (GB-907)', async ({ page }) => {
+    await openModifiedFile(page);
+    const staleRow = page.locator('.ai-note-row.ai-note-stale');
+    await expect(staleRow).toBeVisible({ timeout: 5000 });
+
+    await staleRow.locator('.ai-note-keep-btn').click();
+    // The flag and its actions are gone, but the note itself remains.
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(0);
+    await expect(page.locator('.ai-note-stale-tag')).toHaveCount(0);
+    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4);
+  });
+
+  test('Discard removes an outdated review note (GB-907)', async ({ page }) => {
+    await openModifiedFile(page);
+    const staleRow = page.locator('.ai-note-row.ai-note-stale');
+    await expect(staleRow).toBeVisible({ timeout: 5000 });
+
+    await staleRow.locator('.ai-note-discard-btn').click();
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(0);
+    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
+  });
+
   test('a reviewer can reply to an AI note, creating a linked annotation (GB-906)', async ({ page }) => {
     await openModifiedFile(page);
     const replyBtn = page.locator('.ai-note-reply-btn').first();

@@ -1509,3 +1509,18 @@ describe('GET /api/image/:fileId/:side — side-aware content-type (GB-836)', ()
     expect(rasterizeSvg).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DELETE /api/review-notes/:guid (GB-907)', () => {
+  it('responds ok with removed=false when the note is not on disk', async () => {
+    const res = await app.request('/api/review-notes/some-guid?file=src/app.ts', { method: 'DELETE' });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.removed).toBe(false);
+  });
+
+  it('400s when the guid path param is empty', async () => {
+    const res = await app.request('/api/review-notes/%20?file=src/app.ts', { method: 'DELETE' });
+    expect(res.status).toBe(400);
+  });
+});

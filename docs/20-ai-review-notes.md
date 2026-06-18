@@ -111,8 +111,9 @@ another AI) an optimized way to consume it.
   same match-or-mark-stale logic it applies to human annotations
   (`reanchorReviewNotes`, mirroring `src/review-update.ts`): a matched note
   renders at its current line; an unmatchable note is flagged stale and rendered
-  with an "outdated" badge. (Interactive keep/discard of a stale note is a
-  follow-up.)
+  with an "outdated" badge plus **Keep** / **Discard** controls — Keep dismisses
+  the flag for the session, Discard removes the note from `.pr-notes/` via
+  `DELETE /api/review-notes/:guid` (the `removeNote` store op).
 
 ### 20.4 Authoring
 
@@ -254,8 +255,9 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   the current diff at load time (the same content-near-the-line approach the
   human-annotation stale matcher uses) — a note whose line shifted is moved, one
   whose text is gone is flagged `stale` and rendered with an "outdated" badge.
-  The note's authored snippet is carried on the view; interactive keep/discard of
-  a stale note (which edits `.pr-notes/`) is a follow-up.
+  The note's authored snippet is carried on the view. A reviewer can **Keep** a
+  stale note (dismiss the flag) or **Discard** it (`DELETE
+  /api/review-notes/:guid` → `removeNote`, deleting it from `.pr-notes/`).
 - **P4** — Artifact rendering (diagram source / screenshot via image-diff / test
   output) and the Git LFS wiring.
 - **P5** *(shipped)* — Feed notes into analysis and the export

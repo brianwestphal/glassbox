@@ -114,6 +114,23 @@ describe('DiffView', () => {
     expect(html).toContain('outdated');
   });
 
+  it('offers Keep/Discard only on a stale note that has a guid (GB-907)', () => {
+    const stale = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ guid: 'g1', line: 1, side: 'new', kind: 'risk', body: 'old', stale: true }],
+    }).toString();
+    expect(stale).toContain('ai-note-keep-btn');
+    expect(stale).toContain('ai-note-discard-btn');
+
+    const fresh = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ guid: 'g1', line: 1, side: 'new', kind: 'risk', body: 'current' }],
+    }).toString();
+    expect(fresh).not.toContain('ai-note-keep-btn');
+  });
+
   it('escapes a note body so markup cannot break rendering (GB-896)', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),

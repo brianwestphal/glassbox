@@ -378,6 +378,12 @@ function ReviewNoteRows({ notes }: { notes: ReviewNoteView[] }) {
             <span className="ai-note-text">{n.body}</span>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
             {n.guid !== undefined ? <button className="ai-note-reply-btn" data-line={String(n.line)}>Reply</button> : null}
+            {n.stale === true && n.guid !== undefined ? (
+              <span className="ai-note-stale-actions">
+                <button className="ai-note-keep-btn" title="Dismiss the outdated flag for now">Keep</button>
+                <button className="ai-note-discard-btn" title="Remove this note from .pr-notes/">Discard</button>
+              </span>
+            ) : null}
           </div>
         </div>
       ))}

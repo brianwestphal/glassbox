@@ -334,8 +334,10 @@
   opacity: 0.7;
 }
 
-// "Reply" affordance on a review-note row (doc 20 threading).
-.ai-note-reply-btn {
+// Row affordances: "Reply" (threading) and "Keep"/"Discard" (stale notes).
+.ai-note-reply-btn,
+.ai-note-keep-btn,
+.ai-note-discard-btn {
   flex-shrink: 0;
   margin-left: 8px;
   padding: 1px 8px;
@@ -350,6 +352,13 @@
   &:hover { color: var(--text); border-color: var(--accent); }
 }
 .ai-note-producer + .ai-note-reply-btn { margin-left: 8px; }
+
+.ai-note-stale-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0;
+}
+.ai-note-discard-btn:hover { color: var(--red, #f38ba8); border-color: var(--red, #f38ba8); }
 
 // A review note whose anchored code has changed since it was written (P3).
 .ai-note-stale {
