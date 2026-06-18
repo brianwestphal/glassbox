@@ -39,7 +39,17 @@ fi
 
 SIGN_ID="${APPLE_SIGNING_IDENTITY:-${CODESIGN_IDENTITY:-}}"
 if [[ -n "$SIGN_ID" ]]; then
-  codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$OUT"
+  # In CI the Developer ID lives in an isolated keychain provisioned by
+  # scripts/ci/apple-fm-signing-keychain.sh (exported as APPLE_FM_KEYCHAIN) so
+  # signing never mutates the global search list tauri-action relies on. Locally
+  # the var is unset and codesign uses the default keychain search list.
+  # (Two explicit invocations rather than an array arg — an empty array under
+  # `set -u` is an "unbound variable" error on macOS's stock bash 3.2.)
+  if [[ -n "${APPLE_FM_KEYCHAIN:-}" ]]; then
+    codesign --force --options runtime --timestamp --keychain "$APPLE_FM_KEYCHAIN" --sign "$SIGN_ID" "$OUT"
+  else
+    codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$OUT"
+  fi
   echo "[apple-fm] signed with $SIGN_ID"
 else
   echo "[apple-fm] no APPLE_SIGNING_IDENTITY — built unsigned (dev only)"

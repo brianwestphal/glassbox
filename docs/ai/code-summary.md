@@ -28,7 +28,7 @@ glassbox/
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
 ├── docs/                   # Requirements (1-19) + ARCHITECTURE, tauri-*
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
-├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT)
+├── scripts/                # build-sidecar.sh, build-apple-fm-helper.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT), ci/ (apple-fm-signing-keychain.sh — Developer ID keychain for helper signing)
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
 ├── assets/                 # Static assets shipped with the app
 ├── CLAUDE.md               # Project rules for AI sessions

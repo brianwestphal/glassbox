@@ -15,9 +15,14 @@ providers (Anthropic / OpenAI / Google).
 > helper compiles, `--probe` reports `available`, `--infer` runs real on-device
 > inference returning the `{content}` JSON the analysis parser consumes, the Node
 > bridge + `sendAIRequest({platform:'apple'})` drive it, and the helper signs
-> with hardened runtime. **Remaining (P2a):** production signing with a real
-> Developer ID + **notarization** of the helper alongside the app bundle in CI
-> (needs the release secrets — see §22.8). A working reference exists in the
+> with hardened runtime. **P2a (production signing + notarization wiring) is
+> shipped:** the release workflows now sign the helper with the real Developer ID
+> + hardened runtime before `tauri-action` notarizes the bundle (§22.9). The
+> remaining step is the maintainer's distribution smoke test on a clean macOS-26
+> machine, plus — until GitHub's hosted runners ship a macOS 26 / Xcode 26 image
+> — CI compiles the helper only on a capable runner (the maintainer's local
+> `tauri:build:local` on macOS 26 already produces a signed, notarizable helper).
+> A working reference exists in the
 > sibling Hot Sheet app's "Announcer" feature (`src/announcer/localProvider.ts`,
 > `src/announcer/appleFoundation.ts`, `src-tauri/apple-fm-helper/main.swift`,
 > `scripts/build-apple-fm-helper.sh`) — this doc adapts that approach to
@@ -76,8 +81,9 @@ common developer setups; Apple Foundation Models ship with macOS for free.
 - **Build & bundle** — Compiled by a **guarded** `swiftc` build script
   (no-op on non-macOS / missing `swiftc` / missing macOS-26 SDK) and shipped as
   a Tauri resource; the launcher sets the bin env var for the packaged server.
-  *(Hot Sheet shipped the dev path and left production bundling + code-signing
-  as follow-up — Glassbox should budget for the same.)*
+  Because it lands under Tauri `resources/**` (not as an `externalBin`), Tauri
+  does **not** sign it — so the build script signs it with the Developer ID +
+  hardened runtime before the bundle is notarized (§22.9).
 - **Structured output caveat** — Risk/narrative analysis expects the model to
   return JSON the analysis parser extracts. The helper must therefore produce
   parseable output — either Apple's guided generation constrained to Glassbox's
@@ -148,12 +154,46 @@ common developer setups; Apple Foundation Models ship with macOS for free.
   the settings UI (Apple shown only when the probe passes; no key/endpoint). The
   Node side is hermetically unit-tested with an injected runner; the structured
   output uses the JSON-instructed-prompt path (§22.3).
-- **P2a — Apple FM production notarization in CI.** *(follow-up)* The compile +
-  on-device run + ad-hoc/hardened-runtime signing were verified on macOS-26
-  hardware. What remains is the production release path: signing with the real
-  Developer ID `APPLE_SIGNING_IDENTITY` and **notarizing** the helper alongside
-  the app bundle in the release workflow (needs the CI secrets; the build script
-  already emits a hardened-runtime signature when the identity is set).
+- **P2a — Apple FM production signing + notarization in CI.** *(shipped — see
+  §22.9)* The compile + on-device run + ad-hoc/hardened-runtime signing were
+  verified on macOS-26 hardware. The release workflows now provision the
+  Developer ID and sign the helper before notarization. The only remaining item
+  is the maintainer's distribution smoke test on a clean macOS-26 machine (needs
+  the CI release secrets + Apple Intelligence hardware), plus the standing
+  dependency that CI compiles the helper only on a macOS 26 / Xcode 26 runner.
+
+## 22.9 Production signing & notarization (P2a)
+
+The Apple FM helper is a native arm64 Mach-O binary bundled under Tauri
+`resources/**` (via `scripts/build-sidecar.sh` → `server/`). Tauri signs the
+main app binary and its `externalBin` sidecars (e.g. the Node runtime) with
+hardened runtime, but it does **not** sign arbitrary Mach-O files under
+`resources/**`. Apple's notary service rejects a bundle containing any unsigned
+or non-hardened-runtime Mach-O, so the helper must be signed **before**
+`tauri-action` notarizes the app bundle.
+
+- `scripts/build-apple-fm-helper.sh` signs the compiled helper with
+  `codesign --options runtime --timestamp` using `APPLE_SIGNING_IDENTITY` (the
+  same Developer ID secret Tauri uses for the app bundle), falling back to
+  `CODESIGN_IDENTITY`.
+- In CI the Developer ID is provisioned into an **isolated keychain** by
+  `scripts/ci/apple-fm-signing-keychain.sh import` (run before the sidecar build
+  on macOS when `APPLE_CERTIFICATE` is present) and referenced explicitly via
+  `codesign --keychain "$APPLE_FM_KEYCHAIN"`. The global keychain search list is
+  never mutated, so `tauri-action`'s own signing/notarization keychain is wholly
+  unaffected; a cleanup step removes the keychain before `tauri-action` runs.
+  Wired into both shipping jobs: `release-desktop.yml` (stable) and the signed
+  build in `release-candidate.yml` (beta). No-ops on non-macOS / secret-less
+  runs (helper left unsigned — dev only, never notarized).
+- **Standing dependency:** the helper compiles only on a macOS 26 / Xcode 26
+  toolchain (`swiftc -target arm64-apple-macos26`). GitHub-hosted `macos-latest`
+  runners build it only once that image ships macOS 26; until then CI releases
+  omit the helper and the maintainer's local `tauri:build:local` on macOS 26 is
+  the path that produces a signed, notarizable bundle. The build script no-ops
+  cleanly when the SDK is absent, so the wiring is forward-compatible.
+- **Verification (maintainer):** on a clean (non-build) macOS-26 machine, install
+  the signed + notarized bundle and confirm the helper probes `available` and
+  runs inference with no quarantine/Gatekeeper rejection.
 
 ## Maintenance triggers
 

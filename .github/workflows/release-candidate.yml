@@ -510,8 +510,29 @@ jobs:
             " "$VER"
           fi
 
+      # Provision an isolated keychain with the Developer ID cert so the
+      # sidecar build can sign the Apple FM helper (a resource Mach-O Tauri
+      # won't sign) with hardened runtime before tauri-action notarizes the
+      # bundle. No-ops on non-macOS / when the cert secret is absent.
+      - name: Provision Apple FM helper signing keychain
+        if: runner.os == 'macOS'
+        run: bash scripts/ci/apple-fm-signing-keychain.sh import
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
       - name: Build sidecar
         run: bash scripts/build-sidecar.sh ${{ matrix.target }}
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+      # Tear the helper-signing keychain down before tauri-action so its own
+      # signing/notarization keychain is the sole identity holder.
+      - name: Remove Apple FM helper signing keychain
+        if: ${{ always() && runner.os == 'macOS' }}
+        run: bash scripts/ci/apple-fm-signing-keychain.sh cleanup
         shell: bash
 
       # Windows MSI bundler requires the optional pre-release identifier in

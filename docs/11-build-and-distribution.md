@@ -81,6 +81,7 @@ Requirements for building, packaging, and distributing the application.
 
 - Desktop releases shall be built via GitHub Actions on git tag push.
 - macOS builds shall be code-signed and notarized.
+- The Apple Foundation Models helper, a native Mach-O bundled under Tauri `resources/**` (which Tauri does not sign, unlike its `externalBin` sidecars), shall be signed with the Developer ID + hardened runtime + a secure timestamp **before** `tauri-action` notarizes the app bundle — otherwise the notary service rejects the unsigned nested binary. `scripts/ci/apple-fm-signing-keychain.sh` provisions the Developer ID into an isolated keychain (referenced via `codesign --keychain`, so the global search list and `tauri-action`'s own signing keychain are untouched) for the sidecar-build step in both `release-desktop.yml` and the signed build in `release-candidate.yml`; it no-ops on non-macOS / secret-less runs. The helper compiles only on a macOS 26 / Xcode 26 toolchain, so CI ships it once a `macos-latest` (or pinned) runner provides that SDK; the signing wiring is forward-compatible and inert until then.
 - All builds shall include updater signature artifacts (`latest.json`).
 - Release artifacts shall be published as draft GitHub Releases for manual promotion.
 - Three workflows handle the tag-driven release pipeline:

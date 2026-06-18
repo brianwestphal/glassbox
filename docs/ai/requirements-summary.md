@@ -661,8 +661,15 @@ unit tests), the client `sendAppleRequest` case, the Swift helper
 guarded + `APPLE_SIGNING_IDENTITY`-signed build (`build-apple-fm-helper.sh` wired
 into `build-sidecar.sh`), `server/` bundling + the launcher's
 `GLASSBOX_APPLE_FM_BIN` export, and the settings UI (Apple shown only when the
-probe passes; no key/endpoint). **P2a** — the Swift compile + on-device run +
-notarization need real macOS-26 hardware (follow-up). Adapts the sibling Hot
+probe passes; no key/endpoint). **P2a (signing/notarization wiring) shipped** —
+the helper is a resource Mach-O Tauri won't sign, so the release workflows
+provision the Developer ID into an isolated keychain
+(`scripts/ci/apple-fm-signing-keychain.sh`, referenced via `codesign --keychain`
+so `tauri-action`'s keychain is untouched) and sign it with hardened runtime
+before notarization, in both `release-desktop.yml` and the signed
+`release-candidate.yml` build. Remaining: the maintainer's clean-machine smoke
+test, and CI helper-compilation awaits a macOS 26 / Xcode 26 runner (the local
+`tauri:build:local` already produces a signed bundle). Adapts the sibling Hot
 Sheet app's Announcer implementation.
 
 ## 19. Implementation-status snapshot
