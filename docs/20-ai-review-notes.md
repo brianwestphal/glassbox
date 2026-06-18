@@ -186,9 +186,10 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   annotation, turning a note into a line-anchored conversation. The note row
   carries its SARIF `guid` (`data-note-id`) and a **Reply** button; the reply is
   a normal human annotation linked by a nullable `reply_to_note_id` column on
-  `annotations`, rendered with a "↳ reply" tag. (Replies render on the note's
-  line marked as replies; precise visual nesting *directly beneath* the note,
-  and markdown rendering of note bodies, are polish follow-ups.)
+  `annotations`, rendered with a "↳ reply" tag and **nested directly beneath the
+  note** it answers (an orphan reply — whose note isn't loaded — falls back to
+  line rendering). Markdown rendering of note bodies is a remaining polish
+  follow-up.
 
 ### 20.7 Cross-tool integration (Hot Sheet and other orchestrators)
 

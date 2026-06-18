@@ -1,7 +1,7 @@
 import { test, expect } from './coverage-fixture.js';
 
 // Demo scenario 4 pre-populates annotations on these files:
-//   src/auth/session.ts    — 3 annotations (bug, fix, pattern-follow)
+//   src/auth/session.ts    — 3 annotations (bug, fix, pattern-follow) + 1 reply to a review note
 //   src/api/routes/users.ts — 3 annotations (pattern-follow, style, fix)
 //   src/db/redis.ts          — 1 annotation (note)
 //   src/middleware/auth.ts   — 1 annotation (fix)

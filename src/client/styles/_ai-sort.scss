@@ -358,6 +358,13 @@
   flex-shrink: 0;
   gap: 0;
 }
+
+// Replies to a review note (doc 20 threading) render nested beneath it.
+.annotation-row.ai-note-replies {
+  padding-left: 32px;
+  border-left: 2px solid rgba(180, 190, 254, 0.25);
+  margin-left: 28px;
+}
 .ai-note-discard-btn:hover { color: var(--red, #f38ba8); border-color: var(--red, #f38ba8); }
 
 // A review note whose anchored code has changed since it was written (P3).

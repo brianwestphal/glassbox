@@ -17,11 +17,20 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
   mode: 'split' | 'unified';
   reviewNotes?: ReviewNoteView[];
 }) {
+  // Replies (annotations linked to a review note on this file) render nested
+  // beneath their note, not on their line; everything else goes by line. An
+  // orphan reply — whose note isn't among this file's notes — falls back to
+  // line rendering so it's never lost.
+  const loadedNoteGuids = new Set(reviewNotes.map(n => n.guid).filter((g): g is string => g !== undefined));
+  const repliesByNote: Record<string, Annotation[]> = {};
   const annotationsByLine: Record<string, Annotation[]> = {};
   for (const a of annotations) {
+    if (a.reply_to_note_id !== null && loadedNoteGuids.has(a.reply_to_note_id)) {
+      (repliesByNote[a.reply_to_note_id] ??= []).push(a);
+      continue;
+    }
     const key = `${a.line_number}:${a.side}`;
-    if (!(key in annotationsByLine)) annotationsByLine[key] = [];
-    annotationsByLine[key].push(a);
+    (annotationsByLine[key] ??= []).push(a);
   }
   // AI-authored review notes anchor to the new side; key them the same way so
   // they can break the diff flow at their line (full-width, like annotations).
@@ -49,9 +58,9 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
       ) : diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
       ) : (diff.status === 'added' || diff.status === 'deleted' || mode === 'unified') ? (
-        <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} />
+        <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} />
       ) : (
-        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} />
+        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} />
       )}
     </div>
   );
@@ -75,8 +84,8 @@ function getReviewNotes(pair: LinePair, reviewNotesByLine: Record<string, Review
   return pair.right ? reviewNotesByLine[`${pair.right.newNum}:new`] ?? [] : [];
 }
 
-function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
-  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>;
+function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote }: {
+  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>; repliesByNote: Record<string, Annotation[]>;
 }) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
@@ -141,7 +150,7 @@ function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
                 </div>
               </div>
               {group.annotations.length > 0 ? <AnnotationRows annotations={group.annotations} /> : null}
-              {group.reviewNotes.length > 0 ? <ReviewNoteRows notes={group.reviewNotes} /> : null}
+              {group.reviewNotes.length > 0 ? <ReviewNoteRows notes={group.reviewNotes} repliesByNote={repliesByNote} /> : null}
             </div>
           );
         }
@@ -314,8 +323,8 @@ function buildUnifiedCharDiffs(lines: DiffLine[]): Map<DiffLine, DiffSegment[]> 
   return result;
 }
 
-function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
-  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>;
+function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote }: {
+  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>; repliesByNote: Record<string, Annotation[]>;
 }) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
@@ -349,7 +358,7 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
                   <span className="code">{segments ? renderSegments(segments) : renderLineContent(line.content)}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}
-                {notes.length > 0 ? <ReviewNoteRows notes={notes} /> : null}
+                {notes.length > 0 ? <ReviewNoteRows notes={notes} repliesByNote={repliesByNote} /> : null}
               </div>
             );
           })}
@@ -366,10 +375,13 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
 /** AI-authored review notes (docs/20 §20.6) — rendered review-comment-style,
  *  full-width below their line, styled distinctly as AI-authored (the `ai-note-*`
  *  precedent shared with risk/narrative/guided notes) with a per-kind badge. */
-function ReviewNoteRows({ notes }: { notes: ReviewNoteView[] }) {
+function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; repliesByNote: Record<string, Annotation[]> }) {
   return (
     <>
-      {notes.map(n => (
+      {notes.map(n => {
+        const replies = n.guid !== undefined ? repliesByNote[n.guid] ?? [] : [];
+        return (
+        <>
         <div className={`ai-note-row ai-note-review${n.stale === true ? ' ai-note-stale' : ''}`}
           data-kind={n.kind} data-note-id={n.guid}>
           <div className="ai-note-item">
@@ -386,28 +398,39 @@ function ReviewNoteRows({ notes }: { notes: ReviewNoteView[] }) {
             ) : null}
           </div>
         </div>
-      ))}
+        {replies.length > 0 ? (
+          <div className="annotation-row ai-note-replies">
+            {replies.map(a => <AnnotationItem annotation={a} />)}
+          </div>
+        ) : null}
+        </>
+        );
+      })}
     </>
+  );
+}
+
+function AnnotationItem({ annotation: a }: { annotation: Annotation }) {
+  return (
+    <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
+      data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
+      <span className="annotation-drag-handle" draggable={true} title="Drag to move">⠿</span>
+      <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
+      {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note">↳ reply</span> : null}
+      <span className="annotation-text">{a.content}</span>
+      <div className="annotation-actions">
+        {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}
+        <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
+        <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
+      </div>
+    </div>
   );
 }
 
 function AnnotationRows({ annotations }: { annotations: Annotation[] }) {
   return (
     <div className="annotation-row">
-      {annotations.map(a => (
-        <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
-          data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
-          <span className="annotation-drag-handle" draggable={true} title="Drag to move">⠿</span>
-          <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
-          {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note">↳ reply</span> : null}
-          <span className="annotation-text">{a.content}</span>
-          <div className="annotation-actions">
-            {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}
-            <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
-            <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
-          </div>
-        </div>
-      ))}
+      {annotations.map(a => <AnnotationItem annotation={a} />)}
     </div>
   );
 }

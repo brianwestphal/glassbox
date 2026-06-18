@@ -597,9 +597,10 @@ can Reply to a note (the row carries its `guid` + a Reply button); the
 reply is a human annotation linked by a nullable `reply_to_note_id`
 column, tagged "↳ reply". **Stale keep/discard shipped**: an outdated
 note offers Keep (dismiss the flag) / Discard (`DELETE
-/api/review-notes/:guid` → `removeNote`). Remaining: the AI-driven
-cross-cutting *linking* half of coalescing, P4 artifacts, markdown
-bodies, and nesting replies directly beneath their note.
+/api/review-notes/:guid` → `removeNote`). **Reply nesting shipped**:
+replies render nested directly beneath their note (orphans fall back to
+line rendering). Remaining: the AI-driven cross-cutting *linking* half of
+coalescing, P4 artifacts, and markdown rendering of note bodies.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

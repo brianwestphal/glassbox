@@ -99,9 +99,33 @@ describe('DiffView', () => {
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
       annotations: [makeAnnotation({ line_number: 1, reply_to_note_id: 'note-abc', content: 'I disagree' })],
       mode: 'unified',
+      reviewNotes: [{ guid: 'note-abc', line: 1, side: 'new', kind: 'rationale', body: 'why' }],
     }).toString();
     expect(html).toContain('annotation-reply-tag');
     expect(html).toContain('I disagree');
+  });
+
+  it('nests a reply beneath its note (GB-908)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [makeAnnotation({ id: 'r1', line_number: 1, reply_to_note_id: 'note-abc', content: 'a reply' })],
+      mode: 'unified',
+      reviewNotes: [{ guid: 'note-abc', line: 1, side: 'new', kind: 'rationale', body: 'why' }],
+    }).toString();
+    // The reply lives in the nested replies block, not a top-level annotation-row.
+    expect(html).toContain('ai-note-replies');
+    // The note row comes before the reply.
+    expect(html.indexOf('data-note-id="note-abc"')).toBeLessThan(html.indexOf('a reply'));
+  });
+
+  it('falls back to line rendering for an orphan reply whose note is not loaded (GB-908)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [makeAnnotation({ line_number: 1, reply_to_note_id: 'missing-note', content: 'orphan reply' })],
+      mode: 'unified',
+    }).toString();
+    expect(html).not.toContain('ai-note-replies');
+    expect(html).toContain('orphan reply'); // still rendered, just on its line
   });
 
   it('marks a stale review note as outdated (GB-897)', () => {

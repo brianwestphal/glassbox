@@ -432,7 +432,10 @@ const NARRATIVE_ORDER: Array<{ path: string; position: number; rationale: string
 
 // --- Annotations ---
 
-const ANNOTATIONS: Array<{ filePath: string; line: number; side: string; category: string; content: string }> = [
+const ANNOTATIONS: Array<{ filePath: string; line: number; side: string; category: string; content: string; replyToNoteId?: string }> = [
+  // A reviewer reply to the line-31 risk review note (doc 20 threading) —
+  // renders nested beneath that note.
+  { filePath: 'src/auth/session.ts', line: 31, side: 'new', category: 'note', content: 'Confirmed — the JSON value is an ISO string, so new Date() parses it and the comparison holds.', replyToNoteId: 'demo-note-risk' },
   { filePath: 'src/auth/session.ts', line: 23, side: 'new', category: 'bug', content: 'Redis key should be sanitized — if a session ID contains a colon, it will conflict with the key namespace.' },
   { filePath: 'src/auth/session.ts', line: 30, side: 'new', category: 'fix', content: 'Wrap JSON.parse in try/catch to handle corrupted Redis data gracefully instead of crashing.' },
   { filePath: 'src/auth/session.ts', line: 12, side: 'new', category: 'pattern-follow', content: 'Good use of a named constant instead of a magic number. This makes the TTL self-documenting.' },
@@ -575,7 +578,7 @@ async function setupAnnotations(fileIdMap: Map<string, string>) {
   for (const ann of ANNOTATIONS) {
     const fileId = fileIdMap.get(ann.filePath);
     if (fileId !== undefined) {
-      await addAnnotation(fileId, ann.line, ann.side, ann.category, ann.content);
+      await addAnnotation(fileId, ann.line, ann.side, ann.category, ann.content, ann.replyToNoteId);
     }
   }
 }

@@ -407,6 +407,15 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
   });
 
+  test('a reply to a review note renders nested beneath it (GB-908)', async ({ page }) => {
+    await openModifiedFile(page);
+    // The demo seeds a reply to the line-31 risk note; it renders nested.
+    const replies = page.locator('.annotation-row.ai-note-replies');
+    await expect(replies.first()).toBeVisible({ timeout: 5000 });
+    await expect(replies.locator('.annotation-reply-tag').first()).toBeVisible();
+    await expect(replies).toContainText('Confirmed');
+  });
+
   test('a reviewer can reply to an AI note, creating a linked annotation (GB-906)', async ({ page }) => {
     await openModifiedFile(page);
     const replyBtn = page.locator('.ai-note-reply-btn').first();
