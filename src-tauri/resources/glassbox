@@ -11,6 +11,11 @@ SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo
 CONTENTS_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_PATH")")")"
 NODE_BIN="$CONTENTS_DIR/MacOS/glassbox-node"
 CLI_JS="$CONTENTS_DIR/Resources/server/cli.js"
+# On-device Apple Foundation Models helper (doc 22). Bundled next to cli.js when
+# the macOS-26 build produced it; the Node bridge checks the path exists and
+# reports "unavailable" if it didn't, so exporting it unconditionally is safe.
+# Both the browser-mode exec and the backgrounded desktop server inherit it.
+export GLASSBOX_APPLE_FM_BIN="$CONTENTS_DIR/Resources/server/apple-fm-helper"
 APP_BUNDLE="$(dirname "$CONTENTS_DIR")"
 GLASSBOX_BIN="$CONTENTS_DIR/MacOS/glassbox"
 MAIN_ICON="$CONTENTS_DIR/Resources/icon.icns"

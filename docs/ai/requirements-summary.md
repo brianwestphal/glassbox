@@ -607,9 +607,14 @@ add --artifact` → SARIF `result.attachments`) and text/diagram-source
 artifacts render as inline collapsible code blocks, **image artifacts as
 `<img>`** served by a path-contained `GET /api/review-notes/artifact`
 route, with **sha-256 hashes + Git LFS `.gitattributes`** wiring on the
-writer. Remaining: the AI-driven cross-cutting *linking* half of
-coalescing; the one P4 follow-up — **live diagram rendering** (Mermaid/
-Graphviz/PlantUML) into actual diagrams.
+writer. The **AI-driven cross-cutting *linking*** half of coalescing
+shipped as **producer-side guidance** in the inbound instructions contract
+(a "Final consolidation pass" the generating AI runs after `coalesce`,
+merging near-duplicates via `update`/`remove` and linking related notes via
+shared `--ticket` + inline "see also" body references) — no Glassbox link
+primitive is built until a driver emits structured links. Remaining: the
+one P4 follow-up — **live diagram rendering** (Mermaid/Graphviz/PlantUML)
+into actual diagrams.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 
@@ -630,7 +635,7 @@ no-op — GB-892). All server actions are best-effort (failures swallowed,
 `--debug`-logged). The menu dismisses on item-select, Escape, outside
 click/right-click, scroll, or blur.
 
-## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Partially built (P1 local shipped)**
+## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Built (Apple FM dev-first)**
 
 Extends AI analysis beyond the three cloud providers to **`local`**
 (OpenAI-compatible servers — Ollama default `http://localhost:11434/v1`, LM
@@ -643,9 +648,16 @@ and no required key; Apple uses a Swift `FoundationModels` helper bridged via
 script and bundled as a Tauri resource (macOS-only). Phasing: **P1** local
 **(shipped)** — `KEYLESS_PLATFORMS`/`sendLocalRequest`/`resolveLocalEndpoint`/
 `fetchAvailableModels('local')` + the settings server-URL input; **P2** Apple FM
-(design only — native, macOS-26-only, verifiable only on real hardware; prod
-bundling/code-signing may split). Adapts the sibling Hot Sheet app's Announcer
-implementation.
+**(shipped, dev-first)** — the `apple` keyless platform, the Node bridge
+(`src/ai/apple-foundation.ts`, `--probe`/`--infer` over spawn, injected-runner
+unit tests), the client `sendAppleRequest` case, the Swift helper
+(`src-tauri/apple-fm-helper/main.swift`, `{system,messages}`→`{content}`), the
+guarded + `APPLE_SIGNING_IDENTITY`-signed build (`build-apple-fm-helper.sh` wired
+into `build-sidecar.sh`), `server/` bundling + the launcher's
+`GLASSBOX_APPLE_FM_BIN` export, and the settings UI (Apple shown only when the
+probe passes; no key/endpoint). **P2a** — the Swift compile + on-device run +
+notarization need real macOS-26 hardware (follow-up). Adapts the sibling Hot
+Sheet app's Announcer implementation.
 
 ## 19. Implementation-status snapshot
 

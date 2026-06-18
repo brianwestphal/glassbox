@@ -62,6 +62,12 @@ vi.mock('../../../src/ai/list-models.js', () => ({
   fetchAvailableModels: vi.fn(async () => null),
 }));
 
+// Mock the Apple FM bridge so the route's availability probe is deterministic
+// (no real `spawn` / platform dependence) — treat the helper as unavailable.
+vi.mock('../../../src/ai/apple-foundation.js', () => ({
+  isAppleFoundationAvailable: vi.fn(async () => false),
+}));
+
 // Mock batch planner and runner (not testing actual batch processing)
 vi.mock('../../../src/ai/batch-planner.js', () => ({
   planBatches: vi.fn(() => ({ batches: [], binaryFiles: [] })),
@@ -164,6 +170,11 @@ describe('GET /api/ai/models', () => {
     expect(body.models.google).toBeDefined();
     expect(body.models.local).toBeDefined();
     expect(body.platforms.local).toBe('Local');
+    // Records carry every platform key (the enum-keyed record schema is
+    // exhaustive); the Apple picker button is gated by `appleAvailable` instead.
+    expect(body.models.apple).toBeDefined();
+    expect(body.platforms.apple).toBe('Apple');
+    expect(body.appleAvailable).toBe(false);
   });
 });
 

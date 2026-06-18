@@ -102,6 +102,17 @@ cp dist/svg-rasterize-worker.js "$SERVER_DIR/"
 # Claude channel toggle write a `.mcp.json` pointing at a non-existent file, so
 # the channel silently fails to launch in desktop installs (GB-887).
 cp dist/channel.js "$SERVER_DIR/"
+# Apple Foundation Models helper (doc 22) — the on-device AI provider's Swift
+# CLI. The build is GUARDED (no-op off macOS / missing swiftc / missing macOS-26
+# SDK), so this is a clean skip on Linux/Windows/CI without Xcode 26. When it
+# does build, the binary sits next to cli.js and the launcher points the server
+# at it via GLASSBOX_APPLE_FM_BIN.
+bash "$(dirname "$0")/build-apple-fm-helper.sh" "dist/apple-fm-helper" || true
+if [[ -f "dist/apple-fm-helper" ]]; then
+  cp dist/apple-fm-helper "$SERVER_DIR/apple-fm-helper"
+  chmod +x "$SERVER_DIR/apple-fm-helper"
+  echo "Bundled Apple FM helper into $SERVER_DIR/"
+fi
 mkdir -p "$SERVER_DIR/client"
 cp dist/client/app.global.js "$SERVER_DIR/client/"
 cp dist/client/history.global.js "$SERVER_DIR/client/"

@@ -22,6 +22,15 @@ describe('reviewNoteInstructions (GB-900)', () => {
     expect(text).toContain('.pr-notes/');
     for (const kind of NOTE_KINDS) expect(text).toContain(kind);
   });
+
+  it('instructs the AI-driven cross-cutting consolidation pass (GB-903)', () => {
+    const text = reviewNoteInstructions();
+    expect(text).toContain('Final consolidation pass');
+    // The pass uses the existing update/remove primitives, not a new link command.
+    expect(text).toContain('Merge near-duplicates');
+    expect(text).toContain('Link related notes across files');
+    expect(text).not.toContain('glassbox note link');
+  });
 });
 
 describe('parseNoteAdd', () => {

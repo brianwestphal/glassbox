@@ -118,7 +118,14 @@ export async function runAnalysisBatch<T>(
       continue;
     }
 
-    const arrayResult = z.array(options.itemSchema).safeParse(parsed);
+    // Models reliably return a JSON array for multi-file batches, but for a
+    // single-file batch they very often drop the wrapper and return a bare
+    // object (`{...}` instead of `[{...}]`). Normalize a lone object to a
+    // one-element array so single-file analyses (e.g. guided review on a
+    // one-file review) parse instead of erroring out (GB-915). A non-matching
+    // object still fails the schema below, preserving the loud-failure contract.
+    const candidate = Array.isArray(parsed) ? parsed : [parsed];
+    const arrayResult = z.array(options.itemSchema).safeParse(candidate);
     if (!arrayResult.success) {
       const summary = arrayResult.error.issues
         .slice(0, 3)

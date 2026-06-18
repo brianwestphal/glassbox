@@ -1,4 +1,4 @@
-import { getDefaultModel, getModelContextWindow, MODELS, PLATFORMS, ENV_KEY_NAMES, resolveModelId } from '../../../src/ai/models.js';
+import { APPLE_ON_DEVICE_MODEL_ID, getDefaultModel, getModelContextWindow, KEYLESS_PLATFORMS, MODELS, PLATFORMS, ENV_KEY_NAMES, resolveModelId } from '../../../src/ai/models.js';
 import type { AIPlatform } from '../../../src/ai/models.js';
 
 describe('MODELS', () => {
@@ -45,6 +45,23 @@ describe('PLATFORMS', () => {
     expect(PLATFORMS.anthropic).toBe('Anthropic');
     expect(PLATFORMS.openai).toBe('OpenAI');
     expect(PLATFORMS.google).toBe('Google');
+    expect(PLATFORMS.local).toBe('Local');
+    expect(PLATFORMS.apple).toBe('Apple');
+  });
+});
+
+describe('apple platform (doc 22 P2)', () => {
+  it('is keyless and offers a single on-device default model', () => {
+    expect(KEYLESS_PLATFORMS.has('apple')).toBe(true);
+    expect(MODELS.apple).toHaveLength(1);
+    expect(MODELS.apple[0].id).toBe(APPLE_ON_DEVICE_MODEL_ID);
+    expect(MODELS.apple.filter(m => m.isDefault)).toHaveLength(1);
+    expect(getDefaultModel('apple')).toBe(APPLE_ON_DEVICE_MODEL_ID);
+  });
+
+  it('uses a small, conservative context window for batch planning', () => {
+    expect(getModelContextWindow('apple', APPLE_ON_DEVICE_MODEL_ID)).toBe(4096);
+    expect(getModelContextWindow('apple', 'unknown')).toBe(4096);
   });
 });
 

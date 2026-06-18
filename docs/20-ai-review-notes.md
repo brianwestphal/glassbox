@@ -137,7 +137,18 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   cross-cutting relationships that weren't visible while editing a single file
   (linking related notes across files). The **mechanical dedup** half ships as
   `glassbox note coalesce` (drops notes with an identical anchor + kind + body,
-  keeping the most recent); the AI-driven cross-cutting *linking* is a follow-up.
+  keeping the most recent); the **AI-driven cross-cutting** half — merging
+  near-duplicate notes that say the same thing in different words and linking
+  related notes across files — is **producer-side, not a Glassbox primitive**.
+  It's a judgment a model makes, so it ships as guidance in the inbound
+  AI-instructions contract (below): a "Final consolidation pass" that the
+  generating AI runs after `coalesce`, using the existing `update` / `remove`
+  primitives to merge near-duplicates, and shared `--ticket` + inline "see also
+  `path`" references in note bodies to link related notes. (A dedicated
+  `glassbox note link` primitive recording SARIF `relatedLocations`, plus a
+  "related" render in the diff, is deferred until a consolidation pass actually
+  emits structured links — there is no point building the link UI before a
+  driver produces links.)
 - **Inbound AI-instructions contract** — Glassbox already ships *outbound* AI
   instructions in its markdown export ("here's how to act on annotations"). The
   symmetric *inbound* contract — telling a generating AI **when and how to emit**
@@ -246,8 +257,9 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   note guid, scoped by `--file` or a global search), and a mechanical `coalesce`
   that drops redundant notes (identical anchor + kind + body, keeping the most
   recent). The AI-driven cross-cutting *linking* aspect of coalescing (§20.4)
-  remains a follow-up. (The originally-planned channel MCP tool was replaced by
-  the CLI — see §20.4.)
+  ships as producer-side guidance in the inbound instructions contract (the
+  "Final consolidation pass"), not as a Glassbox primitive. (The
+  originally-planned channel MCP tool was replaced by the CLI — see §20.4.)
 - **P2** *(shipped)* — Ingest and render notes as a distinct, review-comment-
   style source in the diff. A reader (`loadReviewNotesForFile`,
   `src/review-notes/store.ts`) flattens `.pr-notes/` SARIF into diff-anchored
@@ -284,7 +296,11 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
 - **Cross-cutting** — The inbound AI-instructions contract (§20.4) *(shipped —
   `glassbox note instructions` prints the canonical text)*; the Hot Sheet-side
   obligation to actually induce note production (§20.7) lives outside Glassbox
-  and runs that command to get the wording.
+  and runs that command to get the wording. The contract now also instructs the
+  **AI-driven cross-cutting consolidation pass** (§20.4) — merge near-duplicates
+  and link related notes via the existing `update` / `remove` primitives — so
+  the AI-driven half of coalescing is producer-side, with no Glassbox link
+  primitive built until a driver emits structured links.
 
 ## Maintenance triggers
 

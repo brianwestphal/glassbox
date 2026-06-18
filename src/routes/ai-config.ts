@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import { isAppleFoundationAvailable } from '../ai/apple-foundation.js';
 import {
   deleteAPIKey,
   detectAvailablePlatforms,
@@ -24,14 +25,16 @@ import { errorResponse, parseBody } from '../utils/parseBody.js';
 
 export const aiConfigRoutes = new Hono<AppEnv>();
 
-aiConfigRoutes.get('/config', (c) => {
+aiConfigRoutes.get('/config', async (c) => {
   const config = loadAIConfig();
+  // Keyless platforms count as "configured" without an API key: `local` as soon
+  // as its (defaulted) endpoint is set, `apple` when the on-device helper probe
+  // passes (macOS 26 + Apple Intelligence).
+  const appleReady = config.platform === 'apple' && await isAppleFoundationAvailable();
   return c.json({
     platform: config.platform,
     model: config.model,
-    // `local` is keyless — usable as soon as its (defaulted) endpoint is set,
-    // so it counts as "configured" without an API key.
-    keyConfigured: config.apiKey !== null || config.platform === 'local' || isAIServiceTest() || getDemoMode() !== null,
+    keyConfigured: config.apiKey !== null || config.platform === 'local' || appleReady || isAIServiceTest() || getDemoMode() !== null,
     keySource: config.keySource,
     localEndpoint: resolveLocalEndpoint(),
     guidedReview: loadGuidedReviewConfig(),
@@ -58,7 +61,7 @@ aiConfigRoutes.get('/models', async (c) => {
   // `--ai-service-test` so the e2e suite stays hermetic (no outbound calls).
   const platforms: AIPlatform[] = ['anthropic', 'openai', 'google'];
   const models = {
-    anthropic: MODELS.anthropic, openai: MODELS.openai, google: MODELS.google, local: MODELS.local,
+    anthropic: MODELS.anthropic, openai: MODELS.openai, google: MODELS.google, local: MODELS.local, apple: MODELS.apple,
   } as Record<AIPlatform, AIModel[]>;
   if (!isAIServiceTest() && getDemoMode() === null) {
     await Promise.all(platforms.map(async (platform) => {
@@ -74,11 +77,19 @@ aiConfigRoutes.get('/models', async (c) => {
     const localLive = await fetchAvailableModels('local', localKey ?? '', { baseUrl: resolveLocalEndpoint() });
     if (localLive !== null && localLive.length > 0) models.local = localLive;
   }
-  return c.json({ platforms: PLATFORMS, models });
+  // Apple Foundation Models are on-device and macOS-26-only. The records carry
+  // every platform key (the enum-keyed record schema is exhaustive), so the
+  // picker is gated by the `appleAvailable` flag instead of by omitting the key
+  // — the settings UI shows the Apple button only when the helper probe passes.
+  const appleAvailable = await isAppleFoundationAvailable();
+  return c.json({ platforms: PLATFORMS, models, appleAvailable });
 });
 
 aiConfigRoutes.get('/key-status', (c) => {
-  const platforms: AIPlatform[] = ['anthropic', 'openai', 'google', 'local'];
+  // `apple` is included so the settings UI can index `status['apple']`; it's
+  // keyless, so it always reports unconfigured (availability comes from the
+  // helper probe surfaced via `/models`, not from a key).
+  const platforms: AIPlatform[] = ['anthropic', 'openai', 'google', 'local', 'apple'];
   const status = {} as GetAIKeyStatusResp['status'];
   for (const platform of platforms) {
     const { source } = resolveAPIKey(platform);

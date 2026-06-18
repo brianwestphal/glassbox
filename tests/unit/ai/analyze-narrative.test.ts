@@ -49,7 +49,14 @@ describe('runNarrativeAnalysisBatch', () => {
       .rejects.toThrow('not in the review');
   });
 
-  it('throws on non-array result', async () => {
+  it('accepts a single object result for a single-file batch (GB-915)', async () => {
+    vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult[0]) });
+    const results = await runNarrativeAnalysisBatch(makeFiles(1), mockConfig, '/repo');
+    expect(results).toHaveLength(1);
+    expect(results[0].filePath).toBe('src/file0.ts');
+  });
+
+  it('throws on a result matching no schema (object or array)', async () => {
     vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify({ bad: true }) });
     await expect(runNarrativeAnalysisBatch(makeFiles(1), mockConfig, '/repo'))
       .rejects.toThrow('Expected an array');

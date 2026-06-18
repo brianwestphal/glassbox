@@ -38,6 +38,7 @@ export function initDiffView(): void {
 
   setupFetchEffect();
   setupMount(container);
+  setupAINotesEffect(container);
   setupImageModeEffect();
   setupWrapClassEffect(container);
   setupDelegatedHandlers(container);
@@ -130,8 +131,8 @@ function setupMount(container: HTMLElement): void {
   // registered first), so by the time we get here the DOM is up-to-date.
   //
   // The effect intentionally subscribes only to `diffContentSignal` —
-  // `runPostRender` reads `reviewStore`, `diffViewStore`, and `aiStore`
-  // internally (and transitively via `renderAINotes`, `applyHighlighting`,
+  // `runPostRender` reads `reviewStore` and `diffViewStore`
+  // internally (and transitively via `applyHighlighting`,
   // `loadOutline`, etc.), and kerf's reactivity tracker traverses signal
   // reads through function calls during effect execution. Calling
   // `runPostRender` synchronously here would silently subscribe this effect
@@ -224,19 +225,62 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
     applyHighlighting();
     updateToolbarLanguage();
     syncSplitColumnHeights();
-    // Outline + AI notes both key off a real review file; skip for raw views.
+    // Outline keys off a real review file; skip for raw views.
     if (kind === 'text' && fileId !== null) void loadOutline(fileId);
     // Annotation events are registered once via `bindAnnotationEvents()` —
     // they fire for server-rendered annotation rows by `data-action` match.
   }
 
-  // AI notes injection (independent of text/image, but only for in-review files)
-  if (fileId !== null) {
+  // Inline AI notes (risk / narrative / guided) are rendered reactively by
+  // `setupAINotesEffect`, not here — they depend on the sort mode and guided
+  // toggle, which change without re-fetching the diff. See GB-913.
+}
+
+// --- Reactive inline AI notes (risk / narrative / guided) ---
+
+// The risk/narrative/guided notes that render inline in the diff depend on the
+// AI sort mode and the guided-review toggle — neither of which is part of the
+// diff fetch key, so a sort-mode flip leaves the diff DOM (and thus the
+// generation) untouched. Before GB-913 the notes were only drawn from
+// `runPostRender`, which runs only on a generation bump (file / split-unified /
+// whitespace / SVG switch), so switching folder → risk → narrative didn't
+// redraw the notes until the user toggled split/unified to force a refetch.
+// This effect subscribes to the AI store so the notes follow the sort mode, and
+// re-runs on diff (re)render too, so a file switch still draws them.
+function setupAINotesEffect(container: HTMLElement): void {
+  effect(() => {
+    const content = diffContentSignal.value;
+    // Subscribe to the inputs that decide which inline notes show. Reading the
+    // store value subscribes the effect to every AI-store write; the refresh is
+    // cheap and idempotent (it clears before rendering), so over-firing during
+    // analysis polling is harmless.
     const ai = aiStore.state.value;
-    const hasNotes = (ai.sortMode !== 'folder' && fileId in ai.fileNotes)
-      || (ai.guidedReviewEnabled && fileId in ai.guidedNotes);
-    if (hasNotes) renderAINotes(container, fileId);
-  }
+    void ai.sortMode;
+    void ai.guidedReviewEnabled;
+    if (content.kind !== 'text' && content.kind !== 'image') return;
+    const fileId = content.fileId;
+    if (fileId === null) return;
+    // Defer to a microtask so the mount has finished (re)building the diff DOM
+    // before we query it — same ordering contract as `runPostRender`.
+    queueMicrotask(() => { refreshAINotes(container, fileId); });
+  });
+}
+
+// Clear the previously-injected inline AI notes, then redraw the set that
+// applies to the current sort mode / guided state. Clearing makes this
+// idempotent (safe to call on every relevant change) and prevents a stale set
+// from a prior mode lingering — e.g. risk notes hanging around after switching
+// to narrative or folder. Only the client-injected notes are removed; the
+// server-rendered `.pr-notes/` review notes (`.ai-note-review`) and human
+// annotation/reply rows (`.annotation-row`) are left untouched.
+function refreshAINotes(container: HTMLElement, fileId: string): void {
+  container.querySelectorAll('.ai-note-overview, .ai-note-row').forEach(el => {
+    if (!el.classList.contains('ai-note-review')) el.remove();
+  });
+  const ai = aiStore.state.value;
+  const hasNotes = (ai.sortMode !== 'folder' && fileId in ai.fileNotes)
+    || (ai.guidedReviewEnabled && fileId in ai.guidedNotes);
+  if (hasNotes) renderAINotes(container, fileId);
 }
 
 /** Imperatively render a raw repo file (used by go-to-definition for files

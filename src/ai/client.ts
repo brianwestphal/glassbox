@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { debugLog } from '../debug.js';
+import { runAppleFoundationInfer } from './apple-foundation.js';
 import type { AIConfig } from './config.js';
 import { DEFAULT_LOCAL_ENDPOINT } from './config.js';
 import { KEYLESS_PLATFORMS } from './models.js';
@@ -91,6 +92,9 @@ export async function sendAIRequest(
       break;
     case 'local':
       response = await sendLocalRequest(config.baseUrl ?? DEFAULT_LOCAL_ENDPOINT, config.apiKey, config.model, systemPrompt, messages);
+      break;
+    case 'apple':
+      response = await sendAppleRequest(systemPrompt, messages);
       break;
   }
 
@@ -221,6 +225,21 @@ async function sendLocalRequest(
     inputTokens: data.usage?.prompt_tokens ?? 0,
     outputTokens: data.usage?.completion_tokens ?? 0,
   };
+}
+
+/**
+ * On-device Apple Foundation Models (macOS 26+). Reached not over HTTP but
+ * through a bundled Swift helper (`src/ai/apple-foundation.ts`) that runs the
+ * native `FoundationModels` API. Keyless; the helper returns the model's raw
+ * text, which the analysis layer parses with `extractJSON` like any other
+ * provider. The on-device API reports no token usage, so counts are 0.
+ */
+async function sendAppleRequest(
+  systemPrompt: string,
+  messages: AIMessage[],
+): Promise<AIResponse> {
+  const content = await runAppleFoundationInfer(systemPrompt, messages);
+  return { content, inputTokens: 0, outputTokens: 0 };
 }
 
 async function sendGoogleRequest(

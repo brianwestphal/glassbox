@@ -50,6 +50,11 @@ export type SaveAIConfigResp = z.infer<typeof SaveAIConfigRespSchema>;
 export const ListAIModelsRespSchema = z.object({
   platforms: z.record(AIPlatformSchema, z.string()),
   models: z.record(AIPlatformSchema, z.array(AIModelSchema)),
+  // Whether the on-device Apple Foundation Models helper is available right now
+  // (macOS 26 + Apple Intelligence + bundled helper). The picker uses this to
+  // show/hide the Apple platform; the `platforms`/`models` records always carry
+  // every platform key (the record schema over the platform enum is exhaustive).
+  appleAvailable: z.boolean(),
 });
 export type ListAIModelsResp = z.infer<typeof ListAIModelsRespSchema>;
 

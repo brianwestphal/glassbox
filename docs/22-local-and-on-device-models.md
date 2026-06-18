@@ -5,12 +5,23 @@ OpenAI-compatible server such as Ollama or LM Studio) and **Apple Foundation
 Models** (on-device Apple Intelligence), in addition to the existing cloud
 providers (Anthropic / OpenAI / Google).
 
-> **Status: Partially built.** **P1 (the `local` OpenAI-compatible platform) is
-> shipped.** Apple Foundation Models (P2) remain design-only. Phasing is in
-> §22.8. A working reference exists in the sibling Hot Sheet app's "Announcer"
-> feature (`src/announcer/localProvider.ts`, `src/announcer/appleFoundation.ts`,
-> `src-tauri/apple-fm-helper/main.swift`, `scripts/build-apple-fm-helper.sh`) —
-> this doc adapts that approach to Glassbox's AI-platform abstraction.
+> **Status: Built & verified on-device.** **P1 (the `local` OpenAI-compatible
+> platform) is shipped.** **P2 (Apple Foundation Models) is shipped:** the
+> `apple` platform, the Node bridge (`src/ai/apple-foundation.ts`), the Swift
+> helper (`src-tauri/apple-fm-helper/main.swift`), the guarded + code-signing
+> build script (`scripts/build-apple-fm-helper.sh`), bundling, availability
+> gating, and the settings UI all landed; the Node side is unit-tested. The full
+> path was **verified end-to-end on macOS 26 with Apple Intelligence**: the Swift
+> helper compiles, `--probe` reports `available`, `--infer` runs real on-device
+> inference returning the `{content}` JSON the analysis parser consumes, the Node
+> bridge + `sendAIRequest({platform:'apple'})` drive it, and the helper signs
+> with hardened runtime. **Remaining (P2a):** production signing with a real
+> Developer ID + **notarization** of the helper alongside the app bundle in CI
+> (needs the release secrets — see §22.8). A working reference exists in the
+> sibling Hot Sheet app's "Announcer" feature (`src/announcer/localProvider.ts`,
+> `src/announcer/appleFoundation.ts`, `src-tauri/apple-fm-helper/main.swift`,
+> `scripts/build-apple-fm-helper.sh`) — this doc adapts that approach to
+> Glassbox's AI-platform abstraction.
 
 ## Motivation
 
@@ -124,11 +135,25 @@ common developer setups; Apple Foundation Models ship with macOS for free.
   discovery (`fetchAvailableModels('local', …)`; `src/ai/list-models.ts`), and
   the settings UX (server-URL input + optional key; `experimentalTab.tsx`).
   Delivers free/offline review on its own.
-- **P2 — Apple Foundation Models.** The Swift helper + Node bridge + build
-  script + Tauri bundling + availability gating + the structured-output
-  handling. Native, macOS-26-only, verifiable only on real hardware.
-- **P2a — Apple FM production bundling & code-signing.** May split out, mirroring
-  Hot Sheet's dev-first / prod-follow-up sequencing.
+- **P2 — Apple Foundation Models.** *(shipped, dev-first)* The `apple` platform
+  (`KEYLESS_PLATFORMS`, `MODELS.apple`, `APPLE_ON_DEVICE_MODEL_ID` in
+  `src/ai/models.ts`), the Node bridge (`src/ai/apple-foundation.ts` — `--probe`
+  / `--infer` protocol over `spawn`, injected runner, darwin-gated cached
+  availability, bin resolved via `GLASSBOX_APPLE_FM_BIN`), the client `apple`
+  case (`sendAppleRequest`; `src/ai/client.ts`), the Swift helper
+  (`src-tauri/apple-fm-helper/main.swift`, `{system,messages}` → `{content}`
+  text the existing `extractJSON` parses), the guarded + signed build script
+  (`scripts/build-apple-fm-helper.sh`, wired into `build-sidecar.sh`), bundling
+  as a `server/` resource + the launcher's `GLASSBOX_APPLE_FM_BIN` export, and
+  the settings UI (Apple shown only when the probe passes; no key/endpoint). The
+  Node side is hermetically unit-tested with an injected runner; the structured
+  output uses the JSON-instructed-prompt path (§22.3).
+- **P2a — Apple FM production notarization in CI.** *(follow-up)* The compile +
+  on-device run + ad-hoc/hardened-runtime signing were verified on macOS-26
+  hardware. What remains is the production release path: signing with the real
+  Developer ID `APPLE_SIGNING_IDENTITY` and **notarizing** the helper alongside
+  the app bundle in the release workflow (needs the CI secrets; the build script
+  already emits a hardened-runtime signature when the identity is set).
 
 ## Maintenance triggers
 

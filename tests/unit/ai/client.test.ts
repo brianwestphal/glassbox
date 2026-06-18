@@ -5,6 +5,12 @@ vi.mock('../../../src/debug.js', () => ({
   debugLog: vi.fn(),
 }));
 
+vi.mock('../../../src/ai/apple-foundation.js', () => ({
+  runAppleFoundationInfer: vi.fn(),
+}));
+
+import { runAppleFoundationInfer } from '../../../src/ai/apple-foundation.js';
+
 function makeConfig(platform: 'anthropic' | 'openai' | 'google'): AIConfig {
   return { platform, model: 'test-model', apiKey: 'test-key', keySource: 'config' };
 }
@@ -173,6 +179,28 @@ describe('sendAIRequest', () => {
       fetchSpy.mockResolvedValueOnce(new Response('Bad request', { status: 400 }));
       await expect(sendAIRequest(makeConfig('google'), 'sys', [{ role: 'user', content: 'x' }]))
         .rejects.toThrow('Google AI API error (400)');
+    });
+  });
+
+  describe('Apple Foundation Models (on-device)', () => {
+    const appleConfig: AIConfig = { platform: 'apple', model: 'apple-on-device', apiKey: null, keySource: null };
+
+    it('is keyless — does not throw the no-key error, and returns helper content', async () => {
+      vi.mocked(runAppleFoundationInfer).mockResolvedValueOnce('[{"filePath":"a.ts"}]');
+      const result = await sendAIRequest(appleConfig, 'system prompt', [{ role: 'user', content: 'analyze' }]);
+      expect(result.content).toBe('[{"filePath":"a.ts"}]');
+      // The on-device API reports no token usage.
+      expect(result.inputTokens).toBe(0);
+      expect(result.outputTokens).toBe(0);
+      // No HTTP call — it's reached through the Swift helper, not the network.
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(runAppleFoundationInfer).toHaveBeenCalledWith('system prompt', [{ role: 'user', content: 'analyze' }]);
+    });
+
+    it('propagates a helper failure', async () => {
+      vi.mocked(runAppleFoundationInfer).mockRejectedValueOnce(new Error('Apple Foundation Models helper not found'));
+      await expect(sendAIRequest(appleConfig, 'sys', [{ role: 'user', content: 'x' }]))
+        .rejects.toThrow('helper not found');
     });
   });
 });

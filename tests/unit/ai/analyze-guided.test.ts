@@ -65,7 +65,17 @@ describe('runGuidedAnalysisBatch', () => {
       .rejects.toThrow('not in the review');
   });
 
-  it('throws on non-array result', async () => {
+  it('accepts a single object result for a single-file batch (GB-915)', async () => {
+    // For a one-file review, models frequently return a bare object instead of
+    // a one-element array. It must still parse, or guided review silently fails
+    // whenever the review has only one file.
+    vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult[0]) });
+    const results = await runGuidedAnalysisBatch(makeFiles(1), mockConfig, '/repo', guidedConfig);
+    expect(results).toHaveLength(1);
+    expect(results[0].notes.overview).toBe('This file does X');
+  });
+
+  it('throws on a result that matches no schema (object or array)', async () => {
     vi.mocked(sendAIRequest).mockResolvedValue({ content: '{"invalid": true}' });
     await expect(runGuidedAnalysisBatch(makeFiles(1), mockConfig, '/repo', guidedConfig))
       .rejects.toThrow('Expected an array');

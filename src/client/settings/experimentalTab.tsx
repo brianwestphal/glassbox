@@ -50,7 +50,9 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
   const platformModels = modelsData.models[currentPlatform as AIPlatform];
   const keyInfo = keyStatus.status[currentPlatform as AIPlatform];
   const isLocal = currentPlatform === 'local';
-  const showInput = !keyInfo.configured;
+  // Apple Foundation Models are on-device and keyless — no endpoint, no key.
+  const isApple = currentPlatform === 'apple';
+  const showInput = !isApple && !keyInfo.configured;
 
   return (
     <>
@@ -65,10 +67,16 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
       <div className="settings-section">
         <label className="settings-label">Platform</label>
         <div className="segmented-control settings-platform-control">
-          {Object.entries(platforms).map(([key, name]) => (
-            <button className={`segment${key === currentPlatform ? ' active' : ''}`}
-              data-platform={key}>{name}</button>
-          ))}
+          {Object.entries(platforms)
+            // Apple Foundation Models appear only when the on-device helper is
+            // available (macOS 26 + Apple Intelligence); every other platform
+            // always shows. The records carry all platform keys, so the gate is
+            // this flag, not key omission.
+            .filter(([key]) => key !== 'apple' || modelsData.appleAvailable)
+            .map(([key, name]) => (
+              <button className={`segment${key === currentPlatform ? ' active' : ''}`}
+                data-platform={key}>{name}</button>
+            ))}
         </div>
       </div>
 
@@ -84,8 +92,12 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
       <div className="settings-section">
         <label className="settings-label">Model</label>
         <select className="settings-select" id="settings-model">{renderPlatformModels(platformModels, currentModel)}</select>
+        {isApple && (
+          <p className="settings-hint">Runs fully on-device via Apple Intelligence (macOS 26+). No API key or network — free and private.</p>
+        )}
       </div>
 
+      {!isApple && (
       <div className="settings-section">
         <label className="settings-label">{isLocal ? 'API Key (optional)' : 'API Key'}</label>
         {isLocal && !keyInfo.configured && (
@@ -122,6 +134,7 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
           </div>
         )}
       </div>
+      )}
 
       <div className="settings-divider"></div>
 

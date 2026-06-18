@@ -148,10 +148,37 @@ The launch form (`node --import tsx`, not `npx tsx`) matters for quit: `npx tsx`
    - Runs `npm run build` (tsup → `dist/cli.js` + client assets)
    - Copies `dist/`, client assets, and runtime `node_modules` into `src-tauri/server/`
 
+   - Builds the **Apple Foundation Models helper** (`scripts/build-apple-fm-helper.sh`,
+     called from `build-sidecar.sh`). The build is **guarded** — it no-ops with
+     exit 0 on non-macOS, when `swiftc` is missing, or when the macOS-26 SDK
+     (FoundationModels) is absent — so it's a clean skip on Linux/Windows/CI
+     without Xcode 26. When it does compile, the binary is copied to
+     `src-tauri/server/apple-fm-helper` (next to `cli.js`).
+
 2. **`tauri build`** then:
    - Compiles Rust code
    - Bundles the `.app` (macOS), `.AppImage` (Linux), or `.msi` (Windows)
    - Includes the sidecar binary, server resources, CLI launcher scripts, and icons
+
+### Apple Foundation Models helper (doc 22)
+
+The on-device AI provider is a standalone Swift CLI
+(`src-tauri/apple-fm-helper/main.swift`) the Node server shells out to — it is
+**not** compiled by cargo. It's bundled inside `server/**/*` (the same Tauri
+resource glob as `cli.js`), so no `tauri.conf.json` change is needed. At runtime
+the server finds it via **`GLASSBOX_APPLE_FM_BIN`**, exported by the macOS
+launcher (`resources/glassbox`, pointing at
+`Contents/Resources/server/apple-fm-helper`) and also set on the self-spawned
+sidecar in `lib.rs`. The Node bridge checks the path exists and reports
+"unavailable" if the helper wasn't built, so exporting the var unconditionally is
+safe on every OS.
+
+**Signing & notarization:** `build-apple-fm-helper.sh` signs the helper with
+hardened runtime using `APPLE_SIGNING_IDENTITY` (the same identity Tauri uses for
+the bundle; falls back to `CODESIGN_IDENTITY`). For distribution the helper must
+also be **notarized** with the bundle — verifying the full compile + on-device
+run + notarization requires real macOS-26 hardware with Apple Intelligence and is
+tracked as doc-22 P2a.
 
 ### CI/CD (`.github/workflows/release-desktop.yml`)
 

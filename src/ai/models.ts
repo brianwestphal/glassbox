@@ -8,11 +8,11 @@ export const AIModelSchema = z.object({
 });
 export type AIModel = z.infer<typeof AIModelSchema>;
 
-export const AIPlatformSchema = z.enum(['anthropic', 'openai', 'google', 'local']);
+export const AIPlatformSchema = z.enum(['anthropic', 'openai', 'google', 'local', 'apple']);
 export type AIPlatform = z.infer<typeof AIPlatformSchema>;
 
 /** Platforms that run without an API key (local servers / on-device). */
-export const KEYLESS_PLATFORMS: ReadonlySet<AIPlatform> = new Set<AIPlatform>(['local']);
+export const KEYLESS_PLATFORMS: ReadonlySet<AIPlatform> = new Set<AIPlatform>(['local', 'apple']);
 
 /** Runtime guard — narrows `unknown` to `AIPlatform`. */
 export function isAIPlatform(value: unknown): value is AIPlatform {
@@ -24,7 +24,13 @@ export const PLATFORMS: Record<AIPlatform, string> = {
   openai: 'OpenAI',
   google: 'Google',
   local: 'Local',
+  apple: 'Apple',
 };
+
+/** The single on-device Apple Foundation Models entry. There is no model-id
+ *  vocabulary to discover (it's the system model reached via the Swift
+ *  `FoundationModels` API), so this fixed id stands in for it. */
+export const APPLE_ON_DEVICE_MODEL_ID = 'apple-on-device';
 
 // Keep this list up to date — check at least once a day when working on the project
 export const MODELS: Record<AIPlatform, AIModel[]> = {
@@ -46,6 +52,11 @@ export const MODELS: Record<AIPlatform, AIModel[]> = {
   local: [
     { id: 'llama3.1', name: 'Llama 3.1', contextWindow: 8192, isDefault: true },
   ],
+  // On-device Apple Foundation Models — a single fixed entry (no discovery).
+  // The on-device model has a small context window, so batch conservatively.
+  apple: [
+    { id: APPLE_ON_DEVICE_MODEL_ID, name: 'Apple On-Device', contextWindow: 4096, isDefault: true },
+  ],
 };
 
 export const ENV_KEY_NAMES: Record<AIPlatform, string> = {
@@ -54,6 +65,10 @@ export const ENV_KEY_NAMES: Record<AIPlatform, string> = {
   google: 'GEMINI_API_KEY',
   // Optional — most local servers (Ollama) need no key; some do.
   local: 'GLASSBOX_LOCAL_API_KEY',
+  // Apple Foundation Models are keyless (on-device). This name is never read
+  // for auth — `apple` is in KEYLESS_PLATFORMS — but the record requires an
+  // entry per platform.
+  apple: 'GLASSBOX_APPLE_API_KEY',
 };
 
 export function getDefaultModel(platform: AIPlatform): string {
@@ -65,9 +80,11 @@ export function getDefaultModel(platform: AIPlatform): string {
 export function getModelContextWindow(platform: AIPlatform, modelId: string): number {
   const model = MODELS[platform].find(m => m.id === modelId);
   if (model) return model.contextWindow;
-  // Unknown model: arbitrary local models have small windows, so batch
+  // Unknown model: local/on-device models have small windows, so batch
   // conservatively; cloud models default higher.
-  return platform === 'local' ? 8192 : 128000;
+  if (platform === 'local') return 8192;
+  if (platform === 'apple') return 4096;
+  return 128000;
 }
 
 /**
