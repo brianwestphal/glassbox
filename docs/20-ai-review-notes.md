@@ -155,13 +155,14 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   PlantUML — never rendered images), plus test output, logs, perf numbers, and
   command transcripts. They are referenced from a note via
   `artifactLocation.uri` (relative path under `.pr-notes/`).
-- **Binary artifacts via Git LFS** — Genuinely binary artifacts (screenshots)
-  shall be stored under `.pr-notes/artifacts/` and tracked with Git LFS (e.g.
-  `.gitattributes`: `.pr-notes/artifacts/**/*.{png,webp,avif} filter=lfs
-  diff=lfs merge=lfs -text`), so the main repository history stays lean while
-  artifacts remain versioned and portable. Each is referenced by
-  `artifactLocation.uri` and recorded with `artifact.hashes` (sha-256) for
-  verification; binary bytes are never inlined via `artifact.contents`.
+- **Binary artifacts via Git LFS** *(shipped)* — Genuinely binary artifacts
+  (screenshots) are stored under `.pr-notes/artifacts/` and tracked with Git LFS:
+  `glassbox note add --artifact` of an image idempotently ensures the
+  `.gitattributes` filter (`.pr-notes/artifacts/** filter=lfs diff=lfs merge=lfs
+  -text`), so history stays lean. Each is referenced by `artifactLocation.uri`
+  and the writer records a sha-256 hash on the attachment
+  (`artifactLocation.properties["ext-sha256"]`) for verification; binary bytes
+  are never inlined (`artifact.contents`).
 - **Minimize binaries** — Authors shall prefer text/diagram-source over images,
   downscale and compress screenshots (WebP/AVIF), and attach one artifact per
   *claim* rather than per step, to avoid bloating history even under LFS.
@@ -181,13 +182,14 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   natural: `risk` / `assumption` can seed the risk dimensions; an author-stated
   reading order can seed narrative ordering; `rationale` reads like
   guided-review educational text.
-- **Artifact rendering** *(foundation shipped)* — A note attaches artifacts via
-  `glassbox note add --artifact <path>` (SARIF `result.attachments`); text and
-  diagram-*source* artifacts render as an inline, collapsible code block beneath
-  the note (`loadReviewNotesForFile` reads the file text, path-contained +
-  size-capped; `ReviewNoteRows`). Live diagram rendering (Mermaid/Graphviz/
-  PlantUML) and screenshot rendering through the image-diff component are
-  follow-ups (§20.11 P4).
+- **Artifact rendering** *(text + image shipped)* — A note attaches artifacts via
+  `glassbox note add --artifact <path>` (SARIF `result.attachments`). Text and
+  diagram-*source* artifacts render as an inline, collapsible code block; **image
+  artifacts** (`.png`/`.webp`/`.avif`/`.gif`/`.jpg`/`.svg`) render as an `<img>`
+  served by `GET /api/review-notes/artifact` (path-contained, content-typed,
+  size-capped). The reader is path-contained + size-capped throughout. **Live
+  diagram rendering** of diagram-source (Mermaid/Graphviz/PlantUML) into actual
+  diagrams is the remaining follow-up (§20.11 P4).
 - **Threading** *(shipped)* — A reviewer can reply to an AI note with their own
   annotation, turning a note into a line-anchored conversation. The note row
   carries its SARIF `guid` (`data-note-id`) and a **Reply** button; the reply is
@@ -264,11 +266,12 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   The note's authored snippet is carried on the view. A reviewer can **Keep** a
   stale note (dismiss the flag) or **Discard** it (`DELETE
   /api/review-notes/:guid` → `removeNote`, deleting it from `.pr-notes/`).
-- **P4** *(foundation shipped)* — Artifact attachment (`--artifact` → SARIF
-  `result.attachments`) and inline code-block rendering of text / diagram-source
-  artifacts. **Follow-ups:** live diagram rendering (Mermaid/Graphviz/PlantUML);
-  screenshot/binary artifacts via the image-diff component + Git LFS wiring
-  (`.gitattributes`, `artifact.hashes`).
+- **P4** *(mostly shipped)* — Artifact attachment (`--artifact` → SARIF
+  `result.attachments`), inline code-block rendering of text/diagram-source
+  artifacts, `<img>` rendering of image artifacts via a path-contained serving
+  route, sha-256 hashes, and Git LFS `.gitattributes` wiring. **Remaining
+  follow-up:** live *diagram* rendering (Mermaid/Graphviz/PlantUML) into actual
+  diagrams rather than showing the source.
 - **P5** *(shipped)* — Feed notes into analysis and the export
   (`src/review-notes/format.ts`). `runAnalysisBatch` (shared by risk / narrative
   / guided) appends an "Author review notes" section to the prompt, so all three

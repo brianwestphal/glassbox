@@ -41,5 +41,12 @@ export interface ReviewNoteView {
 
 export interface ReviewNoteArtifact {
   uri: string;
+  /** Inline text content (text/diagram-source artifacts). */
   content?: string;
+  /** True for image artifacts (`.png`/`.webp`/`.avif`/`.gif`/`.jpg`/`.svg`) —
+   *  rendered via `<img>` served from `GET /api/review-notes/artifact`. */
+  isImage?: boolean;
 }
+
+/** Image artifact extensions rendered inline as `<img>` (docs/20 §20.5 P4c). */
+export const IMAGE_ARTIFACT_RE = /\.(png|webp|avif|gif|jpe?g|svg)$/i;

@@ -398,6 +398,14 @@
   border-radius: 3px;
   white-space: pre;
 }
+.ai-note-artifact-img {
+  display: block;
+  margin: 4px 0 0;
+  max-width: 100%;
+  max-height: 400px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
 .ai-note-discard-btn:hover { color: var(--red, #f38ba8); border-color: var(--red, #f38ba8); }
 
 // A review note whose anchored code has changed since it was written (P3).

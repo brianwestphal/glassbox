@@ -408,6 +408,12 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                     <summary>📎 {a.uri}</summary>
                     <pre className="ai-note-artifact-content"><code>{a.content}</code></pre>
                   </details>
+                ) : a.isImage === true ? (
+                  <details className="ai-note-artifact">
+                    <summary>📎 {a.uri}</summary>
+                    <img className="ai-note-artifact-img" loading="lazy" alt={a.uri}
+                      src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
+                  </details>
                 ) : (
                   <div className="ai-note-artifact ai-note-artifact-ref">📎 {a.uri}</div>
                 )

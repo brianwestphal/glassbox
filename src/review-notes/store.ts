@@ -24,6 +24,7 @@ import { buildResult, emptyLog, newRun, SarifLogShapeSchema } from './sarif.js';
 import type { NoteKind, ReviewNoteInput } from './types.js';
 import { CONFIDENCE_PROPERTY_KEY, DEFAULT_PRODUCER, DEFAULT_SHARD_CAP, isNoteKind } from './types.js';
 import type { ReviewNoteArtifact, ReviewNoteView } from './view.js';
+import { IMAGE_ARTIFACT_RE } from './view.js';
 
 const NOTES_SUBDIR = join('.pr-notes', 'notes');
 const SHARD_RE = /\.(\d{6})\.sarif$/;
@@ -147,7 +148,11 @@ export function writeReviewNote(repoRoot: string, input: ReviewNoteInput, opts: 
   };
   const { snippet, fingerprint } = anchorSnippet(repoRoot, safeRel, input.startLine, input.endLine);
   const guid = generateId();
-  const result = buildResult({ ...input, file: safeRel }, { guid, snippet, fingerprint });
+  const artifactHashes = hashArtifacts(repoRoot, input.artifacts ?? []);
+  const result = buildResult({ ...input, file: safeRel }, { guid, snippet, fingerprint, artifactHashes });
+  // Ensure binary artifacts under .pr-notes/artifacts/ are Git LFS-tracked so
+  // they don't bloat history (docs/20 §20.5 P4c).
+  if ((input.artifacts ?? []).some(a => IMAGE_ARTIFACT_RE.test(a))) ensureArtifactLfsFilter(repoRoot);
 
   // Pick the shard: the highest existing index with room, else the next index.
   const indices = listShardIndices(repoRoot, safeRel);
@@ -199,6 +204,37 @@ export interface NotePatch {
 
 function writeLog(path: string, log: SarifLog): void {
   writeFileSync(path, JSON.stringify(log, null, 2) + '\n', 'utf-8');
+}
+
+const ARTIFACT_HASH_MAX_BYTES = 50_000_000;
+const LFS_FILTER_LINE = '.pr-notes/artifacts/** filter=lfs diff=lfs merge=lfs -text';
+
+/** sha-256 (hex) of each readable artifact, for verification provenance
+ *  (docs/20 §20.5 P4c). Path-contained; skips missing / oversized files. */
+function hashArtifacts(repoRoot: string, artifacts: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const uri of artifacts) {
+    const safe = uri.replace(/\\/g, '/').replace(/^\/+/, '');
+    if (/(^|\/)\.\.(\/|$)/.test(safe)) continue;
+    try {
+      const abs = join(repoRoot, safe);
+      const stat = statSync(abs);
+      if (!stat.isFile() || stat.size > ARTIFACT_HASH_MAX_BYTES) continue;
+      out[uri] = createHash('sha256').update(readFileSync(abs)).digest('hex');
+    } catch { /* unreadable — no hash */ }
+  }
+  return out;
+}
+
+/** Idempotently add the Git LFS filter for `.pr-notes/artifacts/` binaries. */
+function ensureArtifactLfsFilter(repoRoot: string): void {
+  const path = join(repoRoot, '.gitattributes');
+  try {
+    const existing = existsSync(path) ? readFileSync(path, 'utf-8') : '';
+    if (existing.includes('.pr-notes/artifacts/**')) return;
+    const prefix = existing === '' || existing.endsWith('\n') ? '' : '\n';
+    writeFileSync(path, `${existing}${prefix}${LFS_FILTER_LINE}\n`, 'utf-8');
+  } catch { /* best-effort */ }
 }
 
 /** Shard file paths for a source file, ascending. */
@@ -373,7 +409,11 @@ function readArtifacts(repoRoot: string, result: NoteResult): ReviewNoteArtifact
   for (const att of result.attachments ?? []) {
     const uri = att.artifactLocation?.uri;
     if (typeof uri !== 'string' || uri === '') continue;
-    out.push({ uri, content: readArtifactText(repoRoot, uri) });
+    if (IMAGE_ARTIFACT_RE.test(uri)) {
+      out.push({ uri, isImage: true }); // served as bytes, not read as text
+    } else {
+      out.push({ uri, content: readArtifactText(repoRoot, uri) });
+    }
   }
   return out.length > 0 ? out : undefined;
 }

@@ -185,6 +185,16 @@ describe('DiffView', () => {
     expect(html).toContain('screenshot.png');
   });
 
+  it('renders an image artifact as an <img> served from the artifact route (GB-911)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ line: 1, side: 'new', kind: 'proof', body: 'shot', artifacts: [{ uri: 'assets/x.png', isImage: true }] }],
+    }).toString();
+    expect(html).toContain('ai-note-artifact-img');
+    expect(html).toContain('src="/api/review-notes/artifact?file=assets%2Fx.png"');
+  });
+
   it('renders markdown in a review note body (GB-909)', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),

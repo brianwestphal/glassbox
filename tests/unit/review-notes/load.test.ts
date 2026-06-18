@@ -69,6 +69,13 @@ describe('loadReviewNotesForFile', () => {
     ]);
   });
 
+  it('marks image artifacts so they render as <img> rather than text (GB-911)', () => {
+    writeFileSync(join(repo, 'shot.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'see', kind: 'proof', artifacts: ['shot.png'] });
+    const note = loadReviewNotesForFile(repo, 'src/x.ts')[0];
+    expect(note.artifacts).toEqual([{ uri: 'shot.png', isImage: true }]);
+  });
+
   it('never reads an artifact path that escapes the repo (GB-898)', () => {
     writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'b', kind: 'proof', artifacts: ['../../../etc/passwd'] });
     const note = loadReviewNotesForFile(repo, 'src/x.ts')[0];

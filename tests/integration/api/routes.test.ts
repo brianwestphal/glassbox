@@ -6,6 +6,7 @@
  * from src/server.ts that injects reviewId, currentReviewId, and repoRoot.
  */
 import { PGlite } from '@electric-sql/pglite';
+import { mkdirSync, writeFileSync } from 'fs';
 import { Hono } from 'hono';
 import { tmpdir } from 'os';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1522,5 +1523,30 @@ describe('DELETE /api/review-notes/:guid (GB-907)', () => {
   it('400s when the guid path param is empty', async () => {
     const res = await app.request('/api/review-notes/%20?file=src/app.ts', { method: 'DELETE' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/review-notes/artifact (GB-911)', () => {
+  it('serves an image artifact with the right content-type', async () => {
+    mkdirSync(`${TEST_REPO_ROOT}/.pr-notes/artifacts`, { recursive: true });
+    writeFileSync(`${TEST_REPO_ROOT}/.pr-notes/artifacts/shot.png`, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const res = await app.request('/api/review-notes/artifact?file=.pr-notes/artifacts/shot.png');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+  });
+
+  it('403s a path that escapes the repo', async () => {
+    const res = await app.request('/api/review-notes/artifact?file=../../etc/passwd');
+    expect(res.status).toBe(403);
+  });
+
+  it('415s a non-image extension', async () => {
+    const res = await app.request('/api/review-notes/artifact?file=README.md');
+    expect(res.status).toBe(415);
+  });
+
+  it('404s a missing image', async () => {
+    const res = await app.request('/api/review-notes/artifact?file=.pr-notes/artifacts/missing.png');
+    expect(res.status).toBe(404);
   });
 });

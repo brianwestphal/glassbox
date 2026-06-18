@@ -407,6 +407,16 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
   });
 
+  test('a review note renders an image artifact served from the artifact route (GB-911)', async ({ page }) => {
+    await openModifiedFile(page);
+    const img = page.locator('.ai-note-artifact-img');
+    await expect(img).toHaveCount(1, { timeout: 5000 });
+    await expect(img).toHaveAttribute('src', /\/api\/review-notes\/artifact\?file=assets/);
+    // Expand the artifact and confirm the route actually serves the bytes.
+    await page.getByText('demo-annotations.png').click();
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+  });
+
   test('a review note renders an attached proof artifact (GB-898)', async ({ page }) => {
     await openModifiedFile(page);
     // The proof note (line 23) attaches a test-output artifact.

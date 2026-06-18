@@ -89,6 +89,8 @@ export function buildResult(input: ReviewNoteInput, meta: {
   guid: string;
   snippet?: string;
   fingerprint?: string;
+  /** sha-256 (hex) per artifact uri, recorded on the attachment for verification. */
+  artifactHashes?: Record<string, string>;
 }): Record<string, unknown> {
   const region: Record<string, unknown> = { startLine: input.startLine, endLine: input.endLine };
   if (meta.snippet !== undefined) region.snippet = { text: meta.snippet };
@@ -115,7 +117,12 @@ export function buildResult(input: ReviewNoteInput, meta: {
   if (input.ticket !== undefined && input.ticket !== '') result.workItemUris = [input.ticket];
   if (meta.fingerprint !== undefined) result.partialFingerprints = { [ANCHOR_FINGERPRINT_KEY]: meta.fingerprint };
   if (input.artifacts !== undefined && input.artifacts.length > 0) {
-    result.attachments = input.artifacts.map(uri => ({ artifactLocation: { uri } }));
+    result.attachments = input.artifacts.map(uri => {
+      const artifactLocation: Record<string, unknown> = { uri };
+      const hash = meta.artifactHashes?.[uri];
+      if (hash !== undefined) artifactLocation.properties = { 'ext-sha256': hash };
+      return { artifactLocation };
+    });
   }
   return result;
 }

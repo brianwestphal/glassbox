@@ -3,6 +3,7 @@
  * per-shard record cap + roll-over, run-per-producer grouping, and lossless
  * read-modify-write.
  */
+import { createHash } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -151,5 +152,30 @@ describe('coalesce (GB-902)', () => {
     writeReviewNote(repo, note({ body: 'a' }));
     writeReviewNote(repo, note({ file: 'src/y.ts', body: 'b' }));
     expect(coalesceAll(repo)).toBe(0);
+  });
+});
+
+describe('artifacts (GB-898 / GB-911)', () => {
+  it('records a sha-256 hash of each attached artifact (GB-911)', () => {
+    writeFileSync(join(repo, 'out.txt'), 'hello world', 'utf-8');
+    writeReviewNote(repo, note({ body: 'proof', kind: 'proof', artifacts: ['out.txt'] }));
+    const result = readShard('.pr-notes/notes/src/x.ts.000000.sarif').runs[0].results[0] as {
+      attachments: { artifactLocation: { uri: string; properties?: Record<string, string> } }[];
+    };
+    const expected = createHash('sha256').update('hello world').digest('hex');
+    expect(result.attachments[0].artifactLocation.uri).toBe('out.txt');
+    expect(result.attachments[0].artifactLocation.properties!['ext-sha256']).toBe(expected);
+  });
+
+  it('adds the Git LFS filter when a binary image artifact is attached (GB-911)', () => {
+    writeFileSync(join(repo, 'shot.png'), Buffer.from([0x89, 0x50]));
+    writeReviewNote(repo, note({ artifacts: ['shot.png'] }));
+    expect(readFileSync(join(repo, '.gitattributes'), 'utf-8')).toContain('.pr-notes/artifacts/** filter=lfs');
+  });
+
+  it('does not add the LFS filter for a text-only artifact (GB-911)', () => {
+    writeFileSync(join(repo, 'out.txt'), 'x', 'utf-8');
+    writeReviewNote(repo, note({ artifacts: ['out.txt'] }));
+    expect(existsSync(join(repo, '.gitattributes'))).toBe(false);
   });
 });
