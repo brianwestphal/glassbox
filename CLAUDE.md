@@ -56,7 +56,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `17-claude-channel.md` — Claude Code MCP channel integration, channel server, completion modal
 - `18-direct-comparison.md` — Diffing two arbitrary files or folders by path (`--diff`), independent of git history
 - `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
-- `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (design only)
+- `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (P1 shipped: the `.pr-notes/` SARIF format + the `glassbox note` producer CLI; reader/render and later phases pending)
 - `21-sidebar-context-menu.md` — Right-click context menu on sidebar file rows; the cross-platform "reveal in file manager" action
 
 **Architecture documents** describe system design and setup:
@@ -74,7 +74,8 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 
 ### Key Directories
 
-- `src/cli.ts` — CLI entry point, arg parsing
+- `src/cli.ts` — CLI entry point, arg parsing. Also dispatches the `glassbox note` subcommand (producer-side review-note writer) before normal arg parsing.
+- `src/review-notes/` — AI-authored review notes (doc 20, P1): the `.pr-notes/` SARIF format (`sarif.ts`), the path-sharded on-disk store (`store.ts`), and the `glassbox note` writer CLI (`cli.ts`). Glassbox is the consumer of a tool-neutral, producer-written format.
 - `src/cli-difftool.ts` — `glassbox-difftool` bin entry (git-difftool bridge). Dereferences symlinks in `git difftool --dir-diff`'s asymmetric snapshot dirs, then exec's `glassbox --diff` on the resolved tree. See README "Use as `git difftool`" for setup.
 - `src/server.ts` — Hono app setup, middleware injection
 - `src/api/` — **Typed API layer (shared by client + server).** Each per-resource module (`annotations.ts`, `reviews.ts`, `themes.ts`, `files.ts`, `context.ts`, `outline.ts`, `image.ts`, `project-settings.ts`, `share-prompt.ts`, `system.ts`, `ai.ts`, `channel.ts`) defines a zod `XReqSchema` / `XRespSchema` for each endpoint and exports the inferred TS types alongside the typed client caller functions. Client callers go through `apiCall(RespSchema, path, ...)` (see `src/api/_runner.ts`) which validates the response against the schema before returning — a bad response fails loudly at the boundary. Server route handlers parse incoming bodies with `parseBody(c, ReqSchema)` and validate non-empty path params with `requirePathParam(c, name)` (both in `src/utils/parseBody.ts`), returning a structured 400 on failure. The schema is the single source of truth; drift fails at compile time AND at runtime.

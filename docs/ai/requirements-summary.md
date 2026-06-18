@@ -545,7 +545,7 @@ git subprocesses run with `git difftool`'s leaked `GIT_EXTERNAL_DIFF` /
 own `git diff`/`git show` can't recurse into the difftool helper (NFR-19.12,
 GB-869). Covers FR-19.1–19.13.
 
-## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Design only**
+## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Partially built (P1)**
 
 A line-anchored "review companion" the *generating* AI emits as it writes code:
 structured notes explaining why each non-obvious change is the way it is and what
@@ -569,8 +569,17 @@ uri + sha-256, never inlined — keeping repo history lean. Glassbox renders not
 review-comment-style in the diff, styled distinctly as AI-authored (guided-review
 precedent), with threading and artifact rendering. A corresponding Hot Sheet (and
 other-orchestrator) obligation induces the AI to produce notes as part of its
-process. Phased P1–P5 plus a cross-cutting inbound AI-instructions contract; no
-code yet.
+process. Phased P1–P5 plus a cross-cutting inbound AI-instructions contract.
+**P1 is shipped**: the `.pr-notes/` SARIF profile (`src/review-notes/`)
+and the producer-side **`glassbox note` CLI** writer (Glassbox isn't
+running while the AI codes, so authoring is producer-side — CLI or the
+written spec — not a live MCP tool). Layout is path-sharded
+(`.pr-notes/notes/<src path>.NNNNNN.sarif`, 10k-results-per-shard cap);
+the mapping is standard SARIF (kind→`tags`, ticket→`workItemUris`,
+producer→`tool.driver`, anchor→`region`+snippet, durability→
+`partialFingerprints`) with exactly one custom field,
+`ext-ai-tool-confidence`. Attach-only so far; reader/render (P2+),
+re-anchoring, artifacts, and analysis-feed remain.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 
@@ -600,7 +609,9 @@ navigation, security, themes, share prompt, Claude channel, direct path
 comparison. Doc **19** (git difftool integration) is **Shipped** — the
 accumulating per-file model works for both browser and desktop, plus in-session
 image/SVG comparison (GB-863). Doc **20** (AI-authored review notes) is
-**Design only** — spec agreed, no code yet. Doc **21** (sidebar context menu)
+**Partially built** — P1 shipped (the `.pr-notes/` SARIF format + the
+`glassbox note` producer CLI); reader/render and later phases remain. Doc
+**21** (sidebar context menu)
 is **Shipped** — right-click a file to reveal it in the OS file manager. When a
 new feature is spec'd before implementation, add a doc and mark the entry here
 **Design only** until the code lands, then **Partially built** / **Shipped** as

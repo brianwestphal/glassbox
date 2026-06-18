@@ -8,9 +8,10 @@ notes alongside the diff so a reviewer reads the author's reasoning at the exact
 line it applies to, rather than reconstructing it from prose in a ticket or
 commit message.
 
-> **Status: Design only (not yet implemented).** This document captures the
-> agreed direction. Implementation is tracked as separate phased tickets. The
-> phasing is summarized in §20.11.
+> **Status: Partially built.** **P1 is shipped** — the `.pr-notes/` SARIF format
+> and a producer-side writer (the `glassbox note` CLI). The reader/render side
+> (P2+) is not built yet. Implementation is tracked as separate phased tickets;
+> the phasing and per-phase status are in §20.11.
 
 ## Motivation
 
@@ -39,6 +40,19 @@ another AI) an optimized way to consume it.
   since an ignored notes directory silently defeats the feature.
 - **Tool-neutral** — The directory and file format shall not depend on Glassbox
   to be meaningful; any tool or human browsing the repo can read them.
+- **Layout — sharded by source-file path.** Notes shall be stored at
+  `.pr-notes/notes/<repo-relative source path>.NNNNNN.sarif`, one (or more) SARIF
+  log per source file mirroring the repo tree (e.g.
+  `.pr-notes/notes/src/ai/client.ts.000000.sarif`). This optimizes the dominant
+  read — "the notes for the files in *this* review" — to exactly the changed
+  files' note files, never a full scan, even as a large repo accumulates
+  millions of records. The zero-padded `NNNNNN` index caps any single file's
+  notes at a default of **10,000 results per shard** and rolls to the next index
+  when full, bounding the size for hot, frequently-edited files. (Commit/date
+  sharding was rejected: Glassbox reviews are file/diff-oriented and span
+  uncommitted/staged/branch ranges that don't map to one commit; commit
+  provenance is still recorded *inside* each result, so per-commit views remain
+  possible via a walk/index later.)
 
 ### 20.2 File format — SARIF 2.1.0
 
@@ -58,15 +72,25 @@ another AI) an optimized way to consume it.
     (`new` / `unchanged` / `updated` / `absent`).
   - **Baseline commit** → `run.versionControlProvenance[]` (`repositoryUri`,
     `revisionId`, `branch`).
-  - **Body** → `result.message.markdown`.
+  - **Body** → `result.message.text` + `result.message.markdown`.
   - **Importance / risk** → `result.rank` (0–100) and `result.level`.
+  - **Producer identity** → `run.tool.driver.name` / `.version` — Claude Code,
+    Hot Sheet, etc.; the standard "who produced this run" slot (Glassbox is the
+    *consumer*, not the producer, so it does not appear here).
+  - **Linked ticket** → `result.workItemUris` (standard SARIF work-item link).
   - **Proposed change** → `result.fixes[]`.
   - **Narrative / sequence** → `codeFlows` / `threadFlows`.
-- **Note kind** — Each note shall carry a kind from a controlled vocabulary:
+- **Note kind** — Each note carries a kind from a controlled vocabulary:
   `rationale`, `proof`, `assumption`, `alternative-considered`, `risk`,
-  `test-evidence`. Because SARIF is finding-oriented, notes use
-  `result.kind: "informational"` (or `"review"`) and record the GB note kind,
-  `confidence` (0–1), and ticket links in `result.properties`.
+  `test-evidence`, recorded in the standard `result.properties.tags` array.
+  Notes use `result.kind: "informational"`.
+- **Exactly one custom field.** Every datum maps to standard SARIF except
+  `confidence` (0–1), which has no standard home and is stored under the
+  namespaced property `result.properties["ext-ai-tool-confidence"]` (named so it
+  reads as a producer extension, not a SARIF or Glassbox field). The
+  `partialFingerprints` algorithm key is `"prNoteAnchor/v1"`. Within a shard,
+  results are grouped into SARIF runs by (producer, baseline commit) so
+  `versionControlProvenance` stays accurate per run.
 - **Findings-orientation caveat** — SARIF's ecosystem viewers render results as
   *problems*; they will not present these informational notes as a review
   companion. Glassbox supplies that view itself (§20.6). The format is reused
@@ -93,9 +117,15 @@ another AI) an optimized way to consume it.
 Authoring shall support a combined live-plus-coalesce flow (not either/or):
 
 - **Live, incremental authoring** — As the AI edits, it shall be able to emit
-  notes in place via an MCP channel tool (working name
-  `glassbox_attach_review_note`), at the moment of richest context, rather than
-  reconstructing reasoning after the fact.
+  notes in place at the moment of richest context, rather than reconstructing
+  reasoning after the fact. **Authoring is producer-side, not a Glassbox live
+  service** — Glassbox isn't running while the AI codes. Two adoptable paths:
+  (1) the producer shells out to the **`glassbox note` CLI** (`glassbox note add
+  --file … --lines A-B --kind … --body -`), the reference writer that owns the
+  SARIF shape, fingerprint, baseline provenance, and shard layout; or (2) for
+  tools that can't shell out, the producer writes the SARIF directly per this
+  spec (see the inbound AI-instructions contract below). An earlier
+  `glassbox_attach_review_note` MCP-tool idea was dropped for this reason.
 - **Revision and correction** — The AI shall be able to update or remove its own
   earlier notes as the work evolves, so notes reflect the final state of the
   change rather than an obsolete intermediate step.
@@ -188,8 +218,11 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 
 Implementation is expected to proceed in slices, each tracked as its own ticket:
 
-- **P1** — Define the `.pr-notes/` SARIF schema/profile and a channel MCP tool to
-  write notes (smallest end-to-end slice).
+- **P1** *(shipped)* — The `.pr-notes/` SARIF profile (`src/review-notes/`) and a
+  producer-side writer, the `glassbox note` CLI. **Attach only** — revising or
+  removing a note, and the final coalescing pass, remain a follow-up. (The
+  smallest end-to-end slice; the originally-planned channel MCP tool was replaced
+  by the CLI — see §20.4.)
 - **P2** — Ingest and render notes as a distinct, review-comment-style
   annotation source in the diff view.
 - **P3** — Anchor durability via fingerprint re-matching (reuse the stale

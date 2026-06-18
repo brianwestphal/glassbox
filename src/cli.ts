@@ -207,6 +207,21 @@ export function parseArgs(
 }
 
 async function main() {
+  // `glassbox note ...` — the producer-side review-note writer (docs/20). A
+  // standalone subcommand: write the note and exit, without booting the server
+  // or touching the review DB.
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs[0] === 'note') {
+    const { runNoteCli } = await import('./review-notes/cli.js');
+    try {
+      await runNoteCli(rawArgs.slice(1));
+      process.exit(0);
+    } catch (err) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  }
+
   const parsed = parseArgs(process.argv);
   if (!parsed) {
     printUsage();
