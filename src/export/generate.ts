@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
 import { isGitRepo } from '../git/repo.js';
+import { reviewNotesExportSection } from '../review-notes/format.js';
 
 const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
 const DISMISS_DAYS = 30;
@@ -144,6 +145,11 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
     }
     lines.push('');
   }
+
+  // AI-authored review notes from `.pr-notes/` (docs/20 §20.8, P5) — fold the
+  // generating AI's own rationale/proof into the export for the next session.
+  const reviewNoteLines = reviewNotesExportSection(repoRoot, files.map(f => f.file_path));
+  if (reviewNoteLines.length > 0) lines.push(...reviewNoteLines);
 
   // Instructions for AI tools
   lines.push('---');

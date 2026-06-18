@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import type { ReviewFile } from '../db/queries.js';
 import { getFileContent } from '../git/diff.js';
+import { reviewNotesPromptSection } from '../review-notes/format.js';
 import type { AIMessage } from './client.js';
 import { sendAIRequest } from './client.js';
 import type { AIConfig } from './config.js';
@@ -81,10 +82,15 @@ export async function runAnalysisBatch<T>(
   const contexts = buildFileContexts(files, charBudget);
   const validPaths = new Set(files.map(f => f.file_path));
 
+  // Fold in the author's own AI review notes (docs/20 §20.8, P5) so analysis is
+  // informed by their stated risks/assumptions/rationale.
+  const notesSection = reviewNotesPromptSection(repoRoot, files.map(f => f.file_path));
+
   const initialPrompt = [
     options.initialPromptHeader(files.length),
     '',
     formatContextsForPrompt(contexts),
+    ...(notesSection === '' ? [] : ['', notesSection]),
   ].join('\n');
 
   const messages: AIMessage[] = [{ role: 'user', content: initialPrompt }];

@@ -201,11 +201,12 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 
 - **Machine- and human-readable** — Notes shall be machine-parseable (SARIF
   JSON) and human-readable (markdown bodies).
-- **AI-summarizable** — Glassbox's existing AI analysis shall be able to ingest
-  the notes file to produce a review summary, to pre-seed risk/narrative
-  analysis from the author's own stated risks and assumptions, and to fold note
-  content into the existing `.glassbox/latest-review.md` export. The notes thus
-  serve as both an input to review and a byproduct the next AI session can read.
+- **AI-summarizable** *(shipped, P5)* — Glassbox's AI analysis ingests the notes
+  to pre-seed risk/narrative analysis from the author's own stated risks and
+  assumptions (an "Author review notes" prompt section, `runAnalysisBatch`), and
+  folds note content into the `.glassbox/latest-review.md` export (an "AI Review
+  Notes" section). The notes thus serve as both an input to review and a
+  byproduct the next AI session can read.
 
 ## Non-Functional Requirements
 
@@ -253,8 +254,15 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   a stale note (which edits `.pr-notes/`) is a follow-up.
 - **P4** — Artifact rendering (diagram source / screenshot via image-diff / test
   output) and the Git LFS wiring.
-- **P5** — Feed notes into the existing risk/narrative analysis and the markdown
-  export.
+- **P5** *(shipped)* — Feed notes into analysis and the export
+  (`src/review-notes/format.ts`). `runAnalysisBatch` (shared by risk / narrative
+  / guided) appends an "Author review notes" section to the prompt, so all three
+  analyses are informed by the author's stated risks / assumptions / rationale;
+  `generateReviewExport` folds an "AI Review Notes" section into
+  `.glassbox/latest-review.md` for the next session. (Author-stated *risks /
+  assumptions* seed analysis directly; an explicit author-stated *reading order*
+  signal beyond letting the notes inform narrative analysis is a possible future
+  enhancement.)
 - **Cross-cutting** — The inbound AI-instructions contract (§20.4) *(shipped —
   `glassbox note instructions` prints the canonical text)*; the Hot Sheet-side
   obligation to actually induce note production (§20.7) lives outside Glassbox

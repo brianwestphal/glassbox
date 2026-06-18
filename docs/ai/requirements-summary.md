@@ -589,9 +589,12 @@ their line (flow-broken like annotations so split columns stay aligned),
 styled distinctly as AI-authored with a per-kind badge. **P3 (re-anchor)
 shipped**: `reanchorReviewNotes` re-matches each note's authored snippet
 against the current diff at load (moves shifted notes, flags vanished
-ones stale with an "outdated" badge). Remaining: the AI-driven
-cross-cutting *linking* half of coalescing, P4 artifacts, P5
-analysis-feed, threading, stale keep/discard, and markdown bodies.
+ones stale with an "outdated" badge). **P5 (analysis-feed) shipped**:
+`format.ts` folds notes into the analysis prompt (an "Author review
+notes" section in `runAnalysisBatch`, informing risk/narrative/guided)
+and into the `latest-review.md` export. Remaining: the AI-driven
+cross-cutting *linking* half of coalescing, P4 artifacts, threading,
+stale keep/discard, and markdown bodies.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

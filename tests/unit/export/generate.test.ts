@@ -11,6 +11,7 @@ vi.mock('../../../src/db/queries.js', () => ({
 }));
 
 import { getReview, getReviewFiles, getAnnotationsForReview } from '../../../src/db/queries.js';
+import { writeReviewNote } from '../../../src/review-notes/store.js';
 
 const mockGetReview = vi.mocked(getReview);
 const mockGetReviewFiles = vi.mocked(getReviewFiles);
@@ -90,6 +91,28 @@ describe('generateReviewExport', () => {
     const content = readFileSync(result, 'utf-8');
     expect(content).toContain('## Items to Remember');
     expect(content).toContain('**config.ts:42** - Always validate inputs');
+  });
+
+  it('folds AI review notes from .pr-notes/ into the export (GB-899)', async () => {
+    mockGetReview.mockResolvedValueOnce({
+      id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'uncommitted', mode_args: null,
+      head_commit: 'abc', status: 'in_progress', created_at: '2025-01-01',
+    } as any);
+    mockGetReviewFiles.mockResolvedValueOnce([
+      { id: 'f1', review_id: 'r1', file_path: 'src/app.ts', status: 'reviewed', diff_data: null },
+    ] as any);
+    mockGetAnnotations.mockResolvedValueOnce([]);
+
+    // Write a review note into the temp repo (tempDir is the repoRoot).
+    mkdirSync(join(tempDir, 'src'), { recursive: true });
+    writeFileSync(join(tempDir, 'src/app.ts'), 'a\nb\nc\n', 'utf-8');
+    writeReviewNote(tempDir, { file: 'src/app.ts', startLine: 2, endLine: 2, body: 'why this is safe', kind: 'proof', producer: 'Claude Code' });
+
+    const result = await generateReviewExport('r1', tempDir, true);
+    const content = readFileSync(result, 'utf-8');
+    expect(content).toContain('## AI Review Notes');
+    expect(content).toContain('### src/app.ts');
+    expect(content).toContain('**Line 2** [proof]: why this is safe');
   });
 
   it('includes per-file annotations', async () => {
