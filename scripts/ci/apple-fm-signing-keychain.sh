@@ -16,11 +16,13 @@
 #   apple-fm-signing-keychain.sh import    # create keychain + import cert; exports APPLE_FM_KEYCHAIN
 #   apple-fm-signing-keychain.sh cleanup   # delete the keychain
 #
-# Safety: the keychain is referenced explicitly by build-apple-fm-helper.sh via
-# `codesign --keychain "$APPLE_FM_KEYCHAIN"`, so the GLOBAL keychain search list
-# is never mutated. tauri-action's own signing/notarization keychain is wholly
-# unaffected — even if the cleanup step is skipped, the isolated keychain is not
-# in the search list and is discarded with the ephemeral runner.
+# The imported keychain is added to the user keychain search list — `codesign`
+# resolves a signing identity by name through the search list, so `--keychain`
+# alone is not enough (the identity comes back "no identity found"). This is
+# safe here because the helper runs in a DEDICATED `build-apple-fm-helper` job
+# that does nothing else — no `tauri-action` is present to be confused by the
+# extra keychain — and `cleanup` (and `security delete-keychain`) removes it
+# from the search list again. The runner is ephemeral regardless.
 #
 # No-ops (exit 0) on non-macOS or when APPLE_CERTIFICATE is unset, so fork PRs
 # and secret-less runs still build (the helper is left unsigned — dev only, and
@@ -60,8 +62,18 @@ case "$MODE" in
     # Authorize codesign to use the imported private key without a UI prompt.
     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PW" "$KEYCHAIN" >/dev/null
 
+    # Add the keychain to the user search list so `codesign --sign <identity>`
+    # can resolve the identity by name (a freshly-imported keychain not in the
+    # search list yields "no identity found", even with `--keychain`). Prepend
+    # ours, keeping the existing entries.
+    existing=$(security list-keychains -d user | sed 's/[" ]//g')
+    # shellcheck disable=SC2086
+    security list-keychains -d user -s "$KEYCHAIN" $existing
+
     echo "APPLE_FM_KEYCHAIN=$KEYCHAIN" >> "${GITHUB_ENV:-/dev/null}"
     echo "[apple-fm-sign] imported Developer ID cert into isolated keychain $KEYCHAIN"
+    # Surface what got imported (non-fatal) — handy when diagnosing a CI signing failure.
+    security find-identity -v -p codesigning "$KEYCHAIN" || true
     ;;
   cleanup)
     if [[ -f "$KEYCHAIN" ]]; then

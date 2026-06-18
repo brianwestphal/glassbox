@@ -665,8 +665,9 @@ probe passes; no key/endpoint). **P2a (signing/notarization wiring) shipped** â€
 the helper is a resource Mach-O Tauri won't sign, so a **dedicated
 `build-apple-fm-helper` job on `macos-26`** (the only image with the macOS 26
 SDK) compiles + Developer-ID-signs it (isolated keychain via
-`scripts/ci/apple-fm-signing-keychain.sh`, `codesign --keychain` so
-`tauri-action`'s keychain is untouched) and uploads it as an artifact; the main
+`scripts/ci/apple-fm-signing-keychain.sh`, added to the search list so
+`codesign` resolves the identity â€” safe since that job runs no `tauri-action`)
+and uploads it as an artifact; the main
 bundle build stays on `macos-latest` (macOS 15) and the arm64 shard copies the
 signed binary in (`GLASSBOX_PREBUILT_APPLE_FM_HELPER`) so the bundle's
 notarization covers it. In both `release-desktop.yml` and the signed

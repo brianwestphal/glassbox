@@ -183,10 +183,13 @@ small helper touches macOS 26 — the main bundle build is unchanged:
   (`scripts/build-apple-fm-helper.sh`, using `APPLE_SIGNING_IDENTITY`), verifies
   it was produced, and uploads it as the `apple-fm-helper` artifact. The
   Developer ID is provisioned into an **isolated keychain** by
-  `scripts/ci/apple-fm-signing-keychain.sh import` and referenced explicitly via
-  `codesign --keychain "$APPLE_FM_KEYCHAIN"`, so the global keychain search list
-  is never mutated; a cleanup step deletes it. No-ops without `APPLE_CERTIFICATE`
-  (helper built unsigned — dev only, never notarized).
+  `scripts/ci/apple-fm-signing-keychain.sh import`, which adds it to the user
+  keychain search list so `codesign` can resolve the identity by name (a
+  keychain that isn't in the search list yields "no identity found", even with
+  `--keychain`). That search-list mutation is safe because this job does nothing
+  else — there is no `tauri-action` to confuse — and a cleanup step deletes the
+  keychain (also removing it from the search list). No-ops without
+  `APPLE_CERTIFICATE` (helper built unsigned — dev only, never notarized).
 - **Main `build` job** stays on `macos-latest` (macOS 15). The **arm64** shard
   downloads the signed artifact and `build-sidecar.sh` copies it into the bundle
   via `GLASSBOX_PREBUILT_APPLE_FM_HELPER`; the helper's embedded signature

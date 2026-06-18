@@ -634,7 +634,10 @@ pub fn run() {
                     let args_refs: Vec<&str> = sidecar_args.iter().map(|s| s.as_str()).collect();
                     let (mut rx, child) = sidecar
                         .args(&args_refs)
-                        .env("GLASSBOX_APPLE_FM_BIN", apple_fm_bin.to_string_lossy().to_string())
+                        .env(
+                            "GLASSBOX_APPLE_FM_BIN",
+                            apple_fm_bin.to_string_lossy().to_string(),
+                        )
                         .spawn()
                         .map_err(|e| format!("Failed to spawn sidecar: {e}"))?;
 
