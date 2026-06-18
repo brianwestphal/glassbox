@@ -41,6 +41,7 @@ interface SettingsUIState {
   activeTab: string;
   currentPlatform: string;
   currentModel: string;
+  localEndpoint: string;
   guidedEnabled: boolean;
   guidedTopics: Set<string>;
   showMoreLangs: boolean;
@@ -95,6 +96,7 @@ function renderSettingsModal(
     activeTab: 'general',
     currentPlatform: configData.platform,
     currentModel: configData.model,
+    localEndpoint: configData.localEndpoint,
     guidedEnabled: configData.guidedReview.enabled,
     guidedTopics: new Set(configData.guidedReview.topics),
     showMoreLangs: false,
@@ -169,6 +171,7 @@ interface ActionDeps {
 interface Actions {
   saveConfig: () => void;
   saveConfigDebounced: () => void;
+  saveLocalEndpoint: (endpoint: string) => void;
   saveAppNameDebounced: () => void;
   saveKey: () => void;
   removeKey: () => void;
@@ -207,6 +210,7 @@ function createActions(deps: ActionDeps): Actions {
         await saveAIConfig({
           platform: cur.currentPlatform as AIPlatform,
           model: cur.currentModel,
+          localEndpoint: cur.localEndpoint,
           guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
         });
 
@@ -226,6 +230,23 @@ function createActions(deps: ActionDeps): Actions {
         lastSavedGuidedTopics = new Set(cur.guidedTopics);
       } catch {
         flashSettingsError('Couldn’t save settings — please try again.');
+      }
+    })();
+  }
+
+  // Save the local base URL, then re-discover models against it so the model
+  // dropdown reflects what the (possibly just-changed) server offers.
+  function saveLocalEndpoint(endpoint: string): void {
+    setUi({ localEndpoint: endpoint });
+    void (async () => {
+      try {
+        const cur = ui.value;
+        await saveAIConfig({ platform: cur.currentPlatform as AIPlatform, model: cur.currentModel, localEndpoint: endpoint });
+        const fresh = await listAIModels();
+        deps.modelsData.models.local = fresh.models.local;
+        forceRerender();
+      } catch {
+        flashSettingsError('Couldn’t reach the local model server at that URL.');
       }
     })();
   }
@@ -366,7 +387,7 @@ function createActions(deps: ActionDeps): Actions {
     if (appNameTimer) clearTimeout(appNameTimer);
   }
 
-  return { saveConfig, saveConfigDebounced, saveAppNameDebounced, saveKey, removeKey, toggleTopic, registerDifftoolAction, unregisterDifftoolAction, dispose };
+  return { saveConfig, saveConfigDebounced, saveLocalEndpoint, saveAppNameDebounced, saveKey, removeKey, toggleTopic, registerDifftoolAction, unregisterDifftoolAction, dispose };
 }
 
 // --- TabContext construction ---
@@ -388,6 +409,7 @@ function buildContext(args: {
     isTauri: args.isTauri,
     currentPlatform: cur.currentPlatform,
     currentModel: cur.currentModel,
+    localEndpoint: cur.localEndpoint,
     guidedEnabled: cur.guidedEnabled,
     guidedTopics: cur.guidedTopics,
     showMoreLangs: cur.showMoreLangs,
@@ -478,6 +500,9 @@ function setupDelegates(args: {
   void delegate(overlay, 'change', '#settings-model', (_e, sel) => {
     setUi({ currentModel: asSelect(sel).value });
     actions.saveConfig();
+  });
+  void delegate(overlay, 'change', '#settings-local-endpoint', (_e, input) => {
+    actions.saveLocalEndpoint(asInput(input).value.trim());
   });
   void delegate(overlay, 'click', '#remove-key', actions.removeKey);
   void delegate(overlay, 'click', '#save-key-btn', actions.saveKey);

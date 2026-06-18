@@ -602,6 +602,23 @@ no-op — GB-892). All server actions are best-effort (failures swallowed,
 `--debug`-logged). The menu dismisses on item-select, Escape, outside
 click/right-click, scroll, or blur.
 
+## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Partially built (P1 local shipped)**
+
+Extends AI analysis beyond the three cloud providers to **`local`**
+(OpenAI-compatible servers — Ollama default `http://localhost:11434/v1`, LM
+Studio, etc.) and **`apple`** (Apple Foundation Models, on-device, macOS 26+),
+as two new `AIPlatform` members plugging into the same `sendAIRequest` switch /
+config / discovery / settings abstraction. Local reuses the OpenAI
+`/chat/completions` request + `/models` discovery with a configurable base URL
+and no required key; Apple uses a Swift `FoundationModels` helper bridged via
+`spawn` (stdin/stdout JSON `--probe` + inference), built by a guarded `swiftc`
+script and bundled as a Tauri resource (macOS-only). Phasing: **P1** local
+**(shipped)** — `KEYLESS_PLATFORMS`/`sendLocalRequest`/`resolveLocalEndpoint`/
+`fetchAvailableModels('local')` + the settings server-URL input; **P2** Apple FM
+(design only — native, macOS-26-only, verifiable only on real hardware; prod
+bundling/code-signing may split). Adapts the sibling Hot Sheet app's Announcer
+implementation.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -659,6 +676,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/19-difftool-integration.md` → §18b
 - `docs/20-ai-review-notes.md` → §18c
 - `docs/21-sidebar-context-menu.md` → §18d
+- `docs/22-local-and-on-device-models.md` → §18e
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

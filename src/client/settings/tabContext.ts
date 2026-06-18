@@ -43,6 +43,7 @@ export interface TabContext {
   isTauri: boolean;
   currentPlatform: string;
   currentModel: string;
+  localEndpoint: string;
   guidedEnabled: boolean;
   guidedTopics: Set<string>;
   showMoreLangs: boolean;

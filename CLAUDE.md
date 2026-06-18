@@ -58,6 +58,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
 - `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (P1 shipped: the `.pr-notes/` SARIF format + the `glassbox note` producer CLI; reader/render and later phases pending)
 - `21-sidebar-context-menu.md` — Right-click context menu on sidebar file rows; the cross-platform "reveal in file manager" action
+- `22-local-and-on-device-models.md` — Local OpenAI-compatible (Ollama/LM Studio) and Apple Foundation Models (on-device) as AI platforms (P1 local platform shipped; Apple FM P2 design only)
 
 **Architecture documents** describe system design and setup:
 

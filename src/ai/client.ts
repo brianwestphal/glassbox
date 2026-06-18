@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { debugLog } from '../debug.js';
 import type { AIConfig } from './config.js';
+import { DEFAULT_LOCAL_ENDPOINT } from './config.js';
+import { KEYLESS_PLATFORMS } from './models.js';
 
 export interface AIMessage {
   role: 'user' | 'assistant';
@@ -32,6 +34,16 @@ const OpenAIResponseSchema = z.object({
   usage: z.object({ prompt_tokens: z.number(), completion_tokens: z.number() }).loose(),
 }).loose();
 
+// Local OpenAI-compatible servers (Ollama, LM Studio, …) follow the OpenAI
+// shape but don't always return `usage` — keep it optional so a missing token
+// count degrades to 0 rather than failing the parse.
+const LocalResponseSchema = z.object({
+  choices: z.array(z.object({
+    message: z.object({ content: z.string() }).loose(),
+  }).loose()).min(1),
+  usage: z.object({ prompt_tokens: z.number(), completion_tokens: z.number() }).loose().optional(),
+}).loose();
+
 const GoogleResponseSchema = z.object({
   candidates: z.array(z.object({
     content: z.object({
@@ -44,12 +56,21 @@ const GoogleResponseSchema = z.object({
   }).loose().optional(),
 }).loose();
 
+/** Cloud platforms require a key; throws with a clear message if absent.
+ *  Keyless platforms (local) never call this. */
+function requireKey(config: AIConfig): string {
+  if (config.apiKey === null) {
+    throw new Error(`No API key configured for ${config.platform}`);
+  }
+  return config.apiKey;
+}
+
 export async function sendAIRequest(
   config: AIConfig,
   systemPrompt: string,
   messages: AIMessage[],
 ): Promise<AIResponse> {
-  if (config.apiKey === null) {
+  if (config.apiKey === null && !KEYLESS_PLATFORMS.has(config.platform)) {
     throw new Error(`No API key configured for ${config.platform}`);
   }
 
@@ -60,13 +81,16 @@ export async function sendAIRequest(
   let response: AIResponse;
   switch (config.platform) {
     case 'anthropic':
-      response = await sendAnthropicRequest(config.apiKey, config.model, systemPrompt, messages);
+      response = await sendAnthropicRequest(requireKey(config), config.model, systemPrompt, messages);
       break;
     case 'openai':
-      response = await sendOpenAIRequest(config.apiKey, config.model, systemPrompt, messages);
+      response = await sendOpenAIRequest(requireKey(config), config.model, systemPrompt, messages);
       break;
     case 'google':
-      response = await sendGoogleRequest(config.apiKey, config.model, systemPrompt, messages);
+      response = await sendGoogleRequest(requireKey(config), config.model, systemPrompt, messages);
+      break;
+    case 'local':
+      response = await sendLocalRequest(config.baseUrl ?? DEFAULT_LOCAL_ENDPOINT, config.apiKey, config.model, systemPrompt, messages);
       break;
   }
 
@@ -155,6 +179,47 @@ async function sendOpenAIRequest(
     content: data.choices[0].message.content,
     inputTokens: data.usage.prompt_tokens,
     outputTokens: data.usage.completion_tokens,
+  };
+}
+
+/**
+ * Local OpenAI-compatible server (Ollama / LM Studio / any `/v1`-style
+ * endpoint). Same request body as OpenAI, but against a configurable base URL
+ * and with `Authorization` only when a key is configured (Ollama needs none).
+ */
+async function sendLocalRequest(
+  baseUrl: string,
+  apiKey: string | null,
+  model: string,
+  systemPrompt: string,
+  messages: AIMessage[],
+): Promise<AIResponse> {
+  const oaiMessages = [
+    { role: 'system' as const, content: systemPrompt },
+    ...messages.map(m => ({ role: m.role, content: m.content })),
+  ];
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey !== null && apiKey !== '') headers.Authorization = `Bearer ${apiKey}`;
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model, messages: oaiMessages, max_tokens: 8192, stream: false }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Local model error (${String(response.status)}): ${errorText}`);
+  }
+
+  const raw: unknown = await response.json();
+  const data = LocalResponseSchema.parse(raw);
+
+  return {
+    content: data.choices[0].message.content,
+    inputTokens: data.usage?.prompt_tokens ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
   };
 }
 

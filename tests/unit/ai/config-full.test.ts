@@ -24,6 +24,7 @@ vi.mock('child_process', () => ({
 const {
   resolveAPIKey,
   loadAIConfig,
+  resolveLocalEndpoint,
   saveAIConfigPreferences,
   saveAPIKey,
   deleteAPIKey,
@@ -349,6 +350,46 @@ describe('loadAIConfig', () => {
     expect(config.model).toBe('gemini-2.5-flash');
 
     Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+});
+
+describe('local platform (GB-904)', () => {
+  it('resolveLocalEndpoint defaults to the Ollama endpoint', () => {
+    expect(resolveLocalEndpoint()).toBe('http://localhost:11434/v1');
+  });
+
+  it('resolveLocalEndpoint reads the configured URL and trims a trailing slash', () => {
+    setConfigFile({ ai: { localEndpoint: 'http://host:1234/v1/' } });
+    expect(resolveLocalEndpoint()).toBe('http://host:1234/v1');
+  });
+
+  it('loadAIConfig sets baseUrl and does NOT remap the local model id', () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    setSpawnResult('', 44);
+    setConfigFile({ ai: { platform: 'local', model: 'mistral' } });
+
+    const config = loadAIConfig();
+
+    expect(config.platform).toBe('local');
+    expect(config.model).toBe('mistral'); // not a cloud alias — left as-is
+    expect(config.apiKey).toBeNull(); // keyless
+    expect(config.baseUrl).toBe('http://localhost:11434/v1');
+
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
+  it('saveAIConfigPreferences persists localEndpoint and clears it when empty', () => {
+    saveAIConfigPreferences('local', 'mistral', { localEndpoint: 'http://x:1/v1' });
+    let written = JSON.parse(fsMocks.writeFileSync.mock.calls[0][1] as string);
+    expect(written.ai.platform).toBe('local');
+    expect(written.ai.localEndpoint).toBe('http://x:1/v1');
+
+    vi.clearAllMocks();
+    setNoConfigFile();
+    saveAIConfigPreferences('local', 'mistral', { localEndpoint: '   ' });
+    written = JSON.parse(fsMocks.writeFileSync.mock.calls[0][1] as string);
+    expect(written.ai.localEndpoint).toBeUndefined();
   });
 });
 

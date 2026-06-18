@@ -3,13 +3,26 @@ import { z } from 'zod';
 import { GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_PATH, readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import { resolveAPIKey as _resolveAPIKey } from './api-keys.js';
 import type { AIPlatform } from './models.js';
-import { AIPlatformSchema, getDefaultModel, resolveModelId } from './models.js';
+import { AIPlatformSchema, getDefaultModel, KEYLESS_PLATFORMS, resolveModelId } from './models.js';
 
 export interface AIConfig {
   platform: AIPlatform;
   model: string;
   apiKey: string | null;
   keySource: 'env' | 'keychain' | 'config' | null;
+  /** Base URL for the `local` (OpenAI-compatible) platform. */
+  baseUrl?: string;
+}
+
+/** Default local endpoint — Ollama's OpenAI-compatible API. */
+export const DEFAULT_LOCAL_ENDPOINT = 'http://localhost:11434/v1';
+
+/** The configured local base URL (or the Ollama default), trailing slash
+ *  trimmed. */
+export function resolveLocalEndpoint(): string {
+  const configured = readConfigFile().ai?.localEndpoint?.trim();
+  const base = configured !== undefined && configured !== '' ? configured : DEFAULT_LOCAL_ENDPOINT;
+  return base.replace(/\/+$/, '');
 }
 
 export interface GuidedReviewConfig {
@@ -31,6 +44,7 @@ export const ConfigFileSchema = z.object({
     platform: z.string().optional(),
     model: z.string().optional(),
     keys: z.record(z.string(), z.string()).optional(),
+    localEndpoint: z.string().optional(),
   }).optional(),
   guidedReview: z.object({
     enabled: z.boolean().optional(),
@@ -53,21 +67,29 @@ export function loadAIConfig(): AIConfig {
     : 'anthropic';
   // Resolve a saved preference that may point at a retired/older model id
   // (e.g. a `claude-sonnet-4-*` snapshot) to a currently-offered model so
-  // analysis doesn't 404 on a stale config (GB-893).
-  const model = resolveModelId(platform, config.ai?.model ?? getDefaultModel(platform));
+  // analysis doesn't 404 on a stale config (GB-893). Skip for keyless
+  // platforms (local), whose model id is whatever the user's server offers —
+  // never a cloud alias to remap.
+  const rawModel = config.ai?.model ?? getDefaultModel(platform);
+  const model = KEYLESS_PLATFORMS.has(platform) ? rawModel : resolveModelId(platform, rawModel);
 
   const { key, source } = _resolveAPIKey(platform);
+  const baseUrl = platform === 'local' ? resolveLocalEndpoint() : undefined;
 
-  return { platform, model, apiKey: key, keySource: source };
+  return { platform, model, apiKey: key, keySource: source, baseUrl };
 }
 
-export function saveAIConfigPreferences(platform: AIPlatform, model: string): void {
+export function saveAIConfigPreferences(platform: AIPlatform, model: string, opts: { localEndpoint?: string } = {}): void {
   updateGlobalConfig((config) => {
     const parsed = ConfigFileSchema.safeParse(config);
     const cfg: ConfigFile = parsed.success ? parsed.data : {};
     cfg.ai ??= {};
     cfg.ai.platform = platform;
     cfg.ai.model = model;
+    if (opts.localEndpoint !== undefined) {
+      const trimmed = opts.localEndpoint.trim();
+      cfg.ai.localEndpoint = trimmed === '' ? undefined : trimmed;
+    }
     return cfg;
   });
 }

@@ -8,6 +8,7 @@ import {
   loadAIConfig,
   loadGuidedReviewConfig,
   resolveAPIKey,
+  resolveLocalEndpoint,
   saveAIConfigPreferences,
   saveAPIKey,
   saveGuidedReviewConfig,
@@ -28,8 +29,11 @@ aiConfigRoutes.get('/config', (c) => {
   return c.json({
     platform: config.platform,
     model: config.model,
-    keyConfigured: config.apiKey !== null || isAIServiceTest() || getDemoMode() !== null,
+    // `local` is keyless — usable as soon as its (defaulted) endpoint is set,
+    // so it counts as "configured" without an API key.
+    keyConfigured: config.apiKey !== null || config.platform === 'local' || isAIServiceTest() || getDemoMode() !== null,
     keySource: config.keySource,
+    localEndpoint: resolveLocalEndpoint(),
     guidedReview: loadGuidedReviewConfig(),
   });
 });
@@ -39,7 +43,7 @@ aiConfigRoutes.post('/config', async (c) => {
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
 
-  saveAIConfigPreferences(body.platform, body.model);
+  saveAIConfigPreferences(body.platform, body.model, { localEndpoint: body.localEndpoint });
   if (body.guidedReview !== undefined) {
     saveGuidedReviewConfig(body.guidedReview);
   }
@@ -53,7 +57,9 @@ aiConfigRoutes.get('/models', async (c) => {
   // `MODELS` list per platform on no-key / failure. Skipped under
   // `--ai-service-test` so the e2e suite stays hermetic (no outbound calls).
   const platforms: AIPlatform[] = ['anthropic', 'openai', 'google'];
-  const models = { anthropic: MODELS.anthropic, openai: MODELS.openai, google: MODELS.google } as Record<AIPlatform, AIModel[]>;
+  const models = {
+    anthropic: MODELS.anthropic, openai: MODELS.openai, google: MODELS.google, local: MODELS.local,
+  } as Record<AIPlatform, AIModel[]>;
   if (!isAIServiceTest() && getDemoMode() === null) {
     await Promise.all(platforms.map(async (platform) => {
       const { key } = resolveAPIKey(platform);
@@ -61,12 +67,18 @@ aiConfigRoutes.get('/models', async (c) => {
       const live = await fetchAvailableModels(platform, key);
       if (live !== null && live.length > 0) models[platform] = live;
     }));
+    // Local discovery runs against the configured endpoint regardless of key
+    // (Ollama needs none); a reachable server's installed models replace the
+    // static fallback.
+    const { key: localKey } = resolveAPIKey('local');
+    const localLive = await fetchAvailableModels('local', localKey ?? '', { baseUrl: resolveLocalEndpoint() });
+    if (localLive !== null && localLive.length > 0) models.local = localLive;
   }
   return c.json({ platforms: PLATFORMS, models });
 });
 
 aiConfigRoutes.get('/key-status', (c) => {
-  const platforms: AIPlatform[] = ['anthropic', 'openai', 'google'];
+  const platforms: AIPlatform[] = ['anthropic', 'openai', 'google', 'local'];
   const status = {} as GetAIKeyStatusResp['status'];
   for (const platform of platforms) {
     const { source } = resolveAPIKey(platform);
@@ -93,7 +105,7 @@ aiConfigRoutes.delete('/key', (c) => {
   const platform = c.req.query('platform') ?? 'anthropic';
   const parsed = AIPlatformSchema.safeParse(platform);
   if (!parsed.success) {
-    return errorResponse(c, `platform must be one of: anthropic, openai, google`);
+    return errorResponse(c, `platform must be one of: ${Object.keys(PLATFORMS).join(', ')}`);
   }
   deleteAPIKey(parsed.data);
   return c.json({ ok: true } as const);

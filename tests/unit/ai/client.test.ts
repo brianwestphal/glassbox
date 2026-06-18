@@ -85,6 +85,58 @@ describe('sendAIRequest', () => {
     });
   });
 
+  describe('Local (OpenAI-compatible)', () => {
+    function localConfig(overrides: Partial<AIConfig> = {}): AIConfig {
+      return { platform: 'local', model: 'llama3.1', apiKey: null, keySource: null, baseUrl: 'http://localhost:11434/v1', ...overrides };
+    }
+
+    it('posts to {baseUrl}/chat/completions without an Authorization header when keyless', async () => {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Hello from Ollama' } }],
+        usage: { prompt_tokens: 12, completion_tokens: 4 },
+      }), { status: 200 }));
+
+      const result = await sendAIRequest(localConfig(), 'system prompt', [{ role: 'user', content: 'test' }]);
+      expect(result.content).toBe('Hello from Ollama');
+      expect(result.inputTokens).toBe(12);
+      expect(result.outputTokens).toBe(4);
+
+      const call = fetchSpy.mock.calls[0];
+      expect(call[0]).toBe('http://localhost:11434/v1/chat/completions');
+      const headers = call[1]!.headers as Record<string, string>;
+      expect(headers.Authorization).toBeUndefined();
+      const body = JSON.parse(call[1]!.body as string);
+      expect(body.model).toBe('llama3.1');
+      expect(body.messages[0]).toEqual({ role: 'system', content: 'system prompt' });
+    });
+
+    it('sends a Bearer header when a key is configured', async () => {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: 'ok' } }],
+      }), { status: 200 }));
+
+      await sendAIRequest(localConfig({ apiKey: 'secret' }), 'sys', [{ role: 'user', content: 'x' }]);
+      const headers = fetchSpy.mock.calls[0][1]!.headers as Record<string, string>;
+      expect(headers.Authorization).toBe('Bearer secret');
+    });
+
+    it('defaults token counts to 0 when usage is omitted (Ollama)', async () => {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: 'no usage' } }],
+      }), { status: 200 }));
+
+      const result = await sendAIRequest(localConfig(), 'sys', [{ role: 'user', content: 'x' }]);
+      expect(result.inputTokens).toBe(0);
+      expect(result.outputTokens).toBe(0);
+    });
+
+    it('throws a clear error on a local server failure', async () => {
+      fetchSpy.mockResolvedValueOnce(new Response('connection refused', { status: 502 }));
+      await expect(sendAIRequest(localConfig(), 'sys', [{ role: 'user', content: 'x' }]))
+        .rejects.toThrow('Local model error (502)');
+    });
+  });
+
   describe('Google', () => {
     it('sends request to Google API and parses response', async () => {
       fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({

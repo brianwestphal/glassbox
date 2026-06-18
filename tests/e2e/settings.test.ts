@@ -154,6 +154,34 @@ test.describe('Experimental tab', () => {
 
     await expect(page.locator('#settings-guided-enabled')).toBeVisible();
   });
+
+  test('selecting the Local platform reveals the server URL input and an optional key', async ({ page }) => {
+    await page.goto('/');
+    await openSettings(page);
+    await page.locator('[data-tab="experimental"]').click();
+    await expect(page.locator('[data-panel="experimental"]')).toHaveClass(/active/);
+
+    // The Local platform option exists; the server-URL input is hidden until selected.
+    const localBtn = page.locator('.settings-platform-control [data-platform="local"]');
+    await expect(localBtn).toBeVisible();
+    await expect(page.locator('#settings-local-endpoint')).toHaveCount(0);
+
+    await localBtn.click();
+    await expect(localBtn).toHaveClass(/active/);
+
+    // Server URL input appears, defaulted to the Ollama endpoint.
+    const endpoint = page.locator('#settings-local-endpoint');
+    await expect(endpoint).toBeVisible();
+    await expect(endpoint).toHaveValue('http://localhost:11434/v1');
+
+    // Model dropdown is still present, and the key is framed as optional.
+    await expect(page.locator('#settings-model')).toBeVisible();
+    await expect(page.getByText('API Key (optional)')).toBeVisible();
+
+    // Restore Anthropic so the suite doesn't leave the global config on `local`.
+    await page.locator('.settings-platform-control [data-platform="anthropic"]').click();
+    await expect(page.locator('#settings-local-endpoint')).toHaveCount(0);
+  });
 });
 
 test.describe('Close dialog', () => {

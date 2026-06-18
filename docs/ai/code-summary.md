@@ -157,7 +157,7 @@ See §6 for the schema itself.
 | `config.ts` | Load/save `~/.glassbox/config.json` (platform, model, guided settings, share prompt, channel enabled, cumulative open time). |
 | `api-keys.ts` | Key resolution chain: env var → OS keychain → base64 in config file. Save/delete, source detection. |
 | `keychain.ts` | OS keychain wrappers: macOS `security`, Linux `secret-tool`, Windows `cmdkey`. |
-| `client.ts` | Unified HTTP client. `sendAIRequest(config, system, messages)` dispatches to Anthropic / OpenAI / Google. Returns content + token counts. |
+| `client.ts` | Unified HTTP client. `sendAIRequest(config, system, messages)` dispatches to Anthropic / OpenAI / Google / **Local** (OpenAI-compatible — `sendLocalRequest` posts to `{config.baseUrl}/chat/completions`, optional Bearer; keyless platforms skip the no-key gate via `KEYLESS_PLATFORMS`). Returns content + token counts. |
 | `context-builder.ts` | Build per-file context payloads respecting a char budget. Handles summarization when a file's diff is too large. |
 | `batch-planner.ts` | Split files into token-budgeted batches for a given model. |
 | `batch-runner.ts` | Execute batches sequentially, update progress, honor cancellation. |
@@ -689,7 +689,7 @@ two documents intentionally overlap.
 | Change the DB schema | `src/db/schema.ts` (tables/indexes) + a migration in `src/db/connection.ts` (`addColumnIfMissing` pattern). Query code in `src/db/queries.ts` or `ai-queries.ts`. |
 | Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api/annotations.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
 | Add a CLI option | `src/cli.ts` `parseArgs()` switch; document in `docs/2-cli-and-server.md`. |
-| Add an AI platform | `src/ai/models.ts` (platform + fallback models + env key), `src/ai/list-models.ts` (live-discovery fetch+map for the new provider), `src/ai/client.ts` (HTTP dispatch), `src/ai/api-keys.ts` (key source mapping), `src/ai/keychain.ts` (if new keychain conventions). Update `docs/7-ai-analysis.md`. |
+| Add an AI platform | `src/ai/models.ts` (platform enum + fallback models + env key; `KEYLESS_PLATFORMS` if no key needed), `src/ai/list-models.ts` (live-discovery fetch+map), `src/ai/client.ts` (HTTP/spawn dispatch), `src/ai/config.ts` (any per-platform config like a base URL), `src/ai/api-keys.ts` (key source mapping), `src/routes/ai-config.ts` + `src/api/ai.ts` (config/discovery/key-status wiring), `src/client/settings/experimentalTab.tsx` + `dialog.tsx` (picker + any platform-specific inputs). The `local` platform (doc 22) is the worked example of a keyless, base-URL-configured provider. Update `docs/7-ai-analysis.md`. |
 | Update / discover AI models | Models are discovered live per provider in `src/ai/list-models.ts` (used by `GET /api/ai/models`); `src/ai/models.ts` holds the static fallback + `resolveModelId` old→new mapping. |
 | Add a theme | `src/themes/built-in.ts` (built-in), or create `~/.glassbox/themes/*.json` (custom). All vars from `ThemeColors` must be present. |
 | Change export format | `src/export/generate.ts`. Update `docs/6-export.md`. |

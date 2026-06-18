@@ -24,7 +24,12 @@ function keyStatusHtml(keyInfo: AIKeyStatusEntry): SafeHtml {
 }
 
 function renderPlatformModels(models: Array<{ id: string; name: string; isDefault: boolean }>, currentModel: string): SafeHtml[] {
-  return models.map(m =>
+  // Keep a saved-but-currently-absent model selectable rather than silently
+  // dropping it (e.g. a local model not in the latest discovery list).
+  const list = currentModel === '' || models.some(m => m.id === currentModel)
+    ? models
+    : [{ id: currentModel, name: currentModel, isDefault: false }, ...models];
+  return list.map(m =>
     <option value={m.id} selected={m.id === currentModel}>{m.name}{m.isDefault ? ' (recommended)' : ''}</option>
   );
 }
@@ -40,10 +45,11 @@ function channelHintHtml(channelState: ChannelState): SafeHtml {
 }
 
 function renderExperimentalTab(ctx: TabContext): SafeHtml {
-  const { modelsData, currentPlatform, currentModel, keyStatus, guidedEnabled, channelState } = ctx;
+  const { modelsData, currentPlatform, currentModel, localEndpoint, keyStatus, guidedEnabled, channelState } = ctx;
   const platforms = modelsData.platforms;
   const platformModels = modelsData.models[currentPlatform as AIPlatform];
   const keyInfo = keyStatus.status[currentPlatform as AIPlatform];
+  const isLocal = currentPlatform === 'local';
   const showInput = !keyInfo.configured;
 
   return (
@@ -66,13 +72,25 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
         </div>
       </div>
 
+      {isLocal && (
+        <div className="settings-section">
+          <label className="settings-label">Server URL</label>
+          <input type="text" className="settings-input" id="settings-local-endpoint"
+            value={localEndpoint} placeholder="http://localhost:11434/v1" autoComplete="off" />
+          <p className="settings-hint">OpenAI-compatible endpoint (Ollama, LM Studio, …). The model list loads from here.</p>
+        </div>
+      )}
+
       <div className="settings-section">
         <label className="settings-label">Model</label>
         <select className="settings-select" id="settings-model">{renderPlatformModels(platformModels, currentModel)}</select>
       </div>
 
       <div className="settings-section">
-        <label className="settings-label">API Key</label>
+        <label className="settings-label">{isLocal ? 'API Key (optional)' : 'API Key'}</label>
+        {isLocal && !keyInfo.configured && (
+          <p className="settings-hint">Most local servers (e.g. Ollama) need no key — add one only if yours requires it.</p>
+        )}
         {keyStatusHtml(keyInfo)}
         {showInput && (
           <div className="settings-key-input-group">

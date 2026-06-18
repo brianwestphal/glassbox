@@ -83,6 +83,18 @@ async function fetchOpenAI(apiKey: string): Promise<AIModel[] | null> {
     .map(m => ({ id: m.id, name: m.id, contextWindow: 128000, isDefault: false }));
 }
 
+// --- Local OpenAI-compatible: GET {base}/models → { data: [{ id }] } --------
+// Unlike OpenAI's firehose, a local server lists only its installed models, so
+// no chat-vs-non-chat filtering — every id is offered as-is. Key is optional.
+async function fetchLocal(baseUrl: string, apiKey: string): Promise<AIModel[] | null> {
+  const headers: Record<string, string> = {};
+  if (apiKey !== '') headers.Authorization = `Bearer ${apiKey}`;
+  const raw = await getJson(`${baseUrl}/models`, headers);
+  const parsed = OpenAIListSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  return parsed.data.data.map(m => ({ id: m.id, name: m.id, contextWindow: 8192, isDefault: false }));
+}
+
 // --- Google: GET /v1beta/models → { models: [{ name, displayName, … }] } ---
 const GoogleListSchema = z.object({
   models: z.array(z.object({
@@ -118,10 +130,11 @@ async function fetchGoogle(apiKey: string): Promise<AIModel[] | null> {
  * list, otherwise the first entry is — preserving the "exactly one default"
  * shape the dropdown expects.
  */
-export async function fetchAvailableModels(platform: AIPlatform, apiKey: string): Promise<AIModel[] | null> {
+export async function fetchAvailableModels(platform: AIPlatform, apiKey: string, opts: { baseUrl?: string } = {}): Promise<AIModel[] | null> {
   let models: AIModel[] | null;
   if (platform === 'anthropic') models = await fetchAnthropic(apiKey);
   else if (platform === 'openai') models = await fetchOpenAI(apiKey);
+  else if (platform === 'local') models = await fetchLocal(opts.baseUrl ?? '', apiKey);
   else models = await fetchGoogle(apiKey);
 
   if (models === null || models.length === 0) return null;

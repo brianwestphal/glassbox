@@ -27,6 +27,7 @@ vi.mock('../../../src/ai/config.js', () => ({
     keySource: null,
   })),
   saveAIConfigPreferences: vi.fn(),
+  resolveLocalEndpoint: vi.fn(() => 'http://localhost:11434/v1'),
   resolveAPIKey: vi.fn((_platform: string) => ({ key: null, source: null })),
   detectAvailablePlatforms: vi.fn(() => []),
   isKeychainAvailable: vi.fn(() => true),
@@ -53,6 +54,12 @@ vi.mock('../../../src/ai/mock.js', () => ({
   mockRiskAnalysisBatch: vi.fn(),
   mockNarrativeAnalysisBatch: vi.fn(),
   mockGuidedAnalysisBatch: vi.fn(),
+}));
+
+// Mock live model discovery so /models stays hermetic (no outbound fetch,
+// including the local-endpoint probe) and falls back to the static list.
+vi.mock('../../../src/ai/list-models.js', () => ({
+  fetchAvailableModels: vi.fn(async () => null),
 }));
 
 // Mock batch planner and runner (not testing actual batch processing)
@@ -112,6 +119,7 @@ describe('GET /api/ai/config', () => {
     expect(body.platform).toBe('anthropic');
     expect(body.model).toBeDefined();
     expect(typeof body.keyConfigured).toBe('boolean');
+    expect(body.localEndpoint).toBe('http://localhost:11434/v1');
     expect(body.guidedReview).toBeDefined();
   });
 });
@@ -154,6 +162,8 @@ describe('GET /api/ai/models', () => {
     expect(body.models.anthropic).toBeDefined();
     expect(body.models.openai).toBeDefined();
     expect(body.models.google).toBeDefined();
+    expect(body.models.local).toBeDefined();
+    expect(body.platforms.local).toBe('Local');
   });
 });
 

@@ -8,8 +8,11 @@ export const AIModelSchema = z.object({
 });
 export type AIModel = z.infer<typeof AIModelSchema>;
 
-export const AIPlatformSchema = z.enum(['anthropic', 'openai', 'google']);
+export const AIPlatformSchema = z.enum(['anthropic', 'openai', 'google', 'local']);
 export type AIPlatform = z.infer<typeof AIPlatformSchema>;
+
+/** Platforms that run without an API key (local servers / on-device). */
+export const KEYLESS_PLATFORMS: ReadonlySet<AIPlatform> = new Set<AIPlatform>(['local']);
 
 /** Runtime guard — narrows `unknown` to `AIPlatform`. */
 export function isAIPlatform(value: unknown): value is AIPlatform {
@@ -20,6 +23,7 @@ export const PLATFORMS: Record<AIPlatform, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   google: 'Google',
+  local: 'Local',
 };
 
 // Keep this list up to date — check at least once a day when working on the project
@@ -37,12 +41,19 @@ export const MODELS: Record<AIPlatform, AIModel[]> = {
     { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', contextWindow: 1000000, isDefault: true },
     { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', contextWindow: 1000000, isDefault: false },
   ],
+  // Local models are server-specific and discovered live from the configured
+  // endpoint; this is only the fallback default when discovery is unavailable.
+  local: [
+    { id: 'llama3.1', name: 'Llama 3.1', contextWindow: 8192, isDefault: true },
+  ],
 };
 
 export const ENV_KEY_NAMES: Record<AIPlatform, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
   google: 'GEMINI_API_KEY',
+  // Optional — most local servers (Ollama) need no key; some do.
+  local: 'GLASSBOX_LOCAL_API_KEY',
 };
 
 export function getDefaultModel(platform: AIPlatform): string {
@@ -53,7 +64,10 @@ export function getDefaultModel(platform: AIPlatform): string {
 
 export function getModelContextWindow(platform: AIPlatform, modelId: string): number {
   const model = MODELS[platform].find(m => m.id === modelId);
-  return model ? model.contextWindow : 128000;
+  if (model) return model.contextWindow;
+  // Unknown model: arbitrary local models have small windows, so batch
+  // conservatively; cloud models default higher.
+  return platform === 'local' ? 8192 : 128000;
 }
 
 /**

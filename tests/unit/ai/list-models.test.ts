@@ -79,6 +79,28 @@ describe('fetchAvailableModels — OpenAI', () => {
   });
 });
 
+describe('fetchAvailableModels — Local', () => {
+  it('hits {baseUrl}/models and maps every id with no chat-filtering', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ id: 'llama3.1' }, { id: 'mistral' }, { id: 'nomic-embed-text' }] }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const models = await fetchAvailableModels('local', '', { baseUrl: 'http://localhost:11434/v1' });
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:11434/v1/models');
+    // No firehose filtering — a local server lists only its installed models.
+    expect(models!.map(m => m.id)).toEqual(['llama3.1', 'mistral', 'nomic-embed-text']);
+    // The static default (llama3.1) is flagged when present.
+    expect(models!.filter(m => m.isDefault).map(m => m.id)).toEqual(['llama3.1']);
+  });
+
+  it('returns null when the local server is unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('ECONNREFUSED'))));
+    expect(await fetchAvailableModels('local', '', { baseUrl: 'http://localhost:11434/v1' })).toBeNull();
+  });
+});
+
 describe('fetchAvailableModels — Google', () => {
   it('keeps generateContent models and strips the models/ prefix', async () => {
     mockFetch({ models: [

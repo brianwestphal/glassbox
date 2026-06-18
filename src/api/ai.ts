@@ -30,6 +30,8 @@ export const AIConfigRespSchema = z.object({
   model: z.string(),
   keyConfigured: z.boolean(),
   keySource: KeySourceSchema,
+  /** Base URL for the `local` (OpenAI-compatible) platform. */
+  localEndpoint: z.string(),
   guidedReview: GuidedReviewConfigShapeSchema,
 });
 export type AIConfigResp = z.infer<typeof AIConfigRespSchema>;
@@ -37,6 +39,7 @@ export type AIConfigResp = z.infer<typeof AIConfigRespSchema>;
 export const SaveAIConfigReqSchema = z.object({
   platform: AIPlatformSchema,
   model: z.string().min(1),
+  localEndpoint: z.string().optional(),
   guidedReview: GuidedReviewConfigShapeSchema.optional(),
 });
 export type SaveAIConfigReq = z.infer<typeof SaveAIConfigReqSchema>;
