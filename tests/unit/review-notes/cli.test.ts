@@ -8,7 +8,21 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseNoteAdd, runNoteCli } from '../../../src/review-notes/cli.js';
+import { reviewNoteInstructions } from '../../../src/review-notes/instructions.js';
 import { writeReviewNote } from '../../../src/review-notes/store.js';
+import { NOTE_KINDS } from '../../../src/review-notes/types.js';
+
+describe('reviewNoteInstructions (GB-900)', () => {
+  it('documents the glassbox note surface, the lifecycle, and every kind', () => {
+    const text = reviewNoteInstructions();
+    expect(text).toContain('glassbox note add');
+    expect(text).toContain('glassbox note update');
+    expect(text).toContain('glassbox note remove');
+    expect(text).toContain('glassbox note coalesce');
+    expect(text).toContain('.pr-notes/');
+    for (const kind of NOTE_KINDS) expect(text).toContain(kind);
+  });
+});
 
 describe('parseNoteAdd', () => {
   it('parses a full add invocation', () => {
@@ -58,6 +72,11 @@ describe('runNoteCli', () => {
 
   it('errors on an unknown subcommand', async () => {
     await expect(runNoteCli(['frobnicate'], { cwd: repo })).rejects.toThrow(/unknown 'note' subcommand/);
+  });
+
+  it('instructions prints the inbound contract', async () => {
+    await runNoteCli(['instructions'], { cwd: repo });
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining('Emitting AI review notes'));
   });
 
   it('update edits a note by guid', async () => {

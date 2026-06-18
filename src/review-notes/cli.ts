@@ -9,6 +9,7 @@
 import { spawnSync } from 'child_process';
 import { relative, resolve } from 'path';
 
+import { reviewNoteInstructions } from './instructions.js';
 import type { NotePatch } from './store.js';
 import { coalesceAll, coalesceFile, removeNote, updateNote, warnIfPrNotesIgnored, writeReviewNote } from './store.js';
 import type { NoteKind, ReviewNoteInput } from './types.js';
@@ -51,6 +52,7 @@ Usage:
   glassbox note update   --id <guid> [--file <path>] [--body <text|->] [--kind <kind>] [--confidence <0..1>] [--rank <0..100>] [--ticket <id>]
   glassbox note remove   --id <guid> [--file <path>]
   glassbox note coalesce [--file <path>]
+  glassbox note instructions   Print the inbound AI-instructions contract (for orchestrators to inject)
 
 add — required:
   --file <path>     Source file the note anchors to (relative to cwd or absolute)
@@ -254,6 +256,7 @@ export async function runNoteCli(args: string[], ctx: { cwd?: string } = {}): Pr
     case 'remove': runRemove(rest, cwd); return;
     case 'update': await runUpdate(rest, cwd); return;
     case 'coalesce': runCoalesce(rest, cwd); return;
-    default: throw new Error(`unknown 'note' subcommand: ${sub} (expected add/update/remove/coalesce)`);
+    case 'instructions': console.log(reviewNoteInstructions()); return;
+    default: throw new Error(`unknown 'note' subcommand: ${sub} (expected add/update/remove/coalesce/instructions)`);
   }
 }

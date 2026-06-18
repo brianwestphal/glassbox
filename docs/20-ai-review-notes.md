@@ -136,10 +136,14 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   `glassbox note coalesce` (drops notes with an identical anchor + kind + body,
   keeping the most recent); the AI-driven cross-cutting *linking* is a follow-up.
 - **Inbound AI-instructions contract** — Glassbox already ships *outbound* AI
-  instructions in its markdown export ("here's how to act on annotations"). This
-  feature adds the symmetric *inbound* contract: a documented, adoptable
-  instruction set (skill / `CLAUDE.md` snippet) telling a generating AI when and
-  how to emit review notes. See §20.7 for the cross-tool obligation.
+  instructions in its markdown export ("here's how to act on annotations"). The
+  symmetric *inbound* contract — telling a generating AI **when and how to emit**
+  review notes — ships as a single canonical text
+  (`src/review-notes/instructions.ts`) surfaced via **`glassbox note
+  instructions`**. Any orchestrator (Hot Sheet, a Claude Code skill, any agent
+  runner) runs the command and injects the output into the coding AI's context,
+  so the wording never forks from the actual `glassbox note` CLI surface. See
+  §20.7 for the cross-tool obligation to actually induce note production.
 
 ### 20.5 Artifacts
 
@@ -235,8 +239,10 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   output) and the Git LFS wiring.
 - **P5** — Feed notes into the existing risk/narrative analysis and the markdown
   export.
-- **Cross-cutting** — The inbound AI-instructions contract (§20.4) and the Hot
-  Sheet-side obligation to induce note production (§20.7).
+- **Cross-cutting** — The inbound AI-instructions contract (§20.4) *(shipped —
+  `glassbox note instructions` prints the canonical text)*; the Hot Sheet-side
+  obligation to actually induce note production (§20.7) lives outside Glassbox
+  and runs that command to get the wording.
 
 ## Maintenance triggers
 

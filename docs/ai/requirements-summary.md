@@ -579,9 +579,12 @@ the mapping is standard SARIF (kind→`tags`, ticket→`workItemUris`,
 producer→`tool.driver`, anchor→`region`+snippet, durability→
 `partialFingerprints`) with exactly one custom field,
 `ext-ai-tool-confidence`. The CLI does `add` / `update` / `remove` (by
-note guid) / `coalesce` (mechanical dedup of identical notes); the
-AI-driven cross-cutting *linking* half of coalescing, and reader/render
-(P2+), re-anchoring, artifacts, and analysis-feed, remain.
+note guid) / `coalesce` (mechanical dedup of identical notes) /
+`instructions` (prints the canonical **inbound** AI-instructions contract
+— `src/review-notes/instructions.ts` — for orchestrators to inject, so
+wording never forks from the CLI). Remaining: the AI-driven cross-cutting
+*linking* half of coalescing, and reader/render (P2+), re-anchoring,
+artifacts, and analysis-feed.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 
