@@ -662,15 +662,19 @@ guarded + `APPLE_SIGNING_IDENTITY`-signed build (`build-apple-fm-helper.sh` wire
 into `build-sidecar.sh`), `server/` bundling + the launcher's
 `GLASSBOX_APPLE_FM_BIN` export, and the settings UI (Apple shown only when the
 probe passes; no key/endpoint). **P2a (signing/notarization wiring) shipped** —
-the helper is a resource Mach-O Tauri won't sign, so the release workflows
-provision the Developer ID into an isolated keychain
-(`scripts/ci/apple-fm-signing-keychain.sh`, referenced via `codesign --keychain`
-so `tauri-action`'s keychain is untouched) and sign it with hardened runtime
-before notarization, in both `release-desktop.yml` and the signed
-`release-candidate.yml` build. Remaining: the maintainer's clean-machine smoke
-test, and CI helper-compilation awaits a macOS 26 / Xcode 26 runner (the local
-`tauri:build:local` already produces a signed bundle). Adapts the sibling Hot
-Sheet app's Announcer implementation.
+the helper is a resource Mach-O Tauri won't sign, so a **dedicated
+`build-apple-fm-helper` job on `macos-26`** (the only image with the macOS 26
+SDK) compiles + Developer-ID-signs it (isolated keychain via
+`scripts/ci/apple-fm-signing-keychain.sh`, `codesign --keychain` so
+`tauri-action`'s keychain is untouched) and uploads it as an artifact; the main
+bundle build stays on `macos-latest` (macOS 15) and the arm64 shard copies the
+signed binary in (`GLASSBOX_PREBUILT_APPLE_FM_HELPER`) so the bundle's
+notarization covers it. In both `release-desktop.yml` and the signed
+`release-candidate.yml` build; the Intel bundle omits the helper (arm64-only),
+and any helper-less bundle hides the Apple platform via the probe. Remaining
+(GB-918): the maintainer's clean-machine smoke test, validated via a beta cut
+first (the local `tauri:build:local` on macOS 26 already produces a signed
+bundle). Adapts the sibling Hot Sheet app's Announcer implementation.
 
 ## 19. Implementation-status snapshot
 

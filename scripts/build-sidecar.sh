@@ -103,13 +103,28 @@ cp dist/svg-rasterize-worker.js "$SERVER_DIR/"
 # the channel silently fails to launch in desktop installs (GB-887).
 cp dist/channel.js "$SERVER_DIR/"
 # Apple Foundation Models helper (doc 22) — the on-device AI provider's Swift
-# CLI. The build is GUARDED (no-op off macOS / missing swiftc / missing macOS-26
-# SDK), so this is a clean skip on Linux/Windows/CI without Xcode 26. When it
-# does build, the binary sits next to cli.js and the launcher points the server
-# at it via GLASSBOX_APPLE_FM_BIN.
-bash "$(dirname "$0")/build-apple-fm-helper.sh" "dist/apple-fm-helper" || true
-if [[ -f "dist/apple-fm-helper" ]]; then
-  cp dist/apple-fm-helper "$SERVER_DIR/apple-fm-helper"
+# CLI. It compiles only on a macOS 26 / Xcode 26 toolchain and is arm64-only.
+# Two supply paths:
+#   - CI: a dedicated macOS-26 job compiles + Developer-ID-signs it and hands the
+#     path over via GLASSBOX_PREBUILT_APPLE_FM_HELPER, because the bundle build
+#     itself runs on macOS 15 (which lacks the macOS 26 SDK). We just copy the
+#     already-signed binary in — its embedded signature survives, so the later
+#     notarization of the bundle covers it (see docs/22 §22.9).
+#   - Local (maintainer's macOS 26 machine): the var is unset, so we compile via
+#     the GUARDED build script (no-op off macOS / missing swiftc / missing SDK —
+#     a clean skip on Linux / Windows / Intel / CI-without-Xcode-26).
+# When the helper is absent (any non-arm64 / non-macOS-26 bundle) the app simply
+# hides the Apple platform (its `--probe` finds no binary).
+HELPER_SRC=""
+if [[ -n "${GLASSBOX_PREBUILT_APPLE_FM_HELPER:-}" && -f "${GLASSBOX_PREBUILT_APPLE_FM_HELPER}" ]]; then
+  HELPER_SRC="${GLASSBOX_PREBUILT_APPLE_FM_HELPER}"
+  echo "Using prebuilt Apple FM helper from $HELPER_SRC"
+else
+  bash "$(dirname "$0")/build-apple-fm-helper.sh" "dist/apple-fm-helper" || true
+  [[ -f "dist/apple-fm-helper" ]] && HELPER_SRC="dist/apple-fm-helper"
+fi
+if [[ -n "$HELPER_SRC" ]]; then
+  cp "$HELPER_SRC" "$SERVER_DIR/apple-fm-helper"
   chmod +x "$SERVER_DIR/apple-fm-helper"
   echo "Bundled Apple FM helper into $SERVER_DIR/"
 fi

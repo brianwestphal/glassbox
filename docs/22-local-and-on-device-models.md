@@ -172,28 +172,40 @@ hardened runtime, but it does **not** sign arbitrary Mach-O files under
 or non-hardened-runtime Mach-O, so the helper must be signed **before**
 `tauri-action` notarizes the app bundle.
 
-- `scripts/build-apple-fm-helper.sh` signs the compiled helper with
-  `codesign --options runtime --timestamp` using `APPLE_SIGNING_IDENTITY` (the
-  same Developer ID secret Tauri uses for the app bundle), falling back to
-  `CODESIGN_IDENTITY`.
-- In CI the Developer ID is provisioned into an **isolated keychain** by
-  `scripts/ci/apple-fm-signing-keychain.sh import` (run before the sidecar build
-  on macOS when `APPLE_CERTIFICATE` is present) and referenced explicitly via
-  `codesign --keychain "$APPLE_FM_KEYCHAIN"`. The global keychain search list is
-  never mutated, so `tauri-action`'s own signing/notarization keychain is wholly
-  unaffected; a cleanup step removes the keychain before `tauri-action` runs.
-  Wired into both shipping jobs: `release-desktop.yml` (stable) and the signed
-  build in `release-candidate.yml` (beta). No-ops on non-macOS / secret-less
-  runs (helper left unsigned — dev only, never notarized).
-- **Standing dependency:** the helper compiles only on a macOS 26 / Xcode 26
-  toolchain (`swiftc -target arm64-apple-macos26`). GitHub-hosted `macos-latest`
-  runners build it only once that image ships macOS 26; until then CI releases
-  omit the helper and the maintainer's local `tauri:build:local` on macOS 26 is
-  the path that produces a signed, notarizable bundle. The build script no-ops
-  cleanly when the SDK is absent, so the wiring is forward-compatible.
-- **Verification (maintainer):** on a clean (non-build) macOS-26 machine, install
-  the signed + notarized bundle and confirm the helper probes `available` and
-  runs inference with no quarantine/Gatekeeper rejection.
+The helper compiles only on a **macOS 26 / Xcode 26** toolchain
+(`swiftc -target arm64-apple-macos26`), but the app bundle is built on the proven
+**macOS 15** image. CI bridges that with a **dedicated helper job**, so only the
+small helper touches macOS 26 — the main bundle build is unchanged:
+
+- **`build-apple-fm-helper` job** (`runs-on: macos-26`, in both
+  `release-desktop.yml` and the signed beta build in `release-candidate.yml`):
+  compiles the helper, signs it with `codesign --options runtime --timestamp`
+  (`scripts/build-apple-fm-helper.sh`, using `APPLE_SIGNING_IDENTITY`), verifies
+  it was produced, and uploads it as the `apple-fm-helper` artifact. The
+  Developer ID is provisioned into an **isolated keychain** by
+  `scripts/ci/apple-fm-signing-keychain.sh import` and referenced explicitly via
+  `codesign --keychain "$APPLE_FM_KEYCHAIN"`, so the global keychain search list
+  is never mutated; a cleanup step deletes it. No-ops without `APPLE_CERTIFICATE`
+  (helper built unsigned — dev only, never notarized).
+- **Main `build` job** stays on `macos-latest` (macOS 15). The **arm64** shard
+  downloads the signed artifact and `build-sidecar.sh` copies it into the bundle
+  via `GLASSBOX_PREBUILT_APPLE_FM_HELPER`; the helper's embedded signature
+  survives the copy (and the artifact zip round-trip), so `tauri-action`'s
+  notarization of the whole bundle covers it. The Intel shard sets no such env
+  and omits the helper — Apple Intelligence and the helper are arm64-only, so the
+  Intel bundle never carries it (and the app hides the Apple platform there).
+- **Local builds** (the maintainer's `tauri:build:local` on a macOS 26 machine)
+  leave `GLASSBOX_PREBUILT_APPLE_FM_HELPER` unset, so `build-sidecar.sh` compiles
+  + signs the helper inline as before — no artifact needed.
+- **Gating composes with this:** any bundle without the helper binary (Intel,
+  Linux, Windows, or an arm64 build that didn't get the artifact) reports
+  `unavailable` from `isAppleFoundationAvailable()` and the settings UI omits the
+  Apple platform — so the platform is never listed where it can't run.
+- **Verification (maintainer, → GB-918):** cut a **beta** first (its signed build
+  exercises this path → prerelease, no `latest` flip), then on a clean
+  (non-build) macOS-26 machine install the signed + notarized bundle and confirm
+  the helper probes `available` and runs inference with no quarantine/Gatekeeper
+  rejection, before a stable cut relies on it.
 
 ## Maintenance triggers
 

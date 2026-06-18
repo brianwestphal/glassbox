@@ -90,6 +90,37 @@ describe('build-sidecar.sh ⇄ tsup.config.ts consistency (GB-887)', () => {
   });
 });
 
+// GB-918 — the Apple FM helper compiles only on macOS 26, but the bundle build
+// runs on macOS 15, so CI passes the prebuilt, signed helper in via
+// GLASSBOX_PREBUILT_APPLE_FM_HELPER. These assert the supply contract stays
+// intact: the script honors the prebuilt path, falls back to compiling locally,
+// bundles whichever it ends up with, and the env-var name stays in sync with the
+// release workflows that set it.
+describe('build-sidecar.sh ⇄ Apple FM helper supply (GB-918)', () => {
+  it('uses the prebuilt helper when GLASSBOX_PREBUILT_APPLE_FM_HELPER is set', () => {
+    expect(sidecarScript).toMatch(/GLASSBOX_PREBUILT_APPLE_FM_HELPER/);
+  });
+
+  it('falls back to compiling the helper locally when no prebuilt is supplied', () => {
+    expect(sidecarScript).toMatch(/build-apple-fm-helper\.sh/);
+  });
+
+  it('bundles the resolved helper into the sidecar server dir', () => {
+    expect(sidecarScript).toMatch(/cp\s+"\$HELPER_SRC"\s+"\$SERVER_DIR\/apple-fm-helper"/);
+  });
+
+  it.each([
+    'release-desktop.yml',
+    'release-candidate.yml',
+  ])('release workflow %s sets GLASSBOX_PREBUILT_APPLE_FM_HELPER for the arm64 build', (wf) => {
+    const workflow = readFileSync(join(repoRoot, '.github/workflows', wf), 'utf-8');
+    expect(workflow).toMatch(/GLASSBOX_PREBUILT_APPLE_FM_HELPER/);
+    // …and provides the artifact it points at via a dedicated macOS-26 job.
+    expect(workflow).toMatch(/runs-on:\s*macos-26/);
+    expect(workflow).toMatch(/name:\s*apple-fm-helper/);
+  });
+});
+
 describe('tauri.conf.json bundle.resources', () => {
   const resources: string[] = tauriConf.bundle.resources;
 
