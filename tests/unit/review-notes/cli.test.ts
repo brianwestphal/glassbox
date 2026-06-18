@@ -2,12 +2,13 @@
  * GB-895 (P1) — the `glassbox note` writer CLI: argument parsing and the
  * end-to-end write into `.pr-notes/`.
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseNoteAdd, runNoteCli } from '../../../src/review-notes/cli.js';
+import { writeReviewNote } from '../../../src/review-notes/store.js';
 
 describe('parseNoteAdd', () => {
   it('parses a full add invocation', () => {
@@ -57,5 +58,31 @@ describe('runNoteCli', () => {
 
   it('errors on an unknown subcommand', async () => {
     await expect(runNoteCli(['frobnicate'], { cwd: repo })).rejects.toThrow(/unknown 'note' subcommand/);
+  });
+
+  it('update edits a note by guid', async () => {
+    const { guid } = writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'old', kind: 'rationale' });
+    await runNoteCli(['update', '--id', guid, '--body', 'new', '--kind', 'risk'], { cwd: repo });
+    const r = JSON.parse(readFileSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'), 'utf-8')) as { runs: { results: { message: { text: string } }[] }[] };
+    expect(r.runs[0].results[0].message.text).toBe('new');
+  });
+
+  it('remove deletes a note by guid', async () => {
+    const { guid } = writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'gone', kind: 'rationale' });
+    await runNoteCli(['remove', '--id', guid], { cwd: repo });
+    expect(existsSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'))).toBe(false);
+  });
+
+  it('update/remove error on an unknown id', async () => {
+    await expect(runNoteCli(['update', '--id', 'nope', '--body', 'x'], { cwd: repo })).rejects.toThrow(/no review note found/);
+    await expect(runNoteCli(['remove', '--id', 'nope'], { cwd: repo })).rejects.toThrow(/no review note found/);
+  });
+
+  it('coalesce removes redundant notes', async () => {
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'dup', kind: 'rationale' });
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'dup', kind: 'rationale' });
+    await runNoteCli(['coalesce', '--file', 'src/x.ts'], { cwd: repo });
+    const r = JSON.parse(readFileSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'), 'utf-8')) as { runs: { results: unknown[] }[] };
+    expect(r.runs[0].results).toHaveLength(1);
   });
 });

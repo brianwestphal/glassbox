@@ -132,7 +132,9 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 - **Final coalescing pass** — On completion, a consolidation pass shall reduce
   unhelpful verbosity (merging or dropping redundant notes) and surface
   cross-cutting relationships that weren't visible while editing a single file
-  (linking related notes across files).
+  (linking related notes across files). The **mechanical dedup** half ships as
+  `glassbox note coalesce` (drops notes with an identical anchor + kind + body,
+  keeping the most recent); the AI-driven cross-cutting *linking* is a follow-up.
 - **Inbound AI-instructions contract** — Glassbox already ships *outbound* AI
   instructions in its markdown export ("here's how to act on annotations"). This
   feature adds the symmetric *inbound* contract: a documented, adoptable
@@ -219,10 +221,12 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 Implementation is expected to proceed in slices, each tracked as its own ticket:
 
 - **P1** *(shipped)* — The `.pr-notes/` SARIF profile (`src/review-notes/`) and a
-  producer-side writer, the `glassbox note` CLI. **Attach only** — revising or
-  removing a note, and the final coalescing pass, remain a follow-up. (The
-  smallest end-to-end slice; the originally-planned channel MCP tool was replaced
-  by the CLI — see §20.4.)
+  producer-side writer, the `glassbox note` CLI: `add`, `update` / `remove` (by
+  note guid, scoped by `--file` or a global search), and a mechanical `coalesce`
+  that drops redundant notes (identical anchor + kind + body, keeping the most
+  recent). The AI-driven cross-cutting *linking* aspect of coalescing (§20.4)
+  remains a follow-up. (The originally-planned channel MCP tool was replaced by
+  the CLI — see §20.4.)
 - **P2** — Ingest and render notes as a distinct, review-comment-style
   annotation source in the diff view.
 - **P3** — Anchor durability via fingerprint re-matching (reuse the stale

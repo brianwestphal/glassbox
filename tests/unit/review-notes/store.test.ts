@@ -8,7 +8,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { writeReviewNote } from '../../../src/review-notes/store.js';
+import { coalesceAll, coalesceFile, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
 import type { ReviewNoteInput } from '../../../src/review-notes/types.js';
 
 let repo: string;
@@ -91,5 +91,65 @@ describe('writeReviewNote — run grouping & round-trip', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'x.ts.000000.sarif'), '{"not":"sarif"}', 'utf-8');
     expect(() => writeReviewNote(repo, note())).toThrow(/refusing to overwrite/);
+  });
+});
+
+describe('removeNote (GB-902)', () => {
+  it('removes a note by guid, scoped to its file', () => {
+    const { guid } = writeReviewNote(repo, note());
+    writeReviewNote(repo, note({ body: 'keep me' }));
+    expect(removeNote(repo, guid, 'src/x.ts')).toBe(true);
+    const log = readShard('.pr-notes/notes/src/x.ts.000000.sarif');
+    expect(log.runs[0].results).toHaveLength(1);
+    expect((log.runs[0].results[0] as { guid: string }).guid).not.toBe(guid);
+  });
+
+  it('finds a note by guid without --file (global walk) and deletes an emptied shard', () => {
+    const { guid } = writeReviewNote(repo, note());
+    expect(removeNote(repo, guid)).toBe(true);
+    expect(existsSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'))).toBe(false);
+  });
+
+  it('returns false for an unknown guid', () => {
+    writeReviewNote(repo, note());
+    expect(removeNote(repo, 'nope', 'src/x.ts')).toBe(false);
+  });
+});
+
+describe('updateNote (GB-902)', () => {
+  it('patches body, kind, confidence, and ticket in place', () => {
+    const { guid } = writeReviewNote(repo, note());
+    expect(updateNote(repo, guid, { body: 'revised', kind: 'risk', confidence: 0.5, ticket: 'GB-902' })).toBe(true);
+    const r = readShard('.pr-notes/notes/src/x.ts.000000.sarif').runs[0].results[0] as {
+      message: { text: string; markdown: string }; level: string; properties: Record<string, unknown>; workItemUris: string[];
+    };
+    expect(r.message.markdown).toBe('revised');
+    expect(r.level).toBe('warning');
+    expect(r.properties.tags).toEqual(['risk']);
+    expect(r.properties['ext-ai-tool-confidence']).toBe(0.5);
+    expect(r.workItemUris).toEqual(['GB-902']);
+  });
+
+  it('returns false for an unknown guid', () => {
+    expect(updateNote(repo, 'nope', { body: 'x' })).toBe(false);
+  });
+});
+
+describe('coalesce (GB-902)', () => {
+  it('drops redundant notes (same anchor+kind+body), keeping the most recent', () => {
+    writeReviewNote(repo, note({ body: 'dup' }));
+    writeReviewNote(repo, note({ body: 'unique' }));
+    const { guid: lastDup } = writeReviewNote(repo, note({ body: 'dup' }));
+    expect(coalesceFile(repo, 'src/x.ts')).toBe(1);
+    const results = readShard('.pr-notes/notes/src/x.ts.000000.sarif').runs[0].results as { guid: string; message: { text: string } }[];
+    expect(results).toHaveLength(2);
+    // The surviving 'dup' is the most recently written one.
+    expect(results.find(r => r.message.text === 'dup')!.guid).toBe(lastDup);
+  });
+
+  it('coalesceAll walks every file and is a no-op when nothing is redundant', () => {
+    writeReviewNote(repo, note({ body: 'a' }));
+    writeReviewNote(repo, note({ file: 'src/y.ts', body: 'b' }));
+    expect(coalesceAll(repo)).toBe(0);
   });
 });

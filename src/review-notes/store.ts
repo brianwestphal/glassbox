@@ -15,14 +15,14 @@
  */
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 
 import { generateId } from '../db/ids.js';
 import type { SarifLog, SarifRun } from './sarif.js';
 import { buildResult, emptyLog, newRun, SarifLogShapeSchema } from './sarif.js';
-import type { ReviewNoteInput } from './types.js';
-import { DEFAULT_PRODUCER, DEFAULT_SHARD_CAP } from './types.js';
+import type { NoteKind, ReviewNoteInput } from './types.js';
+import { CONFIDENCE_PROPERTY_KEY, DEFAULT_PRODUCER, DEFAULT_SHARD_CAP } from './types.js';
 
 const NOTES_SUBDIR = join('.pr-notes', 'notes');
 const SHARD_RE = /\.(\d{6})\.sarif$/;
@@ -169,4 +169,170 @@ export function writeReviewNote(repoRoot: string, input: ReviewNoteInput, opts: 
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(log, null, 2) + '\n', 'utf-8');
   return { path, guid };
+}
+
+// --- Edit / coalesce (GB-902) ----------------------------------------------
+
+/** The subset of a SARIF result we read/mutate. A tight cast at the boundary
+ *  (the result we ourselves wrote); other fields pass through untouched. */
+interface NoteResult {
+  guid?: string;
+  message?: { text?: string; markdown?: string };
+  locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number; endLine?: number } } }[];
+  properties?: { tags?: string[]; [k: string]: unknown };
+  rank?: number;
+  level?: string;
+  workItemUris?: string[];
+  [k: string]: unknown;
+}
+
+/** Patch for `updateNote`. Anchor (file/lines) is immutable — that's a new note. */
+export interface NotePatch {
+  body?: string;
+  kind?: NoteKind;
+  confidence?: number;
+  rank?: number;
+  ticket?: string;
+}
+
+function writeLog(path: string, log: SarifLog): void {
+  writeFileSync(path, JSON.stringify(log, null, 2) + '\n', 'utf-8');
+}
+
+/** Shard file paths for a source file, ascending. */
+function listShardPaths(repoRoot: string, safeRel: string): string[] {
+  return listShardIndices(repoRoot, safeRel).map(i => shardPath(repoRoot, safeRel, i));
+}
+
+/** Every notes shard under `.pr-notes/notes/` — used when the note's file isn't
+ *  known (lookup by guid alone). */
+function allShardPaths(repoRoot: string): string[] {
+  const root = join(repoRoot, NOTES_SUBDIR);
+  if (!existsSync(root)) return [];
+  const entries = readdirSync(root, { recursive: true }) as string[];
+  return entries.filter(e => SHARD_RE.test(e)).map(e => join(root, e));
+}
+
+/** Drop empty runs, then write the shard — or delete it if no results remain. */
+function persistOrDelete(path: string, log: SarifLog): void {
+  log.runs = log.runs.filter(run => run.results.length > 0);
+  if (log.runs.length === 0) {
+    if (existsSync(path)) unlinkSync(path);
+  } else {
+    writeLog(path, log);
+  }
+}
+
+/** Remove a note by guid. Searches the file's shards if `file` is given, else
+ *  every shard. Returns true if a note was removed. */
+export function removeNote(repoRoot: string, guid: string, file?: string): boolean {
+  const paths = file !== undefined ? listShardPaths(repoRoot, sanitizeRel(file)) : allShardPaths(repoRoot);
+  for (const path of paths) {
+    const log = readLog(path);
+    for (const run of log.runs) {
+      const idx = run.results.findIndex(r => (r as NoteResult).guid === guid);
+      if (idx !== -1) {
+        run.results.splice(idx, 1);
+        persistOrDelete(path, log);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Apply a patch to a note by guid (anchor is immutable). Returns true if found. */
+export function updateNote(repoRoot: string, guid: string, patch: NotePatch, file?: string): boolean {
+  const paths = file !== undefined ? listShardPaths(repoRoot, sanitizeRel(file)) : allShardPaths(repoRoot);
+  for (const path of paths) {
+    const log = readLog(path);
+    for (const run of log.runs) {
+      const result = run.results.find(r => (r as NoteResult).guid === guid) as NoteResult | undefined;
+      if (result !== undefined) {
+        if (patch.body !== undefined) result.message = { text: patch.body, markdown: patch.body };
+        if (patch.kind !== undefined) {
+          result.properties = { ...result.properties, tags: [patch.kind] };
+          result.level = patch.kind === 'risk' ? 'warning' : 'none';
+        }
+        if (patch.confidence !== undefined) {
+          result.properties = { ...result.properties, [CONFIDENCE_PROPERTY_KEY]: patch.confidence };
+        }
+        if (patch.rank !== undefined) result.rank = patch.rank;
+        if (patch.ticket !== undefined) result.workItemUris = patch.ticket === '' ? undefined : [patch.ticket];
+        writeLog(path, log);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Identity key for dedup: same anchor + kind + body is a redundant note. */
+function noteKey(r: NoteResult): string {
+  const loc = r.locations?.[0]?.physicalLocation;
+  return JSON.stringify([
+    loc?.artifactLocation?.uri,
+    loc?.region?.startLine,
+    loc?.region?.endLine,
+    r.properties?.tags,
+    r.message?.text,
+  ]);
+}
+
+/**
+ * Mechanical coalescing pass for one file (docs/20 §20.4): drop redundant notes
+ * — identical anchor + kind + body — keeping the most recent (last-written)
+ * occurrence. Returns the number of notes removed. (Cross-cutting AI linking is
+ * a separate, AI-driven concern — tracked as its own follow-up.)
+ */
+export function coalesceFile(repoRoot: string, file: string): number {
+  const paths = listShardPaths(repoRoot, sanitizeRel(file));
+  const logs = paths.map(path => ({ path, log: readLog(path) }));
+
+  interface Ref { logIdx: number; runIdx: number; resultIdx: number; key: string }
+  const refs: Ref[] = [];
+  logs.forEach((entry, logIdx) => {
+    entry.log.runs.forEach((run, runIdx) => {
+      run.results.forEach((r, resultIdx) => {
+        refs.push({ logIdx, runIdx, resultIdx, key: noteKey(r as NoteResult) });
+      });
+    });
+  });
+
+  const lastIndexForKey = new Map<string, number>();
+  refs.forEach((ref, i) => lastIndexForKey.set(ref.key, i));
+  const toRemove = refs.filter((ref, i) => lastIndexForKey.get(ref.key) !== i);
+  if (toRemove.length === 0) return 0;
+
+  // Splice descending within each (log, run) so indices stay valid.
+  const touched = new Set<number>();
+  const byRun = new Map<string, number[]>();
+  for (const ref of toRemove) {
+    const k = `${String(ref.logIdx)}:${String(ref.runIdx)}`;
+    const arr = byRun.get(k) ?? [];
+    arr.push(ref.resultIdx);
+    byRun.set(k, arr);
+    touched.add(ref.logIdx);
+  }
+  for (const [k, idxs] of byRun) {
+    const [logIdx, runIdx] = k.split(':').map(Number);
+    const results = logs[logIdx].log.runs[runIdx].results;
+    for (const idx of idxs.sort((a, b) => b - a)) results.splice(idx, 1);
+  }
+  for (const logIdx of touched) persistOrDelete(logs[logIdx].path, logs[logIdx].log);
+  return toRemove.length;
+}
+
+/** Coalesce every file with notes. Returns the total number removed. */
+export function coalesceAll(repoRoot: string): number {
+  const root = join(repoRoot, NOTES_SUBDIR);
+  if (!existsSync(root)) return 0;
+  const sources = new Set<string>();
+  for (const entry of readdirSync(root, { recursive: true }) as string[]) {
+    const m = SHARD_RE.exec(entry);
+    if (m !== null) sources.add(entry.replace(SHARD_RE, '').replace(/\\/g, '/'));
+  }
+  let total = 0;
+  for (const src of sources) total += coalesceFile(repoRoot, src);
+  return total;
 }

@@ -578,8 +578,10 @@ written spec — not a live MCP tool). Layout is path-sharded
 the mapping is standard SARIF (kind→`tags`, ticket→`workItemUris`,
 producer→`tool.driver`, anchor→`region`+snippet, durability→
 `partialFingerprints`) with exactly one custom field,
-`ext-ai-tool-confidence`. Attach-only so far; reader/render (P2+),
-re-anchoring, artifacts, and analysis-feed remain.
+`ext-ai-tool-confidence`. The CLI does `add` / `update` / `remove` (by
+note guid) / `coalesce` (mechanical dedup of identical notes); the
+AI-driven cross-cutting *linking* half of coalescing, and reader/render
+(P2+), re-anchoring, artifacts, and analysis-feed, remain.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

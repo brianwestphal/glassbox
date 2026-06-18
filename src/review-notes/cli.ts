@@ -9,9 +9,25 @@
 import { spawnSync } from 'child_process';
 import { relative, resolve } from 'path';
 
-import { warnIfPrNotesIgnored, writeReviewNote } from './store.js';
+import type { NotePatch } from './store.js';
+import { coalesceAll, coalesceFile, removeNote, updateNote, warnIfPrNotesIgnored, writeReviewNote } from './store.js';
 import type { NoteKind, ReviewNoteInput } from './types.js';
 import { isNoteKind, NOTE_KINDS } from './types.js';
+
+/** Parse `--flag value` pairs into a map. Throws on a flag with no value. */
+function parseFlags(args: string[]): Map<string, string> {
+  const flags = new Map<string, string>();
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (!a.startsWith('--')) throw new Error(`unexpected argument: ${a}`);
+    const key = a.slice(2);
+    const next = args.at(i + 1);
+    if (next === undefined || next.startsWith('--')) throw new Error(`missing value for --${key}`);
+    flags.set(key, next);
+    i++;
+  }
+  return flags;
+}
 
 interface ParsedAdd {
   file: string;
@@ -28,23 +44,29 @@ interface ParsedAdd {
 }
 
 function noteUsage(): string {
-  return `glassbox note — write an AI-authored, line-anchored review note (docs/20)
+  return `glassbox note — AI-authored, line-anchored review notes (docs/20)
 
 Usage:
-  glassbox note add --file <path> --lines <A[-B]> --kind <kind> --body <text|->  [options]
+  glassbox note add      --file <path> --lines <A[-B]> --kind <kind> --body <text|-> [options]
+  glassbox note update   --id <guid> [--file <path>] [--body <text|->] [--kind <kind>] [--confidence <0..1>] [--rank <0..100>] [--ticket <id>]
+  glassbox note remove   --id <guid> [--file <path>]
+  glassbox note coalesce [--file <path>]
 
-Required:
+add — required:
   --file <path>     Source file the note anchors to (relative to cwd or absolute)
   --lines <A[-B]>   1-based line or line range (e.g. 42 or 42-50)
   --kind <kind>     One of: ${NOTE_KINDS.join(', ')}
   --body <text|->   Markdown body; pass - to read the body from stdin
 
-Options:
+add — options:
   --confidence <0..1>   Author confidence
   --rank <0..100>       Importance
   --ticket <id|url>     Linked ticket
   --producer <name>     Producing tool/agent (e.g. "Claude Code", "Hot Sheet")
   --producer-version <v>
+
+update/remove use the guid returned by 'add' (--file scopes the search; omit to search all notes).
+coalesce drops redundant notes (identical anchor + kind + body), keeping the most recent.
 `;
 }
 
@@ -56,16 +78,7 @@ function parseInteger(label: string, value: string): number {
 
 /** Parse `note add` flags. Pure (no I/O) so it can be unit-tested directly. */
 export function parseNoteAdd(args: string[]): ParsedAdd {
-  const flags = new Map<string, string>();
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (!a.startsWith('--')) throw new Error(`unexpected argument: ${a}`);
-    const key = a.slice(2);
-    const next = args.at(i + 1);
-    if (next === undefined || next.startsWith('--')) throw new Error(`missing value for --${key}`);
-    flags.set(key, next);
-    i++;
-  }
+  const flags = parseFlags(args);
 
   const file = flags.get('file');
   const lines = flags.get('lines');
@@ -141,27 +154,14 @@ function toRepoRelative(repoRoot: string, cwd: string, file: string): string {
   return rel;
 }
 
-/** Entry point for `glassbox note ...`. Throws on error (caller maps to exit 1).
- *  `ctx.cwd` is injectable for testing. */
-export async function runNoteCli(args: string[], ctx: { cwd?: string } = {}): Promise<void> {
-  const cwd = ctx.cwd ?? process.cwd();
-  const sub = args.at(0);
-  if (sub === undefined || sub === 'help' || sub === '--help' || sub === '-h') {
-    console.log(noteUsage());
-    return;
-  }
-  if (sub !== 'add') throw new Error(`unknown 'note' subcommand: ${sub} (expected 'add')`);
-
-  const parsed = parseNoteAdd(args.slice(1));
+async function runAdd(args: string[], cwd: string): Promise<void> {
+  const parsed = parseNoteAdd(args);
   const body = parsed.bodyStdin ? await readStdin() : parsed.body;
-  if (body === undefined || body.trim() === '') {
-    throw new Error('note body is empty');
-  }
+  if (body === undefined || body.trim() === '') throw new Error('note body is empty');
 
   const repoRoot = findRepoRoot(cwd);
-  const fileRel = toRepoRelative(repoRoot, cwd, parsed.file);
   const input: ReviewNoteInput = {
-    file: fileRel,
+    file: toRepoRelative(repoRoot, cwd, parsed.file),
     startLine: parsed.startLine,
     endLine: parsed.endLine,
     body,
@@ -172,8 +172,88 @@ export async function runNoteCli(args: string[], ctx: { cwd?: string } = {}): Pr
     producer: parsed.producer,
     producerVersion: parsed.producerVersion,
   };
-
   warnIfPrNotesIgnored(repoRoot);
   const { path, guid } = writeReviewNote(repoRoot, input);
   console.log(`Wrote review note ${guid} -> ${relative(repoRoot, path)}`);
+}
+
+/** Optional `--file` scopes a guid lookup to one file's shards (fast); without
+ *  it the whole `.pr-notes/` tree is searched. */
+function scopedFile(flags: Map<string, string>, repoRoot: string, cwd: string): string | undefined {
+  const file = flags.get('file');
+  return file === undefined ? undefined : toRepoRelative(repoRoot, cwd, file);
+}
+
+function runRemove(args: string[], cwd: string): void {
+  const flags = parseFlags(args);
+  const id = flags.get('id');
+  if (id === undefined) throw new Error('--id <guid> is required');
+  const repoRoot = findRepoRoot(cwd);
+  const removed = removeNote(repoRoot, id, scopedFile(flags, repoRoot, cwd));
+  if (!removed) throw new Error(`no review note found with id ${id}`);
+  console.log(`Removed review note ${id}`);
+}
+
+async function runUpdate(args: string[], cwd: string): Promise<void> {
+  const flags = parseFlags(args);
+  const id = flags.get('id');
+  if (id === undefined) throw new Error('--id <guid> is required');
+
+  const patch: NotePatch = {};
+  const bodyFlag = flags.get('body');
+  if (bodyFlag !== undefined) patch.body = bodyFlag === '-' ? await readStdin() : bodyFlag;
+  const kind = flags.get('kind');
+  if (kind !== undefined) {
+    if (!isNoteKind(kind)) throw new Error(`--kind must be one of: ${NOTE_KINDS.join(', ')}`);
+    patch.kind = kind;
+  }
+  const confidence = flags.get('confidence');
+  if (confidence !== undefined) {
+    const c = Number(confidence);
+    if (Number.isNaN(c) || c < 0 || c > 1) throw new Error('--confidence must be between 0 and 1');
+    patch.confidence = c;
+  }
+  const rank = flags.get('rank');
+  if (rank !== undefined) {
+    const r = Number(rank);
+    if (!Number.isInteger(r) || r < 0 || r > 100) throw new Error('--rank must be an integer 0..100');
+    patch.rank = r;
+  }
+  if (flags.has('ticket')) patch.ticket = flags.get('ticket');
+
+  if (Object.keys(patch).length === 0) throw new Error('nothing to update — pass at least one of --body/--kind/--confidence/--rank/--ticket');
+
+  const repoRoot = findRepoRoot(cwd);
+  const updated = updateNote(repoRoot, id, patch, scopedFile(flags, repoRoot, cwd));
+  if (!updated) throw new Error(`no review note found with id ${id}`);
+  console.log(`Updated review note ${id}`);
+}
+
+function runCoalesce(args: string[], cwd: string): void {
+  const flags = parseFlags(args);
+  const repoRoot = findRepoRoot(cwd);
+  const file = flags.get('file');
+  const removed = file !== undefined
+    ? coalesceFile(repoRoot, toRepoRelative(repoRoot, cwd, file))
+    : coalesceAll(repoRoot);
+  console.log(`Coalesced review notes — removed ${String(removed)} redundant note(s)`);
+}
+
+/** Entry point for `glassbox note ...`. Throws on error (caller maps to exit 1).
+ *  `ctx.cwd` is injectable for testing. */
+export async function runNoteCli(args: string[], ctx: { cwd?: string } = {}): Promise<void> {
+  const cwd = ctx.cwd ?? process.cwd();
+  const sub = args.at(0);
+  if (sub === undefined || sub === 'help' || sub === '--help' || sub === '-h') {
+    console.log(noteUsage());
+    return;
+  }
+  const rest = args.slice(1);
+  switch (sub) {
+    case 'add': await runAdd(rest, cwd); return;
+    case 'remove': runRemove(rest, cwd); return;
+    case 'update': await runUpdate(rest, cwd); return;
+    case 'coalesce': runCoalesce(rest, cwd); return;
+    default: throw new Error(`unknown 'note' subcommand: ${sub} (expected add/update/remove/coalesce)`);
+  }
 }
