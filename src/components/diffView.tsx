@@ -1,4 +1,5 @@
 import type { SafeHtml } from 'kerfjs';
+import { raw } from 'kerfjs';
 
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
@@ -8,6 +9,7 @@ import type { ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { truncateDiffLine } from '../utils/lineTruncate.js';
+import { renderNoteMarkdown } from '../utils/noteMarkdown.js';
 import { ImageDiff } from './imageDiff.js';
 
 export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
@@ -387,7 +389,8 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
           <div className="ai-note-item">
             <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
             {n.stale === true ? <span className="ai-note-stale-tag" title="The code this note referred to has changed">outdated</span> : null}
-            <span className="ai-note-text">{n.body}</span>
+            {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
+            <span className="ai-note-text">{raw(renderNoteMarkdown(n.body))}</span>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
             {n.guid !== undefined ? <button className="ai-note-reply-btn" data-line={String(n.line)}>Reply</button> : null}
             {n.stale === true && n.guid !== undefined ? (

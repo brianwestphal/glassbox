@@ -165,6 +165,16 @@ describe('DiffView', () => {
     expect(html).not.toContain('<b>x</b>');
   });
 
+  it('renders markdown in a review note body (GB-909)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ line: 1, side: 'new', kind: 'proof', body: 'call `foo()` — it is **safe**' }],
+    }).toString();
+    expect(html).toContain('<code>foo()</code>');
+    expect(html).toContain('<strong>safe</strong>');
+  });
+
   it('renders binary file message for non-image binary', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ isBinary: true, filePath: 'data.bin' }),

@@ -599,8 +599,11 @@ column, tagged "↳ reply". **Stale keep/discard shipped**: an outdated
 note offers Keep (dismiss the flag) / Discard (`DELETE
 /api/review-notes/:guid` → `removeNote`). **Reply nesting shipped**:
 replies render nested directly beneath their note (orphans fall back to
-line rendering). Remaining: the AI-driven cross-cutting *linking* half of
-coalescing, P4 artifacts, and markdown rendering of note bodies.
+line rendering). **Markdown bodies shipped**: note bodies (review notes +
+the risk/narrative/guided AI notes) render via a safe, escape-first inline
+renderer (`src/utils/noteMarkdown.ts` — code/bold/italic/links, scheme-
+gated). Remaining: the AI-driven cross-cutting *linking* half of
+coalescing, and P4 artifacts.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

@@ -407,6 +407,14 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
   });
 
+  test('a review note body renders markdown (GB-909)', async ({ page }) => {
+    await openModifiedFile(page);
+    // The rationale note (line 14) uses code spans and bold.
+    await expect(page.locator('.ai-note-review code').filter({ hasText: 'createSession' }).first())
+      .toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ai-note-review strong').filter({ hasText: 'async' }).first()).toBeVisible();
+  });
+
   test('a reply to a review note renders nested beneath it (GB-908)', async ({ page }) => {
     await openModifiedFile(page);
     // The demo seeds a reply to the line-31 risk note; it renders nested.

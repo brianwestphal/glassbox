@@ -1,3 +1,6 @@
+import { raw } from 'kerfjs';
+
+import { renderNoteMarkdown } from '../../utils/noteMarkdown.js';
 import { toElement } from '../dom.js';
 import type { FileNotes } from '../state.js';
 import { aiStore } from '../stores/index.js';
@@ -45,7 +48,8 @@ function renderOverviewNote(container: HTMLElement, overview: string, noteType: 
         <span className={`ai-note-label ai-note-label-${noteType}`}>
           {NOTE_LABELS[noteType] ?? noteType}
         </span>
-        <span className="ai-note-text">{overview}</span>
+        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
+        <span className="ai-note-text">{raw(renderNoteMarkdown(overview))}</span>
       </div>
     </div>
   );
@@ -82,7 +86,8 @@ function renderLineNotes(container: HTMLElement, lines: FileNotes['lines'], note
           <span className={`ai-note-label ai-note-label-${noteType}`}>
             {NOTE_LABELS[noteType] ?? noteType}
           </span>
-          <span className="ai-note-text">{note.content}</span>
+          {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
+          <span className="ai-note-text">{raw(renderNoteMarkdown(note.content))}</span>
         </div>
       </div>
     );

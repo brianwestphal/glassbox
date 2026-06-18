@@ -170,7 +170,9 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 
 - **Rendered like review comments** — Notes shall be presented primarily the way
   existing line-level review comments are, anchored in the diff at their line,
-  not in a separate side pane.
+  not in a separate side pane. Bodies render as **markdown** (inline code, bold,
+  italic, and http(s)/mailto links — via a safe, escape-first renderer
+  `src/utils/noteMarkdown.ts`, shared with the risk/narrative/guided AI notes).
 - **Visually distinct as AI-authored** — Notes shall be styled distinctly so it
   is immediately apparent they are AI-authored review companions rather than the
   reviewer's own annotations — following the precedent of the guided-review
@@ -188,8 +190,7 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   a normal human annotation linked by a nullable `reply_to_note_id` column on
   `annotations`, rendered with a "↳ reply" tag and **nested directly beneath the
   note** it answers (an orphan reply — whose note isn't loaded — falls back to
-  line rendering). Markdown rendering of note bodies is a remaining polish
-  follow-up.
+  line rendering).
 
 ### 20.7 Cross-tool integration (Hot Sheet and other orchestrators)
 
