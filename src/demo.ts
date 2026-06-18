@@ -13,12 +13,12 @@ import type { ReviewNoteView } from './review-notes/view.js';
 export function demoReviewNotes(filePath: string): ReviewNoteView[] {
   if (filePath !== 'src/auth/session.ts') return [];
   return [
-    { line: 14, side: 'new', kind: 'rationale', body: 'createSession is async now because session state moved from an in-process Map to Redis; callers must await it.', confidence: 0.9, producer: 'Claude Code' },
-    { line: 23, side: 'new', kind: 'proof', body: 'The TTL is written atomically with the value via the EX option, so a session can never be stored without an expiry.', producer: 'Claude Code' },
-    { line: 31, side: 'new', kind: 'risk', body: 'expiresAt round-trips through JSON as a string and is re-wrapped in Date() — verify the comparison holds in your runtime.', confidence: 0.6, producer: 'Claude Code' },
+    { guid: 'demo-note-rationale', line: 14, side: 'new', kind: 'rationale', body: 'createSession is async now because session state moved from an in-process Map to Redis; callers must await it.', confidence: 0.9, producer: 'Claude Code' },
+    { guid: 'demo-note-proof', line: 23, side: 'new', kind: 'proof', body: 'The TTL is written atomically with the value via the EX option, so a session can never be stored without an expiry.', producer: 'Claude Code' },
+    { guid: 'demo-note-risk', line: 31, side: 'new', kind: 'risk', body: 'expiresAt round-trips through JSON as a string and is re-wrapped in Date() — verify the comparison holds in your runtime.', confidence: 0.6, producer: 'Claude Code' },
     // Re-anchoring showcase (P3): authored against a 16-byte id, but the code
     // now uses 32 bytes, so the note no longer matches and renders as stale.
-    { line: 15, side: 'new', kind: 'assumption', body: 'Assumed a 16-byte token id here — the implementation has since changed, so this note is out of date.', producer: 'Claude Code', snippet: "  const id = randomBytes(16).toString('hex');" },
+    { guid: 'demo-note-stale', line: 15, side: 'new', kind: 'assumption', body: 'Assumed a 16-byte token id here — the implementation has since changed, so this note is out of date.', producer: 'Claude Code', snippet: "  const id = randomBytes(16).toString('hex');" },
   ];
 }
 

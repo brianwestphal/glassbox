@@ -15,6 +15,8 @@ export interface Annotation {
   category: string;
   content: string;
   is_stale: boolean;
+  /** SARIF guid of the AI review note this annotation replies to (doc 20 threading). */
+  reply_to_note_id?: string | null;
 }
 
 export interface DragAnnotation {

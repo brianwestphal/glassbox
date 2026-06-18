@@ -334,6 +334,23 @@
   opacity: 0.7;
 }
 
+// "Reply" affordance on a review-note row (doc 20 threading).
+.ai-note-reply-btn {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+
+  &:hover { color: var(--text); border-color: var(--accent); }
+}
+.ai-note-producer + .ai-note-reply-btn { margin-left: 8px; }
+
 // A review note whose anchored code has changed since it was written (P3).
 .ai-note-stale {
   opacity: 0.6;

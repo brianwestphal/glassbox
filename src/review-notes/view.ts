@@ -19,6 +19,8 @@ export const REVIEW_NOTE_LABELS: Record<string, string> = {
 
 /** One review note, flattened from SARIF and anchored to a diff line. */
 export interface ReviewNoteView {
+  /** The note's SARIF guid — the stable anchor a reviewer reply links to. */
+  guid?: string;
   line: number;
   side: 'old' | 'new';
   kind: NoteKind;

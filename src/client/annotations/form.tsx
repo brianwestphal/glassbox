@@ -39,7 +39,7 @@ export function bindCreateFormEvents(diffContainer: HTMLElement): void {
   });
 }
 
-export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, side: string): void {
+export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, side: string, replyToNoteId?: string): void {
   // Dismiss any existing create-form (only one open at a time).
   document.querySelectorAll('.annotation-form-container[data-form-key]').forEach(el => { el.remove(); });
 
@@ -51,13 +51,15 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
     formKey,
     content: '',
     category: defaultCategory,
+    replyToNoteId,
   });
 
   const container = toElement(
     <div className="annotation-form-container" data-form-key={formKey} data-line={String(lineNumber)} data-side={side}>
-      <div className="annotation-form">
+      <div className={`annotation-form${replyToNoteId !== undefined ? ' annotation-form-reply' : ''}`}>
+        {replyToNoteId !== undefined ? <span className="annotation-reply-tag">↳ replying to AI note</span> : null}
         {buildCategoryBadge(defaultCategory)}
-        <textarea placeholder="Enter your annotation..." autoFocus></textarea>
+        <textarea placeholder={replyToNoteId !== undefined ? 'Reply to this note...' : 'Enter your annotation...'} autoFocus></textarea>
         <div className="annotation-form-actions">
           <button className="btn btn-sm cancel-btn">Cancel</button>
           <button className="btn btn-sm btn-primary annotation-save-btn">Save</button>
@@ -101,6 +103,7 @@ async function saveNewAnnotation(): Promise<void> {
     side: side as AnnotationSide,
     category: state.category as AnnotationCategory,
     content,
+    replyToNoteId: state.replyToNoteId,
   });
 
   document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${state.formKey}"]`).forEach(el => { el.remove(); });

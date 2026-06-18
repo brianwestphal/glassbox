@@ -32,8 +32,10 @@ describe('loadReviewNotesForFile', () => {
 
     const notes = loadReviewNotesForFile(repo, 'src/x.ts');
     expect(notes).toHaveLength(2);
-    // snippet is the authored text (file lines 5–6), kept for P3 re-anchoring.
-    expect(notes).toContainEqual({ line: 5, side: 'new', kind: 'rationale', body: 'why', confidence: 0.8, producer: 'Claude Code', snippet: 'e\nf' });
+    // snippet is the authored text (file lines 5–6), kept for P3 re-anchoring;
+    // guid is a generated id (threading anchor), so match the rest.
+    expect(notes).toContainEqual(expect.objectContaining({ line: 5, side: 'new', kind: 'rationale', body: 'why', confidence: 0.8, producer: 'Claude Code', snippet: 'e\nf' }));
+    expect(notes.find(n => n.kind === 'rationale')!.guid).toEqual(expect.any(String));
     // No producer / confidence supplied → default producer, undefined confidence.
     const risk = notes.find(n => n.kind === 'risk')!;
     expect(risk.line).toBe(2);

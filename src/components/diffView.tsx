@@ -370,12 +370,14 @@ function ReviewNoteRows({ notes }: { notes: ReviewNoteView[] }) {
   return (
     <>
       {notes.map(n => (
-        <div className={`ai-note-row ai-note-review${n.stale === true ? ' ai-note-stale' : ''}`} data-kind={n.kind}>
+        <div className={`ai-note-row ai-note-review${n.stale === true ? ' ai-note-stale' : ''}`}
+          data-kind={n.kind} data-note-id={n.guid}>
           <div className="ai-note-item">
             <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
             {n.stale === true ? <span className="ai-note-stale-tag" title="The code this note referred to has changed">outdated</span> : null}
             <span className="ai-note-text">{n.body}</span>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
+            {n.guid !== undefined ? <button className="ai-note-reply-btn" data-line={String(n.line)}>Reply</button> : null}
           </div>
         </div>
       ))}
@@ -391,6 +393,7 @@ function AnnotationRows({ annotations }: { annotations: Annotation[] }) {
           data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
           <span className="annotation-drag-handle" draggable={true} title="Drag to move">⠿</span>
           <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
+          {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note">↳ reply</span> : null}
           <span className="annotation-text">{a.content}</span>
           <div className="annotation-actions">
             {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}

@@ -163,6 +163,9 @@ export interface EditFormState {
   formKey: string | null;
   content: string;
   category: string;
+  /** When the create form was opened via "Reply" on an AI review note, the
+   *  note's SARIF guid the new annotation should link to (doc 20 threading). */
+  replyToNoteId?: string;
 }
 
 export const editFormSignal = signal<EditFormState | null>(null);

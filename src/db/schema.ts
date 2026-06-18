@@ -39,6 +39,7 @@ export const SCHEMA_CORE_SQL = `
     content TEXT NOT NULL,
     is_stale BOOLEAN NOT NULL DEFAULT FALSE,
     original_content TEXT,
+    reply_to_note_id TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   );

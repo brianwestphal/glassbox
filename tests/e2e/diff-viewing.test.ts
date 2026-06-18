@@ -384,4 +384,24 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4);
     await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1);
   });
+
+  test('a reviewer can reply to an AI note, creating a linked annotation (GB-906)', async ({ page }) => {
+    await openModifiedFile(page);
+    const replyBtn = page.locator('.ai-note-reply-btn').first();
+    await expect(replyBtn).toBeVisible({ timeout: 5000 });
+    await replyBtn.click();
+
+    // The create form opens, framed as a reply.
+    const form = page.locator('.annotation-form-container');
+    await expect(form).toBeVisible();
+    await expect(page.locator('.annotation-form-reply')).toBeVisible();
+
+    await form.locator('textarea').fill('I have a follow-up question on this');
+    await form.locator('.annotation-save-btn').click();
+
+    // The saved reply renders as an annotation marked as a reply to a note.
+    await expect(page.locator('.annotation-item').filter({ hasText: 'I have a follow-up question on this' }))
+      .toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.annotation-reply-tag').first()).toBeVisible();
+  });
 });

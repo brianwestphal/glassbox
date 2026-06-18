@@ -592,9 +592,12 @@ against the current diff at load (moves shifted notes, flags vanished
 ones stale with an "outdated" badge). **P5 (analysis-feed) shipped**:
 `format.ts` folds notes into the analysis prompt (an "Author review
 notes" section in `runAnalysisBatch`, informing risk/narrative/guided)
-and into the `latest-review.md` export. Remaining: the AI-driven
-cross-cutting *linking* half of coalescing, P4 artifacts, threading,
-stale keep/discard, and markdown bodies.
+and into the `latest-review.md` export. **Threading shipped**: a reviewer
+can Reply to a note (the row carries its `guid` + a Reply button); the
+reply is a human annotation linked by a nullable `reply_to_note_id`
+column, tagged "↳ reply". Remaining: the AI-driven cross-cutting
+*linking* half of coalescing, P4 artifacts, stale keep/discard, markdown
+bodies, and nesting replies directly beneath their note.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

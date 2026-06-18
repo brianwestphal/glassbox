@@ -20,7 +20,7 @@ function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
   return {
     id: 'a1', review_file_id: 'f1', line_number: 1, side: 'new',
     category: 'bug', content: 'Fix this', is_stale: false,
-    original_content: null, created_at: '', updated_at: '', ...overrides,
+    original_content: null, reply_to_note_id: null, created_at: '', updated_at: '', ...overrides,
   };
 }
 
@@ -82,6 +82,26 @@ describe('DiffView', () => {
     }).toString();
     expect(html).toContain('ai-note-row ai-note-review');
     expect(html).toContain('why it holds');
+  });
+
+  it('renders a Reply button and data-note-id on a review note with a guid (GB-906)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ guid: 'note-abc', line: 1, side: 'new', kind: 'rationale', body: 'why' }],
+    }).toString();
+    expect(html).toContain('data-note-id="note-abc"');
+    expect(html).toContain('ai-note-reply-btn');
+  });
+
+  it('marks a human annotation as a reply when it links to a note (GB-906)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [makeAnnotation({ line_number: 1, reply_to_note_id: 'note-abc', content: 'I disagree' })],
+      mode: 'unified',
+    }).toString();
+    expect(html).toContain('annotation-reply-tag');
+    expect(html).toContain('I disagree');
   });
 
   it('marks a stale review note as outdated (GB-897)', () => {

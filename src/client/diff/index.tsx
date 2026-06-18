@@ -359,6 +359,18 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     if (target_ !== null) showAnnotationForm(el, target_.line, target_.side);
   });
 
+  // Reply to an AI review note (doc 20 threading) — open the annotation form
+  // under the note, linked to its SARIF guid.
+  void delegate(container, 'click', '.ai-note-reply-btn', (e, btn) => {
+    e.stopPropagation();
+    const btnEl = asEl(btn);
+    const noteRow = btnEl.closest('.ai-note-row');
+    const guid = noteRow?.getAttribute('data-note-id') ?? '';
+    const line = parseInt(btnEl.dataset.line ?? '', 10);
+    if (noteRow === null || guid === '' || isNaN(line)) return;
+    showAnnotationForm(asEl(noteRow), line, 'new', guid);
+  });
+
   // Drag-and-drop annotation onto a different line
   void delegate(container, 'dragover', '.diff-line', (e, line) => {
     if (dragStore.state.value.annotation === null) return;

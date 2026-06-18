@@ -181,9 +181,13 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 - **Artifact rendering** — Diagram-source artifacts render inline (Mermaid),
   screenshots render through the existing image-diff component, and test output
   renders as a code block.
-- **Threading** *(follow-up)* — A reviewer shall be able to reply to an AI note
-  with their own annotation, turning a note into a line-anchored conversation.
-  (Deferred out of P2 — rendering shipped first; threading is its own ticket.)
+- **Threading** *(shipped)* — A reviewer can reply to an AI note with their own
+  annotation, turning a note into a line-anchored conversation. The note row
+  carries its SARIF `guid` (`data-note-id`) and a **Reply** button; the reply is
+  a normal human annotation linked by a nullable `reply_to_note_id` column on
+  `annotations`, rendered with a "↳ reply" tag. (Replies render on the note's
+  line marked as replies; precise visual nesting *directly beneath* the note,
+  and markdown rendering of note bodies, are polish follow-ups.)
 
 ### 20.7 Cross-tool integration (Hot Sheet and other orchestrators)
 

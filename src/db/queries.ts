@@ -126,14 +126,15 @@ export async function deleteReviewFile(id: string): Promise<void> {
 // --- Annotations ---
 
 export async function addAnnotation(
-  reviewFileId: string, lineNumber: number, side: string, category: string, content: string
+  reviewFileId: string, lineNumber: number, side: string, category: string, content: string,
+  replyToNoteId?: string
 ): Promise<Annotation> {
   const db = await getDb();
   const id = generateId();
   const result = await db.query(
-    `INSERT INTO annotations (id, review_file_id, line_number, side, category, content)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [id, reviewFileId, lineNumber, side, category, content]
+    `INSERT INTO annotations (id, review_file_id, line_number, side, category, content, reply_to_note_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [id, reviewFileId, lineNumber, side, category, content, replyToNoteId ?? null]
   );
   const annotation = parseRow(AnnotationSchema, result.rows[0]);
   if (annotation === undefined) throw new Error('addAnnotation: INSERT did not return a row');

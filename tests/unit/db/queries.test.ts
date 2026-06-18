@@ -273,8 +273,19 @@ describe('queries', () => {
       expect(ann.content).toBe('This is a bug');
       expect(ann.is_stale).toBe(false);
       expect(ann.original_content).toBeNull();
+      expect(ann.reply_to_note_id).toBeNull();
       expect(ann.created_at).toBeDefined();
       expect(ann.updated_at).toBeDefined();
+    });
+
+    it('addAnnotation stores reply_to_note_id when replying to an AI review note (GB-906)', async () => {
+      const review = await createReview('/repo/ann-reply', 'repo', 'uncommitted');
+      const file = await addReviewFile(review.id, 'test.ts', '{}');
+      const reply = await addAnnotation(file.id, 7, 'new', 'note', 'I disagree with this', 'note-guid-123');
+      expect(reply.reply_to_note_id).toBe('note-guid-123');
+
+      const fetched = await getAnnotationsForFile(file.id);
+      expect(fetched[0].reply_to_note_id).toBe('note-guid-123');
     });
 
     it('getAnnotationsForFile returns ordered by line_number', async () => {

@@ -25,6 +25,8 @@ export const CreateAnnotationReqSchema = z.object({
   side: AnnotationSideSchema,
   category: AnnotationCategorySchema,
   content: z.string().min(1),
+  /** SARIF guid of the AI review note this annotation replies to (doc 20 threading). */
+  replyToNoteId: z.string().optional(),
 });
 export type CreateAnnotationReq = z.infer<typeof CreateAnnotationReqSchema>;
 export const CreateAnnotationRespSchema = AnnotationSchema;

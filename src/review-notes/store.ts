@@ -367,6 +367,7 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
         if (startLine === undefined || kind === undefined || !isNoteKind(kind)) continue;
         const confidence = r.properties?.[CONFIDENCE_PROPERTY_KEY];
         out.push({
+          guid: r.guid,
           line: startLine,
           side: 'new',
           kind,

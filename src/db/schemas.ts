@@ -77,6 +77,10 @@ export const AnnotationSchema = z.object({
   content: z.string(),
   is_stale: z.boolean(),
   original_content: z.string().nullable(),
+  // The SARIF guid of the AI review note this annotation replies to (doc 20
+  // threading), or null for a normal annotation. `.default(null)` tolerates
+  // rows written before the column existed.
+  reply_to_note_id: z.string().nullable().default(null),
   created_at: TimestampSchema,
   updated_at: TimestampSchema,
 });
