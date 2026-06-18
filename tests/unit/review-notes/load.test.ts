@@ -32,7 +32,8 @@ describe('loadReviewNotesForFile', () => {
 
     const notes = loadReviewNotesForFile(repo, 'src/x.ts');
     expect(notes).toHaveLength(2);
-    expect(notes).toContainEqual({ line: 5, side: 'new', kind: 'rationale', body: 'why', confidence: 0.8, producer: 'Claude Code' });
+    // snippet is the authored text (file lines 5–6), kept for P3 re-anchoring.
+    expect(notes).toContainEqual({ line: 5, side: 'new', kind: 'rationale', body: 'why', confidence: 0.8, producer: 'Claude Code', snippet: 'e\nf' });
     // No producer / confidence supplied → default producer, undefined confidence.
     const risk = notes.find(n => n.kind === 'risk')!;
     expect(risk.line).toBe(2);

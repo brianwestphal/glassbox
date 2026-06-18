@@ -334,6 +334,25 @@
   opacity: 0.7;
 }
 
+// A review note whose anchored code has changed since it was written (P3).
+.ai-note-stale {
+  opacity: 0.6;
+
+  .ai-note-text { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, 0.25); }
+}
+
+.ai-note-stale-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--orange, #fab387);
+  background: rgba(250, 179, 135, 0.15);
+}
+
 .ai-note-label-rationale { color: var(--blue, #89b4fa); background: rgba(137, 180, 250, 0.15); }
 .ai-note-label-proof { color: var(--green, #a6e3a1); background: rgba(166, 227, 161, 0.15); }
 .ai-note-label-assumption { color: var(--yellow, #f9e2af); background: rgba(249, 226, 175, 0.15); }

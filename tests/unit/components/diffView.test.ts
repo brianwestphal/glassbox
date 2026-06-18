@@ -84,6 +84,16 @@ describe('DiffView', () => {
     expect(html).toContain('why it holds');
   });
 
+  it('marks a stale review note as outdated (GB-897)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ line: 1, side: 'new', kind: 'risk', body: 'no longer applies', stale: true }],
+    }).toString();
+    expect(html).toContain('ai-note-stale');
+    expect(html).toContain('outdated');
+  });
+
   it('escapes a note body so markup cannot break rendering (GB-896)', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),

@@ -179,7 +179,7 @@ export function writeReviewNote(repoRoot: string, input: ReviewNoteInput, opts: 
 interface NoteResult {
   guid?: string;
   message?: { text?: string; markdown?: string };
-  locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number; endLine?: number } } }[];
+  locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number; endLine?: number; snippet?: { text?: string } } } }[];
   properties?: { tags?: string[]; [k: string]: unknown };
   rank?: number;
   level?: string;
@@ -361,7 +361,8 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
       const producer = run.tool.driver.name;
       for (const raw of run.results) {
         const r = raw as NoteResult;
-        const startLine = r.locations?.[0]?.physicalLocation?.region?.startLine;
+        const region = r.locations?.[0]?.physicalLocation?.region;
+        const startLine = region?.startLine;
         const kind = r.properties?.tags?.[0];
         if (startLine === undefined || kind === undefined || !isNoteKind(kind)) continue;
         const confidence = r.properties?.[CONFIDENCE_PROPERTY_KEY];
@@ -372,6 +373,7 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
           body: r.message?.text ?? '',
           confidence: typeof confidence === 'number' ? confidence : undefined,
           producer: producer === '' ? undefined : producer,
+          snippet: region?.snippet?.text,
         });
       }
     }

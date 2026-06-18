@@ -106,11 +106,13 @@ another AI) an optimized way to consume it.
 - **Content fingerprint** — Each note shall carry `partialFingerprints` derived
   from the normalized anchored text, so it can be re-located after surrounding
   edits shift line numbers.
-- **Re-match through the existing stale machinery** — When Glassbox loads notes
-  against the current tree, it shall re-anchor them using the same
-  match-or-mark-stale logic it already applies to human annotations: a matched
-  note renders at its current line; an unmatchable note is flagged stale
-  (`baselineState: absent`) for the reviewer to keep or discard.
+- **Re-match through the existing stale machinery** *(shipped, P3)* — When
+  Glassbox loads notes against the current tree, it re-anchors them using the
+  same match-or-mark-stale logic it applies to human annotations
+  (`reanchorReviewNotes`, mirroring `src/review-update.ts`): a matched note
+  renders at its current line; an unmatchable note is flagged stale and rendered
+  with an "outdated" badge. (Interactive keep/discard of a stale note is a
+  follow-up.)
 
 ### 20.4 Authoring
 
@@ -242,8 +244,13 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   per-kind badge. Demo mode serves illustrative notes. Note bodies render as
   plain text for now (markdown rendering is a later polish); **threading**
   (reviewer replies) is a separate follow-up.
-- **P3** — Anchor durability via fingerprint re-matching (reuse the stale
-  matcher).
+- **P3** *(shipped)* — Anchor durability: `reanchorReviewNotes`
+  (`src/review-notes/reanchor.ts`) re-matches each note's authored text against
+  the current diff at load time (the same content-near-the-line approach the
+  human-annotation stale matcher uses) — a note whose line shifted is moved, one
+  whose text is gone is flagged `stale` and rendered with an "outdated" badge.
+  The note's authored snippet is carried on the view; interactive keep/discard of
+  a stale note (which edits `.pr-notes/`) is a follow-up.
 - **P4** — Artifact rendering (diagram source / screenshot via image-diff / test
   output) and the Git LFS wiring.
 - **P5** — Feed notes into the existing risk/narrative analysis and the markdown

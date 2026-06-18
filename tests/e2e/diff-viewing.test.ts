@@ -360,18 +360,20 @@ test.describe('Diff viewing: Unified mode char diff', () => {
 });
 
 test.describe('AI-authored review notes (doc 20 P2)', () => {
-  // Demo mode serves illustrative `.pr-notes/` notes for session.ts (lines 14,
-  // 23, 31 on the new side). They must render review-comment-style, styled
-  // distinctly as AI-authored, in both diff modes.
+  // Demo mode serves illustrative `.pr-notes/` notes for session.ts: three
+  // aligned notes plus one whose anchored code changed (rendered stale, P3).
   test('review notes render as distinct AI-authored rows in split mode', async ({ page }) => {
     await openModifiedFile(page);
     const rows = page.locator('.ai-note-row.ai-note-review');
     await expect(rows.first()).toBeVisible({ timeout: 5000 });
-    await expect(rows).toHaveCount(3);
+    await expect(rows).toHaveCount(4);
     // Per-kind badges + producer attribution.
     await expect(page.locator('.ai-note-label-rationale')).toBeVisible();
     await expect(page.locator('.ai-note-label-risk')).toBeVisible();
     await expect(page.locator('.ai-note-producer').first()).toHaveText('Claude Code');
+    // The re-anchored note whose code changed is flagged outdated (P3).
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1);
+    await expect(page.locator('.ai-note-stale-tag')).toHaveText('outdated');
   });
 
   test('review notes also render in unified mode', async ({ page }) => {
@@ -379,6 +381,7 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await page.locator('[data-diff-mode="unified"]').click();
     await expect(page.locator('.diff-table-unified')).toBeVisible();
     await expect(page.locator('.ai-note-row.ai-note-review').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
+    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4);
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1);
   });
 });

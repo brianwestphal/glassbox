@@ -370,9 +370,10 @@ function ReviewNoteRows({ notes }: { notes: ReviewNoteView[] }) {
   return (
     <>
       {notes.map(n => (
-        <div className="ai-note-row ai-note-review" data-kind={n.kind}>
+        <div className={`ai-note-row ai-note-review${n.stale === true ? ' ai-note-stale' : ''}`} data-kind={n.kind}>
           <div className="ai-note-item">
             <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
+            {n.stale === true ? <span className="ai-note-stale-tag" title="The code this note referred to has changed">outdated</span> : null}
             <span className="ai-note-text">{n.body}</span>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
           </div>

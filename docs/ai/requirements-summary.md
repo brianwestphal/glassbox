@@ -586,9 +586,12 @@ wording never forks from the CLI). **P2 (reader + render) shipped**:
 `loadReviewNotesForFile` flattens `.pr-notes/` SARIF into diff-anchored
 views (`view.ts`), and `DiffView` server-renders them full-width below
 their line (flow-broken like annotations so split columns stay aligned),
-styled distinctly as AI-authored with a per-kind badge. Remaining: the
-AI-driven cross-cutting *linking* half of coalescing, P3 re-anchoring, P4
-artifacts, P5 analysis-feed, threading, and markdown bodies.
+styled distinctly as AI-authored with a per-kind badge. **P3 (re-anchor)
+shipped**: `reanchorReviewNotes` re-matches each note's authored snippet
+against the current diff at load (moves shifted notes, flags vanished
+ones stale with an "outdated" badge). Remaining: the AI-driven
+cross-cutting *linking* half of coalescing, P4 artifacts, P5
+analysis-feed, threading, stale keep/discard, and markdown bodies.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

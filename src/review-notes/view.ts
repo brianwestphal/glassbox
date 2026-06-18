@@ -25,4 +25,10 @@ export interface ReviewNoteView {
   body: string;
   confidence?: number;
   producer?: string;
+  /** The text the note was authored against, used to re-anchor it against the
+   *  current tree (docs/20 §20.3 P3). */
+  snippet?: string;
+  /** Set by re-anchoring when the authored text can no longer be found at or
+   *  near the note's line — the note is shown but flagged as possibly outdated. */
+  stale?: boolean;
 }

@@ -17,6 +17,7 @@ import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
 import { emptyFileDiff } from '../git/parseDiffData.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-rasterize.js';
 import { IconReveal } from '../icons.js';
+import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
 
@@ -123,10 +124,13 @@ pageRoutes.get('/file/:fileId', async (c) => {
   }
 
   // AI-authored review notes from `.pr-notes/` (docs/20 P2). Demo mode has no
-  // on-disk notes, so it serves a small illustrative set instead.
-  const reviewNotes = getDemoMode() !== null
+  // on-disk notes, so it serves a small illustrative set instead. Re-anchor them
+  // against the current diff so a note whose line shifted lands correctly and a
+  // note whose text is gone is flagged stale (docs/20 §20.3 P3).
+  const rawNotes = getDemoMode() !== null
     ? demoReviewNotes(file.file_path)
     : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
+  const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff);
 
   const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} />;
   return c.html(html.toString());
