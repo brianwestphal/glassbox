@@ -302,85 +302,57 @@ step_release_notes() {
   else
     last_tag=$(git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*' 2>/dev/null || echo "")
   fi
-  local log_range="${last_tag:+${last_tag}..HEAD}"
-  local commit_log
-  commit_log=$(git log ${log_range:-"-30"} --format="%s" --no-decorate)
-  local commit_count
-  commit_count=$(echo "$commit_log" | grep -c '^' || echo "0")
+  # Range gitgist summarizes. When there's no anchoring tag yet, omit the
+  # range entirely and let gitgist fall back to its own default (latest tag
+  # → full history).
+  local range="${last_tag:+${last_tag}..HEAD}"
 
-  # Branch the prompt body on BETA_MODE. A beta cycle diffs against the
-  # immediately-previous tag (5–20 commits typically) and wants a tight
-  # 5–10-bullet summary so each beta's notes don't repeat the prior one's.
-  # A stable cut diffs against the last PRODUCTION tag, which over a v0.X
-  # → v0.X+1 cycle can be 100+ commits totalling many KB of subject text;
-  # the tight beta budget instructs the model to drop ~95% of the content,
-  # so the stable prompt asks for a wider, section-grouped summary plus
-  # tells the model how many commits it's summarizing so it self-paces.
+  # Drafting is delegated to gitgist (https://github.com/brianwestphal/gitgist),
+  # which owns the prompt, AI-provider selection (its `auto` backend reuses the
+  # signed-in `claude` CLI, then ANTHROPIC_API_KEY, then on-device Apple FM),
+  # code-fence stripping, and noise filtering (ticket IDs, refactors, tests,
+  # CI/doc-only changes). gitgist's prompt scales detail to the volume of work,
+  # so a small beta range yields a tight summary and a large stable cycle a
+  # thorough, section-grouped one — no separate beta/stable prompt needed here.
+  local gitgist
+  gitgist=$(resolve_gitgist)
+
   local generated=""
-  if command -v claude &>/dev/null; then
-    info "Drafting release notes with Claude (${commit_count} commits since ${last_tag:-last 30})..."
-    local prompt
-    local beta_rules
-    beta_rules="Rules:
-- Output ONLY markdown bullets — no heading, no preamble, no closing remarks.
-- Each bullet is ONE short line (~80 chars max), user-facing.
-- Group related changes into single bullets.
-- INCLUDE: new features, UX improvements, bug fixes, breaking changes — anything a user upgrading would notice.
-- EXCLUDE: ticket IDs (GB-NNNN), internal refactors, test additions, doc-only changes, implementation rationale, build/CI tweaks.
-- Aim for 5–10 bullets total. Fewer is better."
-    local stable_rules
-    stable_rules="This is a STABLE release summarizing ${commit_count} commits since the last production release ${last_tag:-HEAD~30}. Be thorough — these notes will land in CHANGELOG.md.
-
-Rules:
-- Group bullets under H2 markdown headings: \"## New features\", \"## UX improvements\", \"## Bug fixes\", \"## Performance\", \"## Developer-facing\". Omit any heading whose section is empty.
-- Each bullet is ONE short line (~80 chars max), user-facing.
-- Group several related commits into single bullets when they cover the same feature area.
-- INCLUDE: new features, UX improvements, bug fixes, breaking changes, performance improvements, notable refactors that change user-observable behavior.
-- EXCLUDE: ticket IDs (GB-NNNN), pure internal refactors, test-only additions, doc-only changes, implementation rationale, build/CI tweaks.
-- For a ${commit_count}-commit release cycle aim for 15–40 total bullets, scaled to the volume of user-visible work. Don't pad — if a section has nothing user-facing, drop it. Don't under-deliver either — a stable release of this size shouldn't summarize down to 5 bullets."
-    local body
-    if [[ "${BETA_MODE:-false}" == "true" ]]; then
-      body="$beta_rules"
+  if [[ -n "$gitgist" ]]; then
+    info "Drafting release notes with gitgist (${range:-since last tag})..."
+    local errfile
+    errfile=$(mktemp "${TMPDIR:-/tmp}/gitgist-release.XXXXXX")
+    # gitgist writes the notes to stdout and exits non-zero (with a
+    # `gitgist: …` message on stderr) when no AI provider is available or the
+    # provider errors — so a non-zero exit, not stdout sniffing, signals
+    # failure. Pass the range as a single positional (gitgist treats an
+    # argument containing `..` as a revision range).
+    if generated=$("$gitgist" ${range:+"$range"} 2>"$errfile"); then
+      # gitgist emits a `_No changes in `range`._` placeholder (not an error)
+      # for an empty range; treat that as no draft so the blank-editor
+      # fallback fires instead of seeding the placeholder into the CHANGELOG.
+      if [[ "$generated" == _No\ * ]]; then
+        warn "gitgist found no changes in ${range:-the range} — opening blank editor."
+        generated=""
+      fi
     else
-      body="$stable_rules"
-    fi
-    prompt="Draft release notes for Glassbox (a local code review tool for AI-generated code) from the commit subjects below.
-
-${body}
-
-Commits:
-${commit_log}"
-    # Pipe the prompt via stdin instead of \"claude -p \$prompt\" so we don't
-    # blow past ARG_MAX (1 MB on macOS — a stable cycle's commit-subject
-    # volume can put the positional-arg form right at the kernel's E2BIG
-    # cliff with silent truncation).
-    generated=$(printf '%s' "$prompt" | claude -p 2>/dev/null || true)
-    # Strip leading/trailing blank lines + any stray code-fence wrappers
-    generated=$(echo "$generated" | sed -e '/^```/d' -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
-    # `claude -p` can return 200 OK with an auth/network error printed to
-    # stdout (e.g. "Failed to authenticate. API Error: 403 ..."). Without
-    # this guard, that text would pass the empty-stdout check below and
-    # become the CHANGELOG entry / annotated tag body. Treat known error
-    # signatures as empty so the placeholder fallback fires instead.
-    if echo "$generated" | head -1 | grep -qE '^(Failed to authenticate|API Error:|Error:)'; then
-      warn "Claude draft looks like an auth/network error — opening blank editor."
-      warn "  First line: $(echo "$generated" | head -1)"
+      warn "gitgist draft failed — opening blank editor."
+      warn "  $(tail -1 "$errfile" 2>/dev/null)"
       generated=""
     fi
+    rm -f "$errfile"
   fi
 
   local initial
   if [[ -n "$generated" ]]; then
     success "Draft ready — review and edit in the editor."
-    initial="# Release notes — Claude draft below. Edit freely.
+    initial="# Release notes — gitgist draft below. Edit freely.
 # Lines starting with '#' are removed on save.
 
 ${generated}"
   else
-    if command -v claude &>/dev/null; then
-      warn "Claude draft was empty — opening blank editor."
-    else
-      warn "'claude' CLI not found — opening blank editor. Install Claude Code for AI drafts."
+    if [[ -z "$gitgist" ]]; then
+      warn "'gitgist' not found — opening blank editor. Run 'npm install' (gitgist is a devDependency) or 'npm i -g gitgist' for AI drafts."
     fi
     initial="# Release notes — keep it SHORT and USER-FACING.
 # Bullets only. Skip ticket IDs, refactors, tests, docs, internals.
@@ -390,6 +362,18 @@ ${generated}"
   fi
 
   ask_multiline "release_notes" "Release notes" "$initial"
+}
+
+# Locate the gitgist binary: prefer the project-local install (devDependency,
+# pinned via package-lock), then any globally installed `gitgist`. Echoes the
+# resolved command, or nothing if gitgist isn't available.
+resolve_gitgist() {
+  local local_bin="node_modules/.bin/gitgist"
+  if [[ -x "$local_bin" ]]; then
+    echo "$local_bin"
+  elif command -v gitgist &>/dev/null; then
+    echo "gitgist"
+  fi
 }
 
 step_review() {

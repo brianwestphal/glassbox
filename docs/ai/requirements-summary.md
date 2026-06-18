@@ -307,16 +307,22 @@ Versions are synchronized across `package.json`, `tauri.conf.json`, and
 per day against the registry with 5s timeout; the suggested upgrade
 command matches the detected package manager (npm/yarn/pnpm/bun).
 
-Release notes are AI-drafted by `scripts/release.sh` when the `claude`
-CLI is on PATH: the script pipes the commit log via stdin to `claude -p`
-(stdin avoids `ARG_MAX` on stable cycles), then opens the draft in
-`$EDITOR` for review. Stable diffs against the last **production** tag
-(excluding `*-rc.*` / `*-beta.*`) and asks for 15–40 H2-grouped bullets;
-beta diffs against the immediately-previous tag and asks for 5–10 flat
-bullets. Editor guidance lines prefixed with `#` are stripped on save;
-auth/network errors from `claude -p` are detected and replaced with a
-blank-editor fallback so they never reach `CHANGELOG.md` or annotated
-tag bodies; resumed runs reuse saved notes instead of redrafting.
+Release notes are AI-drafted by `scripts/release.sh`, which delegates to
+[`gitgist`](https://github.com/brianwestphal/gitgist) (a `devDependency`,
+run from `node_modules/.bin/gitgist` or a global install), then opens the
+draft in `$EDITOR` for review. gitgist owns the prompt, provider selection
+(its `auto` backend reuses the signed-in `claude` CLI → `ANTHROPIC_API_KEY`
+→ on-device Apple FM), code-fence stripping, and noise filtering. The
+release script only chooses the comparison base — stable diffs against the
+last **production** tag (excluding `*-rc.*` / `*-beta.*`), beta against the
+immediately-previous tag — and passes it as a `<base>..HEAD` range; gitgist
+scales detail to the volume of work, so no separate beta/stable prompt is
+needed. A failed/unavailable draft is detected by gitgist's **exit code**
+(not stdout sniffing) and the empty-range `_No changes…_` placeholder is
+treated as no draft; both fall back to a blank editor. Editor guidance
+lines prefixed with `#` are stripped on save; resumed runs reuse saved
+notes instead of redrafting. `npm run commit:msg` drafts a Conventional
+Commit message from the staged diff via `gitgist --staged --commit-message`.
 
 Build pipeline: server is ESM via tsup (externals listed in
 `code-summary.md` §14); client is an IIFE via esbuild (es2020, minified);

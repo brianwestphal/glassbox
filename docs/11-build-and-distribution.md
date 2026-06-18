@@ -28,19 +28,19 @@ Requirements for building, packaging, and distributing the application.
 ### 11.3.1 Release Notes Generation
 
 - The release script's preflight shall `git fetch --tags --prune --prune-tags origin` so the comparison-base lookup and the RC / beta tag auto-increment loops see the real upstream tag list — a stale local tag list would either anchor the commit log at an out-of-date base (notes include changes already shipped) or reuse a tag number that already exists upstream (push rejected). A fetch failure shall warn but not abort, so offline runs still proceed against the local tag list.
-- The release script shall draft release notes automatically when the `claude` CLI (Claude Code) is available on the user's PATH, then open the draft in the user's editor for review and edits.
-- The comparison base for the commit log shall depend on the release mode:
+- The release script shall delegate release-notes drafting to [`gitgist`](https://github.com/brianwestphal/gitgist) (a `devDependency`, invoked from the project-local `node_modules/.bin/gitgist`, falling back to a globally installed `gitgist`), then open the draft in the user's editor for review and edits. gitgist owns the AI prompt, provider selection, code-fence stripping, and noise filtering, so the release script no longer hand-rolls a `claude -p` prompt.
+- gitgist's default `auto` provider reuses the signed-in `claude` CLI when present, then the Anthropic API (`ANTHROPIC_API_KEY`), then on-device Apple Foundation Models — so a draft is produced wherever any of those is available, with no API key required for the CLI path.
+- The release script shall remain responsible only for choosing the **comparison base** (gitgist's own default tag lookup does not exclude prereleases), passing it to gitgist as a single `<base>..HEAD` positional range:
   - **Stable** releases shall diff against the last **production** tag (`vX.Y.Z` with no `-rc.N` / `-beta.N` suffix), via `git describe --tags --abbrev=0 --exclude='*-beta.*' --exclude='*-rc.*'`, so the notes cover every change since the previous stable — including changes that previously shipped in betas.
   - **Beta** releases shall diff against whatever the immediately-previous tag was (beta or stable), so each beta's notes don't repeat bullets that already appeared in an earlier beta's notes.
-- The prompt body shall branch on release mode:
-  - **Beta**: ask for 5–10 short user-facing markdown bullets only (no heading, no preamble), explicitly excluding ticket IDs, refactors, tests, docs, and build/CI tweaks.
-  - **Stable**: ask for 15–40 bullets grouped under H2 headings (`## New features`, `## UX improvements`, `## Bug fixes`, `## Performance`, `## Developer-facing`), scaled to the commit-count volume; omit empty sections.
-- The prompt shall be piped to `claude -p` via **stdin** (not as a positional argument) so the script doesn't hit `ARG_MAX` on stable cycles with hundreds of commit subjects.
-- The script shall strip stray code-fence wrappers (`` ``` ``) and trim leading/trailing blank lines from the AI output.
-- The script shall guard against `claude -p` returning an auth/network error message as content. When the first line matches `^(Failed to authenticate|API Error:|Error:)`, the script shall treat the output as empty, warn the user, and fall back to a blank editor with guidance comments — never silently embed the error string in the CHANGELOG or annotated tag body.
+  - When there is no anchoring tag yet, the script shall omit the range and let gitgist fall back to its own default (latest tag → full history).
+- A separate beta/stable prompt is no longer needed: gitgist's prompt scales the amount of detail to the volume of work, so a small beta range yields a tight summary and a large stable cycle a thorough, section-grouped one.
+- The script shall detect a failed or unavailable draft by gitgist's **exit code** (gitgist exits non-zero with a `gitgist: …` message on stderr when no AI provider is available or the provider errors), not by sniffing stdout — eliminating the prior heuristic that scanned the first line for auth/network error signatures. On failure it shall warn (echoing gitgist's stderr tail) and fall back to a blank editor.
+- gitgist emits a `_No changes in `<range>`._` placeholder (a normal, zero-exit result) for an empty range; the script shall treat that placeholder as no draft so the blank-editor fallback fires instead of seeding the placeholder into the CHANGELOG.
 - The editor shall be seeded with guidance lines prefixed with `#`. The `ask_multiline` helper shall strip every `#`-prefixed line from the saved content on read-back, so the comments never reach `CHANGELOG.md` or the annotated tag body.
 - On a resumed release run, the script shall skip the AI draft entirely if saved release notes already exist in the state file and re-open the editor with the saved content — so a re-run never wastes a model call or overwrites in-progress edits.
-- When the `claude` CLI is not installed, the script shall fall back to a blank editor with the same `#`-prefixed guidance comments.
+- When `gitgist` is not found (project-local nor global), the script shall fall back to a blank editor with the same `#`-prefixed guidance comments.
+- An `npm run commit:msg` script shall draft a Conventional Commit message from the staged diff via `gitgist --staged --commit-message`, reusing the same tool and provider stack as release-notes drafting.
 
 ### 11.3.2 GitHub Releases Page
 

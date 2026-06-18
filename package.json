@@ -53,6 +53,7 @@
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
     "release:beta": "bash scripts/release.sh --beta",
+    "commit:msg": "gitgist --staged --commit-message",
     "prepublishOnly": "npm run build"
   },
   "files": [
@@ -82,6 +83,7 @@
     "eslint-plugin-kerfjs": "^0.14.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-tsdoc": "^0.5.2",
+    "gitgist": "^0.1.0",
     "highlight.js": "^11.11.1",
     "sass": "^1.97.3",
     "tsup": "^8.5.1",

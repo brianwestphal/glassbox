@@ -549,8 +549,9 @@ Scripts (`package.json`):
   `chrome.ts` window-chrome compositing); see `scripts/demo/README.md`.
   `domotion-svg` is pinned to 0.13.3 and forced to embedded-font text mode
   (`setRenderTextMode`). Must run outside the command sandbox (Chromium).
-- `release` — version bump + publish stable (see `scripts/release.sh`)
+- `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
+- `commit:msg` — draft a Conventional Commit message from the staged diff via `gitgist --staged --commit-message`.
 
 `tsup.config.ts` produces:
 
