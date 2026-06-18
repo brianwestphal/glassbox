@@ -358,3 +358,27 @@ test.describe('Diff viewing: Unified mode char diff', () => {
     expect(count).toBeGreaterThan(0);
   });
 });
+
+test.describe('AI-authored review notes (doc 20 P2)', () => {
+  // Demo mode serves illustrative `.pr-notes/` notes for session.ts (lines 14,
+  // 23, 31 on the new side). They must render review-comment-style, styled
+  // distinctly as AI-authored, in both diff modes.
+  test('review notes render as distinct AI-authored rows in split mode', async ({ page }) => {
+    await openModifiedFile(page);
+    const rows = page.locator('.ai-note-row.ai-note-review');
+    await expect(rows.first()).toBeVisible({ timeout: 5000 });
+    await expect(rows).toHaveCount(3);
+    // Per-kind badges + producer attribution.
+    await expect(page.locator('.ai-note-label-rationale')).toBeVisible();
+    await expect(page.locator('.ai-note-label-risk')).toBeVisible();
+    await expect(page.locator('.ai-note-producer').first()).toHaveText('Claude Code');
+  });
+
+  test('review notes also render in unified mode', async ({ page }) => {
+    await openModifiedFile(page);
+    await page.locator('[data-diff-mode="unified"]').click();
+    await expect(page.locator('.diff-table-unified')).toBeVisible();
+    await expect(page.locator('.ai-note-row.ai-note-review').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
+  });
+});

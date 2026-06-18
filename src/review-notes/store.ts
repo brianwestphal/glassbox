@@ -22,7 +22,8 @@ import { generateId } from '../db/ids.js';
 import type { SarifLog, SarifRun } from './sarif.js';
 import { buildResult, emptyLog, newRun, SarifLogShapeSchema } from './sarif.js';
 import type { NoteKind, ReviewNoteInput } from './types.js';
-import { CONFIDENCE_PROPERTY_KEY, DEFAULT_PRODUCER, DEFAULT_SHARD_CAP } from './types.js';
+import { CONFIDENCE_PROPERTY_KEY, DEFAULT_PRODUCER, DEFAULT_SHARD_CAP, isNoteKind } from './types.js';
+import type { ReviewNoteView } from './view.js';
 
 const NOTES_SUBDIR = join('.pr-notes', 'notes');
 const SHARD_RE = /\.(\d{6})\.sarif$/;
@@ -335,4 +336,45 @@ export function coalesceAll(repoRoot: string): number {
   let total = 0;
   for (const src of sources) total += coalesceFile(repoRoot, src);
   return total;
+}
+
+// --- Reader (the consumer side of the format; GB-896 P2) -------------------
+
+/**
+ * Load the review notes for a single source file, flattened to diff-anchored
+ * view items (docs/20 §20.6). Notes anchor to the **new** side of the diff (the
+ * working-tree file the producer wrote them against). A shard that isn't a
+ * SARIF log we recognize is skipped, not thrown — a corrupt note file must
+ * never break the diff view.
+ */
+export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNoteView[] {
+  const safeRel = sanitizeRel(file);
+  const out: ReviewNoteView[] = [];
+  for (const path of listShardPaths(repoRoot, safeRel)) {
+    let log: SarifLog;
+    try {
+      log = readLog(path);
+    } catch {
+      continue;
+    }
+    for (const run of log.runs) {
+      const producer = run.tool.driver.name;
+      for (const raw of run.results) {
+        const r = raw as NoteResult;
+        const startLine = r.locations?.[0]?.physicalLocation?.region?.startLine;
+        const kind = r.properties?.tags?.[0];
+        if (startLine === undefined || kind === undefined || !isNoteKind(kind)) continue;
+        const confidence = r.properties?.[CONFIDENCE_PROPERTY_KEY];
+        out.push({
+          line: startLine,
+          side: 'new',
+          kind,
+          body: r.message?.text ?? '',
+          confidence: typeof confidence === 'number' ? confidence : undefined,
+          producer: producer === '' ? undefined : producer,
+        });
+      }
+    }
+  }
+  return out;
 }

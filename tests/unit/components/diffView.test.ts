@@ -52,6 +52,48 @@ describe('DiffView', () => {
     expect(html).toContain('data-file-path="src/app.ts"');
   });
 
+  it('renders no review-note rows when there are no notes (GB-896)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),
+      annotations: [], mode: 'unified',
+    }).toString();
+    expect(html).not.toContain('ai-note-review');
+  });
+
+  it('renders a review note as a full-width AI-authored row anchored to its line — unified (GB-896)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'const x = 1;')])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ line: 1, side: 'new', kind: 'risk', body: 'careful here', producer: 'Claude Code' }],
+    }).toString();
+    expect(html).toContain('ai-note-row ai-note-review');
+    expect(html).toContain('ai-note-label-risk');
+    expect(html).toContain('careful here');
+    expect(html).toContain('Claude Code');
+  });
+
+  it('breaks the split flow to render a review note full-width — split (GB-896)', () => {
+    // A modified hunk: a removed line paired with an added new-side line 1.
+    const hunk = makeHunk([makeLine('remove', 1, 'old'), makeLine('add', 1, 'new')]);
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [hunk] }),
+      annotations: [], mode: 'split',
+      reviewNotes: [{ line: 1, side: 'new', kind: 'proof', body: 'why it holds' }],
+    }).toString();
+    expect(html).toContain('ai-note-row ai-note-review');
+    expect(html).toContain('why it holds');
+  });
+
+  it('escapes a note body so markup cannot break rendering (GB-896)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{ line: 1, side: 'new', kind: 'proof', body: '<b>x</b>' }],
+    }).toString();
+    expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
+    expect(html).not.toContain('<b>x</b>');
+  });
+
   it('renders binary file message for non-image binary', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ isBinary: true, filePath: 'data.bin' }),

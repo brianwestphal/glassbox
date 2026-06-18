@@ -179,8 +179,9 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 - **Artifact rendering** — Diagram-source artifacts render inline (Mermaid),
   screenshots render through the existing image-diff component, and test output
   renders as a code block.
-- **Threading** — A reviewer shall be able to reply to an AI note with their own
-  annotation, turning a note into a line-anchored conversation.
+- **Threading** *(follow-up)* — A reviewer shall be able to reply to an AI note
+  with their own annotation, turning a note into a line-anchored conversation.
+  (Deferred out of P2 — rendering shipped first; threading is its own ticket.)
 
 ### 20.7 Cross-tool integration (Hot Sheet and other orchestrators)
 
@@ -231,8 +232,16 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   recent). The AI-driven cross-cutting *linking* aspect of coalescing (§20.4)
   remains a follow-up. (The originally-planned channel MCP tool was replaced by
   the CLI — see §20.4.)
-- **P2** — Ingest and render notes as a distinct, review-comment-style
-  annotation source in the diff view.
+- **P2** *(shipped)* — Ingest and render notes as a distinct, review-comment-
+  style source in the diff. A reader (`loadReviewNotesForFile`,
+  `src/review-notes/store.ts`) flattens `.pr-notes/` SARIF into diff-anchored
+  view items (`src/review-notes/view.ts`); the `/file/:id` route passes them to
+  `DiffView`, which renders them **server-side, full-width below their line**
+  (breaking the split-column flow like human annotations do, so columns stay
+  aligned), styled distinctly as AI-authored (the `ai-note-*` precedent) with a
+  per-kind badge. Demo mode serves illustrative notes. Note bodies render as
+  plain text for now (markdown rendering is a later polish); **threading**
+  (reviewer replies) is a separate follow-up.
 - **P3** — Anchor durability via fingerprint re-matching (reuse the stale
   matcher).
 - **P4** — Artifact rendering (diagram source / screenshot via image-diff / test

@@ -582,9 +582,13 @@ producer→`tool.driver`, anchor→`region`+snippet, durability→
 note guid) / `coalesce` (mechanical dedup of identical notes) /
 `instructions` (prints the canonical **inbound** AI-instructions contract
 — `src/review-notes/instructions.ts` — for orchestrators to inject, so
-wording never forks from the CLI). Remaining: the AI-driven cross-cutting
-*linking* half of coalescing, and reader/render (P2+), re-anchoring,
-artifacts, and analysis-feed.
+wording never forks from the CLI). **P2 (reader + render) shipped**:
+`loadReviewNotesForFile` flattens `.pr-notes/` SARIF into diff-anchored
+views (`view.ts`), and `DiffView` server-renders them full-width below
+their line (flow-broken like annotations so split columns stay aligned),
+styled distinctly as AI-authored with a per-kind badge. Remaining: the
+AI-driven cross-cutting *linking* half of coalescing, P3 re-anchoring, P4
+artifacts, P5 analysis-feed, threading, and markdown bodies.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

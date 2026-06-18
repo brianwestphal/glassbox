@@ -2,6 +2,22 @@ import { saveGuidedReviewConfig } from './ai/config.js';
 import { appendFileScores, createAnalysis, saveUserPreferences, updateAnalysisStatus } from './db/ai-queries.js';
 import { addAnnotation, addReviewFile, createReview } from './db/queries.js';
 import type { FileDiff } from './git/diff.js';
+import type { ReviewNoteView } from './review-notes/view.js';
+
+/**
+ * Illustrative AI-authored review notes for the demo (docs/20 P2). Demo runs
+ * against synthetic, DB-seeded diffs with no on-disk `.pr-notes/`, so the diff
+ * route serves these instead to showcase the feature. Keyed to new-side lines
+ * of the `src/auth/session.ts` demo file.
+ */
+export function demoReviewNotes(filePath: string): ReviewNoteView[] {
+  if (filePath !== 'src/auth/session.ts') return [];
+  return [
+    { line: 14, side: 'new', kind: 'rationale', body: 'createSession is async now because session state moved from an in-process Map to Redis; callers must await it.', confidence: 0.9, producer: 'Claude Code' },
+    { line: 23, side: 'new', kind: 'proof', body: 'The TTL is written atomically with the value via the EX option, so a session can never be stored without an expiry.', producer: 'Claude Code' },
+    { line: 31, side: 'new', kind: 'risk', body: 'expiresAt round-trips through JSON as a string and is re-wrapped in Date() — verify the comparison holds in your runtime.', confidence: 0.6, producer: 'Claude Code' },
+  ];
+}
 
 export interface DemoScenario {
   id: number;

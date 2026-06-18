@@ -9,12 +9,15 @@ import { ReviewHistory } from '../components/reviewHistory.js';
 import { ReviewShell } from '../components/reviewShell.js';
 import type { ReviewFile } from '../db/queries.js';
 import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, listReviews } from '../db/queries.js';
+import { getDemoMode } from '../debug.js';
+import { demoReviewNotes } from '../demo.js';
 import type { FileDiff } from '../git/diff.js';
 import { getSingleFileDiff, parseDiffData, parseModeString } from '../git/diff.js';
 import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
 import { emptyFileDiff } from '../git/parseDiffData.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-rasterize.js';
 import { IconReveal } from '../icons.js';
+import { loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
 
 export const pageRoutes = new Hono<AppEnv>();
@@ -119,7 +122,13 @@ pageRoutes.get('/file/:fileId', async (c) => {
     }
   }
 
-  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} />;
+  // AI-authored review notes from `.pr-notes/` (docs/20 P2). Demo mode has no
+  // on-disk notes, so it serves a small illustrative set instead.
+  const reviewNotes = getDemoMode() !== null
+    ? demoReviewNotes(file.file_path)
+    : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
+
+  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} />;
   return c.html(html.toString());
 });
 

@@ -4,21 +4,32 @@ import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import { IconEdit, IconReveal, IconTrash } from '../icons.js';
+import type { ReviewNoteView } from '../review-notes/view.js';
+import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { truncateDiffLine } from '../utils/lineTruncate.js';
 import { ImageDiff } from './imageDiff.js';
 
-export function DiffView({ file, diff, annotations, mode }: {
+export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
   file: ReviewFile;
   diff: FileDiff;
   annotations: Annotation[];
   mode: 'split' | 'unified';
+  reviewNotes?: ReviewNoteView[];
 }) {
   const annotationsByLine: Record<string, Annotation[]> = {};
   for (const a of annotations) {
     const key = `${a.line_number}:${a.side}`;
     if (!(key in annotationsByLine)) annotationsByLine[key] = [];
     annotationsByLine[key].push(a);
+  }
+  // AI-authored review notes anchor to the new side; key them the same way so
+  // they can break the diff flow at their line (full-width, like annotations).
+  const reviewNotesByLine: Record<string, ReviewNoteView[]> = {};
+  for (const n of reviewNotes) {
+    const key = `${n.line}:${n.side}`;
+    if (!(key in reviewNotesByLine)) reviewNotesByLine[key] = [];
+    reviewNotesByLine[key].push(n);
   }
 
   return (
@@ -38,9 +49,9 @@ export function DiffView({ file, diff, annotations, mode }: {
       ) : diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
       ) : (diff.status === 'added' || diff.status === 'deleted' || mode === 'unified') ? (
-        <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} />
+        <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} />
       ) : (
-        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} />
+        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} />
       )}
     </div>
   );
@@ -50,7 +61,7 @@ export function DiffView({ file, diff, annotations, mode }: {
 type SplitItem =
   | { kind: 'separator'; hunkIdx: number; hunk: DiffHunk; gapStart: number; gapEnd: number }
   | { kind: 'pair'; pair: LinePair }
-  | { kind: 'annotated'; pair: LinePair; annotations: Annotation[] }
+  | { kind: 'annotated'; pair: LinePair; annotations: Annotation[]; reviewNotes: ReviewNoteView[] }
   | { kind: 'tail'; start: number };
 
 function getAnnotations(pair: LinePair, annotationsByLine: Record<string, Annotation[]>): Annotation[] {
@@ -59,7 +70,14 @@ function getAnnotations(pair: LinePair, annotationsByLine: Record<string, Annota
   return [...leftAnns, ...rightAnns];
 }
 
-function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]> }) {
+function getReviewNotes(pair: LinePair, reviewNotesByLine: Record<string, ReviewNoteView[]>): ReviewNoteView[] {
+  // Notes anchor to the new side (the working-tree file the producer wrote against).
+  return pair.right ? reviewNotesByLine[`${pair.right.newNum}:new`] ?? [] : [];
+}
+
+function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
+  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>;
+}) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
 
@@ -74,8 +92,9 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
 
     for (const pair of pairLines(hunk.lines)) {
       const anns = getAnnotations(pair, annotationsByLine);
-      if (anns.length > 0) {
-        items.push({ kind: 'annotated', pair, annotations: anns });
+      const notes = getReviewNotes(pair, reviewNotesByLine);
+      if (anns.length > 0 || notes.length > 0) {
+        items.push({ kind: 'annotated', pair, annotations: anns, reviewNotes: notes });
       } else {
         items.push({ kind: 'pair', pair });
       }
@@ -83,11 +102,11 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
   }
   items.push({ kind: 'tail', start: tailStart });
 
-  // Group consecutive non-annotated items into split-columns blocks.
-  // Annotated pairs break the flow so annotations render full-width.
+  // Group consecutive non-annotated items into split-columns blocks. A pair
+  // with annotations or review notes breaks the flow so they render full-width.
   type Group =
     | { type: 'columns'; items: Exclude<SplitItem, { kind: 'annotated' }>[] }
-    | { type: 'annotated'; pair: LinePair; annotations: Annotation[] };
+    | { type: 'annotated'; pair: LinePair; annotations: Annotation[]; reviewNotes: ReviewNoteView[] };
 
   const groups: Group[] = [];
   let run: Exclude<SplitItem, { kind: 'annotated' }>[] = [];
@@ -95,7 +114,7 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
   for (const item of items) {
     if (item.kind === 'annotated') {
       if (run.length > 0) { groups.push({ type: 'columns', items: run }); run = []; }
-      groups.push({ type: 'annotated', pair: item.pair, annotations: item.annotations });
+      groups.push({ type: 'annotated', pair: item.pair, annotations: item.annotations, reviewNotes: item.reviewNotes });
     } else {
       run.push(item);
     }
@@ -121,7 +140,8 @@ function SplitDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotation
                   <span className="code">{renderPairContent(group.pair, 'right')}</span>
                 </div>
               </div>
-              <AnnotationRows annotations={group.annotations} />
+              {group.annotations.length > 0 ? <AnnotationRows annotations={group.annotations} /> : null}
+              {group.reviewNotes.length > 0 ? <ReviewNoteRows notes={group.reviewNotes} /> : null}
             </div>
           );
         }
@@ -294,7 +314,9 @@ function buildUnifiedCharDiffs(lines: DiffLine[]): Map<DiffLine, DiffSegment[]> 
   return result;
 }
 
-function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]> }) {
+function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine }: {
+  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>;
+}) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
 
@@ -313,6 +335,7 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
             const lineNum = line.type === 'remove' ? line.oldNum : line.newNum;
             const side = line.type === 'remove' ? 'old' : 'new';
             const anns = annotationsByLine[`${lineNum}:${side}`] ?? [];
+            const notes = reviewNotesByLine[`${lineNum}:${side}`] ?? [];
             const segments = charDiffs.get(line);
             return (
               <div>
@@ -326,6 +349,7 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
                   <span className="code">{segments ? renderSegments(segments) : renderLineContent(line.content)}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}
+                {notes.length > 0 ? <ReviewNoteRows notes={notes} /> : null}
               </div>
             );
           })}
@@ -336,6 +360,25 @@ function UnifiedDiff({ hunks, annotationsByLine }: { hunks: DiffHunk[]; annotati
         ↕ Show remaining lines
       </div>
     </div>
+  );
+}
+
+/** AI-authored review notes (docs/20 §20.6) — rendered review-comment-style,
+ *  full-width below their line, styled distinctly as AI-authored (the `ai-note-*`
+ *  precedent shared with risk/narrative/guided notes) with a per-kind badge. */
+function ReviewNoteRows({ notes }: { notes: ReviewNoteView[] }) {
+  return (
+    <>
+      {notes.map(n => (
+        <div className="ai-note-row ai-note-review" data-kind={n.kind}>
+          <div className="ai-note-item">
+            <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
+            <span className="ai-note-text">{n.body}</span>
+            {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
