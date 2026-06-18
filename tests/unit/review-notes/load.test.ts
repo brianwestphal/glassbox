@@ -49,6 +49,32 @@ describe('loadReviewNotesForFile', () => {
     expect(loadReviewNotesForFile(repo, 'src/y.ts').map(n => n.body)).toEqual(['y']);
   });
 
+  it('reads a text artifact\'s content for inline display (GB-898)', () => {
+    mkdirSync(join(repo, '.pr-notes/artifacts'), { recursive: true });
+    writeFileSync(join(repo, '.pr-notes/artifacts/out.txt'), 'PASS 2 tests', 'utf-8');
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'proof', kind: 'proof', artifacts: ['.pr-notes/artifacts/out.txt'] });
+
+    const note = loadReviewNotesForFile(repo, 'src/x.ts')[0];
+    expect(note.artifacts).toEqual([{ uri: '.pr-notes/artifacts/out.txt', content: 'PASS 2 tests' }]);
+  });
+
+  it('surfaces a missing or binary artifact as a reference with no content (GB-898)', () => {
+    writeFileSync(join(repo, 'binary.bin'), Buffer.from([0x00, 0x01, 0x02]));
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'b', kind: 'proof', artifacts: ['binary.bin', 'does-not-exist.txt'] });
+
+    const note = loadReviewNotesForFile(repo, 'src/x.ts')[0];
+    expect(note.artifacts).toEqual([
+      { uri: 'binary.bin', content: undefined },
+      { uri: 'does-not-exist.txt', content: undefined },
+    ]);
+  });
+
+  it('never reads an artifact path that escapes the repo (GB-898)', () => {
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'b', kind: 'proof', artifacts: ['../../../etc/passwd'] });
+    const note = loadReviewNotesForFile(repo, 'src/x.ts')[0];
+    expect(note.artifacts![0].content).toBeUndefined();
+  });
+
   it('skips a corrupt shard rather than throwing', () => {
     writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'good', kind: 'rationale' });
     // Drop a non-SARIF shard alongside the good one.

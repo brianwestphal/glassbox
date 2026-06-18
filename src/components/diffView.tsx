@@ -400,6 +400,20 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
               </span>
             ) : null}
           </div>
+          {n.artifacts !== undefined && n.artifacts.length > 0 ? (
+            <div className="ai-note-artifacts">
+              {n.artifacts.map(a => (
+                a.content !== undefined ? (
+                  <details className="ai-note-artifact">
+                    <summary>📎 {a.uri}</summary>
+                    <pre className="ai-note-artifact-content"><code>{a.content}</code></pre>
+                  </details>
+                ) : (
+                  <div className="ai-note-artifact ai-note-artifact-ref">📎 {a.uri}</div>
+                )
+              ))}
+            </div>
+          ) : null}
         </div>
         {replies.length > 0 ? (
           <div className="annotation-row ai-note-replies">

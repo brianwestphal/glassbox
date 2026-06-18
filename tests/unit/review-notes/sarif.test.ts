@@ -48,7 +48,16 @@ describe('buildResult', () => {
     const r = buildResult(base, { guid: 'g' }) as Record<string, unknown>;
     expect(r.rank).toBeUndefined();
     expect(r.workItemUris).toBeUndefined();
+    expect(r.attachments).toBeUndefined();
     expect((r.properties as Record<string, unknown>)[CONFIDENCE_PROPERTY_KEY]).toBeUndefined();
+  });
+
+  it('maps artifacts to standard SARIF result.attachments (GB-898)', () => {
+    const r = buildResult({ ...base, artifacts: ['.pr-notes/artifacts/out.txt', 'docs/diagram.mmd'] }, { guid: 'g' }) as Record<string, unknown>;
+    expect(r.attachments).toEqual([
+      { artifactLocation: { uri: '.pr-notes/artifacts/out.txt' } },
+      { artifactLocation: { uri: 'docs/diagram.mmd' } },
+    ]);
   });
 });
 

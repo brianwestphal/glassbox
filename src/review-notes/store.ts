@@ -15,7 +15,7 @@
  */
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 
 import { generateId } from '../db/ids.js';
@@ -23,7 +23,7 @@ import type { SarifLog, SarifRun } from './sarif.js';
 import { buildResult, emptyLog, newRun, SarifLogShapeSchema } from './sarif.js';
 import type { NoteKind, ReviewNoteInput } from './types.js';
 import { CONFIDENCE_PROPERTY_KEY, DEFAULT_PRODUCER, DEFAULT_SHARD_CAP, isNoteKind } from './types.js';
-import type { ReviewNoteView } from './view.js';
+import type { ReviewNoteArtifact, ReviewNoteView } from './view.js';
 
 const NOTES_SUBDIR = join('.pr-notes', 'notes');
 const SHARD_RE = /\.(\d{6})\.sarif$/;
@@ -180,6 +180,7 @@ interface NoteResult {
   guid?: string;
   message?: { text?: string; markdown?: string };
   locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number; endLine?: number; snippet?: { text?: string } } } }[];
+  attachments?: { artifactLocation?: { uri?: string } }[];
   properties?: { tags?: string[]; [k: string]: unknown };
   rank?: number;
   level?: string;
@@ -347,6 +348,36 @@ export function coalesceAll(repoRoot: string): number {
  * SARIF log we recognize is skipped, not thrown — a corrupt note file must
  * never break the diff view.
  */
+const ARTIFACT_MAX_BYTES = 20_000;
+
+/** Read a text/diagram-source artifact's content for inline display (docs/20
+ *  §20.5 P4). Returns undefined for a missing, oversized, binary, or
+ *  path-escaping artifact — the renderer then shows a reference instead. */
+function readArtifactText(repoRoot: string, uri: string): string | undefined {
+  const safe = uri.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (/(^|\/)\.\.(\/|$)/.test(safe)) return undefined; // never read outside the repo
+  try {
+    const abs = join(repoRoot, safe);
+    const stat = statSync(abs);
+    if (!stat.isFile() || stat.size > ARTIFACT_MAX_BYTES) return undefined;
+    const buf = readFileSync(abs);
+    if (buf.includes(0)) return undefined; // a NUL byte ⇒ treat as binary
+    return buf.toString('utf-8');
+  } catch {
+    return undefined;
+  }
+}
+
+function readArtifacts(repoRoot: string, result: NoteResult): ReviewNoteArtifact[] | undefined {
+  const out: ReviewNoteArtifact[] = [];
+  for (const att of result.attachments ?? []) {
+    const uri = att.artifactLocation?.uri;
+    if (typeof uri !== 'string' || uri === '') continue;
+    out.push({ uri, content: readArtifactText(repoRoot, uri) });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNoteView[] {
   const safeRel = sanitizeRel(file);
   const out: ReviewNoteView[] = [];
@@ -375,6 +406,7 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
           confidence: typeof confidence === 'number' ? confidence : undefined,
           producer: producer === '' ? undefined : producer,
           snippet: region?.snippet?.text,
+          artifacts: readArtifacts(repoRoot, r),
         });
       }
     }

@@ -602,8 +602,12 @@ replies render nested directly beneath their note (orphans fall back to
 line rendering). **Markdown bodies shipped**: note bodies (review notes +
 the risk/narrative/guided AI notes) render via a safe, escape-first inline
 renderer (`src/utils/noteMarkdown.ts` — code/bold/italic/links, scheme-
-gated). Remaining: the AI-driven cross-cutting *linking* half of
-coalescing, and P4 artifacts.
+gated). **P4 foundation shipped**: notes attach artifacts (`glassbox note
+add --artifact` → SARIF `result.attachments`) and text/diagram-source
+artifacts render as inline collapsible code blocks (path-contained,
+size-capped reader). Remaining: the AI-driven cross-cutting *linking*
+half of coalescing; P4 follow-ups — live diagram rendering (Mermaid) and
+screenshot/binary artifacts via image-diff + Git LFS.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 

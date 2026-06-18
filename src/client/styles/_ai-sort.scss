@@ -365,6 +365,39 @@
   border-left: 2px solid rgba(180, 190, 254, 0.25);
   margin-left: 28px;
 }
+
+// Proof artifacts attached to a review note (doc 20 §20.5, P4).
+.ai-note-artifacts {
+  padding: 0 12px 6px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ai-note-artifact {
+  font-size: 11px;
+
+  summary {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+  }
+}
+.ai-note-artifact-ref {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.ai-note-artifact-content {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  white-space: pre;
+}
 .ai-note-discard-btn:hover { color: var(--red, #f38ba8); border-color: var(--red, #f38ba8); }
 
 // A review note whose anchored code has changed since it was written (P3).

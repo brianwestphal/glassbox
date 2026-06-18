@@ -30,6 +30,16 @@ describe('parseNoteAdd', () => {
     expect(p).toMatchObject({ file: 'src/x.ts', startLine: 10, endLine: 12, kind: 'rationale', confidence: 0.8, rank: 70, ticket: 'GB-895', producer: 'Claude Code', body: 'why', bodyStdin: false });
   });
 
+  it('collects repeatable --artifact flags (GB-898)', () => {
+    const p = parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--artifact', 'out.txt', '--artifact', 'diagram.mmd', '--body', 'x']);
+    expect(p.artifacts).toEqual(['out.txt', 'diagram.mmd']);
+  });
+
+  it('defaults artifacts to an empty array', () => {
+    const p = parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--body', 'x']);
+    expect(p.artifacts).toEqual([]);
+  });
+
   it('accepts a single line and marks stdin body', () => {
     const p = parseNoteAdd(['--file', 'a.ts', '--lines', '5', '--kind', 'proof', '--body', '-']);
     expect(p.startLine).toBe(5);

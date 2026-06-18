@@ -407,6 +407,16 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
   });
 
+  test('a review note renders an attached proof artifact (GB-898)', async ({ page }) => {
+    await openModifiedFile(page);
+    // The proof note (line 23) attaches a test-output artifact.
+    const artifact = page.locator('.ai-note-artifact').first();
+    await expect(artifact).toBeVisible({ timeout: 5000 });
+    await expect(artifact.locator('summary')).toContainText('session-ttl.test.txt');
+    await artifact.locator('summary').click();
+    await expect(artifact.locator('.ai-note-artifact-content')).toContainText('2 passed');
+  });
+
   test('a review note body renders markdown (GB-909)', async ({ page }) => {
     await openModifiedFile(page);
     // The rationale note (line 14) uses code spans and bold.

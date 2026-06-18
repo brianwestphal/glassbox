@@ -165,6 +165,26 @@ describe('DiffView', () => {
     expect(html).not.toContain('<b>x</b>');
   });
 
+  it('renders a text artifact as an inline code block, and a content-less one as a reference (GB-898)', () => {
+    const html = DiffView({
+      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),
+      annotations: [], mode: 'unified',
+      reviewNotes: [{
+        line: 1, side: 'new', kind: 'proof', body: 'see output',
+        artifacts: [
+          { uri: '.pr-notes/artifacts/out.txt', content: 'PASS 2 tests' },
+          { uri: 'screenshot.png' },
+        ],
+      }],
+    }).toString();
+    expect(html).toContain('ai-note-artifact-content');
+    expect(html).toContain('PASS 2 tests');
+    expect(html).toContain('.pr-notes/artifacts/out.txt');
+    // The binary/missing one is a reference, not a code block.
+    expect(html).toContain('ai-note-artifact-ref');
+    expect(html).toContain('screenshot.png');
+  });
+
   it('renders markdown in a review note body (GB-909)', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1)])] }),

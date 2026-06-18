@@ -44,6 +44,10 @@ export interface ReviewNoteInput {
   /** Producer identity → SARIF `run.tool.driver.name` / `.version`. */
   producer?: string;
   producerVersion?: string;
+  /** Repo-relative paths to committed proof artifacts (test output, logs,
+   *  diagram source) → SARIF `result.attachments[].artifactLocation.uri`
+   *  (docs/20 §20.5). */
+  artifacts?: string[];
 }
 
 /** Property-bag key for the one non-standard datum. Namespaced (`ext-`,

@@ -114,5 +114,8 @@ export function buildResult(input: ReviewNoteInput, meta: {
   if (input.rank !== undefined) result.rank = input.rank;
   if (input.ticket !== undefined && input.ticket !== '') result.workItemUris = [input.ticket];
   if (meta.fingerprint !== undefined) result.partialFingerprints = { [ANCHOR_FINGERPRINT_KEY]: meta.fingerprint };
+  if (input.artifacts !== undefined && input.artifacts.length > 0) {
+    result.attachments = input.artifacts.map(uri => ({ artifactLocation: { uri } }));
+  }
   return result;
 }

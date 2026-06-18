@@ -40,8 +40,21 @@ interface ParsedAdd {
   ticket?: string;
   producer?: string;
   producerVersion?: string;
+  artifacts: string[];
   body?: string;
   bodyStdin: boolean;
+}
+
+/** All values for a repeatable `--flag value` (e.g. `--artifact`). */
+function collectRepeatable(args: string[], name: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === `--${name}`) {
+      const v = args.at(i + 1);
+      if (v !== undefined && !v.startsWith('--')) out.push(v);
+    }
+  }
+  return out;
 }
 
 function noteUsage(): string {
@@ -66,6 +79,8 @@ add — options:
   --ticket <id|url>     Linked ticket
   --producer <name>     Producing tool/agent (e.g. "Claude Code", "Hot Sheet")
   --producer-version <v>
+  --artifact <path>     Attach a committed proof artifact (test output, log,
+                        diagram source); repeatable, repo-relative path
 
 update/remove use the guid returned by 'add' (--file scopes the search; omit to search all notes).
 coalesce drops redundant notes (identical anchor + kind + body), keeping the most recent.
@@ -97,7 +112,7 @@ export function parseNoteAdd(args: string[]): ParsedAdd {
   const endLine = endRaw !== undefined ? parseInteger('--lines end', endRaw) : startLine;
   if (startLine < 1 || endLine < startLine) throw new Error('--lines must be 1-based with start <= end');
 
-  const parsed: ParsedAdd = { file, startLine, endLine, kind: kindRaw, bodyStdin: false };
+  const parsed: ParsedAdd = { file, startLine, endLine, kind: kindRaw, artifacts: collectRepeatable(args, 'artifact'), bodyStdin: false };
 
   const confidence = flags.get('confidence');
   if (confidence !== undefined) {
@@ -173,6 +188,7 @@ async function runAdd(args: string[], cwd: string): Promise<void> {
     ticket: parsed.ticket,
     producer: parsed.producer,
     producerVersion: parsed.producerVersion,
+    artifacts: parsed.artifacts.length > 0 ? parsed.artifacts : undefined,
   };
   warnIfPrNotesIgnored(repoRoot);
   const { path, guid } = writeReviewNote(repoRoot, input);

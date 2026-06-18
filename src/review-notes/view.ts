@@ -33,4 +33,13 @@ export interface ReviewNoteView {
   /** Set by re-anchoring when the authored text can no longer be found at or
    *  near the note's line — the note is shown but flagged as possibly outdated. */
   stale?: boolean;
+  /** Proof artifacts attached to the note (docs/20 §20.5). `content` is the
+   *  text body when the artifact is text/diagram-source and readable; absent for
+   *  binary, missing, or oversized artifacts (rendered as a reference instead). */
+  artifacts?: ReviewNoteArtifact[];
+}
+
+export interface ReviewNoteArtifact {
+  uri: string;
+  content?: string;
 }

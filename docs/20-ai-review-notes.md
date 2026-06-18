@@ -181,9 +181,13 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   natural: `risk` / `assumption` can seed the risk dimensions; an author-stated
   reading order can seed narrative ordering; `rationale` reads like
   guided-review educational text.
-- **Artifact rendering** — Diagram-source artifacts render inline (Mermaid),
-  screenshots render through the existing image-diff component, and test output
-  renders as a code block.
+- **Artifact rendering** *(foundation shipped)* — A note attaches artifacts via
+  `glassbox note add --artifact <path>` (SARIF `result.attachments`); text and
+  diagram-*source* artifacts render as an inline, collapsible code block beneath
+  the note (`loadReviewNotesForFile` reads the file text, path-contained +
+  size-capped; `ReviewNoteRows`). Live diagram rendering (Mermaid/Graphviz/
+  PlantUML) and screenshot rendering through the image-diff component are
+  follow-ups (§20.11 P4).
 - **Threading** *(shipped)* — A reviewer can reply to an AI note with their own
   annotation, turning a note into a line-anchored conversation. The note row
   carries its SARIF `guid` (`data-note-id`) and a **Reply** button; the reply is
@@ -260,8 +264,11 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   The note's authored snippet is carried on the view. A reviewer can **Keep** a
   stale note (dismiss the flag) or **Discard** it (`DELETE
   /api/review-notes/:guid` → `removeNote`, deleting it from `.pr-notes/`).
-- **P4** — Artifact rendering (diagram source / screenshot via image-diff / test
-  output) and the Git LFS wiring.
+- **P4** *(foundation shipped)* — Artifact attachment (`--artifact` → SARIF
+  `result.attachments`) and inline code-block rendering of text / diagram-source
+  artifacts. **Follow-ups:** live diagram rendering (Mermaid/Graphviz/PlantUML);
+  screenshot/binary artifacts via the image-diff component + Git LFS wiring
+  (`.gitattributes`, `artifact.hashes`).
 - **P5** *(shipped)* — Feed notes into analysis and the export
   (`src/review-notes/format.ts`). `runAnalysisBatch` (shared by risk / narrative
   / guided) appends an "Author review notes" section to the prompt, so all three
