@@ -12,7 +12,7 @@ import { runBatches } from '../ai/batch-runner.js';
 import type { AIConfig, GuidedReviewConfig } from '../ai/config.js';
 import { loadAIConfig, loadGuidedReviewConfig } from '../ai/config.js';
 import { mockGuidedAnalysisBatch, mockNarrativeAnalysisBatch, mockRiskAnalysisBatch } from '../ai/mock.js';
-import { getModelContextWindow } from '../ai/models.js';
+import { getModelContextWindow, KEYLESS_PLATFORMS } from '../ai/models.js';
 import {
   AnalysisTypeSchema,
   SaveAIPreferencesReqSchema,
@@ -89,7 +89,10 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
 
   const testMode = isAIServiceTest();
   const config = loadAIConfig();
-  if (config.apiKey === null && !testMode) {
+  // Keyless platforms (`local`, `apple`) have no API key by design, so a null
+  // key is expected for them — gate only the key-based cloud platforms. Mirrors
+  // the client's check (`client.ts`) and `GET /api/ai/config`'s keyConfigured.
+  if (config.apiKey === null && !testMode && !KEYLESS_PLATFORMS.has(config.platform)) {
     debugLog('POST /analyze: no API key configured');
     return c.json({ error: 'No API key configured' }, 400);
   }

@@ -549,6 +549,38 @@ describe('POST /api/ai/analyze (additional cases)', () => {
       keySource: null,
     });
   });
+
+  it('starts analysis for a keyless platform with no API key (GB-925)', async () => {
+    // `apple`/`local` are keyless — apiKey is null by design, so the analyze
+    // endpoint must NOT reject them with "No API key configured". (Earlier this
+    // 400 silently blocked every on-device / local-server analysis.)
+    const { loadAIConfig } = await import('../../../src/ai/config.js');
+    for (const platform of ['apple', 'local'] as const) {
+      vi.mocked(loadAIConfig).mockReturnValue({
+        platform,
+        model: platform === 'apple' ? 'apple-on-device' : 'gemma4:12b',
+        apiKey: null,
+        keySource: null,
+      });
+      const res = await app.request(`/api/ai/analyze?reviewId=${TEST_REVIEW_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'risk' }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.error).toBeUndefined();
+      expect(body.status).toBe('running');
+    }
+
+    // Restore
+    vi.mocked(loadAIConfig).mockReturnValue({
+      platform: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      apiKey: null,
+      keySource: null,
+    });
+  });
 });
 
 // --- Analysis retrieval with data ---

@@ -214,8 +214,16 @@ test.describe('Experimental tab', () => {
     // Apple must NOT be an option for its own fallback.
     await expect(fallbackPlatform.locator('option[value="apple"]')).toHaveCount(0);
 
-    // Pick a fallback platform → its model select + key block render.
+    // A Local fallback exposes the server-URL input (parity with primary-local;
+    // GB-926) plus its model select.
+    await fallbackPlatform.selectOption('local');
+    await expect(page.locator('#settings-local-endpoint')).toBeVisible();
+    await expect(page.locator('#settings-fallback-model')).toBeVisible();
+
+    // Pick a cloud fallback platform → URL input goes away; model select + key
+    // block render.
     await fallbackPlatform.selectOption('anthropic');
+    await expect(page.locator('#settings-local-endpoint')).toHaveCount(0);
     await expect(page.locator('#settings-fallback-model')).toBeVisible();
     await expect(page.locator('[data-panel="experimental"] .settings-key-status')).toBeVisible();
 

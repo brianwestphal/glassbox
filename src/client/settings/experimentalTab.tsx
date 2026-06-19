@@ -167,6 +167,17 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
         </select>
         {hasFallback && (
           <>
+            {fallbackPlatform === 'local' && (
+              // Same shared `ai.localEndpoint` as a primary-local server; the
+              // primary input is hidden while Apple is the platform, so reusing
+              // the id here is safe (no duplicate). Editing it re-discovers the
+              // local model list for the dropdown below.
+              <>
+                <input type="text" className="settings-input" id="settings-local-endpoint"
+                  value={localEndpoint} placeholder="http://localhost:11434/v1" autoComplete="off" />
+                <p className="settings-hint">OpenAI-compatible endpoint (Ollama, LM Studio, …). The fallback model list loads from here.</p>
+              </>
+            )}
             <select className="settings-select settings-fallback-model" id="settings-fallback-model">
               {renderPlatformModels(fallbackModels, fallbackModel)}
             </select>
