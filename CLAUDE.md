@@ -58,7 +58,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
 - `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (P1 shipped: the `.pr-notes/` SARIF format + the `glassbox note` producer CLI; reader/render and later phases pending)
 - `21-sidebar-context-menu.md` — Right-click context menu on sidebar file rows; the cross-platform "reveal in file manager" action
-- `22-local-and-on-device-models.md` — Local OpenAI-compatible (Ollama/LM Studio) and Apple Foundation Models (on-device) as AI platforms (P1 local platform shipped; Apple FM P2 design only)
+- `22-local-and-on-device-models.md` — Local OpenAI-compatible (Ollama/LM Studio) and Apple Foundation Models (on-device) as AI platforms (P1 local platform shipped; Apple FM shipped — its 4096-token window can't fit larger diffs, so selecting Apple lets the user pick a **secondary fallback model** that absorbs any batch the on-device model can't handle, applied per-batch in `runAnalysisBatch`; `APPLE_FM_ANALYSIS_ENABLED` is the kill-switch, §22.10)
 
 **Architecture documents** describe system design and setup:
 
@@ -92,7 +92,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/ai/list-models.ts` — Live model discovery from each provider's models API (`fetchAvailableModels`), with the static list as fallback; powers `GET /api/ai/models`
 - `src/ai/config.ts` — API key resolution (env → keychain → config file) and config management
 - `src/ai/client.ts` — Unified client for Anthropic, OpenAI, Google, Local (OpenAI-compatible), and Apple (on-device) AI providers
-- `src/ai/apple-foundation.ts` — Apple Foundation Models bridge (doc 22 P2): spawns the bundled Swift helper (`src-tauri/apple-fm-helper/main.swift`) via `--probe`/`--infer`; darwin-gated, cached availability, bin via `GLASSBOX_APPLE_FM_BIN`; injectable runner for tests. Built by guarded+signed `scripts/build-apple-fm-helper.sh`. macOS-26-only; Swift/on-device path unverifiable in CI
+- `src/ai/apple-foundation.ts` — Apple Foundation Models bridge (doc 22 P2): spawns the bundled Swift helper (`src-tauri/apple-fm-helper/main.swift`) via `--probe`/`--infer`; darwin-gated, cached availability, bin via `GLASSBOX_APPLE_FM_BIN`; injectable runner for tests. Built by guarded+signed `scripts/build-apple-fm-helper.sh`. macOS-26-only; Swift/on-device path unverifiable in CI. The 4096-token window can't fit the analysis prompt + output for larger diffs, so when `apple` is the platform the user picks a **secondary fallback model** (`fallbackPlatform`/`fallbackModel` in config → `AIConfig.fallback` resolved by `loadAIConfig`): `runAnalysisBatch` runs each batch on-device and retries any failed batch once with the fallback (rebuilding contexts against the fallback's larger window). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`) is the platform kill-switch (doc 22 §22.10)
 - `src/ai/context-builder.ts` — Builds diff context payloads for AI analysis
 - `src/ai/analyze-risk.ts` — Risk analysis orchestration with multi-turn context loop
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop

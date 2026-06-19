@@ -22,6 +22,15 @@ providers (Anthropic / OpenAI / Google).
 > machine, plus — until GitHub's hosted runners ship a macOS 26 / Xcode 26 image
 > — CI compiles the helper only on a capable runner (the maintainer's local
 > `tauri:build:local` on macOS 26 already produces a signed, notarizable helper).
+>
+> **Apple FM's 4096-token context window can't fit the risk-analysis prompt +
+> output for larger diffs** (on-device testing showed non-deterministic
+> `exceededContextWindowSize` failures, and the ceiling isn't removable by prompt
+> trimming). Rather than gate the platform off, **selecting Apple lets the user
+> choose a secondary non-Apple fallback model**: each batch runs on-device and
+> any batch that fails spills to the fallback (`AIConfig.fallback`, applied
+> per-batch in `runAnalysisBatch`). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`)
+> remains the platform kill-switch. See **§22.10**.
 > A working reference exists in the
 > sibling Hot Sheet app's "Announcer" feature (`src/announcer/localProvider.ts`,
 > `src/announcer/appleFoundation.ts`, `src-tauri/apple-fm-helper/main.swift`,
@@ -210,10 +219,59 @@ small helper touches macOS 26 — the main bundle build is unchanged:
   the helper probes `available` and runs inference with no quarantine/Gatekeeper
   rejection, before a stable cut relies on it.
 
+## 22.10 Apple FM small context window — the secondary fallback model
+
+On-device testing on macOS 26 confirmed the Apple Foundation Models system model
+has a **hard 4096-token context window shared by input and output**. Glassbox's
+risk-analysis prompt asks for verbose per-file JSON (six dimension scores +
+rationale + overview + per-line notes), and that output competes with the diff
+input for the same 4096 tokens. In real tests a single ~30-line file overflowed
+(`exceededContextWindowSize`, after a ~64 s hang) while larger 50–80-line files
+happened to fit, because failure is driven by how verbose the *generated* output
+gets — so identical reviews can randomly succeed or fail. Crucially this **isn't
+fixable by prompt trimming**: a single file whose diff alone exceeds the window
+(~150–200 changed lines) can never be scored in one shot, because the model must
+see the whole diff to assess it.
+
+So rather than gate Apple FM off, **selecting `apple` lets the user pick a
+secondary, non-Apple fallback model**, and analysis spills to it **per failed
+batch**:
+
+- `APPLE_FM_ANALYSIS_ENABLED = true` in `src/ai/models.ts` is the platform's
+  kill-switch (flip to `false` to remove it entirely; `loadAIConfig` then maps a
+  saved `apple` preference to the cloud default).
+- The fallback selection (`fallbackPlatform` / `fallbackModel`) is stored in
+  `~/.glassbox/config.json`. `loadAIConfig()` resolves it into a nested
+  `AIConfig.fallback` (its own model + API key + base URL) **only when the
+  primary is `apple`** and the selection is valid + non-apple. One level deep —
+  the fallback never has its own `.fallback`.
+- `runAnalysisBatch` (shared by risk / narrative / guided) runs each batch
+  on-device; on **any** failure (context overflow, helper error, malformed
+  output) it retries that batch once with `config.fallback`, **rebuilding the
+  diff contexts against the fallback's larger window** so they aren't
+  pre-truncated to 4096. If both fail, the batch degrades gracefully (those
+  files get no scores), as before.
+- Settings (Experimental tab): when Apple is selected, a "Fallback model"
+  section offers a platform select (excluding apple) + model select + that
+  platform's API-key entry (a cloud fallback needs its own key). "None" skips
+  oversized files instead.
+
+**Trade-off (accepted):** because only the oversized batches spill, a review's
+risk scores can come from two models (two scoring scales). This maximizes
+on-device (free/private) coverage; whole-review consistency was the rejected
+alternative. The `4096` constant in `models.ts` is correct — the task is what
+doesn't fit, which is exactly what the fallback absorbs.
+
+The Apple on-device path itself stays **CI-unverifiable** (no macOS-26 helper on
+the hosted runners; the integration tests mock availability), so the
+fallback-driven Apple UI is verified on real hardware by the maintainer; the
+fallback config + execution logic are covered by unit + integration tests.
+
 ## Maintenance triggers
 
 Update this document when: a platform id, default endpoint, or config key
 changes; the Apple helper's I/O protocol or build/bundle approach changes; the
-settings UX for keyless providers changes; or the structured-output handling for
-local/on-device models changes. When a phase ships, update its status here and
+settings UX for keyless providers changes; the structured-output handling for
+local/on-device models changes; or Apple FM analysis is re-enabled
+(`APPLE_FM_ANALYSIS_ENABLED`). When a phase ships, update its status here and
 in `docs/ai/requirements-summary.md`.

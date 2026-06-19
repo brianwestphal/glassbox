@@ -27,6 +27,7 @@ vi.mock('../../../src/ai/config.js', () => ({
     keySource: null,
   })),
   saveAIConfigPreferences: vi.fn(),
+  loadFallbackSelection: vi.fn(() => null),
   resolveLocalEndpoint: vi.fn(() => 'http://localhost:11434/v1'),
   resolveAPIKey: vi.fn((_platform: string) => ({ key: null, source: null })),
   detectAvailablePlatforms: vi.fn(() => []),
@@ -63,9 +64,12 @@ vi.mock('../../../src/ai/list-models.js', () => ({
 }));
 
 // Mock the Apple FM bridge so the route's availability probe is deterministic
-// (no real `spawn` / platform dependence) — treat the helper as unavailable.
+// (no real `spawn` / platform dependence). Report the helper as AVAILABLE here
+// so the test proves the platform is gated by the `APPLE_FM_ANALYSIS_ENABLED`
+// feature flag (currently off) rather than by the probe — a passing probe must
+// still not surface Apple while analysis support is disabled.
 vi.mock('../../../src/ai/apple-foundation.js', () => ({
-  isAppleFoundationAvailable: vi.fn(async () => false),
+  isAppleFoundationAvailable: vi.fn(async () => true),
 }));
 
 // Mock batch planner and runner (not testing actual batch processing)
@@ -127,6 +131,18 @@ describe('GET /api/ai/config', () => {
     expect(typeof body.keyConfigured).toBe('boolean');
     expect(body.localEndpoint).toBe('http://localhost:11434/v1');
     expect(body.guidedReview).toBeDefined();
+    // No Apple-FM fallback configured by default.
+    expect(body.fallbackPlatform).toBeNull();
+    expect(body.fallbackModel).toBeNull();
+  });
+
+  it('returns the stored Apple-FM fallback selection when set', async () => {
+    const { loadFallbackSelection } = await import('../../../src/ai/config.js');
+    vi.mocked(loadFallbackSelection).mockReturnValueOnce({ platform: 'anthropic', model: 'claude-sonnet-4-6' });
+    const res = await app.request('/api/ai/config');
+    const body = await res.json();
+    expect(body.fallbackPlatform).toBe('anthropic');
+    expect(body.fallbackModel).toBe('claude-sonnet-4-6');
   });
 });
 
@@ -156,6 +172,24 @@ describe('POST /api/ai/config', () => {
     expect(res.status).toBe(200);
     expect(saveGuidedReviewConfig).toHaveBeenCalledWith({ enabled: true, topics: ['typescript'] });
   });
+
+  it('passes the Apple-FM fallback selection through to saveAIConfigPreferences', async () => {
+    const { saveAIConfigPreferences } = await import('../../../src/ai/config.js');
+    vi.mocked(saveAIConfigPreferences).mockClear();
+    const res = await app.request('/api/ai/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: 'apple',
+        model: 'apple-on-device',
+        fallbackPlatform: 'anthropic',
+        fallbackModel: 'claude-sonnet-4-6',
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(saveAIConfigPreferences).toHaveBeenCalledWith('apple', 'apple-on-device',
+      expect.objectContaining({ fallbackPlatform: 'anthropic', fallbackModel: 'claude-sonnet-4-6' }));
+  });
 });
 
 describe('GET /api/ai/models', () => {
@@ -174,7 +208,10 @@ describe('GET /api/ai/models', () => {
     // exhaustive); the Apple picker button is gated by `appleAvailable` instead.
     expect(body.models.apple).toBeDefined();
     expect(body.platforms.apple).toBe('Apple');
-    expect(body.appleAvailable).toBe(false);
+    // Apple FM analysis is enabled (`APPLE_FM_ANALYSIS_ENABLED === true`), and the
+    // helper probe is mocked to report available, so the platform is offered.
+    // (Its small context window is handled by the per-batch fallback model.)
+    expect(body.appleAvailable).toBe(true);
   });
 });
 

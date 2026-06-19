@@ -33,6 +33,10 @@ export const AIConfigRespSchema = z.object({
   /** Base URL for the `local` (OpenAI-compatible) platform. */
   localEndpoint: z.string(),
   guidedReview: GuidedReviewConfigShapeSchema,
+  /** Secondary model used when the primary (Apple FM) fails a batch. `null`
+   *  when none is configured. */
+  fallbackPlatform: AIPlatformSchema.nullable(),
+  fallbackModel: z.string().nullable(),
 });
 export type AIConfigResp = z.infer<typeof AIConfigRespSchema>;
 
@@ -41,6 +45,9 @@ export const SaveAIConfigReqSchema = z.object({
   model: z.string().min(1),
   localEndpoint: z.string().optional(),
   guidedReview: GuidedReviewConfigShapeSchema.optional(),
+  /** Apple-FM fallback selection. An empty `fallbackPlatform` clears it. */
+  fallbackPlatform: z.string().optional(),
+  fallbackModel: z.string().optional(),
 });
 export type SaveAIConfigReq = z.infer<typeof SaveAIConfigReqSchema>;
 

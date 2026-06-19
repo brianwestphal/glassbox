@@ -75,6 +75,46 @@ describe('runRiskAnalysisBatch', () => {
   });
 });
 
+describe('runRiskAnalysisBatch — Apple FM fallback', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const appleWithFallback = {
+    platform: 'apple', model: 'apple-on-device', apiKey: null, keySource: null,
+    fallback: { platform: 'anthropic', model: 'claude-sonnet-4-6', apiKey: 'k', keySource: 'config' },
+  };
+
+  it('falls back to the secondary model when the on-device platform fails a batch', async () => {
+    // Primary (apple) throws as if the 4096-token window overflowed; the
+    // fallback (anthropic) succeeds.
+    vi.mocked(sendAIRequest).mockImplementation((cfg) =>
+      cfg.platform === 'apple'
+        ? Promise.reject(new Error('exceededContextWindowSize'))
+        : Promise.resolve({ content: JSON.stringify(validResult) }));
+
+    const results = await runRiskAnalysisBatch(makeFiles(1), appleWithFallback as never, '/repo');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].filePath).toBe('src/file0.ts');
+    // Primary attempted first, then the fallback.
+    const platformsTried = vi.mocked(sendAIRequest).mock.calls.map(c => c[0].platform);
+    expect(platformsTried).toEqual(['apple', 'anthropic']);
+  });
+
+  it('re-throws when the primary fails and no fallback is configured', async () => {
+    vi.mocked(sendAIRequest).mockRejectedValue(new Error('exceededContextWindowSize'));
+    const appleNoFallback = { platform: 'apple', model: 'apple-on-device', apiKey: null, keySource: null };
+    await expect(runRiskAnalysisBatch(makeFiles(1), appleNoFallback as never, '/repo'))
+      .rejects.toThrow('exceededContextWindowSize');
+  });
+
+  it('does not invoke the fallback when the primary succeeds', async () => {
+    vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult) });
+    await runRiskAnalysisBatch(makeFiles(1), appleWithFallback as never, '/repo');
+    expect(sendAIRequest).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendAIRequest).mock.calls[0][0].platform).toBe('apple');
+  });
+});
+
 describe('RISK_DIMENSIONS', () => {
   it('has 6 dimensions', () => {
     expect(RISK_DIMENSIONS).toHaveLength(6);

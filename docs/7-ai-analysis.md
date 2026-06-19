@@ -49,6 +49,7 @@ Requirements for optional AI-powered code analysis features.
 - Large reviews shall be split into token-budgeted batches to fit within model context windows.
 - Token estimation shall use a character-based heuristic (approximately 3 characters per token).
 - The system shall support multi-turn context loops where the AI can request full file content for more context.
+- When the on-device Apple Foundation Models platform is selected, a batch it cannot process (its small context window overflowing, or any other failure) shall **fall back per-batch to the user-configured secondary model** rather than failing those files outright (see `22-local-and-on-device-models.md` §22.10).
 - Analysis progress shall be tracked and displayed to the user (completed batches / total batches).
 - Switching between risk and narrative modes shall cancel the other's running analysis.
 - Binary files shall be excluded from AI analysis and assigned a score of 0.

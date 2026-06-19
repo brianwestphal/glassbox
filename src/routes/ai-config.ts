@@ -7,6 +7,7 @@ import {
   getKeychainLabel,
   isKeychainAvailable,
   loadAIConfig,
+  loadFallbackSelection,
   loadGuidedReviewConfig,
   resolveAPIKey,
   resolveLocalEndpoint,
@@ -16,7 +17,7 @@ import {
 } from '../ai/config.js';
 import { fetchAvailableModels } from '../ai/list-models.js';
 import type { AIModel, AIPlatform } from '../ai/models.js';
-import { AIPlatformSchema, MODELS, PLATFORMS } from '../ai/models.js';
+import { AIPlatformSchema, APPLE_FM_ANALYSIS_ENABLED, MODELS, PLATFORMS } from '../ai/models.js';
 import type { AIKeyStatusEntry, GetAIKeyStatusResp } from '../api/index.js';
 import { SaveAIConfigReqSchema, SaveAIKeyReqSchema } from '../api/index.js';
 import { getDemoMode, isAIServiceTest } from '../debug.js';
@@ -30,7 +31,8 @@ aiConfigRoutes.get('/config', async (c) => {
   // Keyless platforms count as "configured" without an API key: `local` as soon
   // as its (defaulted) endpoint is set, `apple` when the on-device helper probe
   // passes (macOS 26 + Apple Intelligence).
-  const appleReady = config.platform === 'apple' && await isAppleFoundationAvailable();
+  const appleReady = APPLE_FM_ANALYSIS_ENABLED && config.platform === 'apple' && await isAppleFoundationAvailable();
+  const fallbackSelection = loadFallbackSelection();
   return c.json({
     platform: config.platform,
     model: config.model,
@@ -38,6 +40,10 @@ aiConfigRoutes.get('/config', async (c) => {
     keySource: config.keySource,
     localEndpoint: resolveLocalEndpoint(),
     guidedReview: loadGuidedReviewConfig(),
+    // Apple-FM fallback selection as stored, regardless of the current primary
+    // platform, so the settings dialog can show/preserve it; `null` when unset.
+    fallbackPlatform: fallbackSelection?.platform ?? null,
+    fallbackModel: fallbackSelection?.model ?? null,
   });
 });
 
@@ -46,7 +52,11 @@ aiConfigRoutes.post('/config', async (c) => {
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
 
-  saveAIConfigPreferences(body.platform, body.model, { localEndpoint: body.localEndpoint });
+  saveAIConfigPreferences(body.platform, body.model, {
+    localEndpoint: body.localEndpoint,
+    fallbackPlatform: body.fallbackPlatform,
+    fallbackModel: body.fallbackModel,
+  });
   if (body.guidedReview !== undefined) {
     saveGuidedReviewConfig(body.guidedReview);
   }
@@ -80,8 +90,11 @@ aiConfigRoutes.get('/models', async (c) => {
   // Apple Foundation Models are on-device and macOS-26-only. The records carry
   // every platform key (the enum-keyed record schema is exhaustive), so the
   // picker is gated by the `appleAvailable` flag instead of by omitting the key
-  // — the settings UI shows the Apple button only when the helper probe passes.
-  const appleAvailable = await isAppleFoundationAvailable();
+  // — the settings UI shows the Apple button only when this is true. It's
+  // currently force-disabled (`APPLE_FM_ANALYSIS_ENABLED`): the on-device
+  // model's 4096-token window can't fit the analysis prompt + output, so even a
+  // passing helper probe must not offer it. The probe is short-circuited away.
+  const appleAvailable = APPLE_FM_ANALYSIS_ENABLED && await isAppleFoundationAvailable();
   return c.json({ platforms: PLATFORMS, models, appleAvailable });
 });
 

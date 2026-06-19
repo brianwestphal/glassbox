@@ -152,9 +152,9 @@ See §6 for the schema itself.
 
 | File | Purpose |
 |------|---------|
-| `models.ts` | Static platform/model list — now the **fallback** for live discovery (`list-models.ts`); also defaults + context windows + ENV var names. `AIPlatform` = anthropic/openai/google/`local`/`apple`; `KEYLESS_PLATFORMS` = {local, apple}. `apple` has a single fixed entry (`APPLE_ON_DEVICE_MODEL_ID`, 4096-token window — no discovery). `resolveModelId(platform, id)` best-effort-maps a stale/older id to the current same-tier model (GB-893; skipped for keyless platforms). |
+| `models.ts` | Static platform/model list — now the **fallback** for live discovery (`list-models.ts`); also defaults + context windows + ENV var names. `AIPlatform` = anthropic/openai/google/`local`/`apple`; `KEYLESS_PLATFORMS` = {local, apple}. `apple` has a single fixed entry (`APPLE_ON_DEVICE_MODEL_ID`, 4096-token window — no discovery). **`APPLE_FM_ANALYSIS_ENABLED = true`** is the Apple-platform kill-switch (flip to `false` to remove it; `loadAIConfig` then maps a saved `apple` pref to the cloud default). Apple's small window can't fit larger diffs, so selecting it lets the user pick a **secondary fallback model** (`fallbackPlatform`/`fallbackModel` → `AIConfig.fallback`; `runAnalysisBatch` retries any failed batch with it — doc 22 §22.10). `resolveModelId(platform, id)` best-effort-maps a stale/older id to the current same-tier model (GB-893; skipped for keyless platforms). |
 | `list-models.ts` | **Live model discovery** (GB-894): `fetchAvailableModels(platform, key)` hits each provider's models API (Anthropic `/v1/models`, OpenAI `/v1/models` filtered to chat, Google `/v1beta/models` filtered to `generateContent`), zod-validates, maps to `{id,name,contextWindow}`; returns `null` on failure so the caller falls back to the static list. |
-| `config.ts` | Load/save `~/.glassbox/config.json` (platform, model, guided settings, share prompt, channel enabled, cumulative open time). |
+| `config.ts` | Load/save `~/.glassbox/config.json` (platform, model, guided settings, share prompt, channel enabled, cumulative open time). `loadAIConfig` resolves the Apple-FM secondary fallback (`fallbackPlatform`/`fallbackModel`) into a nested `AIConfig.fallback` when the primary is `apple`; `loadFallbackSelection` returns the stored selection for settings display. |
 | `api-keys.ts` | Key resolution chain: env var → OS keychain → base64 in config file. Save/delete, source detection. |
 | `keychain.ts` | OS keychain wrappers: macOS `security`, Linux `secret-tool`, Windows `cmdkey`. |
 | `client.ts` | Unified client. `sendAIRequest(config, system, messages)` dispatches to Anthropic / OpenAI / Google / **Local** (OpenAI-compatible — `sendLocalRequest` posts to `{config.baseUrl}/chat/completions`, optional Bearer) / **Apple** (on-device — `sendAppleRequest` calls the `apple-foundation.ts` bridge, no HTTP, token counts 0); keyless platforms (`local`, `apple`) skip the no-key gate via `KEYLESS_PLATFORMS`. Returns content + token counts. |
@@ -166,7 +166,7 @@ See §6 for the schema itself.
 | `analyze-narrative.ts` | Narrative orchestrator. Produces a reading order + per-file rationale + walkthrough notes. |
 | `analyze-guided.ts` | Guided review orchestrator (topic-driven educational notes). |
 | `guided-review.ts` | Builds guided-review topic suffix text injected into risk/narrative prompts. |
-| `shared.ts` | Utilities: JSON extraction, "need more context" detection, prompt formatting helpers. |
+| `shared.ts` | Utilities: JSON extraction, "need more context" detection, prompt formatting helpers. `runAnalysisBatch` wraps the per-batch send loop with the Apple-FM **per-batch fallback** — on any failure it retries the batch once with `config.fallback`, rebuilding contexts against the fallback's larger window. |
 | `mock.ts` | `--ai-service-test` mock responses for all three analysis types (no network). |
 
 ### `src/themes/`

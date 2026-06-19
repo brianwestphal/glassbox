@@ -41,6 +41,9 @@ interface SettingsUIState {
   activeTab: string;
   currentPlatform: string;
   currentModel: string;
+  // Apple-FM fallback selection (empty string = none).
+  fallbackPlatform: string;
+  fallbackModel: string;
   localEndpoint: string;
   guidedEnabled: boolean;
   guidedTopics: Set<string>;
@@ -96,6 +99,8 @@ function renderSettingsModal(
     activeTab: 'general',
     currentPlatform: configData.platform,
     currentModel: configData.model,
+    fallbackPlatform: configData.fallbackPlatform ?? '',
+    fallbackModel: configData.fallbackModel ?? '',
     localEndpoint: configData.localEndpoint,
     guidedEnabled: configData.guidedReview.enabled,
     guidedTopics: new Set(configData.guidedReview.topics),
@@ -175,6 +180,8 @@ interface Actions {
   saveAppNameDebounced: () => void;
   saveKey: () => void;
   removeKey: () => void;
+  saveFallbackKey: () => void;
+  removeFallbackKey: () => void;
   toggleTopic: (topic: string) => void;
   registerDifftoolAction: () => void;
   unregisterDifftoolAction: () => void;
@@ -212,6 +219,11 @@ function createActions(deps: ActionDeps): Actions {
           model: cur.currentModel,
           localEndpoint: cur.localEndpoint,
           guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
+          // Only send the fallback while Apple is the primary — otherwise omit
+          // it so an unrelated save doesn't clear the stored selection.
+          ...(cur.currentPlatform === 'apple'
+            ? { fallbackPlatform: cur.fallbackPlatform, fallbackModel: cur.fallbackModel }
+            : {}),
         });
 
         const newConfig = await getAIConfig();
@@ -267,18 +279,17 @@ function createActions(deps: ActionDeps): Actions {
     }, SETTINGS_APP_NAME_DEBOUNCE_MS);
   }
 
-  function saveKey(): void {
-    const keyInput = overlay.querySelector<HTMLInputElement>('#settings-key');
+  // Save/remove are parameterized by platform + element ids so the same logic
+  // serves the primary platform's key block and the Apple-FM fallback's.
+  function saveKeyFor(platform: string, inputId: string, storageName: string): void {
+    if (platform === '') return;
+    const keyInput = overlay.querySelector<HTMLInputElement>(`#${inputId}`);
     if (keyInput === null || keyInput.value.trim() === '') return;
-    const storageRadio = overlay.querySelector<HTMLInputElement>('input[name="key-storage"]:checked');
+    const storageRadio = overlay.querySelector<HTMLInputElement>(`input[name="${storageName}"]:checked`);
     const storage = storageRadio?.value ?? 'config';
     void (async () => {
       try {
-        await saveAIKey({
-          platform: ui.value.currentPlatform as AIPlatform,
-          key: keyInput.value.trim(),
-          storage: storage as KeyStorage,
-        });
+        await saveAIKey({ platform: platform as AIPlatform, key: keyInput.value.trim(), storage: storage as KeyStorage });
         const newStatus = await getAIKeyStatus();
         keyStatus.status = newStatus.status;
         const newConfig = await getAIConfig();
@@ -290,10 +301,11 @@ function createActions(deps: ActionDeps): Actions {
     })();
   }
 
-  function removeKey(): void {
+  function removeKeyFor(platform: string): void {
+    if (platform === '') return;
     void (async () => {
       try {
-        await deleteAIKey({ platform: ui.value.currentPlatform as AIPlatform });
+        await deleteAIKey({ platform: platform as AIPlatform });
         const newStatus = await getAIKeyStatus();
         keyStatus.status = newStatus.status;
         const newConfig = await getAIConfig();
@@ -304,6 +316,11 @@ function createActions(deps: ActionDeps): Actions {
       }
     })();
   }
+
+  const saveKey = (): void => { saveKeyFor(ui.value.currentPlatform, 'settings-key', 'key-storage'); };
+  const removeKey = (): void => { removeKeyFor(ui.value.currentPlatform); };
+  const saveFallbackKey = (): void => { saveKeyFor(ui.value.fallbackPlatform, 'settings-fallback-key', 'fallback-key-storage'); };
+  const removeFallbackKey = (): void => { removeKeyFor(ui.value.fallbackPlatform); };
 
   function toggleTopic(topic: string): void {
     const cur = ui.value;
@@ -387,7 +404,7 @@ function createActions(deps: ActionDeps): Actions {
     if (appNameTimer) clearTimeout(appNameTimer);
   }
 
-  return { saveConfig, saveConfigDebounced, saveLocalEndpoint, saveAppNameDebounced, saveKey, removeKey, toggleTopic, registerDifftoolAction, unregisterDifftoolAction, dispose };
+  return { saveConfig, saveConfigDebounced, saveLocalEndpoint, saveAppNameDebounced, saveKey, removeKey, saveFallbackKey, removeFallbackKey, toggleTopic, registerDifftoolAction, unregisterDifftoolAction, dispose };
 }
 
 // --- TabContext construction ---
@@ -409,6 +426,8 @@ function buildContext(args: {
     isTauri: args.isTauri,
     currentPlatform: cur.currentPlatform,
     currentModel: cur.currentModel,
+    fallbackPlatform: cur.fallbackPlatform,
+    fallbackModel: cur.fallbackModel,
     localEndpoint: cur.localEndpoint,
     guidedEnabled: cur.guidedEnabled,
     guidedTopics: cur.guidedTopics,
@@ -509,6 +528,28 @@ function setupDelegates(args: {
   void delegate(overlay, 'keydown', '#settings-key', (e) => {
     const ke = e as KeyboardEvent;
     if (ke.key === 'Enter') { ke.preventDefault(); actions.saveKey(); }
+  });
+  // Apple-FM fallback model picker (shown only when Apple is the platform).
+  void delegate(overlay, 'change', '#settings-fallback-platform', (_e, sel) => {
+    const platform = asSelect(sel).value;
+    let model = '';
+    if (platform !== '') {
+      const models = modelsData.models[platform as AIPlatform];
+      const def = models.find(m => m.isDefault);
+      model = def ? def.id : (models[0]?.id ?? '');
+    }
+    setUi({ fallbackPlatform: platform, fallbackModel: model });
+    actions.saveConfig();
+  });
+  void delegate(overlay, 'change', '#settings-fallback-model', (_e, sel) => {
+    setUi({ fallbackModel: asSelect(sel).value });
+    actions.saveConfig();
+  });
+  void delegate(overlay, 'click', '#remove-fallback-key', actions.removeFallbackKey);
+  void delegate(overlay, 'click', '#save-fallback-key-btn', actions.saveFallbackKey);
+  void delegate(overlay, 'keydown', '#settings-fallback-key', (e) => {
+    const ke = e as KeyboardEvent;
+    if (ke.key === 'Enter') { ke.preventDefault(); actions.saveFallbackKey(); }
   });
   void delegate(overlay, 'change', '#settings-guided-enabled', (_e, cb) => {
     setUi({ guidedEnabled: asInput(cb).checked });

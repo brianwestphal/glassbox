@@ -43,6 +43,10 @@ export interface TabContext {
   isTauri: boolean;
   currentPlatform: string;
   currentModel: string;
+  // Apple-FM fallback selection (empty string = none). Only surfaced by the
+  // Experimental tab when the primary platform is `apple`.
+  fallbackPlatform: string;
+  fallbackModel: string;
   localEndpoint: string;
   guidedEnabled: boolean;
   guidedTopics: Set<string>;

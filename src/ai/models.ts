@@ -32,6 +32,25 @@ export const PLATFORMS: Record<AIPlatform, string> = {
  *  `FoundationModels` API), so this fixed id stands in for it. */
 export const APPLE_ON_DEVICE_MODEL_ID = 'apple-on-device';
 
+/**
+ * Kill-switch for Apple Foundation Models as a code-analysis platform. When
+ * `false`, the platform is hidden from the picker and a saved `apple` preference
+ * falls back to the cloud default (see `loadAIConfig`).
+ *
+ * It's enabled. The on-device model's 4096-token window — shared by input *and*
+ * output — can't fit the risk-analysis prompt + verbose JSON output for larger
+ * diffs (it overflows with `exceededContextWindowSize`, and that ceiling isn't
+ * removable by prompt trimming since the model must see the whole file). So
+ * rather than gate the platform off, selecting `apple` lets the user choose a
+ * **secondary non-Apple fallback model**: each analysis batch runs on-device,
+ * and any batch that fails spills to the fallback (`AIConfig.fallback`, resolved
+ * in `loadAIConfig`; applied per-batch in `runAnalysisBatch`). Flip to `false`
+ * to disable the platform entirely again.
+ */
+// Typed as `boolean` (not the inferred literal `true`) so the gate checks aren't
+// flagged as constant conditions and toggling it stays a one-line edit.
+export const APPLE_FM_ANALYSIS_ENABLED: boolean = true;
+
 // Keep this list up to date — check at least once a day when working on the project
 export const MODELS: Record<AIPlatform, AIModel[]> = {
   anthropic: [

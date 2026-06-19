@@ -641,7 +641,7 @@ no-op — GB-892). All server actions are best-effort (failures swallowed,
 `--debug`-logged). The menu dismisses on item-select, Escape, outside
 click/right-click, scroll, or blur.
 
-## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Built (Apple FM dev-first)**
+## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Built (local + Apple FM with secondary fallback)**
 
 Extends AI analysis beyond the three cloud providers to **`local`**
 (OpenAI-compatible servers — Ollama default `http://localhost:11434/v1`, LM
@@ -676,6 +676,18 @@ and any helper-less bundle hides the Apple platform via the probe. Remaining
 (GB-918): the maintainer's clean-machine smoke test, validated via a beta cut
 first (the local `tauri:build:local` on macOS 26 already produces a signed
 bundle). Adapts the sibling Hot Sheet app's Announcer implementation.
+**Apple FM's 4096-token window (shared input+output) can't fit the risk-analysis
+prompt + verbose JSON output for larger diffs** — it overflows
+non-deterministically (`exceededContextWindowSize`), and the ceiling isn't
+removable by prompt trimming (the model must see the whole file). So selecting
+`apple` lets the user pick a **secondary non-Apple fallback model**
+(`fallbackPlatform`/`fallbackModel` → nested `AIConfig.fallback` via
+`loadAIConfig`): `runAnalysisBatch` runs each batch on-device and retries any
+**failed batch** once with the fallback (rebuilding contexts against its larger
+window). Trade-off: a review may then mix two models' scores — accepted to keep
+on-device coverage. `APPLE_FM_ANALYSIS_ENABLED` is the platform kill-switch; the
+fallback config + execution are unit/integration-tested while the on-device path
+stays CI-unverifiable (doc 22 §22.10).
 
 ## 19. Implementation-status snapshot
 

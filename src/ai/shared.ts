@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import type { ReviewFile } from '../db/queries.js';
+import { debugLog } from '../debug.js';
 import { getFileContent } from '../git/diff.js';
 import { reviewNotesPromptSection } from '../review-notes/format.js';
 import type { AIMessage } from './client.js';
@@ -69,6 +70,29 @@ interface AnalysisBatchOptions<T> {
  * strings; everything else is identical.
  */
 export async function runAnalysisBatch<T>(
+  files: ReviewFile[],
+  config: AIConfig,
+  repoRoot: string,
+  options: AnalysisBatchOptions<T>,
+): Promise<T[]> {
+  try {
+    return await runAnalysisBatchOnce(files, config, repoRoot, options);
+  } catch (err) {
+    // Per-batch fallback: when the primary platform can't produce a usable
+    // result for this batch (Apple FM's 4096-token window overflowing, a helper
+    // error, malformed output, …) and the user configured a secondary model,
+    // retry the same batch once with it. The fallback rebuilds its own contexts
+    // against its larger window, so the diff isn't pre-truncated to 4096. One
+    // level only — `config.fallback` itself has no `.fallback` (see
+    // `loadAIConfig`), so this can't recurse.
+    if (config.fallback === undefined) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    debugLog(`[${options.analysisName}] primary platform '${config.platform}' failed for batch (${msg.slice(0, 160)}); retrying with fallback '${config.fallback.platform}'`);
+    return runAnalysisBatchOnce(files, config.fallback, repoRoot, options);
+  }
+}
+
+async function runAnalysisBatchOnce<T>(
   files: ReviewFile[],
   config: AIConfig,
   repoRoot: string,

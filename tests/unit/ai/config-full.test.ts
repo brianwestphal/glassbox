@@ -24,6 +24,7 @@ vi.mock('child_process', () => ({
 const {
   resolveAPIKey,
   loadAIConfig,
+  loadFallbackSelection,
   resolveLocalEndpoint,
   saveAIConfigPreferences,
   saveAPIKey,
@@ -350,6 +351,75 @@ describe('loadAIConfig', () => {
     expect(config.model).toBe('gemini-2.5-flash');
 
     Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
+  it('keeps `apple` as the platform when Apple FM analysis is enabled', () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    setSpawnResult('', 44);
+    setConfigFile({ ai: { platform: 'apple', model: 'apple-on-device' } });
+
+    const config = loadAIConfig();
+
+    expect(config.platform).toBe('apple');
+    expect(config.fallback).toBeUndefined();
+
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
+  it('resolves the Apple-FM fallback config when one is saved', () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    setSpawnResult('', 44);
+    setConfigFile({ ai: { platform: 'apple', model: 'apple-on-device', fallbackPlatform: 'anthropic', fallbackModel: 'claude-sonnet-4-6' } });
+
+    const config = loadAIConfig();
+
+    expect(config.platform).toBe('apple');
+    expect(config.fallback?.platform).toBe('anthropic');
+    expect(config.fallback?.model).toBe('claude-sonnet-4-6');
+    // One level only — the fallback has no fallback of its own.
+    expect(config.fallback?.fallback).toBeUndefined();
+
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
+  it('ignores an `apple` fallback selection (can’t fall back to itself)', () => {
+    setConfigFile({ ai: { platform: 'apple', fallbackPlatform: 'apple' } });
+    expect(loadAIConfig().fallback).toBeUndefined();
+  });
+
+  it('does not attach a fallback when the primary platform is not apple', () => {
+    setConfigFile({ ai: { platform: 'anthropic', fallbackPlatform: 'openai' } });
+    expect(loadAIConfig().fallback).toBeUndefined();
+  });
+});
+
+describe('Apple-FM fallback persistence', () => {
+  it('persists the fallback selection via saveAIConfigPreferences', () => {
+    setConfigFile({ ai: { platform: 'apple', model: 'apple-on-device' } });
+    saveAIConfigPreferences('apple', 'apple-on-device', { fallbackPlatform: 'anthropic', fallbackModel: 'claude-sonnet-4-6' });
+    const written = JSON.parse(fsMocks.writeFileSync.mock.calls.at(-1)![1]);
+    expect(written.ai.fallbackPlatform).toBe('anthropic');
+    expect(written.ai.fallbackModel).toBe('claude-sonnet-4-6');
+  });
+
+  it('clears the fallback when an empty platform is saved', () => {
+    setConfigFile({ ai: { platform: 'apple', fallbackPlatform: 'anthropic', fallbackModel: 'claude-sonnet-4-6' } });
+    saveAIConfigPreferences('apple', 'apple-on-device', { fallbackPlatform: '' });
+    const written = JSON.parse(fsMocks.writeFileSync.mock.calls.at(-1)![1]);
+    expect(written.ai.fallbackPlatform).toBeUndefined();
+    expect(written.ai.fallbackModel).toBeUndefined();
+  });
+
+  it('loadFallbackSelection returns the stored selection regardless of primary', () => {
+    setConfigFile({ ai: { platform: 'anthropic', fallbackPlatform: 'google', fallbackModel: 'gemini-2.5-flash' } });
+    expect(loadFallbackSelection()).toEqual({ platform: 'google', model: 'gemini-2.5-flash' });
+  });
+
+  it('loadFallbackSelection returns null when unset', () => {
+    setConfigFile({ ai: { platform: 'apple' } });
+    expect(loadFallbackSelection()).toBeNull();
   });
 });
 
