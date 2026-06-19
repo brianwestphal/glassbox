@@ -30,7 +30,7 @@ test.describe('GB-785: risk-dimension dropdown', () => {
     });
     await page.route('**/api/ai/config**', async (route) => {
       if (route.request().method() === 'GET') {
-        await route.fulfill({ json: { platform: 'anthropic', model: 'claude-opus-4-7', keyConfigured: true, keySource: 'env', localEndpoint: 'http://localhost:11434/v1', guidedReview: { enabled: false, topics: [] } } });
+        await route.fulfill({ json: { platform: 'anthropic', model: 'claude-opus-4-7', keyConfigured: true, keySource: 'env', localEndpoint: 'http://localhost:11434/v1', guidedReview: { enabled: false, topics: [] }, fallbackPlatform: null, fallbackModel: null } });
       } else {
         await route.fulfill({ json: { ok: true } });
       }
