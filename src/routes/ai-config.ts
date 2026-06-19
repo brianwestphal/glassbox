@@ -90,11 +90,11 @@ aiConfigRoutes.get('/models', async (c) => {
   // Apple Foundation Models are on-device and macOS-26-only. The records carry
   // every platform key (the enum-keyed record schema is exhaustive), so the
   // picker is gated by the `appleAvailable` flag instead of by omitting the key
-  // — the settings UI shows the Apple button only when this is true. It's
-  // currently force-disabled (`APPLE_FM_ANALYSIS_ENABLED`): the on-device
-  // model's 4096-token window can't fit the analysis prompt + output, so even a
-  // passing helper probe must not offer it. The probe is short-circuited away.
-  const appleAvailable = APPLE_FM_ANALYSIS_ENABLED && await isAppleFoundationAvailable();
+  // — the settings UI shows the Apple button only when this is true, and only
+  // while the platform isn't force-disabled (`APPLE_FM_ANALYSIS_ENABLED`).
+  // `--ai-service-test` forces it available (the on-device helper can't run on
+  // CI / Linux), so the e2e suite can exercise the Apple + fallback settings UI.
+  const appleAvailable = APPLE_FM_ANALYSIS_ENABLED && (isAIServiceTest() || await isAppleFoundationAvailable());
   return c.json({ platforms: PLATFORMS, models, appleAvailable });
 });
 

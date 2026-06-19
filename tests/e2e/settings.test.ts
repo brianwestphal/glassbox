@@ -178,9 +178,72 @@ test.describe('Experimental tab', () => {
     await expect(page.locator('#settings-model')).toBeVisible();
     await expect(page.getByText('API Key (optional)')).toBeVisible();
 
-    // Restore Anthropic so the suite doesn't leave the global config on `local`.
+    // Reset to the default platform. The demo server's config is isolated to a
+    // disposable dir (GB-923), so this no longer protects the developer's real
+    // config — it keeps a retry / later test starting from the clean default.
     await page.locator('.settings-platform-control [data-platform="anthropic"]').click();
     await expect(page.locator('#settings-local-endpoint')).toHaveCount(0);
+  });
+
+  test('selecting Apple reveals the fallback model picker, which persists', async ({ page }) => {
+    // Apple is on-device only; the server forces `appleAvailable` under
+    // `--ai-service-test` (the helper can't run on CI/Linux) so this UI is
+    // reachable. Its small context window is handled by a secondary fallback
+    // model the user picks here.
+    await page.goto('/');
+    await openSettings(page);
+    await page.locator('[data-tab="experimental"]').click();
+    await expect(page.locator('[data-panel="experimental"]')).toHaveClass(/active/);
+
+    const appleBtn = page.locator('.settings-platform-control [data-platform="apple"]');
+    await expect(appleBtn).toBeVisible();
+
+    // No fallback picker until Apple is selected.
+    await expect(page.locator('#settings-fallback-platform')).toHaveCount(0);
+
+    await appleBtn.click();
+    await expect(appleBtn).toHaveClass(/active/);
+
+    // The fallback platform select appears, defaulting to "None" (no fallback
+    // configured yet), so the fallback model select is hidden.
+    const fallbackPlatform = page.locator('#settings-fallback-platform');
+    await expect(fallbackPlatform).toBeVisible();
+    await expect(page.getByText('Fallback model')).toBeVisible();
+    await expect(page.locator('#settings-fallback-model')).toHaveCount(0);
+
+    // Apple must NOT be an option for its own fallback.
+    await expect(fallbackPlatform.locator('option[value="apple"]')).toHaveCount(0);
+
+    // Pick a fallback platform → its model select + key block render.
+    await fallbackPlatform.selectOption('anthropic');
+    await expect(page.locator('#settings-fallback-model')).toBeVisible();
+    await expect(page.locator('[data-panel="experimental"] .settings-key-status')).toBeVisible();
+
+    // The selection persists server-side (the dialog saves on change).
+    await expect.poll(async () => {
+      const cfg = await page.request.get('/api/ai/config').then(r => r.json());
+      return [cfg.platform, cfg.fallbackPlatform];
+    }).toEqual(['apple', 'anthropic']);
+
+    // Reopen to confirm the saved selection re-renders.
+    await page.locator('#settings-close').click();
+    await openSettings(page);
+    await page.locator('[data-tab="experimental"]').click();
+    await expect(appleBtn).toHaveClass(/active/);
+    await expect(page.locator('#settings-fallback-platform')).toHaveValue('anthropic');
+    await expect(page.locator('#settings-fallback-model')).toBeVisible();
+
+    // Reset to the default platform (clear the fallback first). The demo config
+    // is isolated (GB-923); this is for retry / later-test determinism, not the
+    // developer's real config.
+    await page.locator('#settings-fallback-platform').selectOption('');
+    await expect(page.locator('#settings-fallback-model')).toHaveCount(0);
+    await page.locator('.settings-platform-control [data-platform="anthropic"]').click();
+    await expect(page.locator('#settings-fallback-platform')).toHaveCount(0);
+    await expect.poll(async () => {
+      const cfg = await page.request.get('/api/ai/config').then(r => r.json());
+      return cfg.platform;
+    }).toBe('anthropic');
   });
 });
 

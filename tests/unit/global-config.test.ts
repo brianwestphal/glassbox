@@ -51,6 +51,43 @@ describe('global-config', () => {
     });
   });
 
+  describe('GLASSBOX_CONFIG_DIR override (GB-923)', () => {
+    // The dir is resolved once at import, so each case sets the env then
+    // re-imports the module fresh via vi.resetModules() + dynamic import.
+    const saved = process.env.GLASSBOX_CONFIG_DIR;
+    afterEach(() => {
+      if (saved === undefined) delete process.env.GLASSBOX_CONFIG_DIR;
+      else process.env.GLASSBOX_CONFIG_DIR = saved;
+    });
+
+    it('defaults to ~/.glassbox/config.json when the override is unset', async () => {
+      delete process.env.GLASSBOX_CONFIG_DIR;
+      vi.resetModules();
+      const { homedir } = await import('os');
+      const { join } = await import('path');
+      const mod = await import('../../src/global-config.js');
+      expect(mod.GLOBAL_CONFIG_DIR).toBe(join(homedir(), '.glassbox'));
+      expect(mod.GLOBAL_CONFIG_PATH).toBe(join(homedir(), '.glassbox', 'config.json'));
+    });
+
+    it('uses GLASSBOX_CONFIG_DIR when set, so a test run never touches the real config', async () => {
+      process.env.GLASSBOX_CONFIG_DIR = '/tmp/glassbox-e2e-config-123';
+      vi.resetModules();
+      const mod = await import('../../src/global-config.js');
+      expect(mod.GLOBAL_CONFIG_DIR).toBe('/tmp/glassbox-e2e-config-123');
+      expect(mod.GLOBAL_CONFIG_PATH).toBe('/tmp/glassbox-e2e-config-123/config.json');
+    });
+
+    it('ignores a blank override', async () => {
+      process.env.GLASSBOX_CONFIG_DIR = '   ';
+      vi.resetModules();
+      const { homedir } = await import('os');
+      const { join } = await import('path');
+      const mod = await import('../../src/global-config.js');
+      expect(mod.GLOBAL_CONFIG_DIR).toBe(join(homedir(), '.glassbox'));
+    });
+  });
+
   describe('updateGlobalConfig', () => {
     it('reads, mutates in place, then writes — no races between unrelated keys', () => {
       vi.mocked(fsMock.existsSync).mockReturnValue(true);

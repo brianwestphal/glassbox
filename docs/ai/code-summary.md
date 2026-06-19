@@ -60,7 +60,7 @@ glassbox/
 | `demo.ts` | Pre-configured demo scenarios (invoked via `--demo:N`). Bypasses git + locking. Includes one binary **image diff** (`src-tauri/icons/128x128.png`, modeled as a rename from `64x64.png`) so the image comparison modes — and the GB-823 slice-tool e2e — have real coverage; demo mode resolves to "uncommitted", so the image bytes are served from git HEAD / the working tree. |
 | `update-check.ts` | Daily npm update check against the registry (npm/yarn/pnpm/bun detection). |
 | `review-update.ts` | Refreshes diffs for an existing review when HEAD is the same but the working tree changed. Runs fuzzy annotation migration. |
-| `global-config.ts` | Single source of truth for `~/.glassbox/config.json` and the `~/.glassbox/` dir. Exports `readGlobalConfig()` and `updateGlobalConfig(mutator)` (read-modify-write under one call so concurrent writers can't clobber unrelated keys). All other modules go through this — channel toggle, share prompt, theme selection, AI preferences, API keys. |
+| `global-config.ts` | Single source of truth for `~/.glassbox/config.json` and the `~/.glassbox/` dir. Exports `readGlobalConfig()` and `updateGlobalConfig(mutator)` (read-modify-write under one call so concurrent writers can't clobber unrelated keys). All other modules go through this — channel toggle, share prompt, theme selection, AI preferences, API keys. The dir defaults to `~/.glassbox` but `GLASSBOX_CONFIG_DIR` overrides it (resolved once at import) so the e2e suite redirects global config/themes to a disposable dir instead of the developer's real config (GB-923). |
 
 ### `src/api/` — typed API layer (shared by client + server)
 

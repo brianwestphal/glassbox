@@ -10,12 +10,22 @@ import { defineConfig } from '@playwright/test';
 // invocation a fresh review.
 const DIFF_WORK_DIR = join(tmpdir(), `glassbox-e2e-diff-${process.pid}`);
 
-// Create the work dir here (config eval runs before the webServers) rather than
+// Isolate the demo server's GLOBAL config (`~/.glassbox/config.json` + custom
+// themes) under a disposable pid-scoped dir via GLASSBOX_CONFIG_DIR (GB-923).
+// Without this the suite reads/writes the developer's real `~/.glassbox`, so
+// the settings tests silently overwrite their AI platform/keys and the
+// local-platform test becomes machine-dependent (failing when the real config
+// already selects `local`). A fresh empty dir also gives every run a
+// deterministic default platform (`anthropic`).
+const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-config-${process.pid}`);
+
+// Create the work dirs here (config eval runs before the webServers) rather than
 // via a shell `mkdir -p` in the webServer command — the CLI chdirs into
 // `--project-dir` before creating anything itself, so the dir must exist first.
 // Doing it in Node keeps it cross-platform (`mkdir -p` isn't valid on Windows
 // `cmd`, where it spuriously creates a `-p` dir and then errors on reruns).
 mkdirSync(DIFF_WORK_DIR, { recursive: true });
+mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 
 // Optionally launch a branded, system-installed browser instead of Playwright's
 // bundled Chromium. Unset by default (CI/dev use the bundled build); set
@@ -48,6 +58,10 @@ export default defineConfig({
       port: 4183,
       reuseExistingServer: false,
       timeout: 15000,
+      // Redirect ~/.glassbox to a disposable dir so settings tests never touch
+      // the developer's real global config (GB-923). Playwright merges this over
+      // the inherited process.env, so only the override is needed here.
+      env: { GLASSBOX_CONFIG_DIR: DEMO_CONFIG_DIR },
     },
     {
       // Direct-comparison E2E server (doc 18). Boots `--diff` against the

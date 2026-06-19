@@ -213,6 +213,19 @@ describe('GET /api/ai/models', () => {
     // (Its small context window is handled by the per-batch fallback model.)
     expect(body.appleAvailable).toBe(true);
   });
+
+  it('forces appleAvailable under --ai-service-test even when the helper probe fails', async () => {
+    const { isAIServiceTest } = await import('../../../src/debug.js');
+    const { isAppleFoundationAvailable } = await import('../../../src/ai/apple-foundation.js');
+    // The route calls isAIServiceTest() twice (discovery skip + the apple gate);
+    // both true short-circuits the probe so the e2e can render the Apple UI on
+    // CI/Linux where the on-device helper can't run.
+    vi.mocked(isAIServiceTest).mockReturnValueOnce(true).mockReturnValueOnce(true);
+    vi.mocked(isAppleFoundationAvailable).mockResolvedValueOnce(false);
+    const res = await app.request('/api/ai/models');
+    const body = await res.json();
+    expect(body.appleAvailable).toBe(true);
+  });
 });
 
 describe('GET /api/ai/key-status', () => {

@@ -26,6 +26,7 @@ The system shall persist the following entities:
 ### 9.3 Configuration Files
 
 - Global AI configuration shall be stored in `~/.glassbox/config.json` with `0600` file permissions.
+- The global config directory shall default to `~/.glassbox` but be overridable via the `GLASSBOX_CONFIG_DIR` environment variable, so automated runs (notably the e2e suite) can redirect global state — AI platform/keys, custom themes — to a disposable directory instead of mutating the developer's real config (GB-923).
 - Project-specific settings shall be stored in `<repo>/.glassbox/settings.json`.
 - Project-specific settings shall also be accessible via `GET /api/project-settings` and `PATCH /api/project-settings` API endpoints.
 - API keys in the config file shall be stored with base64 encoding.

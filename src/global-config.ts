@@ -15,8 +15,21 @@ const GlobalConfigSchema = z.record(z.string(), z.unknown());
  * selection, AI preferences, etc. All readers and writers MUST go through
  * `readGlobalConfig` / `updateGlobalConfig` here so concurrent mutations
  * don't clobber each other.
+ *
+ * The directory is `~/.glassbox` by default, but `GLASSBOX_CONFIG_DIR` overrides
+ * it. That override exists so an automated run (notably the Playwright e2e suite)
+ * can point global state — AI platform/keys, custom themes — at a disposable
+ * directory instead of mutating the developer's real `~/.glassbox/config.json`
+ * (GB-923). Resolved once at import; the value is captured per process, which is
+ * exactly the lifetime a spawned test server wants.
  */
-export const GLOBAL_CONFIG_DIR = join(homedir(), '.glassbox');
+function resolveGlobalConfigDir(): string {
+  const override = process.env.GLASSBOX_CONFIG_DIR;
+  if (override !== undefined && override.trim() !== '') return override;
+  return join(homedir(), '.glassbox');
+}
+
+export const GLOBAL_CONFIG_DIR = resolveGlobalConfigDir();
 export const GLOBAL_CONFIG_PATH = join(GLOBAL_CONFIG_DIR, 'config.json');
 
 export type GlobalConfig = Record<string, unknown>;
