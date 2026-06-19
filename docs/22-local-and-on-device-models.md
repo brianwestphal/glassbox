@@ -92,7 +92,11 @@ common developer setups; Apple Foundation Models ship with macOS for free.
   a Tauri resource; the launcher sets the bin env var for the packaged server.
   Because it lands under Tauri `resources/**` (not as an `externalBin`), Tauri
   does **not** sign it — so the build script signs it with the Developer ID +
-  hardened runtime before the bundle is notarized (§22.9).
+  hardened runtime before the bundle is notarized (§22.9). In **dev**
+  (`tauri:dev`) the packaging path never runs, so `scripts/tauri-dev.sh` builds
+  the helper (same guarded script) and exports `GLASSBOX_APPLE_FM_BIN` to it; the
+  dev Node server inherits that env, so the Apple platform appears in dev on a
+  capable machine instead of being silently absent (GB-924).
 - **Structured output caveat** — Risk/narrative analysis expects the model to
   return JSON the analysis parser extracts. The helper must therefore produce
   parseable output — either Apple's guided generation constrained to Glassbox's

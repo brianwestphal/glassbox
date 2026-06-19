@@ -92,7 +92,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/ai/list-models.ts` — Live model discovery from each provider's models API (`fetchAvailableModels`), with the static list as fallback; powers `GET /api/ai/models`
 - `src/ai/config.ts` — API key resolution (env → keychain → config file) and config management
 - `src/ai/client.ts` — Unified client for Anthropic, OpenAI, Google, Local (OpenAI-compatible), and Apple (on-device) AI providers
-- `src/ai/apple-foundation.ts` — Apple Foundation Models bridge (doc 22 P2): spawns the bundled Swift helper (`src-tauri/apple-fm-helper/main.swift`) via `--probe`/`--infer`; darwin-gated, cached availability, bin via `GLASSBOX_APPLE_FM_BIN`; injectable runner for tests. Built by guarded+signed `scripts/build-apple-fm-helper.sh`. macOS-26-only; Swift/on-device path unverifiable in CI. The 4096-token window can't fit the analysis prompt + output for larger diffs, so when `apple` is the platform the user picks a **secondary fallback model** (`fallbackPlatform`/`fallbackModel` in config → `AIConfig.fallback` resolved by `loadAIConfig`): `runAnalysisBatch` runs each batch on-device and retries any failed batch once with the fallback (rebuilding contexts against the fallback's larger window). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`) is the platform kill-switch (doc 22 §22.10)
+- `src/ai/apple-foundation.ts` — Apple Foundation Models bridge (doc 22 P2): spawns the bundled Swift helper (`src-tauri/apple-fm-helper/main.swift`) via `--probe`/`--infer`; darwin-gated, cached availability, bin via `GLASSBOX_APPLE_FM_BIN`; injectable runner for tests. Built by guarded+signed `scripts/build-apple-fm-helper.sh` (in production via `build-sidecar.sh`; in dev via `scripts/tauri-dev.sh`, which builds it + exports `GLASSBOX_APPLE_FM_BIN` so the Apple platform appears in `tauri:dev` too — GB-924). macOS-26-only; Swift/on-device path unverifiable in CI. The 4096-token window can't fit the analysis prompt + output for larger diffs, so when `apple` is the platform the user picks a **secondary fallback model** (`fallbackPlatform`/`fallbackModel` in config → `AIConfig.fallback` resolved by `loadAIConfig`): `runAnalysisBatch` runs each batch on-device and retries any failed batch once with the fallback (rebuilding contexts against the fallback's larger window). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`) is the platform kill-switch (doc 22 §22.10)
 - `src/ai/context-builder.ts` — Builds diff context payloads for AI analysis
 - `src/ai/analyze-risk.ts` — Risk analysis orchestration with multi-turn context loop
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
@@ -211,7 +211,7 @@ Raw PGLite queries (no ORM). Six tables:
 npm run build          # tsup -> dist/cli.js + dist/client/app.global.js + dist/client/styles.css
 npm run build:client   # Build only client assets (JS + CSS) into dist/client/
 npm run dev            # Build client assets, then run via tsx
-npm run tauri:dev      # Build client + run Node server + Tauri window (dev mode)
+npm run tauri:dev      # Build client + build Apple FM helper (guarded) + run Node server + Tauri window (dev mode)
 npm run tauri:build    # Build sidecar + package native desktop app
 ```
 

@@ -132,6 +132,7 @@ Per-file `git difftool` accumulates every changed file into **one** desktop wind
 | Sidecar binary    | Stub placeholder (from `ensure-sidecar-stub.sh`)      | Real Node.js binary (from `build-sidecar.sh`)    |
 | Server code       | Source TypeScript via tsx                             | Bundled `cli.js` in `server/` resource dir       |
 | Port selection    | Automatic (tries 4183, increments if in use)          | Automatic (same behavior)                        |
+| Apple FM helper   | Built by `tauri-dev.sh` → `dist/apple-fm-helper`, exported via `GLASSBOX_APPLE_FM_BIN` (guarded; the dev Node server inherits the env) | Built by `build-sidecar.sh`, bundled in `server/`, exported by the launcher |
 | Release-only code | Skipped (`#[cfg(not(debug_assertions))]`)             | Active (welcome screen, updater)                 |
 
 In dev mode, the Rust `setup` callback (`#[cfg(debug_assertions)]`) spawns the Node server via `node --import tsx src/cli.ts --no-open` (with `TSX_TSCONFIG_PATH=tsconfig.json`), parses the server URL from stdout ("running at ..."), and navigates the webview — the same pattern production uses with the sidecar. This enables automatic port selection in dev mode, avoiding failures when port 4183 is already in use. The `beforeDevCommand` only builds client assets (CSS/JS). The sidecar binary is never used — `ensure-sidecar-stub.sh` creates a no-op placeholder so Tauri's build system doesn't complain.
@@ -172,6 +173,15 @@ launcher (`resources/glassbox`, pointing at
 sidecar in `lib.rs`. The Node bridge checks the path exists and reports
 "unavailable" if the helper wasn't built, so exporting the var unconditionally is
 safe on every OS.
+
+In **dev** (`tauri:dev`), production `build-sidecar.sh` never runs, so
+`scripts/tauri-dev.sh` builds the helper itself (`build-apple-fm-helper.sh` →
+`dist/apple-fm-helper`, same guard) and `export`s `GLASSBOX_APPLE_FM_BIN` to it.
+The Rust dev launcher spawns the Node server as a child that inherits this env,
+so the Apple platform appears in dev on a capable machine (macOS 26 + Apple
+Intelligence). On a machine where the build is skipped, the var stays unset and
+Apple cleanly reports unavailable — without this, the platform never showed in
+dev even though it was enabled (GB-924).
 
 **Signing & notarization:** `build-apple-fm-helper.sh` signs the helper with
 hardened runtime using `APPLE_SIGNING_IDENTITY` (the same identity Tauri uses for
