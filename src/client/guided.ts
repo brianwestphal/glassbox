@@ -27,8 +27,23 @@ export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
 
   void (async () => {
     try {
-      await startAnalysis({ type: 'guided', invalidateCache });
+      const result = await startAnalysis({ type: 'guided', invalidateCache });
       if (gen !== pollGeneration) return;
+      // `startAnalysis` resolves to a success-or-error union (a 4xx/5xx returns
+      // `{ error }` rather than throwing). Surface the rejection instead of
+      // polling a run that never started — otherwise it sits on "running"
+      // forever (GB-927).
+      if ('error' in result) {
+        console.error('Guided analysis error:', result.error);
+        clientLog(`triggerGuidedAnalysis: server rejected — ${result.error}`);
+        aiStore.actions.setAnalysisState('guided', {
+          status: 'failed',
+          error: friendlyError(result.error),
+          progressCompleted: 0,
+          progressTotal: 0,
+        });
+        return;
+      }
       clientLog(`triggerGuidedAnalysis: server accepted, starting poll (gen=${String(gen)})`);
       pollGuidedStatus(gen);
     } catch (err: unknown) {

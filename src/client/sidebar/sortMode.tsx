@@ -68,8 +68,23 @@ export function triggerAnalysis(mode: 'risk' | 'narrative', invalidateCache: boo
 
   void (async () => {
     try {
-      await startAnalysis({ type: mode, invalidateCache });
+      const result = await startAnalysis({ type: mode, invalidateCache });
       if (gen !== pollGenerations[mode]) return;
+      // `startAnalysis` resolves to a success-or-error union (a 4xx/5xx returns
+      // `{ error }` rather than throwing — see `apiCall`). Surface the rejection
+      // as a failed state instead of polling a server that never started the
+      // run, which left the UI stuck on "running" forever (GB-927).
+      if ('error' in result) {
+        console.error('Analysis error:', result.error);
+        clientLog(`triggerAnalysis(${mode}): server rejected — ${result.error}`);
+        aiStore.actions.setAnalysisState(mode, {
+          status: 'failed',
+          error: friendlyError(result.error),
+          progressCompleted: 0,
+          progressTotal: 0,
+        });
+        return;
+      }
       clientLog(`triggerAnalysis(${mode}): server accepted, starting poll (gen=${String(gen)})`);
       pollAnalysisStatus(mode, gen);
     } catch (err: unknown) {
