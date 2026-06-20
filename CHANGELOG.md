@@ -2,6 +2,25 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.15.0] - 2026-06-20
+
+
+
+- **AI Review Notes** — AI tools can now emit line-anchored notes explaining *why* a change was made and what proves it correct, via the new `glassbox note` command. Notes are stored as committed SARIF in `.pr-notes/` and render review-comment-style inline in the diff, distinctly styled as AI-authored.
+- **Reply to review notes** — Reply to an AI-authored review note with an annotation; replies render nested beneath the note they answer, turning a note into a threaded conversation.
+- **Keep/Discard outdated notes** — Review notes re-anchor to the current diff as code moves; notes whose authored code has changed are flagged "outdated", with Keep (dismiss the flag) and Discard (remove the note) controls.
+- **Proof artifacts on notes** — Review notes can carry committed proof artifacts (test output, logs, diagram source, and images), rendered inline beneath the note. Images record a SHA-256 hash and use Git LFS to keep binaries out of history.
+- **Notes feed analysis and export** — The generating AI's stated rationale, risks, and assumptions now inform Glassbox's AI analysis and are folded into the markdown export the next AI session reads.
+- **Markdown in AI notes** — AI note bodies (review, risk, narrative, and guided) now render a safe markdown subset, so code spans, emphasis, and links display properly.
+- **Local AI platform** — Run risk, narrative, and guided analysis against any OpenAI-compatible server (Ollama, LM Studio) — free, offline, and without an API key.
+- **Apple Foundation Models** — New on-device AI platform (macOS 26+) that runs analysis locally with no network calls or API key. Because its context window is small, selecting it lets you pick a secondary fallback model that handles diffs too large to fit on-device.
+- **More note commands** — `glassbox note` gains `update`, `remove`, and `coalesce` subcommands, plus an `instructions` contract telling a generating AI when and how to emit review notes.
+
+
+- Keyless AI platforms (Apple and Local) can now run analysis — the analyze endpoint no longer rejects them for having no API key.
+- A rejected analysis start (e.g. a keyless 400) now surfaces an error instead of spinning on "running" forever.
+- Settings tests and the demo server no longer read or overwrite your real `~/.glassbox/config.json`.
+
 ## [0.14.0] - 2026-06-17
 
 
