@@ -2,6 +2,11 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.16.0] - 2026-06-20
+
+
+- The Apple Foundation Models (on-device) provider now runs through a signed and notarized helper binary for more reliable on-device analysis on macOS.
+
 ## [0.15.0] - 2026-06-20
 
 
