@@ -26,10 +26,10 @@ import { saveGuidedReviewConfig } from '../../src/ai/config.js';
 import { setupDemoReview } from '../../src/demo.js';
 
 describe('DEMO_SCENARIOS', () => {
-  it('has 6 scenarios with unique ids', () => {
-    expect(DEMO_SCENARIOS).toHaveLength(6);
+  it('has 7 scenarios with unique ids', () => {
+    expect(DEMO_SCENARIOS).toHaveLength(7);
     const ids = DEMO_SCENARIOS.map(s => s.id);
-    expect(new Set(ids).size).toBe(6);
+    expect(new Set(ids).size).toBe(7);
   });
 
   it('each scenario has id and label', () => {
@@ -97,6 +97,13 @@ describe('setupDemoReview', () => {
     await setupDemoReview(5);
     expect(saveGuidedReviewConfig).toHaveBeenCalledWith(
       expect.objectContaining({ enabled: true, topics: expect.arrayContaining(['programming']) }),
+    );
+  });
+
+  it('scenario 7 threads a reply onto the line-31 review note', async () => {
+    await setupDemoReview(7);
+    expect(addAnnotation).toHaveBeenCalledWith(
+      'f-src/auth/session.ts', 31, 'new', 'note', expect.any(String), 'demo-note-risk',
     );
   });
 });

@@ -29,7 +29,8 @@
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +47,16 @@ import type { Browser, Page } from '@playwright/test';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
 const OUT_DIR = resolve(ROOT, 'assets');
+
+// Isolate the demo server's GLOBAL config under a disposable pid-scoped dir via
+// GLASSBOX_CONFIG_DIR (mirrors the e2e suite, GB-923). Without this the capture
+// reads the developer's real `~/.glassbox/config.json`, so the settings
+// screenshot bakes in whatever AI platform/model that machine happens to have
+// selected — non-reproducible across machines. A fresh empty dir gives every
+// run the deterministic default platform (`anthropic`) while `--ai-service-test`
+// still surfaces the full 5-platform picker (Local / Apple included).
+const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-stills-config-${String(process.pid)}`);
+mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 
 const VIEWPORT = { width: 1280, height: 800 };
 
@@ -145,6 +156,17 @@ const SCENARIOS: Scenario[] = [
       await openFile(page, TARGET_FILE);
     },
   },
+  {
+    id: 7,
+    slug: 'review-notes',
+    label: 'AI review notes inline with the diff',
+    async setup(page) {
+      // session.ts carries the illustrative AI review notes (rationale / proof /
+      // risk / outdated) plus the threaded human reply; wait for them to render.
+      await openFile(page, TARGET_FILE);
+      await page.waitForSelector('.ai-note-review', { timeout: 10000 });
+    },
+  },
 ];
 
 function waitForServer(base: string): Promise<void> {
@@ -172,7 +194,7 @@ function spawnDemoServer(scenarioId: number, port: number): ChildProcessByStdio<
       '--ai-service-test',
       '--port', String(port),
     ],
-    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GLASSBOX_CONFIG_DIR: DEMO_CONFIG_DIR } },
   );
   const tag = `[demo:${String(scenarioId)}]`;
   server.stdout.on('data', (d) => process.stdout.write(`${tag} ${String(d)}`));

@@ -34,6 +34,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
   { id: 4, label: 'Annotations with different categories' },
   { id: 5, label: 'Settings dialog with guided review' },
   { id: 6, label: 'Direct comparison (--diff) of two folders' },
+  { id: 7, label: 'AI review notes inline with the diff' },
 ];
 
 // --- Fake file diffs ---
@@ -521,6 +522,13 @@ export async function setupDemoReview(scenario: number): Promise<{ reviewId: str
       await saveUserPreferences({ sort_mode: 'folder' });
       break;
 
+    case 7: // AI review notes — session.ts carries the illustrative review
+      // notes (rationale / proof / risk / outdated) via `demoReviewNotes`;
+      // seed the one human reply so the threading story is visible too.
+      await setupReviewNoteReply(fileIdMap);
+      await saveUserPreferences({ sort_mode: 'folder' });
+      break;
+
     default:
       break;
   }
@@ -580,5 +588,20 @@ async function setupAnnotations(fileIdMap: Map<string, string>) {
     if (fileId !== undefined) {
       await addAnnotation(fileId, ann.line, ann.side, ann.category, ann.content, ann.replyToNoteId);
     }
+  }
+}
+
+/**
+ * Seeds only the single human reply threaded onto the line-31 risk review note
+ * (`demo-note-risk`), so the AI-review-notes scenario shows the full threading
+ * loop — AI note plus a reviewer's reply nested beneath it — without the rest of
+ * the annotation set cluttering the diff.
+ */
+async function setupReviewNoteReply(fileIdMap: Map<string, string>) {
+  const reply = ANNOTATIONS.find(a => a.replyToNoteId !== undefined);
+  if (reply === undefined) return;
+  const fileId = fileIdMap.get(reply.filePath);
+  if (fileId !== undefined) {
+    await addAnnotation(fileId, reply.line, reply.side, reply.category, reply.content, reply.replyToNoteId);
   }
 }

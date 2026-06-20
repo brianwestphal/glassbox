@@ -31,7 +31,8 @@
 
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -70,6 +71,13 @@ const EXPORT_MD = resolve(ROOT, '.glassbox/latest-review.md');
 
 const PORT = 4188;
 const BASE = `http://localhost:${String(PORT)}`;
+
+// Isolate the demo server's GLOBAL config under a disposable pid-scoped dir via
+// GLASSBOX_CONFIG_DIR (mirrors the e2e suite + the stills capture, GB-923) so
+// the run doesn't read or mutate the developer's real `~/.glassbox` (scenario 1
+// writes the guided-review config server-side).
+const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-demo-config-${String(process.pid)}`);
+mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 
 const TARGET_FILE = 'src/auth/session.ts';
 const BROWSE_FILE = 'src/db/redis.ts';
@@ -151,7 +159,7 @@ async function main(): Promise<void> {
   const server = spawn(
     tsxBin,
     ['src/cli.ts', '--demo:1', '--no-open', '--strict-port', '--ai-service-test', '--port', String(PORT)],
-    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GLASSBOX_CONFIG_DIR: DEMO_CONFIG_DIR } },
   );
   server.stdout.on('data', d => process.stdout.write(`[server] ${String(d)}`));
   server.stderr.on('data', d => process.stderr.write(`[server] ${String(d)}`));

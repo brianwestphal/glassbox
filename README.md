@@ -92,6 +92,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Drag and drop** annotations to different lines
 - **Double-click** to edit, click the category badge to reclassify
 - **Collapsible folder tree** in the sidebar with file filter
+- **Right-click any file** in the sidebar — reveal in your file manager, copy its path, open it in your editor, or mark it reviewed
 - **Resizable sidebar** and word wrap toggle
 - **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
 - **Go-to-definition and a nav stack** — click any symbol to jump to its definition, with back/forward through your trail
@@ -104,7 +105,8 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Automatic .gitignore prompt** — reminds you to exclude `.glassbox/` from version control
 - **Auto port selection** — if the default port is busy, it finds an open one
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
-- **AI-powered analysis** _(optional)_ — risk scoring, narrative reading order, and guided review to help you focus and learn as you review
+- **AI review notes** _(optional)_ — render the generating AI's line-anchored rationale and proof, committed alongside the code in `.pr-notes/`, right in the diff — and reply to any note inline
+- **AI-powered analysis** _(optional)_ — risk scoring, narrative reading order, and guided review, powered by cloud, local (Ollama / LM Studio), or on-device (Apple) models
 
 ---
 
@@ -144,13 +146,17 @@ Click the shield or book icon in the sidebar to switch from the default folder v
 
 ### Supported providers
 
-| Provider      | Models                           | Env variable        |
-| ------------- | -------------------------------- | ------------------- |
-| **Anthropic** | Claude Sonnet 4, Claude Haiku 4  | `ANTHROPIC_API_KEY` |
-| **OpenAI**    | GPT-4o, GPT-4o Mini              | `OPENAI_API_KEY`    |
-| **Google**    | Gemini 2.5 Flash, Gemini 2.5 Pro | `GEMINI_API_KEY`    |
+| Provider      | Models                                       | Runs                          |
+| ------------- | -------------------------------------------- | ----------------------------- |
+| **Anthropic** | Claude Sonnet 4.6, Opus 4.8, Haiku 4.5       | Cloud — `ANTHROPIC_API_KEY`   |
+| **OpenAI**    | GPT-4o, GPT-4o Mini                          | Cloud — `OPENAI_API_KEY`      |
+| **Google**    | Gemini 2.5 Flash, Gemini 2.5 Pro             | Cloud — `GEMINI_API_KEY`      |
+| **Local**     | Any Ollama / LM Studio model                 | On your machine — no key      |
+| **Apple**     | On-device Apple Intelligence                 | On-device (macOS) — no key    |
 
-You can switch providers and models in the settings dialog (gear icon in the sidebar).
+Available models are discovered live from each provider, so the list stays current without an app update. Switch providers and models in the settings dialog (gear icon in the sidebar).
+
+**Local and on-device models are free, private, and offline.** Point Glassbox at any OpenAI-compatible server like [Ollama](https://ollama.com/) or [LM Studio](https://lmstudio.ai/), or — on a Mac with Apple Intelligence — run analysis on-device with Apple Foundation Models. Either way, no API key is required and your code never leaves your machine.
 
 ### API key storage
 
@@ -161,6 +167,24 @@ Your API key never leaves your machine. Glassbox resolves keys in this order:
 3. **Config file** — stored in `~/.glassbox/config.json` with `0600` permissions, base64-encoded. Use this as a fallback if your OS keychain isn't available.
 
 Keys entered through the settings dialog are stored in the OS keychain by default when available, and never sent anywhere except directly to the AI provider's API.
+
+---
+
+## AI Review Notes
+
+When an AI writes or modifies code, it knows _why_ each non-obvious change is the way it is and _what proves it correct_ — and then throws that context away. The reasoning lives in the model's head at edit time, and the reviewer is left to reconstruct it from prose in a ticket or commit message.
+
+**AI Review Notes** give the generating AI a structured, line-anchored channel to record that reasoning. The AI emits notes with the `glassbox note` command; they're stored as committed SARIF under `.pr-notes/` — tool-neutral and travelling with the repo — and Glassbox renders them review-comment-style at the exact line they apply to:
+
+- **Rationale** — why this change, and what alternatives were rejected
+- **Proof** — the test that passed, a measurement, or a before/after screenshot (notes can carry text and image artifacts)
+- **Risk / assumption** — what a reviewer should double-check
+
+<img src="assets/demo-review-notes.png" alt="AI-authored review notes rendered inline with the diff, with a threaded reply" width="720">
+
+You can **reply** to any note with your own annotation — threaded beneath it like a pull-request comment. When a note's code later changes, Glassbox re-anchors it to its new line and flags it **outdated**, so stale reasoning never misleads you. And because the notes are plain SARIF in `.pr-notes/`, any tool or teammate can read them — Glassbox is just the most pleasant way to consume them.
+
+See [docs/20-ai-review-notes.md](docs/20-ai-review-notes.md) for the format and the producer-side `glassbox note` CLI.
 
 ---
 
