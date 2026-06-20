@@ -92,7 +92,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/ai/list-models.ts` — Live model discovery from each provider's models API (`fetchAvailableModels`), with the static list as fallback; powers `GET /api/ai/models`
 - `src/ai/config.ts` — API key resolution (env → keychain → config file) and config management
 - `src/ai/client.ts` — Unified client for Anthropic, OpenAI, Google, Local (OpenAI-compatible), and Apple (on-device) AI providers
-- `src/ai/apple-foundation.ts` — Apple Foundation Models bridge (doc 22 P2): spawns the bundled Swift helper (`src-tauri/apple-fm-helper/main.swift`) via `--probe`/`--infer`; darwin-gated, cached availability, bin via `GLASSBOX_APPLE_FM_BIN`; injectable runner for tests. Built by guarded+signed `scripts/build-apple-fm-helper.sh` (in production via `build-sidecar.sh`; in dev via `scripts/tauri-dev.sh`, which builds it + exports `GLASSBOX_APPLE_FM_BIN` so the Apple platform appears in `tauri:dev` too — GB-924). macOS-26-only; Swift/on-device path unverifiable in CI. The 4096-token window can't fit the analysis prompt + output for larger diffs, so when `apple` is the platform the user picks a **secondary fallback model** (`fallbackPlatform`/`fallbackModel` in config → `AIConfig.fallback` resolved by `loadAIConfig`): `runAnalysisBatch` runs each batch on-device and retries any failed batch once with the fallback (rebuilding contexts against the fallback's larger window). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`) is the platform kill-switch (doc 22 §22.10)
+- `src/ai/apple-foundation.ts` — Apple Foundation Models bridge (doc 22 P2): a thin wrapper over the [`apple-fm`](https://github.com/brianwestphal/apple-fm) npm package (`probe` / `generate` / `isPlatformSupported`). Glassbox no longer ships its own Swift helper — `apple-fm` provides a tested Node library over its own Developer-ID **signed + notarized** helper binary, which it resolves via `APPLE_FM_BIN`, then its bundled `bin/apple-fm-helper`, then `PATH`. `isAppleFoundationAvailable()` gates on `isPlatformSupported()` then `probe()`, cached; `runAppleFoundationInfer()` calls `generate({system, messages})`. Platform-gated + cached; the on-device path is unverifiable in CI (macOS-26 + Apple Intelligence only) and is unit-tested against a mocked `apple-fm`. `apple-fm` is a bundled external runtime dep — its package (with the helper) is copied into the sidecar by `build-sidecar.sh`; the Tauri launcher points `APPLE_FM_BIN` at `server/node_modules/apple-fm/bin/apple-fm-helper`; in dev it resolves straight from the project's `node_modules`. The 4096-token window can't fit the analysis prompt + output for larger diffs, so when `apple` is the platform the user picks a **secondary fallback model** (`fallbackPlatform`/`fallbackModel` in config → `AIConfig.fallback` resolved by `loadAIConfig`): `runAnalysisBatch` runs each batch on-device and retries any failed batch once with the fallback (rebuilding contexts against the fallback's larger window). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`) is the platform kill-switch (doc 22 §22.10)
 - `src/ai/context-builder.ts` — Builds diff context payloads for AI analysis
 - `src/ai/analyze-risk.ts` — Risk analysis orchestration with multi-turn context loop
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
@@ -211,13 +211,13 @@ Raw PGLite queries (no ORM). Six tables:
 npm run build          # tsup -> dist/cli.js + dist/client/app.global.js + dist/client/styles.css
 npm run build:client   # Build only client assets (JS + CSS) into dist/client/
 npm run dev            # Build client assets, then run via tsx
-npm run tauri:dev      # Build client + build Apple FM helper (guarded) + run Node server + Tauri window (dev mode)
+npm run tauri:dev      # Build client + run Node server + Tauri window (dev mode)
 npm run tauri:build    # Build sidecar + package native desktop app
 ```
 
 The build produces:
 
-- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs`) are kept external.
+- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs`, `apple-fm`) are kept external.
 - `dist/client/app.global.js` — Client JS bundle (IIFE, minified, es2020 target)
 - `dist/client/styles.css` — Compiled and compressed CSS from SCSS
 
@@ -231,7 +231,7 @@ The build produces:
 
 In dev mode (`npm run dev` or `tauri:dev`), external packages resolve from the project's `node_modules/` automatically. In production Tauri builds, the sidecar runs from `src-tauri/server/` with only the explicitly copied packages available. Forgetting step 2 causes "module not found" errors that only appear in production.
 
-Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`)
+Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`), `apple-fm` (carries the on-device helper binary it resolves relative to its own package, so it must stay external)
 
 ## Testing
 

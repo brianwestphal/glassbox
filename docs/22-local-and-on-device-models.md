@@ -6,22 +6,26 @@ Models** (on-device Apple Intelligence), in addition to the existing cloud
 providers (Anthropic / OpenAI / Google).
 
 > **Status: Built & verified on-device.** **P1 (the `local` OpenAI-compatible
-> platform) is shipped.** **P2 (Apple Foundation Models) is shipped:** the
-> `apple` platform, the Node bridge (`src/ai/apple-foundation.ts`), the Swift
-> helper (`src-tauri/apple-fm-helper/main.swift`), the guarded + code-signing
-> build script (`scripts/build-apple-fm-helper.sh`), bundling, availability
-> gating, and the settings UI all landed; the Node side is unit-tested. The full
-> path was **verified end-to-end on macOS 26 with Apple Intelligence**: the Swift
-> helper compiles, `--probe` reports `available`, `--infer` runs real on-device
-> inference returning the `{content}` JSON the analysis parser consumes, the Node
-> bridge + `sendAIRequest({platform:'apple'})` drive it, and the helper signs
-> with hardened runtime. **P2a (production signing + notarization wiring) is
-> shipped:** the release workflows now sign the helper with the real Developer ID
-> + hardened runtime before `tauri-action` notarizes the bundle (§22.9). The
-> remaining step is the maintainer's distribution smoke test on a clean macOS-26
-> machine, plus — until GitHub's hosted runners ship a macOS 26 / Xcode 26 image
-> — CI compiles the helper only on a capable runner (the maintainer's local
-> `tauri:build:local` on macOS 26 already produces a signed, notarizable helper).
+> platform) is shipped.** **P2 (Apple Foundation Models) is shipped, and now
+> delegates to the [`apple-fm`](https://github.com/brianwestphal/apple-fm)
+> package** instead of a Glassbox-maintained Swift helper: the `apple` platform,
+> the Node bridge (`src/ai/apple-foundation.ts`, a thin wrapper over `apple-fm`'s
+> `probe` / `generate`), availability gating, and the settings UI all landed; the
+> Node side is unit-tested against a mocked `apple-fm`. `apple-fm` ships a tested
+> Node library over its own Developer-ID **signed + notarized** helper binary —
+> so Glassbox no longer compiles, signs, or notarizes a Swift helper itself, and
+> the dedicated macOS-26 CI compile job is gone. The on-device path was previously
+> verified end-to-end on macOS 26 with Apple Intelligence (probe → on-device
+> inference → the `{content}` text the analysis parser consumes); the `apple-fm`
+> migration keeps the same `{system,messages}` → text contract.
+>
+> **Production bundling (§22.9):** `build-sidecar.sh` copies the `apple-fm`
+> package (helper included) into the sidecar; the helper's embedded
+> signature survives, so `tauri-action`'s notarization of the whole bundle covers
+> it. The remaining step is the maintainer's distribution smoke test on a clean
+> macOS-26 machine — the on-device run + Gatekeeper/notarization acceptance of the
+> bundled helper can only be verified on real macOS-26 hardware with Apple
+> Intelligence.
 >
 > **Apple FM's 4096-token context window can't fit the risk-analysis prompt +
 > output for larger diffs** (on-device testing showed non-deterministic
@@ -31,11 +35,9 @@ providers (Anthropic / OpenAI / Google).
 > any batch that fails spills to the fallback (`AIConfig.fallback`, applied
 > per-batch in `runAnalysisBatch`). `APPLE_FM_ANALYSIS_ENABLED` (`src/ai/models.ts`)
 > remains the platform kill-switch. See **§22.10**.
-> A working reference exists in the
-> sibling Hot Sheet app's "Announcer" feature (`src/announcer/localProvider.ts`,
-> `src/announcer/appleFoundation.ts`, `src-tauri/apple-fm-helper/main.swift`,
-> `scripts/build-apple-fm-helper.sh`) — this doc adapts that approach to
-> Glassbox's AI-platform abstraction.
+> `apple-fm` itself originated from the same on-device approach used in the sibling
+> Hot Sheet app's "Announcer" feature, extracted into a reusable, separately
+> signed + notarized package.
 
 ## Motivation
 
@@ -78,25 +80,29 @@ common developer setups; Apple Foundation Models ship with macOS for free.
 
 ### 22.3 Apple Foundation Models (on-device)
 
-- **Mechanism** — A native **Swift helper** (`FoundationModels` framework,
-  macOS 26+) is bridged from Node via `child_process.spawn` with a stdin/stdout
-  **JSON protocol**: `--probe` prints `available`/`unavailable`; an inference
-  subcommand reads `{ system, messages }` on stdin and writes the model's
-  response as JSON on stdout. (HTTP isn't applicable — the model is reached
-  through a Swift API, not a server.)
-- **Availability** — Detected by spawning the helper with `--probe` (gated to
-  macOS; cached per session). The helper resolves via an env var
-  (`GLASSBOX_APPLE_FM_BIN`) else a known path; absent → unavailable.
-- **Build & bundle** — Compiled by a **guarded** `swiftc` build script
-  (no-op on non-macOS / missing `swiftc` / missing macOS-26 SDK) and shipped as
-  a Tauri resource; the launcher sets the bin env var for the packaged server.
-  Because it lands under Tauri `resources/**` (not as an `externalBin`), Tauri
-  does **not** sign it — so the build script signs it with the Developer ID +
-  hardened runtime before the bundle is notarized (§22.9). In **dev**
-  (`tauri:dev`) the packaging path never runs, so `scripts/tauri-dev.sh` builds
-  the helper (same guarded script) and exports `GLASSBOX_APPLE_FM_BIN` to it; the
-  dev Node server inherits that env, so the Apple platform appears in dev on a
-  capable machine instead of being silently absent (GB-924).
+- **Mechanism** — Delegated to the [`apple-fm`](https://github.com/brianwestphal/apple-fm)
+  package, a tested, zero-runtime-dependency Node library over a native **Swift
+  helper** (`FoundationModels` framework, macOS 26+) that `apple-fm` bundles and
+  spawns. `src/ai/apple-foundation.ts` calls `apple-fm`'s `generate({ system,
+  messages })` and returns the model's text. (HTTP isn't applicable — the model
+  is reached through a Swift API, not a server.) Glassbox no longer ships its own
+  Swift helper or build script.
+- **Availability** — `isAppleFoundationAvailable()` gates on `apple-fm`'s
+  `isPlatformSupported()` (macOS on Apple Silicon) then `probe()` (macOS 26 +
+  Apple Intelligence enabled + model downloaded), cached per session; any failure
+  → unavailable. `apple-fm` resolves its helper binary via the `APPLE_FM_BIN` env
+  var, then its bundled `bin/apple-fm-helper`, then `PATH`.
+- **Build & bundle** — Nothing to compile: `apple-fm` ships a prebuilt,
+  Developer-ID **signed + notarized** arm64 helper. `build-sidecar.sh` copies the
+  `apple-fm` package (helper included) into the sidecar's `node_modules` like any
+  other external dep, and the Tauri launcher points `APPLE_FM_BIN` at
+  `server/node_modules/apple-fm/bin/apple-fm-helper`. The bundled helper's
+  embedded signature survives into the app bundle, so `tauri-action`'s
+  notarization covers it (§22.9) — codesign needs no macOS-26 SDK, so the bundle
+  build stays on macOS 15. In **dev** (`tauri:dev`) the Node server runs from
+  source and `apple-fm` resolves its bundled helper straight from the project's
+  `node_modules`, so the Apple platform appears in dev on a capable machine with
+  no extra wiring.
 - **Structured output caveat** — Risk/narrative analysis expects the model to
   return JSON the analysis parser extracts. The helper must therefore produce
   parseable output — either Apple's guided generation constrained to Glassbox's
@@ -134,10 +140,11 @@ common developer setups; Apple Foundation Models ship with macOS for free.
 - The local provider shall be **hermetically unit-testable** by injecting
   `fetch` (request shape, discovery parsing, availability, fallback) — same as
   the cloud live-discovery tests.
-- The Apple helper's Node bridge shall be unit-testable by injecting the process
-  runner (probe/inference protocol). The **Swift helper itself and the
-  end-to-end on-device path can only be verified on real macOS-26 hardware with
-  Apple Intelligence** — out of scope for CI / this environment.
+- The Apple bridge shall be unit-testable by mocking the `apple-fm` module
+  (`probe` / `generate` / `isPlatformSupported`). The **on-device helper itself
+  and the end-to-end on-device path can only be verified on real macOS-26
+  hardware with Apple Intelligence** — out of scope for CI / this environment;
+  `apple-fm` smoke-verifies its own helper independently.
 
 ## 22.7 Cross-platform support
 
@@ -154,74 +161,61 @@ common developer setups; Apple Foundation Models ship with macOS for free.
   discovery (`fetchAvailableModels('local', …)`; `src/ai/list-models.ts`), and
   the settings UX (server-URL input + optional key; `experimentalTab.tsx`).
   Delivers free/offline review on its own.
-- **P2 — Apple Foundation Models.** *(shipped, dev-first)* The `apple` platform
+- **P2 — Apple Foundation Models.** *(shipped)* The `apple` platform
   (`KEYLESS_PLATFORMS`, `MODELS.apple`, `APPLE_ON_DEVICE_MODEL_ID` in
-  `src/ai/models.ts`), the Node bridge (`src/ai/apple-foundation.ts` — `--probe`
-  / `--infer` protocol over `spawn`, injected runner, darwin-gated cached
-  availability, bin resolved via `GLASSBOX_APPLE_FM_BIN`), the client `apple`
-  case (`sendAppleRequest`; `src/ai/client.ts`), the Swift helper
-  (`src-tauri/apple-fm-helper/main.swift`, `{system,messages}` → `{content}`
-  text the existing `extractJSON` parses), the guarded + signed build script
-  (`scripts/build-apple-fm-helper.sh`, wired into `build-sidecar.sh`), bundling
-  as a `server/` resource + the launcher's `GLASSBOX_APPLE_FM_BIN` export, and
-  the settings UI (Apple shown only when the probe passes; no key/endpoint). The
-  Node side is hermetically unit-tested with an injected runner; the structured
-  output uses the JSON-instructed-prompt path (§22.3).
-- **P2a — Apple FM production signing + notarization in CI.** *(shipped — see
-  §22.9)* The compile + on-device run + ad-hoc/hardened-runtime signing were
-  verified on macOS-26 hardware. The release workflows now provision the
-  Developer ID and sign the helper before notarization. The only remaining item
-  is the maintainer's distribution smoke test on a clean macOS-26 machine (needs
-  the CI release secrets + Apple Intelligence hardware), plus the standing
-  dependency that CI compiles the helper only on a macOS 26 / Xcode 26 runner.
+  `src/ai/models.ts`), the Node bridge (`src/ai/apple-foundation.ts` — a thin
+  wrapper over the `apple-fm` package's `probe` / `generate`, platform-gated
+  cached availability), the client `apple` case (`sendAppleRequest`;
+  `src/ai/client.ts`, `{system,messages}` → text the existing `extractJSON`
+  parses), and the settings UI (Apple shown only when the probe passes; no
+  key/endpoint). The Node side is hermetically unit-tested against a mocked
+  `apple-fm`; the structured output uses the JSON-instructed-prompt path (§22.3).
+- **P2a — Apple FM production signing + notarization.** *(shipped — see §22.9)*
+  Migrated to the `apple-fm` package, which ships its own Developer-ID signed +
+  notarized helper, so Glassbox no longer compiles, signs, or notarizes a Swift
+  helper and the dedicated macOS-26 CI job is gone. `build-sidecar.sh` bundles the
+  package (helper included) and `tauri-action` notarizes the whole bundle. The
+  only remaining item is the maintainer's distribution smoke test on a clean
+  macOS-26 machine (Apple Intelligence hardware) confirming the bundled helper
+  runs and passes Gatekeeper.
 
 ## 22.9 Production signing & notarization (P2a)
 
-The Apple FM helper is a native arm64 Mach-O binary bundled under Tauri
-`resources/**` (via `scripts/build-sidecar.sh` → `server/`). Tauri signs the
-main app binary and its `externalBin` sidecars (e.g. the Node runtime) with
-hardened runtime, but it does **not** sign arbitrary Mach-O files under
-`resources/**`. Apple's notary service rejects a bundle containing any unsigned
-or non-hardened-runtime Mach-O, so the helper must be signed **before**
-`tauri-action` notarizes the app bundle.
+The on-device helper is a native arm64 Mach-O shipped **inside the `apple-fm`
+npm package** (`node_modules/apple-fm/bin/apple-fm-helper`), already Developer-ID
+signed with hardened runtime **and independently notarized** by `apple-fm`.
+`build-sidecar.sh` copies the `apple-fm` package into the sidecar's
+`node_modules` like any other external dep, so the helper rides along; the Tauri
+launcher points `APPLE_FM_BIN` at `server/node_modules/apple-fm/bin/apple-fm-helper`.
 
-The helper compiles only on a **macOS 26 / Xcode 26** toolchain
-(`swiftc -target arm64-apple-macos26`), but the app bundle is built on the proven
-**macOS 15** image. CI bridges that with a **dedicated helper job**, so only the
-small helper touches macOS 26 — the main bundle build is unchanged:
+This collapses the prior dedicated-job complexity:
 
-- **`build-apple-fm-helper` job** (`runs-on: macos-26`, in both
-  `release-desktop.yml` and the signed beta build in `release-candidate.yml`):
-  compiles the helper, signs it with `codesign --options runtime --timestamp`
-  (`scripts/build-apple-fm-helper.sh`, using `APPLE_SIGNING_IDENTITY`), verifies
-  it was produced, and uploads it as the `apple-fm-helper` artifact. The
-  Developer ID is provisioned into an **isolated keychain** by
-  `scripts/ci/apple-fm-signing-keychain.sh import`, which adds it to the user
-  keychain search list so `codesign` can resolve the identity by name (a
-  keychain that isn't in the search list yields "no identity found", even with
-  `--keychain`). That search-list mutation is safe because this job does nothing
-  else — there is no `tauri-action` to confuse — and a cleanup step deletes the
-  keychain (also removing it from the search list). No-ops without
-  `APPLE_CERTIFICATE` (helper built unsigned — dev only, never notarized).
-- **Main `build` job** stays on `macos-latest` (macOS 15). The **arm64** shard
-  downloads the signed artifact and `build-sidecar.sh` copies it into the bundle
-  via `GLASSBOX_PREBUILT_APPLE_FM_HELPER`; the helper's embedded signature
-  survives the copy (and the artifact zip round-trip), so `tauri-action`'s
-  notarization of the whole bundle covers it. The Intel shard sets no such env
-  and omits the helper — Apple Intelligence and the helper are arm64-only, so the
-  Intel bundle never carries it (and the app hides the Apple platform there).
-- **Local builds** (the maintainer's `tauri:build:local` on a macOS 26 machine)
-  leave `GLASSBOX_PREBUILT_APPLE_FM_HELPER` unset, so `build-sidecar.sh` compiles
-  + signs the helper inline as before — no artifact needed.
-- **Gating composes with this:** any bundle without the helper binary (Intel,
-  Linux, Windows, or an arm64 build that didn't get the artifact) reports
-  `unavailable` from `isAppleFoundationAvailable()` and the settings UI omits the
-  Apple platform — so the platform is never listed where it can't run.
-- **Verification (maintainer, → GB-918):** cut a **beta** first (its signed build
-  exercises this path → prerelease, no `latest` flip), then on a clean
-  (non-build) macOS-26 machine install the signed + notarized bundle and confirm
-  the helper probes `available` and runs inference with no quarantine/Gatekeeper
-  rejection, before a stable cut relies on it.
+- **No macOS-26 CI job, no Swift compile.** Glassbox no longer compiles a helper,
+  so there is no `swiftc`/macOS-26-SDK dependency in CI. The entire
+  `build-apple-fm-helper` job (and the `scripts/ci/apple-fm-signing-keychain.sh`
+  isolated-keychain provisioning) is removed from both `release-desktop.yml` and
+  `release-candidate.yml`. The bundle build stays on the proven **macOS 15** image.
+- **Notarization covers the bundled helper.** Apple's notary service accepts a
+  nested Mach-O that is Developer-ID signed with hardened runtime (the team need
+  not match the outer app). `apple-fm`'s helper already satisfies that, and its
+  embedded signature survives the package copy into the bundle, so `tauri-action`'s
+  notarization of the whole app covers it.
+- **Optional belt-and-braces re-sign.** When a signing identity is available
+  (`APPLE_SIGNING_IDENTITY` / `CODESIGN_IDENTITY`, e.g. the maintainer's local
+  `tauri:build:local` on macOS), `build-sidecar.sh` re-signs the bundled helper
+  with that identity + hardened runtime so the bundle's signature is
+  self-consistent. In CI the identity isn't passed to the sidecar step, so the
+  helper keeps `apple-fm`'s own valid signature.
+- **Gating composes with this:** on a non-macOS / non-arm64 install the bundled
+  helper simply never runs (`apple-fm`'s `probe` reports `unsupportedPlatform`),
+  `isAppleFoundationAvailable()` returns false, and the settings UI omits the
+  Apple platform — so it's never listed where it can't run.
+- **Verification (maintainer):** cut a **beta** first (its signed build exercises
+  this path → prerelease, no `latest` flip), then on a clean (non-build) macOS-26
+  machine install the signed + notarized bundle and confirm the bundled helper
+  probes `available` and runs inference with no quarantine/Gatekeeper rejection,
+  before a stable cut relies on it. This is the one step that can't be verified in
+  CI or off-device.
 
 ## 22.10 Apple FM small context window — the secondary fallback model
 

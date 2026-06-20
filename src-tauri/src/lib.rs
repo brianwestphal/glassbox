@@ -625,19 +625,23 @@ pub fn run() {
                         .sidecar("glassbox-node")
                         .map_err(|e| format!("Failed to create sidecar command: {e}"))?;
 
-                    // Point the server at the bundled Apple Foundation Models
-                    // helper (doc 22). The Node bridge checks the path exists and
-                    // reports "unavailable" if the macOS-26 build didn't produce
-                    // one, so setting it unconditionally is safe on every OS.
-                    let apple_fm_bin = resource_dir.join("server").join("apple-fm-helper");
+                    // Point the `apple-fm` library at the on-device helper it
+                    // bundles inside the sidecar's node_modules (doc 22). apple-fm
+                    // reads APPLE_FM_BIN first, then falls back to discovery; the
+                    // helper only runs on macOS 26 + Apple Silicon and otherwise
+                    // reports "unavailable", so setting it unconditionally is safe
+                    // on every OS.
+                    let apple_fm_bin = resource_dir
+                        .join("server")
+                        .join("node_modules")
+                        .join("apple-fm")
+                        .join("bin")
+                        .join("apple-fm-helper");
 
                     let args_refs: Vec<&str> = sidecar_args.iter().map(|s| s.as_str()).collect();
                     let (mut rx, child) = sidecar
                         .args(&args_refs)
-                        .env(
-                            "GLASSBOX_APPLE_FM_BIN",
-                            apple_fm_bin.to_string_lossy().to_string(),
-                        )
+                        .env("APPLE_FM_BIN", apple_fm_bin.to_string_lossy().to_string())
                         .spawn()
                         .map_err(|e| format!("Failed to spawn sidecar: {e}"))?;
 

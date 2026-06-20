@@ -28,7 +28,7 @@ glassbox/
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
 ├── docs/                   # Requirements (1-19) + ARCHITECTURE, tauri-*
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
-├── scripts/                # build-sidecar.sh, build-apple-fm-helper.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT), ci/ (apple-fm-signing-keychain.sh — Developer ID keychain for helper signing)
+├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT)
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
 ├── assets/                 # Static assets shipped with the app
 ├── CLAUDE.md               # Project rules for AI sessions
@@ -158,7 +158,7 @@ See §6 for the schema itself.
 | `api-keys.ts` | Key resolution chain: env var → OS keychain → base64 in config file. Save/delete, source detection. |
 | `keychain.ts` | OS keychain wrappers: macOS `security`, Linux `secret-tool`, Windows `cmdkey`. |
 | `client.ts` | Unified client. `sendAIRequest(config, system, messages)` dispatches to Anthropic / OpenAI / Google / **Local** (OpenAI-compatible — `sendLocalRequest` posts to `{config.baseUrl}/chat/completions`, optional Bearer) / **Apple** (on-device — `sendAppleRequest` calls the `apple-foundation.ts` bridge, no HTTP, token counts 0); keyless platforms (`local`, `apple`) skip the no-key gate via `KEYLESS_PLATFORMS`. Returns content + token counts. |
-| `apple-foundation.ts` | **Apple Foundation Models bridge** (doc 22 P2). `spawn`s the bundled Swift helper (`src-tauri/apple-fm-helper/main.swift`): `isAppleFoundationAvailable()` runs `--probe` (darwin-gated, cached per session, bin via `GLASSBOX_APPLE_FM_BIN` else `./apple-fm-helper`); `runAppleFoundationInfer(system, messages)` runs `--infer` (`{system,messages}` stdin → `{content}` stdout, zod-validated) and returns the raw text the analysis layer's `extractJSON` parses. Process runner + darwin flag are injectable (`_setAppleFoundationForTesting`) so the matrix is testable on Linux CI; the Swift compile + on-device path need real macOS-26 hardware. |
+| `apple-foundation.ts` | **Apple Foundation Models bridge** (doc 22 P2). A thin wrapper over the [`apple-fm`](https://github.com/brianwestphal/apple-fm) package (Glassbox no longer ships its own Swift helper): `isAppleFoundationAvailable()` gates on `apple-fm`'s `isPlatformSupported()` then `probe()` (cached per session); `runAppleFoundationInfer(system, messages)` calls `apple-fm`'s `generate({system, messages})` and returns the raw text the analysis layer's `extractJSON` parses. `apple-fm` ships its own signed + notarized helper, resolved via `APPLE_FM_BIN` → bundled `bin/apple-fm-helper` → `PATH`. Unit-tested against a mocked `apple-fm`; the on-device path needs real macOS-26 hardware. |
 | `context-builder.ts` | Build per-file context payloads respecting a char budget. Handles summarization when a file's diff is too large. |
 | `batch-planner.ts` | Split files into token-budgeted batches for a given model. |
 | `batch-runner.ts` | Execute batches sequentially, update progress, honor cancellation. |

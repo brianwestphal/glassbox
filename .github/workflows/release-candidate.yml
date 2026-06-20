@@ -439,46 +439,10 @@ jobs:
   # the DRAFT prerelease created above — they're not publicly visible until
   # `publish-release` flips the draft.
 
-  # Compile + Developer-ID-sign the Apple FM helper on a macOS-26 runner — the
-  # only hosted image with the macOS 26 SDK / FoundationModels (Xcode 26). Kept
-  # off the main build matrix so the app bundle keeps building on macOS 15; the
-  # arm64 signed shard consumes this as an artifact. Beta-gated to match the
-  # signed `build` job (the unsigned validation gate doesn't ship a bundle).
-  build-apple-fm-helper:
-    name: Build Apple FM helper (macOS 26)
-    if: contains(github.ref, '-beta.')
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Provision Apple FM helper signing keychain
-        run: bash scripts/ci/apple-fm-signing-keychain.sh import
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Build + sign helper
-        run: bash scripts/build-apple-fm-helper.sh dist/apple-fm-helper
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-
-      - name: Remove signing keychain
-        if: always()
-        run: bash scripts/ci/apple-fm-signing-keychain.sh cleanup
-
-      - name: Verify helper compiled
-        run: test -f dist/apple-fm-helper || { echo "Apple FM helper was not produced"; exit 1; }
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: apple-fm-helper
-          path: dist/apple-fm-helper
-          if-no-files-found: error
-
   build:
     name: Build Tauri Signed (${{ matrix.friendly }})
     if: contains(github.ref, '-beta.')
-    needs: [create-release, build-apple-fm-helper]
+    needs: [create-release]
     strategy:
       fail-fast: false
       matrix:
@@ -546,24 +510,14 @@ jobs:
             " "$VER"
           fi
 
-      # The Apple FM helper is compiled + Developer-ID-signed on a dedicated
-      # macOS-26 runner (build-apple-fm-helper job); this bundle build stays on
-      # macOS 15. Pull the signed binary in for the Apple Silicon bundle only
-      # (helper + Apple Intelligence are arm64; the Intel bundle omits it and the
-      # app hides the Apple platform). build-sidecar.sh copies it in; its
-      # embedded signature survives so tauri-action's notarization covers it.
-      - name: Download signed Apple FM helper
-        if: matrix.target == 'aarch64-apple-darwin'
-        uses: actions/download-artifact@v4
-        with:
-          name: apple-fm-helper
-          path: prebuilt-apple-fm
-
+      # The on-device Apple FM helper ships inside the `apple-fm` dependency,
+      # already Developer-ID signed + notarized. build-sidecar.sh copies the
+      # apple-fm package (helper included) into the sidecar; its embedded
+      # signature survives, so tauri-action's notarization of the bundle covers
+      # it — no dedicated macOS-26 compile job is needed.
       - name: Build sidecar
         run: bash scripts/build-sidecar.sh ${{ matrix.target }}
         shell: bash
-        env:
-          GLASSBOX_PREBUILT_APPLE_FM_HELPER: ${{ matrix.target == 'aarch64-apple-darwin' && format('{0}/prebuilt-apple-fm/apple-fm-helper', github.workspace) || '' }}
 
       # Windows MSI bundler requires the optional pre-release identifier in
       # the app version to be numeric-only (e.g. `0.9.0-1`). Beta tags use

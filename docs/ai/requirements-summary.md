@@ -652,33 +652,28 @@ Studio, etc.) and **`apple`** (Apple Foundation Models, on-device, macOS 26+),
 as two new `AIPlatform` members plugging into the same `sendAIRequest` switch /
 config / discovery / settings abstraction. Local reuses the OpenAI
 `/chat/completions` request + `/models` discovery with a configurable base URL
-and no required key; Apple uses a Swift `FoundationModels` helper bridged via
-`spawn` (stdin/stdout JSON `--probe` + inference), built by a guarded `swiftc`
-script and bundled as a Tauri resource (macOS-only). Phasing: **P1** local
+and no required key; Apple delegates to the [`apple-fm`](https://github.com/brianwestphal/apple-fm)
+package — a Node library over its own bundled, signed + notarized
+`FoundationModels` helper (macOS-only). Phasing: **P1** local
 **(shipped)** — `KEYLESS_PLATFORMS`/`sendLocalRequest`/`resolveLocalEndpoint`/
 `fetchAvailableModels('local')` + the settings server-URL input; **P2** Apple FM
-**(shipped, dev-first)** — the `apple` keyless platform, the Node bridge
-(`src/ai/apple-foundation.ts`, `--probe`/`--infer` over spawn, injected-runner
-unit tests), the client `sendAppleRequest` case, the Swift helper
-(`src-tauri/apple-fm-helper/main.swift`, `{system,messages}`→`{content}`), the
-guarded + `APPLE_SIGNING_IDENTITY`-signed build (`build-apple-fm-helper.sh` wired
-into `build-sidecar.sh`), `server/` bundling + the launcher's
-`GLASSBOX_APPLE_FM_BIN` export, and the settings UI (Apple shown only when the
-probe passes; no key/endpoint). **P2a (signing/notarization wiring) shipped** —
-the helper is a resource Mach-O Tauri won't sign, so a **dedicated
-`build-apple-fm-helper` job on `macos-26`** (the only image with the macOS 26
-SDK) compiles + Developer-ID-signs it (isolated keychain via
-`scripts/ci/apple-fm-signing-keychain.sh`, added to the search list so
-`codesign` resolves the identity — safe since that job runs no `tauri-action`)
-and uploads it as an artifact; the main
-bundle build stays on `macos-latest` (macOS 15) and the arm64 shard copies the
-signed binary in (`GLASSBOX_PREBUILT_APPLE_FM_HELPER`) so the bundle's
-notarization covers it. In both `release-desktop.yml` and the signed
-`release-candidate.yml` build; the Intel bundle omits the helper (arm64-only),
-and any helper-less bundle hides the Apple platform via the probe. Remaining
-(GB-918): the maintainer's clean-machine smoke test, validated via a beta cut
-first (the local `tauri:build:local` on macOS 26 already produces a signed
-bundle). Adapts the sibling Hot Sheet app's Announcer implementation.
+**(shipped)** — the `apple` keyless platform, the Node bridge
+(`src/ai/apple-foundation.ts`, a thin wrapper over `apple-fm`'s `probe`/`generate`,
+mocked-`apple-fm` unit tests), the client `sendAppleRequest` case
+(`{system,messages}`→text), and the settings UI (Apple shown only when the probe
+passes; no key/endpoint). **P2a (signing/notarization) shipped via the `apple-fm`
+migration** — `apple-fm` ships its helper already Developer-ID signed + hardened
++ independently notarized, so Glassbox no longer compiles, signs, or notarizes a
+Swift helper and the **dedicated `macos-26` CI job + signing-keychain script are
+removed**. `build-sidecar.sh` copies the `apple-fm` package (helper included) into
+the sidecar like any external dep; the embedded signature survives so
+`tauri-action`'s notarization of the whole bundle covers it (codesign needs no
+macOS-26 SDK, so the bundle build stays on `macos-latest`). The launcher points
+`APPLE_FM_BIN` at the bundled helper; a guarded re-sign in `build-sidecar.sh`
+keeps the signature self-consistent when an identity is present. Non-arm64 /
+non-macOS bundles hide the Apple platform via the probe (`unsupportedPlatform`).
+Remaining: the maintainer's clean-machine macOS-26 smoke test (the one off-CI,
+on-device verification), validated via a beta cut first.
 **Apple FM's 4096-token window (shared input+output) can't fit the risk-analysis
 prompt + verbose JSON output for larger diffs** — it overflows
 non-deterministically (`exceededContextWindowSize`), and the ceiling isn't

@@ -229,10 +229,10 @@ async function sendLocalRequest(
 
 /**
  * On-device Apple Foundation Models (macOS 26+). Reached not over HTTP but
- * through a bundled Swift helper (`src/ai/apple-foundation.ts`) that runs the
- * native `FoundationModels` API. Keyless; the helper returns the model's raw
- * text, which the analysis layer parses with `extractJSON` like any other
- * provider. The on-device API reports no token usage, so counts are 0.
+ * through the `apple-fm` package (`src/ai/apple-foundation.ts`), whose bundled
+ * Swift helper runs the native `FoundationModels` API. Keyless; it returns the
+ * model's raw text, which the analysis layer parses with `extractJSON` like any
+ * other provider. The on-device API reports no token usage, so counts are 0.
  */
 async function sendAppleRequest(
   systemPrompt: string,

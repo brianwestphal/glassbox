@@ -102,32 +102,15 @@ cp dist/svg-rasterize-worker.js "$SERVER_DIR/"
 # Claude channel toggle write a `.mcp.json` pointing at a non-existent file, so
 # the channel silently fails to launch in desktop installs (GB-887).
 cp dist/channel.js "$SERVER_DIR/"
-# Apple Foundation Models helper (doc 22) — the on-device AI provider's Swift
-# CLI. It compiles only on a macOS 26 / Xcode 26 toolchain and is arm64-only.
-# Two supply paths:
-#   - CI: a dedicated macOS-26 job compiles + Developer-ID-signs it and hands the
-#     path over via GLASSBOX_PREBUILT_APPLE_FM_HELPER, because the bundle build
-#     itself runs on macOS 15 (which lacks the macOS 26 SDK). We just copy the
-#     already-signed binary in — its embedded signature survives, so the later
-#     notarization of the bundle covers it (see docs/22 §22.9).
-#   - Local (maintainer's macOS 26 machine): the var is unset, so we compile via
-#     the GUARDED build script (no-op off macOS / missing swiftc / missing SDK —
-#     a clean skip on Linux / Windows / Intel / CI-without-Xcode-26).
-# When the helper is absent (any non-arm64 / non-macOS-26 bundle) the app simply
-# hides the Apple platform (its `--probe` finds no binary).
-HELPER_SRC=""
-if [[ -n "${GLASSBOX_PREBUILT_APPLE_FM_HELPER:-}" && -f "${GLASSBOX_PREBUILT_APPLE_FM_HELPER}" ]]; then
-  HELPER_SRC="${GLASSBOX_PREBUILT_APPLE_FM_HELPER}"
-  echo "Using prebuilt Apple FM helper from $HELPER_SRC"
-else
-  bash "$(dirname "$0")/build-apple-fm-helper.sh" "dist/apple-fm-helper" || true
-  [[ -f "dist/apple-fm-helper" ]] && HELPER_SRC="dist/apple-fm-helper"
-fi
-if [[ -n "$HELPER_SRC" ]]; then
-  cp "$HELPER_SRC" "$SERVER_DIR/apple-fm-helper"
-  chmod +x "$SERVER_DIR/apple-fm-helper"
-  echo "Bundled Apple FM helper into $SERVER_DIR/"
-fi
+# Apple Foundation Models helper (doc 22) — the on-device AI provider. We no
+# longer compile our own Swift helper: the `apple-fm` runtime dependency ships a
+# Developer-ID signed + notarized arm64 helper at
+# `node_modules/apple-fm/bin/apple-fm-helper`, which the `apple-fm` library
+# resolves relative to its own package. Copying the `apple-fm` package below (in
+# the external-deps loop) brings that helper along, so there is nothing to build
+# here — the bundle build works on the macOS-15 runner with no macOS-26 SDK. On
+# any non-macOS / non-arm64 bundle the helper simply never runs (apple-fm's probe
+# reports `unsupportedPlatform`) and the Apple platform stays hidden.
 mkdir -p "$SERVER_DIR/client"
 cp dist/client/app.global.js "$SERVER_DIR/client/"
 cp dist/client/history.global.js "$SERVER_DIR/client/"
@@ -138,12 +121,28 @@ cp dist/client/styles.css "$SERVER_DIR/client/"
 # external-deps list — see tests/unit/build-sidecar-externals.test.ts, which
 # fails if a tsup-external package is missing here. @modelcontextprotocol/sdk is
 # required by the channel server (dist/channel.js); @preact/signals-core is a
-# transitive dep of kerfjs.
-for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm @modelcontextprotocol/sdk kerfjs @preact/signals-core; do
+# transitive dep of kerfjs; apple-fm carries the on-device helper binary that its
+# library resolves relative to its own package, so it must stay external.
+for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm @modelcontextprotocol/sdk kerfjs @preact/signals-core apple-fm; do
   dest="$SERVER_DIR/node_modules/$pkg"
   mkdir -p "$(dirname "$dest")"
   cp -R "node_modules/$pkg" "$dest"
 done
+
+# Re-sign the bundled Apple FM helper with our Developer ID + hardened runtime
+# when a signing identity is available (the same secret Tauri uses for the app —
+# see the release workflows). apple-fm ships it signed + notarized already, but
+# re-signing under our identity keeps the app bundle's signature self-consistent
+# so the later notarization of the whole bundle covers it. codesign needs no
+# macOS-26 SDK, so this runs fine on the macOS-15 bundle runner. Locally the var
+# is unset and the helper keeps apple-fm's own valid signature.
+APPLE_FM_HELPER="$SERVER_DIR/node_modules/apple-fm/bin/apple-fm-helper"
+APPLE_FM_SIGN_ID="${APPLE_SIGNING_IDENTITY:-${CODESIGN_IDENTITY:-}}"
+if [[ "$(uname)" == "Darwin" && -f "$APPLE_FM_HELPER" && -n "$APPLE_FM_SIGN_ID" ]]; then
+  chmod +x "$APPLE_FM_HELPER"
+  codesign --force --options runtime --timestamp --sign "$APPLE_FM_SIGN_ID" "$APPLE_FM_HELPER"
+  echo "Re-signed Apple FM helper with $APPLE_FM_SIGN_ID"
+fi
 
 echo "Server resources: $SERVER_DIR/ ($(du -sh "$SERVER_DIR" | cut -f1))"
 echo "Done."

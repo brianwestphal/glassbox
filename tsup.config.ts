@@ -20,8 +20,11 @@ export default defineConfig([
     splitting: false,
     clean: true,
     sourcemap: true,
-    // Bundle everything except node_modules dependencies
-    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg|@modelcontextprotocol|kerfjs|@preact)/],
+    // Bundle everything except node_modules dependencies. `apple-fm` MUST stay
+    // external: it locates its bundled native helper (`bin/apple-fm-helper`)
+    // relative to its own package directory, so it has to live in the sidecar's
+    // node_modules rather than being inlined into cli.js.
+    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg|@modelcontextprotocol|kerfjs|@preact|apple-fm)/],
     define: {
       'process.env.BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
     },

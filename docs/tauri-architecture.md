@@ -132,7 +132,7 @@ Per-file `git difftool` accumulates every changed file into **one** desktop wind
 | Sidecar binary    | Stub placeholder (from `ensure-sidecar-stub.sh`)      | Real Node.js binary (from `build-sidecar.sh`)    |
 | Server code       | Source TypeScript via tsx                             | Bundled `cli.js` in `server/` resource dir       |
 | Port selection    | Automatic (tries 4183, increments if in use)          | Automatic (same behavior)                        |
-| Apple FM helper   | Built by `tauri-dev.sh` → `dist/apple-fm-helper`, exported via `GLASSBOX_APPLE_FM_BIN` (guarded; the dev Node server inherits the env) | Built by `build-sidecar.sh`, bundled in `server/`, exported by the launcher |
+| Apple FM helper   | Resolved by `apple-fm` from the project's `node_modules/apple-fm/bin/` (no build/wiring) | Bundled via the `apple-fm` package in `server/node_modules/`, `APPLE_FM_BIN` set by the launcher |
 | Release-only code | Skipped (`#[cfg(not(debug_assertions))]`)             | Active (welcome screen, updater)                 |
 
 In dev mode, the Rust `setup` callback (`#[cfg(debug_assertions)]`) spawns the Node server via `node --import tsx src/cli.ts --no-open` (with `TSX_TSCONFIG_PATH=tsconfig.json`), parses the server URL from stdout ("running at ..."), and navigates the webview — the same pattern production uses with the sidecar. This enables automatic port selection in dev mode, avoiding failures when port 4183 is already in use. The `beforeDevCommand` only builds client assets (CSS/JS). The sidecar binary is never used — `ensure-sidecar-stub.sh` creates a no-op placeholder so Tauri's build system doesn't complain.
@@ -149,12 +149,12 @@ The launch form (`node --import tsx`, not `npx tsx`) matters for quit: `npx tsx`
    - Runs `npm run build` (tsup → `dist/cli.js` + client assets)
    - Copies `dist/`, client assets, and runtime `node_modules` into `src-tauri/server/`
 
-   - Builds the **Apple Foundation Models helper** (`scripts/build-apple-fm-helper.sh`,
-     called from `build-sidecar.sh`). The build is **guarded** — it no-ops with
-     exit 0 on non-macOS, when `swiftc` is missing, or when the macOS-26 SDK
-     (FoundationModels) is absent — so it's a clean skip on Linux/Windows/CI
-     without Xcode 26. When it does compile, the binary is copied to
-     `src-tauri/server/apple-fm-helper` (next to `cli.js`).
+   - Copies the **`apple-fm` package** (the on-device Apple FM provider) into
+     `src-tauri/server/node_modules/` as one of the external runtime deps. Its
+     bundled, signed helper binary (`bin/apple-fm-helper`) rides along — nothing
+     is compiled. When a signing identity is set, the bundled helper is re-signed
+     with hardened runtime as a belt-and-braces (see "Apple Foundation Models
+     helper" below).
 
 2. **`tauri build`** then:
    - Compiles Rust code
@@ -163,32 +163,33 @@ The launch form (`node --import tsx`, not `npx tsx`) matters for quit: `npx tsx`
 
 ### Apple Foundation Models helper (doc 22)
 
-The on-device AI provider is a standalone Swift CLI
-(`src-tauri/apple-fm-helper/main.swift`) the Node server shells out to — it is
-**not** compiled by cargo. It's bundled inside `server/**/*` (the same Tauri
-resource glob as `cli.js`), so no `tauri.conf.json` change is needed. At runtime
-the server finds it via **`GLASSBOX_APPLE_FM_BIN`**, exported by the macOS
-launcher (`resources/glassbox`, pointing at
-`Contents/Resources/server/apple-fm-helper`) and also set on the self-spawned
-sidecar in `lib.rs`. The Node bridge checks the path exists and reports
-"unavailable" if the helper wasn't built, so exporting the var unconditionally is
-safe on every OS.
+The on-device AI provider comes from the
+[`apple-fm`](https://github.com/brianwestphal/apple-fm) package — Glassbox no
+longer ships its own Swift CLI. `apple-fm` is a Node library over its own bundled
+native helper (`node_modules/apple-fm/bin/apple-fm-helper`), and `src/ai/apple-foundation.ts`
+calls its `probe` / `generate`. The package is copied into the sidecar's
+`node_modules` by `build-sidecar.sh` (it's a `tsup`-external runtime dep). At
+runtime the launcher exports **`APPLE_FM_BIN`** pointing at
+`Contents/Resources/server/node_modules/apple-fm/bin/apple-fm-helper` (set on the
+self-spawned sidecar in `lib.rs`); `apple-fm` also discovers that path on its own,
+so the export is a robust belt-and-braces. The bridge reports "unavailable" off
+macOS / off Apple Silicon / when the probe fails, so this is safe on every OS.
 
-In **dev** (`tauri:dev`), production `build-sidecar.sh` never runs, so
-`scripts/tauri-dev.sh` builds the helper itself (`build-apple-fm-helper.sh` →
-`dist/apple-fm-helper`, same guard) and `export`s `GLASSBOX_APPLE_FM_BIN` to it.
-The Rust dev launcher spawns the Node server as a child that inherits this env,
-so the Apple platform appears in dev on a capable machine (macOS 26 + Apple
-Intelligence). On a machine where the build is skipped, the var stays unset and
-Apple cleanly reports unavailable — without this, the platform never showed in
-dev even though it was enabled (GB-924).
+In **dev** (`tauri:dev`), the Node server runs from source and `apple-fm` resolves
+its helper straight from the project's `node_modules/apple-fm/bin/`, so the Apple
+platform appears in dev on a capable machine (macOS 26 + Apple Intelligence) with
+no build step or env wiring.
 
-**Signing & notarization:** `build-apple-fm-helper.sh` signs the helper with
-hardened runtime using `APPLE_SIGNING_IDENTITY` (the same identity Tauri uses for
-the bundle; falls back to `CODESIGN_IDENTITY`). For distribution the helper must
-also be **notarized** with the bundle — verifying the full compile + on-device
-run + notarization requires real macOS-26 hardware with Apple Intelligence and is
-tracked as doc-22 P2a.
+**Signing & notarization:** `apple-fm` ships its helper already Developer-ID
+signed with hardened runtime and independently notarized, and the embedded
+signature survives the package copy into the bundle, so `tauri-action`'s
+notarization of the whole app covers it — no dedicated macOS-26 compile/sign job
+is needed. When a signing identity is available (`APPLE_SIGNING_IDENTITY`, falling
+back to `CODESIGN_IDENTITY`) `build-sidecar.sh` re-signs the bundled helper with
+hardened runtime so the bundle's signature stays self-consistent. Confirming the
+bundled helper runs on-device and passes Gatekeeper after notarization requires
+real macOS-26 hardware with Apple Intelligence (doc-22 §22.9, maintainer smoke
+test).
 
 ### CI/CD (`.github/workflows/release-desktop.yml`)
 

@@ -95,48 +95,8 @@ jobs:
             });
             return data.id;
 
-  # Compile + Developer-ID-sign the Apple FM helper on a macOS-26 runner — the
-  # only hosted image with the macOS 26 SDK / FoundationModels (Xcode 26). Kept
-  # OUT of the main `build` matrix on purpose: the app bundle keeps building on
-  # the proven macOS 15 image, and only this small helper touches macOS 26. The
-  # arm64 `build` shard consumes the result as an artifact. arm64-only — Apple
-  # Intelligence + the helper are arm64; the Intel bundle never carries it.
-  build-apple-fm-helper:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-
-      # Provision the Developer ID into an isolated keychain referenced via
-      # `codesign --keychain`, so nothing global is mutated. No-ops without the
-      # cert secret (helper then built unsigned — never notarized).
-      - name: Provision Apple FM helper signing keychain
-        run: bash scripts/ci/apple-fm-signing-keychain.sh import
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Build + sign helper
-        run: bash scripts/build-apple-fm-helper.sh dist/apple-fm-helper
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-
-      - name: Remove signing keychain
-        if: always()
-        run: bash scripts/ci/apple-fm-signing-keychain.sh cleanup
-
-      # Fail loud if the helper didn't compile — on a macOS-26 runner it should,
-      # and we don't want to silently ship a macOS build without on-device AI.
-      - name: Verify helper compiled
-        run: test -f dist/apple-fm-helper || { echo "Apple FM helper was not produced"; exit 1; }
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: apple-fm-helper
-          path: dist/apple-fm-helper
-          if-no-files-found: error
-
   build:
-    needs: [create-release, build-apple-fm-helper]
+    needs: [create-release]
 
     strategy:
       fail-fast: false
@@ -175,25 +135,14 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      # The Apple FM helper is compiled + Developer-ID-signed on a dedicated
-      # macOS-26 runner (build-apple-fm-helper job) — this bundle build stays on
-      # macOS 15. Pull the signed binary in for the Apple Silicon bundle only
-      # (the helper + Apple Intelligence are arm64; the Intel bundle omits it and
-      # the app hides the Apple platform). build-sidecar.sh copies it into the
-      # bundle; its embedded signature survives so tauri-action's notarization
-      # below covers it. See docs/22 §22.9.
-      - name: Download signed Apple FM helper
-        if: matrix.target == 'aarch64-apple-darwin'
-        uses: actions/download-artifact@v4
-        with:
-          name: apple-fm-helper
-          path: prebuilt-apple-fm
-
+      # The on-device Apple FM helper now ships inside the `apple-fm` dependency,
+      # already Developer-ID signed + notarized. build-sidecar.sh copies the
+      # apple-fm package (helper included) into the sidecar; the helper's embedded
+      # signature survives, so tauri-action's notarization of the whole bundle
+      # below covers it — no dedicated macOS-26 compile job is needed. See docs/22.
       - name: Build sidecar
         run: bash scripts/build-sidecar.sh ${{ matrix.target }}
         shell: bash
-        env:
-          GLASSBOX_PREBUILT_APPLE_FM_HELPER: ${{ matrix.target == 'aarch64-apple-darwin' && format('{0}/prebuilt-apple-fm/apple-fm-helper', github.workspace) || '' }}
 
       - name: Build Tauri app and upload to release
         uses: tauri-apps/tauri-action@v0

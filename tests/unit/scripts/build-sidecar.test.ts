@@ -90,34 +90,36 @@ describe('build-sidecar.sh ⇄ tsup.config.ts consistency (GB-887)', () => {
   });
 });
 
-// GB-918 — the Apple FM helper compiles only on macOS 26, but the bundle build
-// runs on macOS 15, so CI passes the prebuilt, signed helper in via
-// GLASSBOX_PREBUILT_APPLE_FM_HELPER. These assert the supply contract stays
-// intact: the script honors the prebuilt path, falls back to compiling locally,
-// bundles whichever it ends up with, and the env-var name stays in sync with the
-// release workflows that set it.
-describe('build-sidecar.sh ⇄ Apple FM helper supply (GB-918)', () => {
-  it('uses the prebuilt helper when GLASSBOX_PREBUILT_APPLE_FM_HELPER is set', () => {
-    expect(sidecarScript).toMatch(/GLASSBOX_PREBUILT_APPLE_FM_HELPER/);
+// The on-device Apple FM provider now comes from the `apple-fm` dependency,
+// which ships its own Developer-ID signed + notarized helper binary — Glassbox
+// no longer compiles a Swift helper. These assert the new supply contract: the
+// `apple-fm` package is copied into the sidecar (so its bundled helper travels
+// with it), the bundled helper is re-signed when a signing identity is present,
+// and the obsolete self-compiled-helper machinery is gone.
+describe('build-sidecar.sh ⇄ Apple FM helper supply (apple-fm migration)', () => {
+  it('copies the apple-fm package into the sidecar node_modules', () => {
+    // The copy loop lists apple-fm; resolveHelperPath() then finds the bundled
+    // bin/apple-fm-helper relative to the package, so no separate copy is needed.
+    expect(sidecarScript).toMatch(/for pkg in [^;]*\bapple-fm\b/);
   });
 
-  it('falls back to compiling the helper locally when no prebuilt is supplied', () => {
-    expect(sidecarScript).toMatch(/build-apple-fm-helper\.sh/);
+  it('re-signs the bundled apple-fm helper when a signing identity is set', () => {
+    expect(sidecarScript).toMatch(/node_modules\/apple-fm\/bin\/apple-fm-helper/);
+    expect(sidecarScript).toMatch(/codesign[^\n]*--options runtime[^\n]*APPLE_FM_SIGN_ID/);
   });
 
-  it('bundles the resolved helper into the sidecar server dir', () => {
-    expect(sidecarScript).toMatch(/cp\s+"\$HELPER_SRC"\s+"\$SERVER_DIR\/apple-fm-helper"/);
+  it('no longer compiles its own Swift helper', () => {
+    expect(sidecarScript).not.toMatch(/build-apple-fm-helper\.sh/);
+    expect(sidecarScript).not.toMatch(/GLASSBOX_PREBUILT_APPLE_FM_HELPER/);
   });
 
   it.each([
     'release-desktop.yml',
     'release-candidate.yml',
-  ])('release workflow %s sets GLASSBOX_PREBUILT_APPLE_FM_HELPER for the arm64 build', (wf) => {
+  ])('release workflow %s no longer runs a dedicated macOS-26 helper-build job', (wf) => {
     const workflow = readFileSync(join(repoRoot, '.github/workflows', wf), 'utf-8');
-    expect(workflow).toMatch(/GLASSBOX_PREBUILT_APPLE_FM_HELPER/);
-    // …and provides the artifact it points at via a dedicated macOS-26 job.
-    expect(workflow).toMatch(/runs-on:\s*macos-26/);
-    expect(workflow).toMatch(/name:\s*apple-fm-helper/);
+    expect(workflow).not.toMatch(/GLASSBOX_PREBUILT_APPLE_FM_HELPER/);
+    expect(workflow).not.toMatch(/build-apple-fm-helper/);
   });
 });
 
