@@ -1,6 +1,7 @@
 import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
 
 import { discardReviewNote, moveAnnotation, revealFile } from '../../api/index.js';
+import { hydrateAttachments } from '../annotations/attachments.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
 import { asEl, asElement } from '../dom.js';
@@ -229,6 +230,10 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
     if (kind === 'text' && fileId !== null) void loadOutline(fileId);
     // Annotation events are registered once via `bindAnnotationEvents()` —
     // they fire for server-rendered annotation rows by `data-action` match.
+    // Fill each annotation row's attachment chips (doc 25). The rows are
+    // server-rendered with empty `[data-att-list]` containers; one bulk fetch
+    // populates them all.
+    void hydrateAttachments(container);
   }
 
   // Inline AI notes (risk / narrative / guided) are rendered reactively by

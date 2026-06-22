@@ -4,6 +4,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { z } from 'zod';
 
+import { getAttachmentsForReview } from '../db/attachment-queries.js';
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
 import { ImageRegionSchema } from '../db/schemas.js';
 import { isGitRepo } from '../git/repo.js';
@@ -155,6 +156,14 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
     lines.push('');
   }
 
+  // Reviewer attachments, grouped by the annotation they hang off (doc 25), so
+  // they can be listed inline under each comment with their on-disk paths.
+  const attachments = await getAttachmentsForReview(reviewId);
+  const attByAnnotation: Record<string, typeof attachments> = {};
+  for (const at of attachments) {
+    (attByAnnotation[at.annotation_id] ??= []).push(at);
+  }
+
   // Per-file annotations
   lines.push('## File Annotations');
   lines.push('');
@@ -165,6 +174,11 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
     lines.push('');
     for (const a of fileAnns) {
       lines.push(`- ${annotationAnchorLabel(a)} [${a.category}]: ${a.content}`);
+      const atts = attByAnnotation[a.id] ?? [];
+      if (atts.length > 0) {
+        lines.push('  - Attachments (readable files on disk):');
+        for (const at of atts) lines.push(`    - \`${at.stored_path}\` (${at.original_filename})`);
+      }
     }
     lines.push('');
   }
@@ -187,6 +201,7 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
   lines.push('4. **pattern-avoid** annotations highlight anti-patterns. Refactor the indicated code and avoid the pattern elsewhere.');
   lines.push('5. **remember** annotations are rules/preferences to persist. Update the project\'s AI configuration file (e.g., CLAUDE.md) with these.');
   lines.push('6. **note** annotations are informational context. Consider them but they may not require code changes.');
+  lines.push('7. **Attachments** listed under an annotation are real files on disk (screenshots, logs, specs, etc.) — read them from the given path for additional context when acting on that comment.');
   lines.push('');
 
   const content = lines.join('\n');

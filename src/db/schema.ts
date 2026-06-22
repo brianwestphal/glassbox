@@ -50,6 +50,23 @@ export const SCHEMA_CORE_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_annotations_file ON annotations(review_file_id);
+
+  -- Reviewer-uploaded file attachments on a feedback item (doc 25). Any
+  -- annotation — line comment, image comment, image region, or note reply —
+  -- can carry attachments. Bytes live on disk under <dataDir>/attachments/;
+  -- this table holds the metadata + the on-disk path.
+  CREATE TABLE IF NOT EXISTS attachments (
+    id TEXT PRIMARY KEY,
+    annotation_id TEXT NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+    original_filename TEXT NOT NULL,
+    stored_path TEXT NOT NULL,
+    mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    size INTEGER NOT NULL DEFAULT 0,
+    sha256 TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_attachments_annotation ON attachments(annotation_id);
 `;
 
 /** AI tables: analyses, file scores, user preferences. */

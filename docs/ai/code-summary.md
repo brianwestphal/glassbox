@@ -96,6 +96,7 @@ How the layer is used:
 | `api/reviews.ts` | Review CRUD + completion / reopen / refresh / delete-completed / delete-all + gitignore prompt. |
 | `api/files.ts` | Files list, file detail, file status, file reveal in OS file manager, file path (relative+absolute), open-in-default-editor. |
 | `api/annotations.ts` | Annotation CRUD, move, keep, stale-handling endpoints. |
+| `api/attachments.ts` | Reviewer file attachments on any annotation (doc 25): `POST/GET /annotations/:id/attachments`, `GET /attachments/all`, `GET /attachments/:id/raw`, `POST /attachments/:id/quicklook`, `DELETE /attachments/:id`. Upload is multipart; preview shells out to OS Quick Look via `openOS(... ,'quicklook')`. |
 | `api/outline.ts` | `/outline/:fileId` and `/symbol-definition` go-to-definition repo scan. |
 | `api/context.ts` | `/context/:fileId` line-range fetch for hunk expansion. |
 | `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`). |
@@ -355,6 +356,7 @@ See `src/db/schema.ts` for the authoritative SQL. Quick reference:
 - `ai_file_scores(id, analysis_id →ai_analyses, review_file_id, file_path, sort_order, aggregate_score, rationale, dimension_scores, notes, created_at)`
   — `dimension_scores` and `notes` are **JSON strings**
 - `user_preferences(id='singleton', sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace, svg_view_mode, last_image_mode, image_sxs_orientation)` — one row (`last_image_mode` defaults to `side-by-side`; `image_sxs_orientation` is `left-right`|`over-under`, doc 24)
+- `attachments(id, annotation_id →annotations ON DELETE CASCADE, original_filename, stored_path, mime_type, size, sha256, created_at)` — reviewer file attachments (doc 25). Bytes live under `<dataDir>/attachments/`; queries in `src/db/attachment-queries.ts`, disk I/O in `src/attachments/store.ts`. Deleting an annotation also removes its attachment files (`deleteAnnotation`).
 
 Foreign keys cascade-delete. Indexes: `idx_review_files_review`,
 `idx_annotations_file`, `idx_ai_analyses_review`,
@@ -697,6 +699,7 @@ two documents intentionally overlap.
 | Add a new page/route | `src/routes/pages.tsx`; register in `src/server.ts`. |
 | Change the DB schema | `src/db/schema.ts` (tables/indexes) + a migration in `src/db/connection.ts` (`addColumnIfMissing` pattern). Query code in `src/db/queries.ts` or `ai-queries.ts`. |
 | Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api/annotations.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
+| Work on feedback attachments | `src/client/annotations/attachments.tsx` (chips/upload/drag-drop/preview), `src/routes/api/attachments.ts` + `src/api/attachments.ts` (API), `src/db/attachment-queries.ts` + `src/attachments/store.ts` (storage), `src/utils/openOS.ts` (`'quicklook'`), `src/export/generate.ts` (export paths). Doc 25. |
 | Add a CLI option | `src/cli.ts` `parseArgs()` switch; document in `docs/2-cli-and-server.md`. |
 | Add an AI platform | `src/ai/models.ts` (platform enum + fallback models + env key; `KEYLESS_PLATFORMS` if no key needed), `src/ai/list-models.ts` (live-discovery fetch+map), `src/ai/client.ts` (HTTP/spawn dispatch), `src/ai/config.ts` (any per-platform config like a base URL), `src/ai/api-keys.ts` (key source mapping), `src/routes/ai-config.ts` + `src/api/ai.ts` (config/discovery/key-status wiring), `src/client/settings/experimentalTab.tsx` + `dialog.tsx` (picker + any platform-specific inputs). The `local` platform (doc 22) is the worked example of a keyless, base-URL-configured provider. Update `docs/7-ai-analysis.md`. |
 | Update / discover AI models | Models are discovered live per provider in `src/ai/list-models.ts` (used by `GET /api/ai/models`); `src/ai/models.ts` holds the static fallback + `resolveModelId` old→new mapping. |

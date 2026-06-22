@@ -29,7 +29,21 @@ import { debugLog } from '../debug.js';
  * Both paths pass argv without shell interpolation (no `exec`), so a path or URL
  * containing spaces or shell metacharacters is safe.
  */
-export function openOS(target: string, mode: 'url' | 'reveal' | 'edit'): void {
+export function openOS(target: string, mode: 'url' | 'reveal' | 'edit' | 'quicklook'): void {
+  if (mode === 'quicklook') {
+    // macOS has a real Quick Look CLI (the spacebar-preview panel); other
+    // platforms have no equivalent, so fall back to the default GUI opener
+    // (doc 25). Detached/non-blocking — `qlmanage -p` holds the panel open and
+    // must not block the HTTP request behind it.
+    if (process.platform === 'darwin') {
+      launchDetached('qlmanage', ['-p', target]);
+    } else if (process.platform === 'win32') {
+      launchDetached('cmd', ['/c', 'start', '', target]);
+    } else {
+      launchDetached('xdg-open', [target]);
+    }
+    return;
+  }
   if (mode === 'edit') {
     if (process.platform === 'darwin') {
       launchDetached('open', [target]);

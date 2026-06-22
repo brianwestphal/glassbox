@@ -151,6 +151,12 @@ export async function getAnnotationsForFile(reviewFileId: string): Promise<Annot
   return parseRows(AnnotationSchema, result.rows);
 }
 
+export async function getAnnotationById(id: string): Promise<Annotation | undefined> {
+  const db = await getDb();
+  const result = await db.query('SELECT * FROM annotations WHERE id = $1', [id]);
+  return parseRow(AnnotationSchema, result.rows[0]);
+}
+
 export async function getAnnotationsForReview(reviewId: string): Promise<AnnotationWithFilePath[]> {
   const db = await getDb();
   const result = await db.query(
@@ -173,6 +179,11 @@ export async function updateAnnotation(id: string, content: string, category: st
 
 export async function deleteAnnotation(id: string): Promise<void> {
   const db = await getDb();
+  // Remove any attachment bytes from disk before the row goes away (the DB
+  // cascade drops the `attachments` rows, but not their files — doc 25).
+  const { getAttachmentsForAnnotation } = await import('./attachment-queries.js');
+  const { deleteAttachmentFile } = await import('../attachments/store.js');
+  for (const att of await getAttachmentsForAnnotation(id)) deleteAttachmentFile(att.stored_path);
   await db.query('DELETE FROM annotations WHERE id = $1', [id]);
 }
 

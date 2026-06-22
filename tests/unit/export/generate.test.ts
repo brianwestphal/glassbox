@@ -10,12 +10,19 @@ vi.mock('../../../src/db/queries.js', () => ({
   getAnnotationsForReview: vi.fn(),
 }));
 
+// The export folds in attachment paths (doc 25); default to none.
+vi.mock('../../../src/db/attachment-queries.js', () => ({
+  getAttachmentsForReview: vi.fn(() => Promise.resolve([])),
+}));
+
 import { getReview, getReviewFiles, getAnnotationsForReview } from '../../../src/db/queries.js';
+import { getAttachmentsForReview } from '../../../src/db/attachment-queries.js';
 import { writeReviewNote } from '../../../src/review-notes/store.js';
 
 const mockGetReview = vi.mocked(getReview);
 const mockGetReviewFiles = vi.mocked(getReviewFiles);
 const mockGetAnnotations = vi.mocked(getAnnotationsForReview);
+const mockGetAttachments = vi.mocked(getAttachmentsForReview);
 
 describe('generateReviewExport', () => {
   let tempDir: string;
@@ -75,6 +82,27 @@ describe('generateReviewExport', () => {
     expect(content).toContain('## Annotation Summary');
     expect(content).toContain('**bug**: 2');
     expect(content).toContain('**style**: 1');
+  });
+
+  it('lists attachment paths under their annotation (doc 25)', async () => {
+    mockGetReview.mockResolvedValueOnce({
+      id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'staged', mode_args: null,
+      head_commit: 'abc', status: 'in_progress', created_at: '2025-01-01',
+    } as any);
+    mockGetReviewFiles.mockResolvedValueOnce([]);
+    mockGetAnnotations.mockResolvedValueOnce([
+      { id: 'a1', file_path: 'a.ts', line_number: 1, side: 'new', category: 'bug', content: 'Bug here', stale: false },
+    ] as any);
+    mockGetAttachments.mockResolvedValueOnce([
+      { id: 'at1', annotation_id: 'a1', original_filename: 'shot.png', stored_path: '/data/attachments/at1-shot.png', mime_type: 'image/png', size: 9, sha256: null, created_at: '2025-01-01', file_path: 'a.ts', line_number: 1 },
+    ] as any);
+
+    const content = readFileSync(await generateReviewExport('r1', tempDir, true), 'utf-8');
+    expect(content).toContain('Attachments (readable files on disk):');
+    expect(content).toContain('/data/attachments/at1-shot.png');
+    expect(content).toContain('(shot.png)');
+    // The AI instructions mention attachments are readable files.
+    expect(content).toContain('**Attachments** listed under an annotation are real files');
   });
 
   it('includes Items to Remember section for remember annotations', async () => {

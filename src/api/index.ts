@@ -34,6 +34,7 @@ import * as themes from './themes.js';
 
 export * from './ai.js';
 export * from './annotations.js';
+export * from './attachments.js';
 export * from './channel.js';
 export * from './context.js';
 export * from './difftool.js';

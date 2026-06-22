@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 
 import type { AppEnv } from '../types.js';
 import { annotationsRoutes } from './api/annotations.js';
+import { attachmentsRoutes } from './api/attachments.js';
 import { contextRoutes } from './api/context.js';
 import { filesRoutes } from './api/files.js';
 import { imageRoutes } from './api/image.js';
@@ -22,6 +23,7 @@ export const apiRoutes = new Hono<AppEnv>();
 apiRoutes.route('/', reviewsRoutes);
 apiRoutes.route('/', filesRoutes);
 apiRoutes.route('/', annotationsRoutes);
+apiRoutes.route('/', attachmentsRoutes);
 apiRoutes.route('/', outlineRoutes);
 apiRoutes.route('/', contextRoutes);
 apiRoutes.route('/', projectSettingsRoutes);

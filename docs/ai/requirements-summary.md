@@ -122,6 +122,20 @@ pane, unscoped on both). Layout-only — no new server route. Client wiring:
 `adaptImageToolbar`/`setupImageModeEffect` in `src/client/diff/index.tsx`,
 panes + per-pane sizing in `src/client/diff/imageDiff/index.ts`.
 
+**Feedback attachments** (doc 25, P1 shipped): a reviewer can attach any file
+type to a feedback item via an **attach button** or **drag-and-drop**; the files
+render as **chips** beneath the comment and persist with the review (hydrated
+from the server on reload). Selecting a chip and pressing **Space** (or clicking)
+opens it in the OS preview — macOS **Quick Look** (`qlmanage -p`), default opener
+on Windows/Linux — launched by the always-local Node server shelling out (the
+`'quicklook'` mode of `openOS`, same path as "reveal in file manager"). Bytes
+live under `<dataDir>/attachments/` with an `attachments` table; the markdown
+export lists each attachment's **absolute path** under its annotation so the AI
+tool can read it. The data/API layer is generic over any annotation; P1 wires the
+UI on **line annotations** only — image-feedback/note-reply surfaces, paste-to-
+attach, and chip thumbnails are follow-ups. Client:
+`src/client/annotations/attachments.tsx`; routes `src/routes/api/attachments.ts`.
+
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions
 (stored as normalized `{x,y,w,h}` fractions) that show on both A/B sides

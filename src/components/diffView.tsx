@@ -443,9 +443,11 @@ function AnnotationItem({ annotation: a }: { annotation: Annotation }) {
       <span className="annotation-text">{a.content}</span>
       <div className="annotation-actions">
         {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}
+        <button className="btn btn-xs btn-icon" data-action="attach" title="Attach a file"><IconPaperclip /></button>
         <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
         <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
       </div>
+      <div className="annotation-attachments" data-att-list={a.id} data-morph-skip></div>
     </div>
   );
 }

@@ -149,3 +149,8 @@ export function IconChevronDown(): SafeHtml {
 export function IconSquareDashed(): SafeHtml {
   return <svg {...S14}><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg>;
 }
+
+/** File icon (lucide) — a generic attachment chip (doc 25). */
+export function IconFile(): SafeHtml {
+  return <svg {...S12}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v6h6"/></svg>;
+}

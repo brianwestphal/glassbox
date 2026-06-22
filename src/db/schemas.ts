@@ -117,6 +117,22 @@ export const AnnotationWithFilePathSchema = AnnotationSchema.extend({
 });
 export type AnnotationWithFilePath = z.infer<typeof AnnotationWithFilePathSchema>;
 
+// --- Attachments (doc 25) ---
+
+// A reviewer-uploaded file attached to an annotation. Bytes live on disk under
+// <dataDir>/attachments/; this row carries the metadata + the absolute path.
+export const AttachmentSchema = z.object({
+  id: z.string(),
+  annotation_id: z.string(),
+  original_filename: z.string(),
+  stored_path: z.string(),
+  mime_type: z.string(),
+  size: z.number(),
+  sha256: z.string().nullable().default(null),
+  created_at: TimestampSchema,
+});
+export type Attachment = z.infer<typeof AttachmentSchema>;
+
 // --- AI analyses ---
 
 export const AIAnalysisSchema = z.object({

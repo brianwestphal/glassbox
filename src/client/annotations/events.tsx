@@ -10,6 +10,7 @@ import {
   reviewStore,
   setEditForm,
 } from '../stores/index.js';
+import { bindAttachmentEvents } from './attachments.js';
 import { buildCategoryBadge } from './categories.js';
 import { showReclassifyPopup } from './reclassifyPopup.js';
 import { buildAnnotationItemHtml } from './render.js';
@@ -20,6 +21,10 @@ import { buildAnnotationItemHtml } from './render.js';
  *  delegated handlers fire for every annotation row, current and future,
  *  without ever needing per-element `addEventListener`. */
 export function bindAnnotationEvents(diffContainer: HTMLElement): void {
+  // Attachment chips/upload/preview delegates (doc 25) — same once-per-surface
+  // model as the annotation handlers below.
+  bindAttachmentEvents(diffContainer);
+
   void delegate(diffContainer, 'click', '.annotation-item [data-action="delete"]', (e, btn) => {
     e.stopPropagation();
     const item = asEl(btn).closest<HTMLElement>('.annotation-item');
