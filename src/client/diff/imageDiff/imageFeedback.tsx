@@ -9,6 +9,7 @@ import {
   updateAnnotation as updateAnnotationApi,
   updateAnnotationRegion as updateAnnotationRegionApi,
 } from '../../../api/index.js';
+import { IconEdit, IconSquareDashed, IconTrash } from '../../../icons.js';
 import { showCategoryPicker } from '../../annotations/categories.js';
 import { toElement } from '../../dom.js';
 import { CATEGORIES } from '../../state.js';
@@ -536,8 +537,8 @@ function commentItemJsx(c: CommentItem): SafeHtml {
         <span className="image-feedback-text">{c.content}</span>
       </div>
       <div className="image-feedback-item-actions">
-        <button className="btn btn-xs btn-icon" data-action="edit" title="Edit">✎</button>
-        <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete">✕</button>
+        <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
+        <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
       </div>
     </li>
   );
@@ -554,8 +555,8 @@ function regionItemJsx(r: RegionItem, number: number): SafeHtml {
         <span className="image-feedback-text">{r.content}</span>
       </div>
       <div className="image-feedback-item-actions">
-        <button className="btn btn-xs btn-icon" data-action="edit" title="Edit">✎</button>
-        <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete">✕</button>
+        <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
+        <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
       </div>
     </li>
   );
@@ -591,8 +592,8 @@ function feedbackPanelJsx(
   return (
     <div className="image-feedback-inner">
       <div className="image-feedback-bar">
-        <button className={`btn btn-sm ${drawMode ? 'active' : ''}`} data-action="toggle-draw">
-          {drawMode ? 'Drawing…' : '▭ Draw region'}
+        <button className={`btn btn-sm image-feedback-draw-btn ${drawMode ? 'active' : ''}`} data-action="toggle-draw">
+          {drawMode ? 'Drawing…' : <><IconSquareDashed /> Draw region</>}
         </button>
         <span className="image-feedback-hint">
           {drawMode ? 'Drag a rectangle on the image to mark a region' : 'Comment on this image, or draw a region to anchor a comment'}

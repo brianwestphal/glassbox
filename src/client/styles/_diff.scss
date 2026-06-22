@@ -406,6 +406,9 @@
   border-bottom: 1px solid var(--border);
   cursor: pointer;
 
+  // The "Show remaining lines" expander leads with a chevrons icon.
+  svg { width: 14px; height: 14px; vertical-align: -3px; margin-right: 4px; }
+
   &:hover { background: rgba(137,180,250,0.1); }
 }
 

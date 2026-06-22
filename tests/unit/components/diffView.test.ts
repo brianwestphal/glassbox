@@ -103,6 +103,8 @@ describe('DiffView', () => {
     }).toString();
     expect(html).toContain('annotation-reply-tag');
     expect(html).toContain('I disagree');
+    // GB-952: the reply tag uses a lucide icon (<svg>), not the ↳ glyph.
+    expect(html).not.toContain('↳');
   });
 
   it('nests a reply beneath its note (GB-908)', () => {
@@ -338,6 +340,8 @@ describe('DiffView', () => {
     }).toString();
     expect(html).toContain('hunk-expander-tail');
     expect(html).toContain('Show remaining lines');
+    // GB-952: a lucide chevrons icon leads the expander, not the ↕ glyph.
+    expect(html).not.toContain('↕');
   });
 
   it('renders character-level diff for paired remove+add lines', () => {
@@ -404,5 +408,7 @@ describe('DiffView', () => {
     expect(html).toContain('data-action="edit"');
     expect(html).toContain('data-action="delete"');
     expect(html).toContain('data-action="reclassify"');
+    // GB-952: the drag handle is a lucide grip icon, not the ⠿ braille glyph.
+    expect(html).not.toContain('⠿');
   });
 });

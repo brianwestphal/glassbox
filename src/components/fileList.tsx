@@ -1,5 +1,6 @@
 import type { ReviewFile } from '../db/queries.js';
 import { parseDiffData } from '../git/diff.js';
+import { IconChevronDown } from '../icons.js';
 
 interface TreeNode {
   name: string;
@@ -70,7 +71,7 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
         return (
           <div className="folder-group">
             <div className={`folder-header${isCollapsible ? ' collapsible' : ''}`} style={`padding-left:${16 + depth * 12}px`}>
-              {isCollapsible ? <span className="folder-arrow">▾</span> : <span className="folder-arrow-spacer"></span>}
+              {isCollapsible ? <span className="folder-arrow"><IconChevronDown /></span> : <span className="folder-arrow-spacer"></span>}
               <span className="folder-name">{child.name}/</span>
               {stale ? <span className="stale-dot"></span> : null}
             </div>

@@ -65,12 +65,17 @@
 // Marks a human annotation that replies to an AI review note (doc 20 threading).
 .annotation-reply-tag {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 3px;
   color: var(--blue, #89b4fa);
   background: rgba(137, 180, 250, 0.12);
+
+  svg { width: 12px; height: 12px; }
 }
 
 .annotation-text {
@@ -125,11 +130,14 @@
 .annotation-drag-handle {
   cursor: grab;
   color: var(--text-dim);
-  font-size: 14px;
+  display: flex;
+  align-items: center;
   line-height: 1;
   flex-shrink: 0;
   user-select: none;
   padding: 0 2px;
+
+  svg { display: block; }
 
   &:hover { color: var(--text); }
 }

@@ -2,6 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 import { raw } from 'kerfjs';
 
 import { parseDiffData } from '../../git/parseDiffData.js';
+import { IconChevronDown } from '../../icons.js';
 import type { AnalysisModeState, NarrativeFileOrder, RiskFileScore } from '../state.js';
 import {
   aiStore,
@@ -234,7 +235,7 @@ function treeNodeJsx(node: TreeNode, depth: number, pathPrefix: string): SafeHtm
               data-action={isCollapsible ? 'toggle-folder' : undefined}
               data-folder-path={folderPath}>
               {isCollapsible
-                ? <span className="folder-arrow">{'▾'}</span>
+                ? <span className="folder-arrow"><IconChevronDown /></span>
                 : <span className="folder-arrow-spacer"></span>}
               <span className="folder-name">{child.name}/</span>
               {stale && <span className="stale-dot"></span>}

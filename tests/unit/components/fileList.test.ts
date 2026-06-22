@@ -70,6 +70,8 @@ describe('FileList', () => {
     const html = FileList({ files, annotationCounts: {}, staleCounts: {} }).toString();
     expect(html).toContain('collapsible');
     expect(html).toContain('folder-arrow');
+    // GB-952: the disclosure caret is a lucide chevron (<svg>), not the ▾ glyph.
+    expect(html).not.toContain('▾');
   });
 
   it('renders file status from diff_data', () => {

@@ -2,6 +2,7 @@ import { delegate } from 'kerfjs';
 
 import type { AnnotationCategory, AnnotationSide } from '../../api/index.js';
 import { createAnnotation } from '../../api/index.js';
+import { IconCornerDownRight } from '../../icons.js';
 import { asTextarea, toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
 import { editFormSignal, reviewStore, setEditForm } from '../stores/index.js';
@@ -57,7 +58,7 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
   const container = toElement(
     <div className="annotation-form-container" data-form-key={formKey} data-line={String(lineNumber)} data-side={side}>
       <div className={`annotation-form${replyToNoteId !== undefined ? ' annotation-form-reply' : ''}`}>
-        {replyToNoteId !== undefined ? <span className="annotation-reply-tag">↳ replying to AI note</span> : null}
+        {replyToNoteId !== undefined ? <span className="annotation-reply-tag"><IconCornerDownRight /> replying to AI note</span> : null}
         {buildCategoryBadge(defaultCategory)}
         <textarea placeholder={replyToNoteId !== undefined ? 'Reply to this note...' : 'Enter your annotation...'} autoFocus></textarea>
         <div className="annotation-form-actions">

@@ -124,3 +124,28 @@ export function IconHeart(): SafeHtml {
 export function IconPaperclip(): SafeHtml {
   return <svg {...S12}><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>;
 }
+
+/** Grip (vertical) icon (lucide) — a drag handle. */
+export function IconGripVertical(): SafeHtml {
+  return <svg {...S14}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>;
+}
+
+/** Corner-down-right icon (lucide) — marks a reply to an AI review note. */
+export function IconCornerDownRight(): SafeHtml {
+  return <svg {...S12}><polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg>;
+}
+
+/** Chevrons up/down icon (lucide) — the "show remaining lines" hunk expander. */
+export function IconChevronsUpDown(): SafeHtml {
+  return <svg {...S14}><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>;
+}
+
+/** Chevron-down icon (lucide) — folder disclosure caret (rotated when collapsed). */
+export function IconChevronDown(): SafeHtml {
+  return <svg {...S12}><path d="m6 9 6 6 6-6"/></svg>;
+}
+
+/** Square-dashed icon (lucide) — "draw a region" on an image (doc 23). */
+export function IconSquareDashed(): SafeHtml {
+  return <svg {...S14}><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg>;
+}

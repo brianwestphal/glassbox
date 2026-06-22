@@ -161,10 +161,14 @@
 
 .folder-arrow {
   width: 12px;
-  font-size: 10px;
+  height: 12px;
   flex-shrink: 0;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.1s;
+
+  svg { display: block; }
 }
 
 .folder-arrow-spacer {

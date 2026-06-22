@@ -1,15 +1,15 @@
 import type { SafeHtml } from 'kerfjs';
 
-import { IconEdit, IconTrash } from '../../icons.js';
+import { IconCornerDownRight, IconEdit, IconGripVertical, IconTrash } from '../../icons.js';
 import { toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 
 export function buildAnnotationItemHtml(annotation: Annotation): SafeHtml {
   return (
     <>
-      <span className="annotation-drag-handle" draggable={true} title="Drag to move">{'⠇'}</span>
+      <span className="annotation-drag-handle" draggable={true} title="Drag to move"><IconGripVertical /></span>
       <span className={`annotation-category category-${annotation.category}`} data-action="reclassify">{annotation.category}</span>
-      {annotation.reply_to_note_id !== null && annotation.reply_to_note_id !== undefined && <span className="annotation-reply-tag" title="Reply to an AI review note">{'↳ reply'}</span>}
+      {annotation.reply_to_note_id !== null && annotation.reply_to_note_id !== undefined && <span className="annotation-reply-tag" title="Reply to an AI review note"><IconCornerDownRight /> reply</span>}
       <span className="annotation-text">{annotation.content}</span>
       <div className="annotation-actions">
         {annotation.is_stale && <button className="btn btn-xs btn-keep" data-action="keep">Keep</button>}

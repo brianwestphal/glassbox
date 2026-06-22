@@ -4,7 +4,7 @@ import { raw } from 'kerfjs';
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
-import { IconEdit, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
+import { IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
 import type { ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
@@ -197,7 +197,7 @@ function renderSplitColumn(
         if (item.kind === 'tail') {
           return (
             <div className="hunk-separator hunk-expander-tail" data-start={item.start}>
-              ↕ Show remaining lines
+              <IconChevronsUpDown /> Show remaining lines
             </div>
           );
         }
@@ -368,7 +368,7 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNot
         );
       })}
       <div className="hunk-separator hunk-expander-tail" data-start={tailStart}>
-        ↕ Show remaining lines
+        <IconChevronsUpDown /> Show remaining lines
       </div>
     </div>
   );
@@ -437,9 +437,9 @@ function AnnotationItem({ annotation: a }: { annotation: Annotation }) {
   return (
     <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
       data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
-      <span className="annotation-drag-handle" draggable={true} title="Drag to move">⠿</span>
+      <span className="annotation-drag-handle" draggable={true} title="Drag to move"><IconGripVertical /></span>
       <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
-      {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note">↳ reply</span> : null}
+      {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note"><IconCornerDownRight /> reply</span> : null}
       <span className="annotation-text">{a.content}</span>
       <div className="annotation-actions">
         {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}

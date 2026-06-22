@@ -358,6 +358,15 @@
   }
 }
 
+// "Draw region" button: square-dashed icon + label on one row.
+.image-feedback-draw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  svg { width: 14px; height: 14px; }
+}
+
 .image-feedback-hint {
   color: var(--text-dim);
   font-size: 12px;
