@@ -357,3 +357,125 @@ test.describe('Image feedback follow-ups', () => {
     expect(Math.abs(drawn.height - (y1 - y0))).toBeLessThan(6);
   });
 });
+
+// GB-941 — SVG rendered view zooms as a vector (re-rasterizes) instead of
+// magnifying a fixed bitmap. The deterministic proxy: a vector wrap grows its
+// *layout* size (offsetWidth) with zoom, so the browser re-renders the SVG at
+// full resolution; a raster wrap keeps a constant layout size and only the CSS
+// transform scales it (which is what produced the pixelation).
+test.describe('SVG vector zoom (GB-941)', () => {
+  const SVG_FILE = 'icon.svg';
+
+  async function openRenderedSvg(page: import('@playwright/test').Page) {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-item .file-name', { hasText: SVG_FILE }).click();
+    // The SVG view toggle appears for SVG files; switch to the rendered view.
+    await expect(page.locator('[data-svg-mode="rendered"]')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-svg-mode="rendered"]').click();
+    await expect(page.locator('.diff-view[data-is-svg="true"] .image-diff')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-image-mode="difference"]').click();
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>('[data-panel="difference"] .image-layer-old');
+      return img !== null && img.complete && img.naturalWidth > 0;
+    }, null, { timeout: 10000 });
+  }
+
+  function wrapLayoutWidth(page: import('@playwright/test').Page): Promise<number> {
+    return page.evaluate(() => {
+      const wrap = document.querySelector<HTMLElement>('[data-panel="difference"] .image-zoom-wrap');
+      return wrap ? wrap.offsetWidth : 0;
+    });
+  }
+
+  function canvasWidth(page: import('@playwright/test').Page): Promise<number> {
+    return page.evaluate(() => {
+      const c = document.querySelector<HTMLElement>('[data-panel="difference"] .image-visual-canvas');
+      return c ? c.clientWidth : 0;
+    });
+  }
+
+  test('the wrapper is flagged for vector zoom', async ({ page }) => {
+    await openRenderedSvg(page);
+    await expect(page.locator('[data-panel="difference"] .image-zoom-wrap'))
+      .toHaveAttribute('data-vector-zoom', 'true');
+  });
+
+  test('zooming in grows the layout size (re-raster) without a transform scale', async ({ page }) => {
+    await openRenderedSvg(page);
+    const base = await wrapLayoutWidth(page);
+    expect(base).toBeGreaterThan(0);
+
+    const zoomIn = page.locator('.diff-toolbar-image [data-zoom-action="in"]');
+    await zoomIn.click();
+    await zoomIn.click();
+
+    // Layout width grew — the SVG is re-rasterized at the larger size.
+    await expect.poll(() => wrapLayoutWidth(page), { timeout: 5000 }).toBeGreaterThan(base + 10);
+
+    // And the wrapper is positioned by translate only — no scale() that would
+    // magnify a bitmap.
+    const transform = await page.evaluate(() => {
+      const wrap = document.querySelector<HTMLElement>('[data-panel="difference"] .image-zoom-wrap');
+      return wrap ? wrap.style.transform : '';
+    });
+    expect(transform).not.toContain('scale(');
+
+    // Fit resets back to the base layout size.
+    await page.locator('.diff-toolbar-image [data-zoom-action="fit"]').click();
+    await expect.poll(() => wrapLayoutWidth(page), { timeout: 5000 }).toBeLessThan(base + 2);
+  });
+
+  // Regression for the flex-shrink clamp: a vector wrap must be allowed to grow
+  // PAST the canvas. The flex parent's default flex-shrink:1 would otherwise pull
+  // the wrapper back to the canvas size, so the SVG never actually rendered
+  // larger and zooming just panned it (reported on GB-941).
+  test('zooming past the viewport actually enlarges the image (not clamped to the canvas)', async ({ page }) => {
+    await openRenderedSvg(page);
+    const cw = await canvasWidth(page);
+    expect(cw).toBeGreaterThan(0);
+
+    // Zoom in until the wrapper should exceed the canvas (or we hit the cap).
+    const zoomIn = page.locator('.diff-toolbar-image [data-zoom-action="in"]');
+    for (let i = 0; i < 6; i++) await zoomIn.click();
+
+    // The wrapper's real layout width must exceed the canvas — proof it was not
+    // shrunk back to fit.
+    await expect.poll(() => wrapLayoutWidth(page), { timeout: 5000 }).toBeGreaterThan(cw + 1);
+
+    // The rendered <img> itself is genuinely larger than the viewport.
+    const imgBox = await page.locator('[data-panel="difference"] .image-layer-old').boundingBox();
+    if (!imgBox) throw new Error('image layer has no box');
+    expect(imgBox.width).toBeGreaterThan(cw);
+  });
+
+  test('raster images still zoom via transform scale (layout size constant)', async ({ page }) => {
+    // Regression guard: the PNG path must keep the cheap transform-scale model.
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-item .file-name', { hasText: '128x128.png' }).click();
+    await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-image-mode="difference"]').click();
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>('[data-panel="difference"] .image-layer-old');
+      return img !== null && img.complete && img.naturalWidth > 0;
+    }, null, { timeout: 10000 });
+
+    const base = await wrapLayoutWidth(page);
+    expect(base).toBeGreaterThan(0);
+    await expect(page.locator('[data-panel="difference"] .image-zoom-wrap'))
+      .not.toHaveAttribute('data-vector-zoom', 'true');
+
+    const zoomIn = page.locator('.diff-toolbar-image [data-zoom-action="in"]');
+    await zoomIn.click();
+    await zoomIn.click();
+
+    // Layout size unchanged; the transform carries the scale.
+    expect(Math.abs((await wrapLayoutWidth(page)) - base)).toBeLessThan(2);
+    const transform = await page.evaluate(() => {
+      const wrap = document.querySelector<HTMLElement>('[data-panel="difference"] .image-zoom-wrap');
+      return wrap ? wrap.style.transform : '';
+    });
+    expect(transform).toContain('scale(');
+  });
+});

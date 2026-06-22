@@ -286,6 +286,23 @@ const DEMO_FILES: Array<{
     isBinary: true,
     hunks: [],
   },
+  {
+    // A real SVG change so the demo (and the e2e suite) exercises the SVG
+    // *rendered* view and its vector zoom (GB-941). Modeled as a rename so both
+    // sides resolve to real committed icons (old = red, new = blue, both 20x20
+    // with explicit width/height so the <img> reports a natural size). Default
+    // view is the code (text) diff; the Rendered toggle switches to ImageDiff.
+    path: 'tests/fixtures/diff/new/icon.svg',
+    oldPath: 'tests/fixtures/diff/old/icon.svg',
+    status: 'modified',
+    hunks: [{
+      oldStart: 1, oldCount: 1, newStart: 1, newCount: 1,
+      lines: [
+        { type: 'remove', oldNum: 1, newNum: null, content: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="red"/></svg>' },
+        { type: 'add', oldNum: null, newNum: 1, content: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="blue"/></svg>' },
+      ],
+    }],
+  },
 ];
 
 // --- Guided review notes ---

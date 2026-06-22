@@ -100,6 +100,16 @@ function canvasToImagePct(cnx: number, cny: number, ss: SliceState, zs: ZoomStat
   const wby = ss.wrap.offsetTop;
   const px = cnx * cw;
   const py = cny * ch;
+
+  // A vector wrap (GB-941) carries the zoom in its layout size, so offsetWidth /
+  // offsetLeft already reflect it — the position within the image is a plain
+  // fraction of the wrapper, without dividing out a transform scale.
+  if (ss.wrap.dataset.vectorZoom === 'true') {
+    const fx = (px - wbx - zs.panX) / ww;
+    const fy = (py - wby - zs.panY) / wh;
+    return `${fx * 100}% ${fy * 100}%`;
+  }
+
   const wx = (px - wbx - zs.panX) / zs.zoom;
   const wy = (py - wby - zs.panY) / zs.zoom;
   return `${(wx / ww) * 100}% ${(wy / wh) * 100}%`;

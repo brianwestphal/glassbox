@@ -95,6 +95,12 @@
 .image-zoom-wrap {
   position: relative;
   transform-origin: 0 0;
+  // Don't let the flex parent shrink the wrapper back to fit. For raster zoom
+  // (transform: scale) the layout size always stays within the canvas so this is
+  // a no-op, but for vector zoom (GB-941) the wrapper's layout width/height grow
+  // past the canvas — without this, flexbox would clamp it back to the canvas
+  // size and the SVG would never actually render larger (it would just pan).
+  flex-shrink: 0;
 
   // Both images fill the wrapper exactly (wrapper is aspect-ratio-correct)
   .image-layer {

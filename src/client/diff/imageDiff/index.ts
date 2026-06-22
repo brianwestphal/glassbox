@@ -15,12 +15,24 @@ export function bindImageDiff(): void {
   const hasNew = asEl(container).dataset.hasNew === 'true';
   const hasComparison = hasOld && hasNew;
 
+  // SVG rendered views zoom as vectors: the wrapper grows its layout size with
+  // zoom so the browser re-rasterizes the SVG crisply, rather than magnifying a
+  // fixed bitmap via transform: scale() (GB-941). Raster images keep the scale
+  // path. The `.diff-view` ancestor carries `data-is-svg` for the rendered view.
+  const isVector = container.closest('.diff-view')?.getAttribute('data-is-svg') === 'true';
+
   void loadMetadata(fileId, container);
 
   // Shared zoom/pan state across all visual modes
   const sharedZoom: ZoomState = { zoom: 1, panX: 0, panY: 0 };
 
   const canvases = Array.from(container.querySelectorAll<HTMLElement>('.image-visual-canvas'));
+  if (isVector) {
+    for (const c of canvases) {
+      const w = c.querySelector<HTMLElement>('.image-zoom-wrap');
+      if (w !== null) w.dataset.vectorZoom = 'true';
+    }
+  }
 
   const refImg = container.querySelector<HTMLImageElement>('.image-layer-old');
   if (refImg === null) return;
@@ -34,8 +46,13 @@ export function bindImageDiff(): void {
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
     if (!cw || !ch) return;
     const scale = Math.min(cw / nw, ch / nh);
-    wrap.style.width = `${Math.round(nw * scale)}px`;
-    wrap.style.height = `${Math.round(nh * scale)}px`;
+    const fitW = Math.round(nw * scale);
+    const fitH = Math.round(nh * scale);
+    // Stamp the zoom=1 base size; the vector zoom path multiplies it by the zoom.
+    wrap.dataset.zoomBaseW = String(fitW);
+    wrap.dataset.zoomBaseH = String(fitH);
+    wrap.style.width = `${fitW}px`;
+    wrap.style.height = `${fitH}px`;
   }
 
   function applyToCanvas(canvas: HTMLElement) {
@@ -157,6 +174,12 @@ export function bindImageDiff(): void {
         const nw = (bw > 0 && bh > 0) ? bw : refImg.naturalWidth;
         const nh = (bw > 0 && bh > 0) ? bh : refImg.naturalHeight;
         if (nw > 0 && nh > 0) {
+          // For a vector wrap, the base size drives applyZoom — set it to the
+          // natural size so "actual size" maps zoom = 1 to 1:1 pixels.
+          if (isVector) {
+            vis.wrap.dataset.zoomBaseW = String(nw);
+            vis.wrap.dataset.zoomBaseH = String(nh);
+          }
           vis.wrap.style.width = `${nw}px`;
           vis.wrap.style.height = `${nh}px`;
           sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0;
