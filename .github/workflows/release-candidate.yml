@@ -177,6 +177,15 @@ jobs:
       - run: npm run build:client
       - run: npx playwright install chromium
       - run: npm run test:e2e
+      - name: Upload Playwright report + traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-linux
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
   # Windows-native e2e (x64 runner, so Playwright's bundled Chromium runs without
   # emulation — no PW_CHANNEL needed here). Not in the publish gate yet: it's
@@ -198,6 +207,15 @@ jobs:
       - run: npm run build:client
       - run: npx playwright install chromium
       - run: npm run test:e2e
+      - name: Upload Playwright report + traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-windows
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
   npm-pack:
     name: npm Pack (Dry Run)

@@ -38,11 +38,36 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30000,
   retries: 1,
+  // Run serially under CI. The whole suite shares ONE demo server — a single
+  // PGLite review plus a single GLASSBOX_CONFIG_DIR — across every worker, so
+  // parallel workers race on shared state: timing-sensitive image-feedback drag
+  // tests get starved of mouse-event frames under CPU contention (region move
+  // produces 0 / partial movement), and theme tests race each other on the
+  // shared config dir (one test deleting a custom theme while another reads the
+  // theme list → a mid-read 404 that the failOnPageError fixture turns into a
+  // failure). Those flakes showed up only on the slower CI runners (consistently
+  // on Windows, intermittently on Linux, never locally). Locally we keep
+  // Playwright's default parallelism for speed; `CI` is set by GitHub Actions
+  // (and by `test-e2e-docker.sh` for a faithful local repro).
+  workers: process.env.CI ? 1 : undefined,
+  // `list` keeps the human-readable console output; `html` writes a
+  // self-contained report to `playwright-report/` (with embedded traces) that
+  // the E2E CI jobs upload on failure. `open: 'never'` stops the HTML reporter
+  // from trying to launch a browser at the end of a failed CI run (which would
+  // hang the job).
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:4183',
     headless: true,
     channel,
     viewport: { width: 1280, height: 720 },
+    // Capture a Playwright trace when a test fails its first attempt and is
+    // retried. The trace bundles the network log, console, and DOM snapshots,
+    // so a CI-only failure (e.g. a 404 whose URL the bare console message
+    // omits, or a flaky drag) can be diagnosed from the uploaded artifact
+    // without reproducing the exact runner environment. The E2E CI jobs upload
+    // `playwright-report/` + `test-results/` on failure.
+    trace: 'on-first-retry',
   },
   webServer: process.env.SKIP_WEBSERVER ? undefined : [
     {

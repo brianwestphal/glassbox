@@ -2,6 +2,15 @@ import { test, expect } from './coverage-fixture.js';
 
 test.describe('Theme system', () => {
 
+  // The demo server keeps the active theme in a single shared config dir for the
+  // whole suite, so whatever theme a test switches to persists into the next
+  // one. Reset to the dark default before each test so assertions that compare
+  // against the default (e.g. the initial `--bg` in the switch test) are
+  // order-independent rather than depending on what ran before.
+  test.beforeEach(async ({ request }) => {
+    await request.post('/api/themes/active', { data: { id: 'dark' } });
+  });
+
   test('settings dialog shows theme dropdown with built-in themes', async ({ page }) => {
     await page.goto('/');
     // Open settings dialog

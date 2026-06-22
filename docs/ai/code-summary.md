@@ -589,6 +589,17 @@ machine. Without it, any test that triggers a live risk/narrative analysis
 only passes where a key happens to be configured (env / keychain / config),
 and 400s in CI.
 
+The whole suite shares **one** demo server (one PGLite review + one
+`GLASSBOX_CONFIG_DIR`), so the config runs **serially under CI** (`workers:
+process.env.CI ? 1 : undefined`) — parallel workers raced on that shared state
+(timing-sensitive image-feedback drag tests starved of mouse-event frames, and
+theme tests 404ing each other by deleting custom themes mid-read). Locally it
+keeps Playwright's default parallelism for speed. Theme tests reset the active
+theme to `dark` in a `beforeEach` so they're order-independent. On failure the
+E2E CI jobs upload `playwright-report/` + `test-results/` (the config enables
+`trace: 'on-first-retry'` and the HTML reporter) so a CI-only failure can be
+inspected from the artifact without reproducing the runner.
+
 To reproduce CI's Linux e2e environment locally, `scripts/test-e2e-docker.sh`
 (`npm run test:e2e:docker`) runs the suite inside the
 `mcr.microsoft.com/playwright:vX.Y.Z-noble` image (version pinned from
