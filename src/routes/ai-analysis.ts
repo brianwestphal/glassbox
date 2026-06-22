@@ -608,6 +608,7 @@ aiAnalysisRoutes.post('/preferences', async (c) => {
     ignore_whitespace: boolean;
     svg_view_mode: string;
     last_image_mode: string;
+    image_sxs_orientation: string;
   }> = {};
   if (body.sort_mode !== undefined) allowed.sort_mode = body.sort_mode;
   if (body.risk_sort_dimension !== undefined) allowed.risk_sort_dimension = body.risk_sort_dimension;
@@ -615,6 +616,7 @@ aiAnalysisRoutes.post('/preferences', async (c) => {
   if (body.ignore_whitespace !== undefined) allowed.ignore_whitespace = body.ignore_whitespace;
   if (body.svg_view_mode !== undefined) allowed.svg_view_mode = body.svg_view_mode;
   if (body.last_image_mode !== undefined) allowed.last_image_mode = body.last_image_mode;
+  if (body.image_sxs_orientation !== undefined) allowed.image_sxs_orientation = body.image_sxs_orientation;
   await saveUserPreferences(allowed);
   return c.json({ ok: true } as const);
 });

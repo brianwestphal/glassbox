@@ -372,6 +372,7 @@ describe('POST /api/ai/preferences', () => {
         ignore_whitespace: true,
         svg_view_mode: 'rendered',
         last_image_mode: 'difference',
+        image_sxs_orientation: 'over-under',
       }),
     });
     expect(res.status).toBe(200);
@@ -381,6 +382,7 @@ describe('POST /api/ai/preferences', () => {
     expect(prefs.ignore_whitespace).toBe(true);
     expect(prefs.svg_view_mode).toBe('rendered');
     expect(prefs.last_image_mode).toBe('difference');
+    expect(prefs.image_sxs_orientation).toBe('over-under');
   });
 
   it('preserves previously set preferences when updating other fields', async () => {

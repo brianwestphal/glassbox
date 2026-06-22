@@ -580,3 +580,116 @@ test.describe('Zoom/pan gestures (GB-942)', () => {
     expect(Math.abs(afterPan.width - zoomed.width)).toBeLessThan(2);
   });
 });
+
+// Doc 24 — side-by-side image comparison with a left-right / over-under sub-option.
+test.describe('Side-by-side image comparison (doc 24)', () => {
+  const IMG = '128x128.png';
+
+  async function openSxs(page: import('@playwright/test').Page) {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-item .file-name', { hasText: IMG }).click();
+    await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
+    // Default mode for a two-sided image is side-by-side; make sure it's active
+    // regardless of what an earlier test left persisted.
+    await page.locator('[data-image-mode="side-by-side"]').click();
+    await expect(page.locator('[data-panel="side-by-side"]')).toHaveClass(/active/, { timeout: 5000 });
+  }
+
+  // The default mode (side-by-side) is asserted at the unit level — the demo
+  // server is shared and earlier specs persist `last_image_mode`, so the default
+  // isn't observable here. This test covers the functional behavior: both panes
+  // render both images, and each pane is sized to its OWN image (the demo's old
+  // and new icons are 64px and 128px — different sizes that must not be forced
+  // to a shared aspect ratio).
+  test('shows both old and new panes, each sized to its own image', async ({ page }) => {
+    await openSxs(page);
+    const panel = page.locator('[data-panel="side-by-side"]');
+    await expect(panel.locator('[data-sxs-pane="old"] .image-layer-old')).toBeVisible();
+    await expect(panel.locator('[data-sxs-pane="new"] .image-layer-new')).toBeVisible();
+
+    // Each pane's zoom-wrap is sized from its own image's aspect ratio. Both demo
+    // icons are square, so each wrap must be (near) square — proof the new pane
+    // wasn't stretched to the old image's box (and vice versa).
+    const square = await page.evaluate(() => {
+      const ratio = (sel: string) => {
+        const w = document.querySelector<HTMLElement>(`[data-sxs-pane="${sel}"] .image-zoom-wrap`);
+        if (!w || w.offsetWidth === 0 || w.offsetHeight === 0) return null;
+        return w.offsetWidth / w.offsetHeight;
+      };
+      return { old: ratio('old'), new: ratio('new') };
+    });
+    expect(square.old).not.toBeNull();
+    expect(square.new).not.toBeNull();
+    expect(Math.abs((square.old ?? 0) - 1)).toBeLessThan(0.1);
+    expect(Math.abs((square.new ?? 0) - 1)).toBeLessThan(0.1);
+  });
+
+  test('the orientation sub-control only shows in side-by-side mode', async ({ page }) => {
+    await openSxs(page);
+    await expect(page.locator('[data-sxs-orient-control]')).toBeVisible();
+    // Switch to another mode — the sub-control hides.
+    await page.locator('[data-image-mode="difference"]').click();
+    await expect(page.locator('[data-sxs-orient-control]')).toBeHidden();
+  });
+
+  test('switching to over-under flips the panel layout and persists across reload', async ({ page }) => {
+    await openSxs(page);
+    const panel = page.locator('[data-panel="side-by-side"]');
+    await expect(panel).toHaveAttribute('data-sxs-orientation', 'left-right');
+
+    await page.locator('[data-sxs-orient="over-under"]').click();
+    await expect(panel).toHaveAttribute('data-sxs-orientation', 'over-under');
+
+    // The two panes are now stacked vertically (new pane below the old pane).
+    const stacked = await page.evaluate(() => {
+      const a = document.querySelector('[data-sxs-pane="old"]')?.getBoundingClientRect();
+      const b = document.querySelector('[data-sxs-pane="new"]')?.getBoundingClientRect();
+      if (!a || !b) return null;
+      return { stacked: b.top >= a.bottom - 1, sameRow: Math.abs(a.top - b.top) < 1 };
+    });
+    expect(stacked?.stacked).toBe(true);
+    expect(stacked?.sameRow).toBe(false);
+
+    // Persisted: reopen and the orientation is still over-under.
+    await openSxs(page);
+    await expect(page.locator('[data-panel="side-by-side"]'))
+      .toHaveAttribute('data-sxs-orientation', 'over-under', { timeout: 5000 });
+
+    // Reset to the default so later tests start from left-right.
+    await page.locator('[data-sxs-orient="left-right"]').click();
+    await expect(page.locator('[data-panel="side-by-side"]'))
+      .toHaveAttribute('data-sxs-orientation', 'left-right');
+  });
+
+  test('a region can be drawn on the new (B) pane and persists', async ({ page }) => {
+    await openSxs(page);
+    await page.locator('[data-action="toggle-draw"]').click();
+    const overlay = page.locator('[data-sxs-pane="new"] [data-region-overlay]');
+    const box = await overlay.boundingBox();
+    if (!box) throw new Error('new-pane overlay has no box');
+    await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.35);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.7, { steps: 8 });
+    await page.mouse.up();
+
+    const comment = 'B pane region from side-by-side';
+    const pendingInput = page.locator('[data-role="pending-input"]');
+    await expect(pendingInput).toBeVisible({ timeout: 5000 });
+    await pendingInput.fill(comment);
+    await page.locator('[data-action="save-pending"]').click();
+
+    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment });
+    await expect(row).toBeVisible({ timeout: 5000 });
+    const id = await row.getAttribute('data-id');
+    if (id === null || id === 'pending') throw new Error(`region row has no saved id (${id})`);
+    // The box renders on a side-by-side pane overlay.
+    await expect(page.locator(`[data-panel="side-by-side"] .region-box[data-region-id="${id}"]`).first())
+      .toBeVisible({ timeout: 5000 });
+
+    // Persists across reload.
+    await openSxs(page);
+    await expect(page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment }))
+      .toBeVisible({ timeout: 5000 });
+  });
+});

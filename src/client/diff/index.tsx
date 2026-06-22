@@ -301,46 +301,69 @@ export function setRawDiffContent(filePath: string, html: string): void {
   };
 }
 
+/** Resolve the stored image mode to one that exists for THIS file. A single-side
+ *  image (added/deleted) has no comparison panels, so difference/slice/side-by-side
+ *  fall back to the single "image" viewer; a two-sided file maps the single
+ *  "image" mode to the side-by-side default. */
+function effectiveImageMode(imageDiffEl: HTMLElement, storeMode: string): string {
+  const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
+  let mode = storeMode;
+  if (!hasComparison && (mode === 'difference' || mode === 'slice' || mode === 'side-by-side')) mode = 'image';
+  if (hasComparison && mode === 'image') mode = 'side-by-side';
+  return mode;
+}
+
+/** Apply the active image comparison mode to the toolbar + panels. The
+ *  side-by-side orientation sub-control is shown only while that mode is active. */
+function applyImageMode(container: HTMLElement, imageToolbar: HTMLElement | null | undefined, mode: string): void {
+  imageToolbar?.querySelectorAll('[data-image-mode]').forEach(b =>
+    b.classList.toggle('active', asEl(b).dataset.imageMode === mode));
+  container.querySelectorAll('.image-diff-panel').forEach(p =>
+    p.classList.toggle('active', asEl(p).dataset.panel === mode));
+  const orientControl = imageToolbar?.querySelector<HTMLElement>('[data-sxs-orient-control]');
+  if (orientControl) orientControl.style.display = mode === 'side-by-side' ? '' : 'none';
+}
+
+/** Apply the side-by-side orientation (left-right / over-under) to the sub-control
+ *  buttons and the panel — the panel's `data-sxs-orientation` drives the CSS flow. */
+function applyImageOrientation(container: HTMLElement, imageToolbar: HTMLElement | null | undefined, orientation: string): void {
+  imageToolbar?.querySelectorAll('[data-sxs-orient]').forEach(b =>
+    b.classList.toggle('active', asEl(b).dataset.sxsOrient === orientation));
+  const panel = container.querySelector<HTMLElement>('[data-panel="side-by-side"]');
+  if (panel) panel.dataset.sxsOrientation = orientation;
+}
+
 function adaptImageToolbar(container: HTMLElement, imageToolbar: HTMLElement | null | undefined): void {
   if (imageToolbar == null) return;
   const imageDiffEl = container.querySelector<HTMLElement>('.image-diff');
   if (imageDiffEl === null) return;
   const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
+  const sxsBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="side-by-side"]');
   const diffBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="difference"]');
   const sliceBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="slice"]');
   const imageBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="image"]');
-  if (hasComparison) {
-    if (diffBtn) diffBtn.style.display = '';
-    if (sliceBtn) sliceBtn.style.display = '';
-    if (imageBtn) imageBtn.style.display = 'none';
-  } else {
-    if (diffBtn) diffBtn.style.display = 'none';
-    if (sliceBtn) sliceBtn.style.display = 'none';
-    if (imageBtn) imageBtn.style.display = '';
+  for (const btn of [sxsBtn, diffBtn, sliceBtn]) {
+    if (btn) btn.style.display = hasComparison ? '' : 'none';
   }
-  let mode = diffViewStore.state.value.lastImageMode;
-  if (!hasComparison && (mode === 'difference' || mode === 'slice')) mode = 'image';
-  if (hasComparison && mode === 'image') mode = 'slice';
-  imageToolbar.querySelectorAll('[data-image-mode]').forEach(b =>
-    b.classList.toggle('active', asEl(b).dataset.imageMode === mode));
-  container.querySelectorAll('.image-diff-panel').forEach(p =>
-    p.classList.toggle('active', asEl(p).dataset.panel === mode));
+  if (imageBtn) imageBtn.style.display = hasComparison ? 'none' : '';
+  const mode = effectiveImageMode(imageDiffEl, diffViewStore.state.value.lastImageMode);
+  applyImageMode(container, imageToolbar, mode);
+  applyImageOrientation(container, imageToolbar, diffViewStore.state.value.sxsOrientation);
 }
 
 // --- Reactive image mode panel switching ---
 
 function setupImageModeEffect(): void {
   effect(() => {
-    const mode = diffViewStore.state.value.lastImageMode;
+    const storeMode = diffViewStore.state.value.lastImageMode;
+    const orientation = diffViewStore.state.value.sxsOrientation;
     const container = document.getElementById('diff-container');
     if (container === null) return;
     const imageDiffEl = container.querySelector<HTMLElement>('.image-diff');
     if (imageDiffEl === null) return;
     const imageToolbar = document.querySelector<HTMLElement>('.diff-toolbar-image');
-    imageToolbar?.querySelectorAll('[data-image-mode]').forEach(b =>
-      b.classList.toggle('active', asEl(b).dataset.imageMode === mode));
-    container.querySelectorAll('.image-diff-panel').forEach(p =>
-      p.classList.toggle('active', asEl(p).dataset.panel === mode));
+    applyImageMode(container, imageToolbar, effectiveImageMode(imageDiffEl, storeMode));
+    applyImageOrientation(container, imageToolbar, orientation);
   });
 }
 

@@ -91,8 +91,21 @@ export function initImageFeedback(container: HTMLElement): void {
 
   function renderOverlays(): void {
     for (const overlay of overlays) {
-      const boxes: SafeHtml[] = regions.map((r, i) => regionBoxJsx(r.region, i + 1, r.id, false));
-      if (pending !== null) boxes.push(regionBoxJsx(pending, regions.length + 1, 'pending', true));
+      // A side-by-side pane's overlay carries `data-region-side` (old/new). On a
+      // sided overlay, a region scoped to the *other* side is hidden; unscoped
+      // (A+B) regions show on both. Overlays without a side (difference / slice /
+      // single image) show every region. Badge numbers stay the global 1..N so
+      // they line up with the region list in the feedback panel (doc 24).
+      const side = overlay.dataset.regionSide;
+      const shows = (scope: RegionScope): boolean =>
+        side === undefined || scope === undefined || scope === side;
+      const boxes: SafeHtml[] = [];
+      regions.forEach((r, i) => {
+        if (shows(r.region.side)) boxes.push(regionBoxJsx(r.region, i + 1, r.id, false));
+      });
+      if (pending !== null && shows(pending.side)) {
+        boxes.push(regionBoxJsx(pending, regions.length + 1, 'pending', true));
+      }
       overlay.replaceChildren(...boxes.map((b) => toElement(b)));
       overlay.classList.toggle('draw-mode', drawMode);
       overlay.style.pointerEvents = drawMode ? 'auto' : 'none';

@@ -308,6 +308,19 @@ describe('ai-queries', () => {
       expect(prefs.sort_mode).toBe('folder');
       expect(prefs.risk_sort_dimension).toBe('aggregate');
       expect(prefs.show_risk_scores).toBe(false);
+      // Side-by-side is the default image-comparison mode, left-right its default
+      // orientation (doc 24).
+      expect(prefs.last_image_mode).toBe('side-by-side');
+      expect(prefs.image_sxs_orientation).toBe('left-right');
+    });
+
+    it('saveUserPreferences round-trips the side-by-side orientation', async () => {
+      await saveUserPreferences({ image_sxs_orientation: 'over-under' });
+      const prefs = await getUserPreferences();
+      expect(prefs.image_sxs_orientation).toBe('over-under');
+      // Kept across an unrelated update.
+      await saveUserPreferences({ sort_mode: 'folder' });
+      expect((await getUserPreferences()).image_sxs_orientation).toBe('over-under');
     });
 
     it('saveUserPreferences creates record', async () => {

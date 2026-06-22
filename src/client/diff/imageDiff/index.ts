@@ -41,7 +41,16 @@ export function bindImageDiff(): void {
   function sizeWrap(canvas: HTMLElement) {
     const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
     if (wrap === null) return;
-    const nw = ref.naturalWidth, nh = ref.naturalHeight;
+    // Size each canvas's wrap to ITS OWN image's natural size. Difference/slice
+    // overlay old+new in one wrap (first layer is old = ref); side-by-side gives
+    // each pane its own image, so the new pane must size to the new image — not
+    // the old's — or a differently-shaped B image would be distorted (doc 24).
+    const ownImg = canvas.querySelector<HTMLImageElement>('.image-layer');
+    let nw = ref.naturalWidth, nh = ref.naturalHeight;
+    if (ownImg !== null && ownImg.naturalWidth > 0 && ownImg.naturalHeight > 0) {
+      nw = ownImg.naturalWidth;
+      nh = ownImg.naturalHeight;
+    }
     if (!nw || !nh) return;
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
     if (!cw || !ch) return;
@@ -83,6 +92,13 @@ export function bindImageDiff(): void {
   if (refImg.complete && refImg.naturalWidth > 0) onImageReady();
   else refImg.addEventListener('load', onImageReady);
 
+  // Side-by-side has a second image (the new pane) whose natural size drives its
+  // own pane; re-fit when any image finishes loading (doc 24).
+  for (const img of Array.from(container.querySelectorAll<HTMLImageElement>('.image-layer'))) {
+    if (img.complete && img.naturalWidth > 0) continue;
+    img.addEventListener('load', () => { syncVisible(); });
+  }
+
   new ResizeObserver(() => {
     for (const c of canvases) {
       if (c.offsetParent !== null) {
@@ -107,6 +123,19 @@ export function bindImageDiff(): void {
       imageToolbar.querySelectorAll('[data-image-mode]').forEach(b => b.classList.toggle('active', b === btn));
       container.querySelectorAll('.image-diff-panel').forEach(p =>
         p.classList.toggle('active', asEl(p).dataset.panel === mode));
+      requestAnimationFrame(() => { syncVisible(); });
+    });
+  });
+
+  // Side-by-side orientation sub-control (doc 24): flip left-right vs over-under.
+  // The store update drives the active-class + panel-attribute swap reactively
+  // (see setupImageModeEffect); we re-fit here because the layout flip changes
+  // how much space each pane gets.
+  imageToolbar?.querySelectorAll('[data-sxs-orient]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const orient = asEl(btn).dataset.sxsOrient === 'over-under' ? 'over-under' : 'left-right';
+      diffViewStore.actions.update({ sxsOrientation: orient });
+      void saveAIPreferences({ image_sxs_orientation: orient });
       requestAnimationFrame(() => { syncVisible(); });
     });
   });

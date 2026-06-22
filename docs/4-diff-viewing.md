@@ -21,9 +21,10 @@ Requirements for displaying file diffs and navigating changes.
 
 ### 4.3 Image Comparison
 
-For binary image files (PNG, JPEG, GIF, WebP), the system shall provide three comparison modes:
+For binary image files (PNG, JPEG, GIF, WebP), the system shall provide these comparison modes:
 
 - **Metadata comparison** — Extract metadata (format, dimensions, file size, color space, channels, bit depth, alpha, density) from both old and new versions and display as a text diff. Changed properties are highlighted as additions/removals. Metadata is parsed from image headers (PNG IHDR, JPEG SOF/JFIF, GIF header, WebP VP8/VP8L/VP8X) with no native dependencies.
+- **Side by Side mode** — Show the old (A) and new (B) images in two panes, with a sub-option to switch between a left/right (default) and an over/under layout. This is the **default** mode for a two-sided image change. See [24. Side-by-Side Image Comparison](24-image-comparison-layouts.md) for the full requirements.
 - **Difference mode** — Overlay the new (B) image on top of the old (A) image using CSS `mix-blend-mode: difference`. Identical pixels appear black; changed pixels light up. Images are centered in the container.
 - **Slice mode** — Overlay images center-to-center with a draggable cutting line. Two handles on the container edges define the line (supports any angle — vertical, horizontal, diagonal). The new (B) image is clipped by the line, showing old (A) on one side and new (B) on the other. The image canvas fills the area between the diff header and the bottom toolbar via flexbox (not a viewport-height guess); both handles are pinned just inside the canvas edges so neither is clipped by the canvas's `overflow: hidden` nor hidden under the toolbar — see `sliceGeometry.ts` (`edgeHandleTransform`) and the flex sizing in `_image-diff.scss` (GB-823 — the bottom handle was previously unreachable because the canvas overshot under the toolbar).
 

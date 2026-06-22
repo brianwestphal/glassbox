@@ -162,6 +162,7 @@ export const UserPreferencesSchema = z.object({
   ignore_whitespace: z.boolean(),
   svg_view_mode: z.string(),
   last_image_mode: z.string(),
+  image_sxs_orientation: z.string(),
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 

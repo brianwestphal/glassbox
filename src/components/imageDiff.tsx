@@ -34,6 +34,33 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
         <div className="image-metadata-loading">Loading metadata...</div>
       </div>
 
+      {/* Side-by-side mode (doc 24): old (A) and new (B) shown next to each
+          other. Orientation (left-right vs over-under) is set on the panel by
+          the client from the persisted preference. Each pane is its own
+          zoom/pan canvas; the two share one zoom state (synced). */}
+      {hasComparison && (
+        <div className="image-diff-panel image-diff-sxs" data-panel="side-by-side" data-sxs-orientation="left-right">
+          <div className="image-sxs-pane" data-sxs-pane="old">
+            <div className="image-sxs-label">Old (A)</div>
+            <div className="image-visual-canvas" data-zoomable="true">
+              <div className="image-zoom-wrap">
+                <img className="image-layer image-layer-old" src={`/api/image/${fileId}/old`} alt="Old version" />
+                <div className="region-overlay" data-region-overlay data-region-side="old"></div>
+              </div>
+            </div>
+          </div>
+          <div className="image-sxs-pane" data-sxs-pane="new">
+            <div className="image-sxs-label">New (B)</div>
+            <div className="image-visual-canvas" data-zoomable="true">
+              <div className="image-zoom-wrap">
+                <img className="image-layer image-layer-new" src={`/api/image/${fileId}/new`} alt="New version" />
+                <div className="region-overlay" data-region-overlay data-region-side="new"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Difference mode (blend) */}
       {hasComparison && (
         <div className="image-diff-panel image-diff-visual" data-panel="difference">

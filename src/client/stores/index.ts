@@ -49,6 +49,7 @@ interface DiffViewState {
   wrapLines: boolean;
   ignoreWhitespace: boolean;
   lastImageMode: string;
+  sxsOrientation: 'left-right' | 'over-under';
   svgViewMode: 'code' | 'rendered';
   highlightLang: string;
   highlightAuto: boolean;
@@ -61,7 +62,8 @@ export const diffViewStore = defineStore({
     diffMode: 'split',
     wrapLines: false,
     ignoreWhitespace: false,
-    lastImageMode: 'metadata',
+    lastImageMode: 'side-by-side',
+    sxsOrientation: 'left-right',
     svgViewMode: 'code',
     highlightLang: 'plaintext',
     highlightAuto: true,

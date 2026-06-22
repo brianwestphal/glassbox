@@ -5,6 +5,7 @@ import {
   refreshReview,
   SortModeSchema,
   SvgViewModeSchema,
+  SxsOrientationSchema,
 } from "../api/index.js";
 import { IconGear, IconRefresh } from "../icons.js";
 import { initDebug } from "./api.js";
@@ -41,6 +42,9 @@ async function initAISorting() {
     const svgViewMode = SvgViewModeSchema.safeParse(prefs.svg_view_mode).success
       ? SvgViewModeSchema.parse(prefs.svg_view_mode)
       : 'code';
+    const sxsOrientation = SxsOrientationSchema.safeParse(prefs.image_sxs_orientation).success
+      ? SxsOrientationSchema.parse(prefs.image_sxs_orientation)
+      : 'left-right';
     aiStore.actions.update({
       sortMode,
       riskSortDimension: prefs.risk_sort_dimension ?? 'aggregate',
@@ -49,7 +53,8 @@ async function initAISorting() {
     diffViewStore.actions.update({
       ignoreWhitespace: prefs.ignore_whitespace ?? false,
       svgViewMode,
-      lastImageMode: prefs.last_image_mode ?? 'metadata',
+      lastImageMode: prefs.last_image_mode ?? 'side-by-side',
+      sxsOrientation,
     });
 
     // Check if AI is configured

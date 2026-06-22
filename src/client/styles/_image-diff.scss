@@ -156,6 +156,52 @@
   &:active { cursor: grabbing; }
 }
 
+// --- Side-by-side Mode (doc 24) ---
+
+// Two panes (old / new) shown next to each other. The active panel fills the
+// slot between the diff header and the bottom toolbar (same flex chain as the
+// difference / slice canvases). `data-sxs-orientation` flips the flow: row =
+// left/right (default), column = over/under. The 1px gap over the panel's
+// border-colored background draws a thin divider between the panes.
+.image-diff-sxs {
+  &.active { display: flex; }
+  flex: 1;
+  min-height: 0;
+  flex-direction: row;
+  gap: 1px;
+  background: var(--border);
+
+  &[data-sxs-orientation="over-under"] { flex-direction: column; }
+
+  .image-sxs-pane {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+
+  .image-sxs-label {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .image-visual-canvas {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+// Orientation sub-control sits just right of the mode control.
+.image-sxs-orient { margin-left: 8px; }
+
 // --- Image Toolbar (in bottom diff-toolbar) ---
 
 .diff-toolbar-image {

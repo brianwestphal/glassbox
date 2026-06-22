@@ -85,10 +85,16 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
             <div className="diff-toolbar-image" style="display:none">
               <div className="diff-toolbar-left">
                 <div className="segmented-control">
-                  <button className="segment active" data-image-mode="metadata">Metadata</button>
+                  <button className="segment" data-image-mode="metadata">Metadata</button>
+                  <button className="segment active" data-image-mode="side-by-side">Side by Side</button>
                   <button className="segment" data-image-mode="difference">Difference</button>
                   <button className="segment" data-image-mode="slice">Slice</button>
                   <button className="segment" data-image-mode="image" style="display:none">Image</button>
+                </div>
+                {/* Orientation sub-option, shown only while Side by Side is active (doc 24). */}
+                <div className="segmented-control image-sxs-orient" data-sxs-orient-control style="display:none">
+                  <button className="segment active" data-sxs-orient="left-right" title="Place the two images left and right">Left / Right</button>
+                  <button className="segment" data-sxs-orient="over-under" title="Stack the two images top and bottom">Over / Under</button>
                 </div>
               </div>
               <div className="diff-toolbar-right">

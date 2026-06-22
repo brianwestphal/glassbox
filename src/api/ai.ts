@@ -195,6 +195,11 @@ export type SvgViewMode = z.infer<typeof SvgViewModeSchema>;
 export const ImageModeSchema = z.enum(['metadata', 'side-by-side', 'difference', 'slice']);
 export type ImageMode = z.infer<typeof ImageModeSchema>;
 
+// Layout of the side-by-side image comparison: panes left/right (default) or
+// stacked top/bottom. A sub-option of the side-by-side mode (doc 24).
+export const SxsOrientationSchema = z.enum(['left-right', 'over-under']);
+export type SxsOrientation = z.infer<typeof SxsOrientationSchema>;
+
 /**
  * Stored preferences shape. The GET response uses `z.string()` (not the
  * enum schemas) for fields the DB persists as plain strings, so a row
@@ -209,6 +214,7 @@ export const UserPreferencesShapeSchema = z.object({
   ignore_whitespace: z.boolean().optional(),
   svg_view_mode: z.string().optional(),
   last_image_mode: z.string().optional(),
+  image_sxs_orientation: z.string().optional(),
 });
 export type UserPreferencesShape = z.infer<typeof UserPreferencesShapeSchema>;
 
@@ -222,6 +228,7 @@ export const SaveAIPreferencesReqSchema = z.object({
   ignore_whitespace: z.boolean().optional(),
   svg_view_mode: SvgViewModeSchema.optional(),
   last_image_mode: ImageModeSchema.optional(),
+  image_sxs_orientation: SxsOrientationSchema.optional(),
 });
 export type SaveAIPreferencesReq = z.infer<typeof SaveAIPreferencesReqSchema>;
 

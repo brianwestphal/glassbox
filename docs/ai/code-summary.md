@@ -116,7 +116,7 @@ How the layer is used:
 | `diffView.tsx` | Diff rendering (split + unified hunks, syntax highlighting integration). |
 | `fileList.tsx` | Sidebar file list with status + annotation badges. |
 | `reviewShell.tsx` | Shared layout used by both `/` and `/review/:reviewId` — sidebar (header, filter, file list, footer slot), diff toolbar, image toolbar, navigation bar. Routes only differ in the footer (Complete vs. Reopen). |
-| `imageDiff.tsx` | Image diff view (metadata / difference / slice modes). Each visual panel's zoom-wrap carries a `[data-region-overlay]` for image-feedback region boxes, and the view ends with a `[data-image-feedback]` mount point the client populates (doc 23). |
+| `imageDiff.tsx` | Image diff view (metadata / **side-by-side** / difference / slice modes; doc 24). Side-by-side is the default for a two-sided change: two panes (`[data-sxs-pane="old"|"new"]`), each its own zoom canvas + image + region overlay, with `data-sxs-orientation` on the panel flipping left-right↔over-under. Each visual panel's zoom-wrap carries a `[data-region-overlay]` for image-feedback region boxes (the side-by-side overlays add `data-region-side` so A-only/B-only regions render only on the matching pane), and the view ends with a `[data-image-feedback]` mount point the client populates (doc 23). |
 | `reviewHistory.tsx` | Review history page table. |
 
 ### `src/db/` — database layer (raw SQL, no ORM)
@@ -354,7 +354,7 @@ See `src/db/schema.ts` for the authoritative SQL. Quick reference:
 - `ai_analyses(id, review_id →reviews, analysis_type, status, error_message, progress_completed, progress_total, created_at, updated_at)`
 - `ai_file_scores(id, analysis_id →ai_analyses, review_file_id, file_path, sort_order, aggregate_score, rationale, dimension_scores, notes, created_at)`
   — `dimension_scores` and `notes` are **JSON strings**
-- `user_preferences(id='singleton', sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace, svg_view_mode, last_image_mode)` — one row
+- `user_preferences(id='singleton', sort_mode, risk_sort_dimension, show_risk_scores, ignore_whitespace, svg_view_mode, last_image_mode, image_sxs_orientation)` — one row (`last_image_mode` defaults to `side-by-side`; `image_sxs_orientation` is `left-right`|`over-under`, doc 24)
 
 Foreign keys cascade-delete. Indexes: `idx_review_files_review`,
 `idx_annotations_file`, `idx_ai_analyses_review`,

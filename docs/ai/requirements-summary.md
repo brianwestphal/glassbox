@@ -109,6 +109,19 @@ and could take tens of seconds on large SVGs; that dependency was removed.
 the actual-size target + caveat. The user's Code/Rendered choice is
 remembered across files.
 
+**Side-by-side comparison** (doc 24, Shipped): a **Side by Side** mode shows
+old (A) and new (B) in two panes and is the **default** mode for a two-sided
+image (or rendered-SVG) change. A single sub-option — shown only while
+side-by-side is active — flips the panes between **left/right** (default) and
+**over/under** (`data-sxs-orientation` on the panel drives the CSS flow);
+the choice persists as the `image_sxs_orientation` user preference. Zoom/pan is
+synchronized across the two panes (reusing the shared zoom state), each pane is
+sized to its own image (differently-sized A/B aren't distorted), and doc-23
+drawn-region feedback works per pane (A-only on the A pane, B-only on the B
+pane, unscoped on both). Layout-only — no new server route. Client wiring:
+`adaptImageToolbar`/`setupImageModeEffect` in `src/client/diff/index.tsx`,
+panes + per-pane sizing in `src/client/diff/imageDiff/index.ts`.
+
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions
 (stored as normalized `{x,y,w,h}` fractions) that show on both A/B sides
