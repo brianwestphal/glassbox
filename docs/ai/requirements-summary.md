@@ -143,6 +143,15 @@ a shared full-screen **lightbox** (`src/client/lightbox.tsx`) where the reviewer
 a marked thumbnail (`src/components/reviewNoteRegionThumb.tsx`), reusing doc 23's
 normalized `{x,y,w,h}` model with an `artifact` uri in `region_data`.
 
+**Ground-truth comparison** (doc 26, **Design only**): a planned separate mode to
+compare an **actual** image against an **expected**/ground-truth image (design
+spec, reference render, or previous-actual baseline), even when the expected
+lives outside the repo. **Manifest-driven** actual→expected mapping; reuses the
+doc-24 comparison modes + doc-23 region marking + doc-18 arbitrary-path plumbing.
+v1 = single still images; a perceptual diff (filter identical / anti-aliasing-
+tolerant / difference score) is a fast-follow; sets/flows + a capture pipeline
+(incl. domotion animated SVGs) are later. No code yet — phased follow-up tickets.
+
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions
 (stored as normalized `{x,y,w,h}` fractions) that show on both A/B sides
