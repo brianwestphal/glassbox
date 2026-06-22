@@ -124,10 +124,48 @@
   svg { flex-shrink: 0; }
 }
 
+// Inline image preview on the chip (GB-958), in place of the file icon.
+.attachment-chip-thumb {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 3px;
+  background: var(--bg-hover, rgba(255,255,255,0.04));
+}
+
 .attachment-chip-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// --- Attachment preview overlay (lightbox, GB-958) ---
+
+.attachment-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: zoom-out;
+}
+
+.attachment-overlay-img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.attachment-overlay-pdf {
+  width: 86vw;
+  height: 90vh;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .attachment-chip-remove {
