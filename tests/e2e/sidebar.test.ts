@@ -265,3 +265,28 @@ test.describe('File context menu (GB-884)', () => {
     await expect.poll(() => openedPath, { timeout: 3000 }).toBe(`/api/files/${fileId ?? ''}/open`);
   });
 });
+
+// GB-955 — nav-bar button to hide/show the sidebar.
+test.describe('Sidebar toggle', () => {
+  test('hides and shows the sidebar from the nav bar', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.file-item').first()).toBeVisible();
+    // Open a file so the nav bar (with the toggle) appears.
+    await page.locator('.file-item').first().click();
+
+    const toggle = page.locator('#sidebar-toggle-btn');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    const sidebar = page.locator('.sidebar');
+    await expect(sidebar).toBeVisible();
+
+    await toggle.click();
+    await expect(sidebar).toBeHidden();
+    await expect(page.locator('.review-app')).toHaveClass(/sidebar-collapsed/);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await toggle.click();
+    await expect(sidebar).toBeVisible();
+    await expect(page.locator('.review-app')).not.toHaveClass(/sidebar-collapsed/);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+});

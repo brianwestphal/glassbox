@@ -251,7 +251,9 @@ reported; parse errors are handled gracefully.
 Layout: sidebar + main diff pane, sidebar resizable via drag handle. The
 sidebar contains repo name, review mode, file filter, sort-mode
 segmented control, file list, and action buttons (Complete Review,
-Review History). Diff header has a "Reveal in Finder" button.
+Review History). Diff header has a "Reveal in Finder" button. The nav bar
+has a hide/show **sidebar toggle** (panel icon, before the back/forward
+arrows; per-session, not persisted across reload — GB-955).
 
 Navigation: collapsible folder tree; type-to-filter; `j`/`k` between
 files; click to load. Annotation-count and stale-count badges per file.

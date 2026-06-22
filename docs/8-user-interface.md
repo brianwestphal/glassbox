@@ -8,6 +8,7 @@ Requirements for the browser-based UI and user interaction patterns.
 
 - The UI shall consist of a sidebar (file list) and a main content area (diff viewer).
 - The sidebar shall be resizable via drag handle.
+- The navigation bar (shown once a file is open) shall include a **hide/show sidebar** toggle (a lucide panel icon, placed before the back/forward arrows). Collapsing hides the sidebar and its resize handle so the diff fills the width; the button shows a pressed state while collapsed. The state is per-session (not persisted across a full reload), so a fresh load always starts with the sidebar visible and the toggle reachable (GB-955).
 - The sidebar shall contain: repository name, review mode, file filter, sort mode control, file list, and action buttons (Complete Review, Review History).
 - The diff header shall include a "Reveal in Finder" button that opens the file's parent directory in the OS file manager.
 

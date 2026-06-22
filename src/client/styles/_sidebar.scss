@@ -10,6 +10,18 @@
   flex-shrink: 0;
 }
 
+// Sidebar hide/show toggle (GB-955): collapse the sidebar + its resize handle,
+// letting the diff fill the width. Toggled from the nav bar; the button shows a
+// pressed state while collapsed.
+.review-app.sidebar-collapsed {
+  .sidebar,
+  .sidebar-resize { display: none; }
+}
+
+#sidebar-toggle-btn[aria-pressed="true"] {
+  color: var(--accent);
+}
+
 .sidebar-resize {
   width: 4px;
   cursor: col-resize;

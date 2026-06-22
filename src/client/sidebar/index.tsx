@@ -24,8 +24,24 @@ export function initSidebar(): void {
   bindDelegatedEvents(sidebar);
   bindFileContextMenu(sidebar);
   bindSidebarResize();
+  bindSidebarToggle();
   bindKeyboardNav();
   bindAutoScroll(sidebar);
+}
+
+/** Hide/show the sidebar from the nav-bar toggle (GB-955). Intentionally not
+ *  persisted across reloads: the toggle lives in the nav bar (shown once a file
+ *  is open), so persisting a collapsed state could otherwise strand the user
+ *  with no sidebar and no visible toggle on a fresh load. */
+function bindSidebarToggle(): void {
+  const btn = document.getElementById('sidebar-toggle-btn');
+  const app = document.querySelector<HTMLElement>('.review-app');
+  if (btn === null || app === null) return;
+  btn.addEventListener('click', () => {
+    const collapsed = app.classList.toggle('sidebar-collapsed');
+    btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+    btn.setAttribute('title', collapsed ? 'Show sidebar' : 'Hide sidebar');
+  });
 }
 
 function mountSortControl(sidebar: HTMLElement): void {
