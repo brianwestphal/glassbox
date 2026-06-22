@@ -507,3 +507,76 @@ test.describe('SVG vector zoom (GB-941)', () => {
     expect(transform).toContain('scale(');
   });
 });
+
+// GB-942 — macOS trackpad gestures: pinch (wheel + ctrlKey) zooms, a plain
+// two-finger swipe (wheel without ctrlKey) pans. Verified on the raster image
+// since the wheel handler is shared by raster and SVG.
+test.describe('Zoom/pan gestures (GB-942)', () => {
+  async function openDifference(page: import('@playwright/test').Page) {
+    await openImageDiff(page);
+    await page.locator('[data-image-mode="difference"]').click();
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>('[data-panel="difference"] .image-layer-old');
+      return img !== null && img.complete && img.naturalWidth > 0;
+    }, null, { timeout: 10000 });
+  }
+
+  async function wheel(page: import('@playwright/test').Page, opts: { dy?: number; dx?: number; ctrl?: boolean }) {
+    await page.evaluate((o) => {
+      const canvas = document.querySelector<HTMLElement>('[data-panel="difference"] .image-visual-canvas');
+      if (canvas === null) throw new Error('no visible canvas');
+      const r = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(new WheelEvent('wheel', {
+        deltaX: o.dx ?? 0,
+        deltaY: o.dy ?? 0,
+        clientX: r.left + r.width / 2,
+        clientY: r.top + r.height / 2,
+        ctrlKey: o.ctrl ?? false,
+        bubbles: true,
+        cancelable: true,
+      }));
+    }, opts);
+  }
+
+  function imgBox(page: import('@playwright/test').Page) {
+    return page.locator('[data-panel="difference"] .image-layer-old').boundingBox();
+  }
+
+  test('pinch (ctrl+wheel) zooms in', async ({ page }) => {
+    await openDifference(page);
+    const before = await imgBox(page);
+    if (!before) throw new Error('no image box');
+
+    // Pinch-out arrives as ctrl+wheel with negative deltaY.
+    for (let i = 0; i < 4; i++) await wheel(page, { dy: -100, ctrl: true });
+
+    await expect.poll(async () => (await imgBox(page))?.width ?? 0, { timeout: 5000 })
+      .toBeGreaterThan(before.width + 20);
+  });
+
+  test('a plain two-finger swipe pans once zoomed (and does nothing at fit)', async ({ page }) => {
+    await openDifference(page);
+
+    // At fit (zoom 1) a swipe must not move or zoom anything.
+    const atFit = await imgBox(page);
+    if (!atFit) throw new Error('no image box');
+    await wheel(page, { dy: 120 });
+    const stillFit = await imgBox(page);
+    if (!stillFit) throw new Error('no image box');
+    expect(Math.abs(stillFit.y - atFit.y)).toBeLessThan(2);
+    expect(Math.abs(stillFit.width - atFit.width)).toBeLessThan(2);
+
+    // Zoom in (pinch), then a plain swipe pans — it must not change the zoom.
+    for (let i = 0; i < 5; i++) await wheel(page, { dy: -100, ctrl: true });
+    const zoomed = await imgBox(page);
+    if (!zoomed) throw new Error('no image box');
+
+    await wheel(page, { dy: 150 });
+    await expect.poll(async () => (await imgBox(page))?.y ?? 0, { timeout: 5000 })
+      .toBeLessThan(zoomed.y - 20);
+    // Width unchanged — the swipe panned, it did not zoom.
+    const afterPan = await imgBox(page);
+    if (!afterPan) throw new Error('no image box');
+    expect(Math.abs(afterPan.width - zoomed.width)).toBeLessThan(2);
+  });
+});

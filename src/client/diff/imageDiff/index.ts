@@ -130,8 +130,19 @@ export function bindImageDiff(): void {
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      zoomAt(sharedZoom, canvas, wrap, e.clientX, e.clientY, e.deltaY > 0 ? 0.9 : 1.1);
-      applyToAll();
+      // macOS-native trackpad mapping (GB-942): a pinch arrives as a wheel event
+      // with ctrlKey set (also true for an explicit Ctrl/Cmd+wheel), so pinch =
+      // zoom; a plain two-finger swipe is a wheel event without ctrlKey, so it
+      // pans. Panning only does something once the image overflows (zoom > 1).
+      if (e.ctrlKey) {
+        zoomAt(sharedZoom, canvas, wrap, e.clientX, e.clientY, e.deltaY > 0 ? 0.9 : 1.1);
+        applyToAll();
+      } else if (sharedZoom.zoom > 1) {
+        sharedZoom.panX -= e.deltaX;
+        sharedZoom.panY -= e.deltaY;
+        clampPan(sharedZoom, canvas, wrap);
+        applyToAll();
+      }
     }, { passive: false });
 
     let panning = false;
