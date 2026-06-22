@@ -2,6 +2,17 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.17.0] - 2026-06-22
+
+
+- SVGs in the diff "Rendered" view now render live in the browser, so animated SVGs animate and text uses the browser's fonts — replacing the old server-side rasterizer that flattened animations and stalled on large files.
+- Zooming an SVG in the rendered view now scales it as a true vector, so it stays crisp at any zoom level instead of looking pixelated.
+- Image feedback: add textual comments to images, including comments anchored to rectangular regions you draw, shown on both sides of the diff.
+- Image comments and regions can now be assigned any annotation category (bug, fix, style, etc.) instead of always being plain notes, and support per-side scope, hover-linking, and moving/resizing regions.
+
+- macOS trackpad gestures on image and SVG diffs now match native behavior: pinch zooms at the cursor, and a two-finger swipe pans instead of zooming.
+- Panning a zoomed SVG is now reliable across browsers, with a cursor that signals the image is draggable.
+
 ## [0.16.0] - 2026-06-20
 
 
