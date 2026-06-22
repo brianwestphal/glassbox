@@ -65,14 +65,12 @@ for which UI surfaces are wired today.
 
 ## Status
 
-- **Shipped (P1):** the data + API layer for *any* annotation (upload / list /
-  serve / quicklook / delete), the chip UI + attach button + drag-drop on
-  **line annotations**, image thumbnails + the in-app preview overlay, OS opener
-  for other types, and the export integration.
-- **Follow-ups:** the same attachment bar on the **image-feedback** comments /
-  regions UI (doc 23) and on **note replies** (doc 20); paste-to-attach from the
-  clipboard. (The backend already accepts attachments on those annotations —
-  only the UI wiring is pending.)
+- **Shipped:** the data + API layer for *any* annotation (upload / list / serve /
+  quicklook / delete); the chip UI + attach button + drag-drop + paste-to-attach
+  on **line annotations**, **note replies** (they reuse the same `AnnotationItem`),
+  and **image-feedback** comments / regions (doc 23); image thumbnails + the
+  in-app preview overlay; the OS opener for other types; and the export
+  integration.
 
 ## Implementation pointers
 

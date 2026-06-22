@@ -161,10 +161,15 @@ async function removeChip(chip: HTMLElement): Promise<void> {
   }
 }
 
-/** The annotation id for a drop target: the dropped-on row's annotation, found
- *  via its `[data-att-list]` container (every annotation row has one). */
+// Every feedback row that can carry attachments: a line/reply annotation row
+// (`.annotation-item`) or an image-feedback comment/region row
+// (`.image-feedback-item`, doc 23). Both render an attach button + a
+// `[data-att-list]` container holding the annotation id (GB-956).
+const FEEDBACK_ROW = '.annotation-item, .image-feedback-item';
+
+/** The annotation id for a row, found via its `[data-att-list]` container. */
 function annotationIdForRow(el: Element): string | null {
-  const row = el.closest<HTMLElement>('.annotation-item');
+  const row = el.closest<HTMLElement>(FEEDBACK_ROW);
   const container = row?.querySelector<HTMLElement>('[data-att-list]');
   return container?.dataset.attList ?? null;
 }
@@ -201,8 +206,8 @@ export function bindAttachmentEvents(root: HTMLElement): void {
     });
   }
 
-  // Attach button → file picker.
-  void delegate(root, 'click', '.annotation-item [data-action="attach"]', (e, btn) => {
+  // Attach button → file picker (line/reply rows and image-feedback rows).
+  void delegate(root, 'click', '.annotation-item [data-action="attach"], .image-feedback-item [data-action="attach"]', (e, btn) => {
     e.stopPropagation();
     const id = annotationIdForRow(asEl(btn));
     if (id !== null) openFilePicker(id);
@@ -234,18 +239,18 @@ export function bindAttachmentEvents(root: HTMLElement): void {
     if (chip !== null) void removeChip(chip);
   });
 
-  // Drag-and-drop a file onto an annotation row → upload to that annotation.
-  void delegate(root, 'dragover', '.annotation-item', (e, row) => {
+  // Drag-and-drop a file onto a feedback row → upload to that annotation.
+  void delegate(root, 'dragover', FEEDBACK_ROW, (e, row) => {
     const de = e as DragEvent;
     if (de.dataTransfer?.types.includes('Files') !== true) return;
     de.preventDefault();
     de.dataTransfer.dropEffect = 'copy';
     asEl(row).classList.add('annotation-drop-target');
   });
-  void delegate(root, 'dragleave', '.annotation-item', (_e, row) => {
+  void delegate(root, 'dragleave', FEEDBACK_ROW, (_e, row) => {
     asEl(row).classList.remove('annotation-drop-target');
   });
-  void delegate(root, 'drop', '.annotation-item', (e, row) => {
+  void delegate(root, 'drop', FEEDBACK_ROW, (e, row) => {
     const de = e as DragEvent;
     const files = de.dataTransfer?.files;
     asEl(row).classList.remove('annotation-drop-target');

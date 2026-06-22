@@ -416,12 +416,17 @@
 
 .image-feedback-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 8px;
   padding: 6px 8px;
   background: rgba(137, 180, 250, 0.05);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
+
+  // The attachments chip row (doc 25) drops to its own full-width line; no
+  // extra left indent inside this already-padded item.
+  .annotation-attachments { margin-left: 0; }
 }
 
 // Highlighted when the matching region box on the image is hovered.

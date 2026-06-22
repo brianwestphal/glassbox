@@ -131,9 +131,11 @@ on Windows/Linux — launched by the always-local Node server shelling out (the
 `'quicklook'` mode of `openOS`, same path as "reveal in file manager"). Bytes
 live under `<dataDir>/attachments/` with an `attachments` table; the markdown
 export lists each attachment's **absolute path** under its annotation so the AI
-tool can read it. The data/API layer is generic over any annotation; P1 wires the
-UI on **line annotations** only — image-feedback/note-reply surfaces, paste-to-
-attach, and chip thumbnails are follow-ups. Client:
+tool can read it. Images show a chip **thumbnail** and open an **in-app preview
+overlay** (lightbox) on click/Space; other types open in the OS default app.
+**Paste-to-attach** works while a feedback item is focused. The attachment bar is
+wired on **line annotations**, **note replies** (same `AnnotationItem`), and
+**image-feedback** comments/regions. Client:
 `src/client/annotations/attachments.tsx`; routes `src/routes/api/attachments.ts`.
 
 **Image feedback** (doc 23): a panel below the image canvas lets the

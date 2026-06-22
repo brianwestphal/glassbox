@@ -134,6 +134,30 @@ test.describe('Image feedback (doc 23)', () => {
       .toContainText('The exported icon looks washed out', { timeout: 5000 });
   });
 
+  // GB-956 regression guard: the image-feedback edit/delete icon buttons must
+  // work. A click lands on the lucide `<svg>` inside the button (an SVGElement),
+  // which the panel handler's old `instanceof HTMLElement` guard rejected,
+  // silently dropping edit/delete after the glyphs became icons (GB-952).
+  test('the edit icon button on an image-feedback comment opens its inline editor', async ({ page }) => {
+    await openImageDiff(page);
+    const panel = page.locator('[data-image-feedback]');
+    await expect(panel.locator('[data-role="general-input"]')).toBeVisible({ timeout: 5000 });
+    const marker = `edit-icon-${Date.now().toString(36)}`;
+    await panel.locator('[data-role="general-input"]').fill(marker);
+    await panel.locator('[data-action="add-general"]').click();
+    const item = panel.locator('.image-feedback-item', { hasText: marker });
+    await expect(item).toBeVisible({ timeout: 5000 });
+
+    // Click the edit button's inner icon (the SVGElement target).
+    await item.locator('[data-action="edit"] svg').click();
+    await expect(item.locator('[data-role="edit-input"]')).toBeVisible({ timeout: 5000 });
+
+    // Cleanup: cancel the editor, then delete the comment (also via its icon).
+    await item.locator('[data-action="cancel-edit"]').click();
+    await item.locator('[data-action="delete"]').click();
+    await expect(panel.locator('.image-feedback-item', { hasText: marker })).toHaveCount(0, { timeout: 5000 });
+  });
+
   test('draws a rectangle region, comments on it, and shows it on the image', async ({ page }) => {
     await openImageDiff(page);
     await showDifference(page);

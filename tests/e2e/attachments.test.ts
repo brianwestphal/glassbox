@@ -132,4 +132,31 @@ test.describe('Annotation attachments (doc 25)', () => {
     await expect(page.locator('.annotation-item', { hasText: marker })
       .locator('.attachment-chip', { hasText: 'pasted.txt' })).toBeVisible({ timeout: 5000 });
   });
+
+  // GB-956: the attachment bar also works on image-feedback comments (doc 23).
+  test('attach a file to an image-feedback comment', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-item .file-name', { hasText: '128x128.png' }).click();
+    await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
+
+    const panel = page.locator('[data-image-feedback]');
+    await expect(panel.locator('[data-role="general-input"]')).toBeVisible({ timeout: 5000 });
+    const marker = `imgfb-${Date.now().toString(36)}`;
+    await panel.locator('[data-role="general-input"]').fill(marker);
+    await panel.locator('[data-action="add-general"]').click();
+
+    const item = panel.locator('.image-feedback-item', { hasText: marker });
+    await expect(item).toBeVisible({ timeout: 5000 });
+
+    const chooserPromise = page.waitForEvent('filechooser');
+    await item.locator('[data-action="attach"]').click();
+    (await chooserPromise).setFiles({ name: 'imgnote.txt', mimeType: 'text/plain', buffer: Buffer.from('note') });
+
+    await expect(item.locator('.attachment-chip', { hasText: 'imgnote.txt' })).toBeVisible({ timeout: 5000 });
+
+    // Cleanup: deleting the comment cascades its attachment.
+    await item.locator('[data-action="delete"]').click();
+    await expect(panel.locator('.image-feedback-item', { hasText: marker })).toHaveCount(0, { timeout: 5000 });
+  });
 });

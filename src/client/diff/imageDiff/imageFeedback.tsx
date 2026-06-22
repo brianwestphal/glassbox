@@ -9,7 +9,8 @@ import {
   updateAnnotation as updateAnnotationApi,
   updateAnnotationRegion as updateAnnotationRegionApi,
 } from '../../../api/index.js';
-import { IconEdit, IconSquareDashed, IconTrash } from '../../../icons.js';
+import { IconEdit, IconPaperclip, IconSquareDashed, IconTrash } from '../../../icons.js';
+import { hydrateAttachments } from '../../annotations/attachments.js';
 import { showCategoryPicker } from '../../annotations/categories.js';
 import { toElement } from '../../dom.js';
 import { CATEGORIES } from '../../state.js';
@@ -121,6 +122,9 @@ export function initImageFeedback(container: HTMLElement): void {
     if (pending !== null) {
       panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]')?.focus();
     }
+    // `replaceChildren` wiped the per-item `[data-att-list]` containers; refill
+    // their attachment chips (doc 25 / GB-956). Async + idempotent.
+    void hydrateAttachments(panel);
   }
 
   function renderAll(): void {
@@ -368,7 +372,11 @@ export function initImageFeedback(container: HTMLElement): void {
 
   panel.addEventListener('click', (e) => {
     const target = e.target;
-    if (!(target instanceof HTMLElement)) return;
+    // `Element`, not `HTMLElement`: a click lands on the `<svg>`/`<path>` inside
+    // an icon button (`SVGElement`), which `closest('[data-action]')` still
+    // resolves correctly. The stricter guard silently dropped edit/delete/etc.
+    // once the glyphs became lucide icons (GB-952 regression, caught by GB-956).
+    if (!(target instanceof Element)) return;
     const actionEl = target.closest<HTMLElement>('[data-action]');
     if (actionEl === null) return;
     const action = actionEl.dataset.action;
@@ -537,9 +545,11 @@ function commentItemJsx(c: CommentItem): SafeHtml {
         <span className="image-feedback-text">{c.content}</span>
       </div>
       <div className="image-feedback-item-actions">
+        <button className="btn btn-xs btn-icon" data-action="attach" title="Attach a file"><IconPaperclip /></button>
         <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
         <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
       </div>
+      <div className="annotation-attachments" data-att-list={c.id}></div>
     </li>
   );
 }
@@ -555,9 +565,11 @@ function regionItemJsx(r: RegionItem, number: number): SafeHtml {
         <span className="image-feedback-text">{r.content}</span>
       </div>
       <div className="image-feedback-item-actions">
+        <button className="btn btn-xs btn-icon" data-action="attach" title="Attach a file"><IconPaperclip /></button>
         <button className="btn btn-xs btn-icon" data-action="edit" title="Edit"><IconEdit /></button>
         <button className="btn btn-xs btn-icon btn-danger" data-action="delete" title="Delete"><IconTrash /></button>
       </div>
+      <div className="annotation-attachments" data-att-list={r.id}></div>
     </li>
   );
 }
