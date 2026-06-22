@@ -119,3 +119,8 @@ export function IconShareGeneric(): SafeHtml {
 export function IconHeart(): SafeHtml {
   return <svg {...S14}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>;
 }
+
+/** Paperclip icon (lucide) — marks an AI review-note artifact (doc 20). */
+export function IconPaperclip(): SafeHtml {
+  return <svg {...S12}><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>;
+}

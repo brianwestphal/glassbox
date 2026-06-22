@@ -4,7 +4,7 @@ import { diffViewStore } from '../../stores/index.js';
 import { initImageFeedback } from './imageFeedback.js';
 import { loadMetadata } from './metadata.js';
 import { initSliceTool } from './sliceTool.js';
-import { applyZoom, clampPan, notifyZoomChange, setZoomState, zoomAt,type ZoomState } from './zoom.js';
+import { applyZoom, clampPan, notifyZoomChange, pickActualSize, setZoomState, zoomAt,type ZoomState } from './zoom.js';
 
 export function bindImageDiff(): void {
   const container = document.querySelector('.image-diff');
@@ -216,21 +216,33 @@ export function bindImageDiff(): void {
         sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0;
         syncVisible();
       } else if (action === 'actual') {
+        // "Actual size" makes EVERY visible canvas 1:1 — in side-by-side both
+        // panes go to their own natural size, not just the first (GB-951).
         const bw = parseInt(asEl(container).dataset.baseWidth ?? '', 10);
         const bh = parseInt(asEl(container).dataset.baseHeight ?? '', 10);
-        const nw = (bw > 0 && bh > 0) ? bw : refImg.naturalWidth;
-        const nh = (bw > 0 && bh > 0) ? bh : refImg.naturalHeight;
-        if (nw > 0 && nh > 0) {
+        let appliedAny = false;
+        for (const c of canvases) {
+          if (c.offsetParent === null) continue;
+          const wrap = c.querySelector<HTMLElement>('.image-zoom-wrap');
+          if (wrap === null) continue;
+          const img = c.querySelector<HTMLImageElement>('.image-layer');
+          const size = pickActualSize({
+            perPane: c.closest('[data-sxs-pane]') !== null,
+            imgNatural: { w: img?.naturalWidth ?? 0, h: img?.naturalHeight ?? 0 },
+            base: { w: bw, h: bh },
+          });
+          if (size === null) continue;
           // For a vector wrap, the base size drives applyZoom — set it to the
           // natural size so "actual size" maps zoom = 1 to 1:1 pixels.
           if (isVector) {
-            vis.wrap.dataset.zoomBaseW = String(nw);
-            vis.wrap.dataset.zoomBaseH = String(nh);
+            wrap.dataset.zoomBaseW = String(size.w);
+            wrap.dataset.zoomBaseH = String(size.h);
           }
-          vis.wrap.style.width = `${nw}px`;
-          vis.wrap.style.height = `${nh}px`;
-          sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0;
+          wrap.style.width = `${size.w}px`;
+          wrap.style.height = `${size.h}px`;
+          appliedAny = true;
         }
+        if (appliedAny) { sharedZoom.zoom = 1; sharedZoom.panX = 0; sharedZoom.panY = 0; }
       }
       applyToAll();
     });

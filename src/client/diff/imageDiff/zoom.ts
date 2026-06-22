@@ -53,6 +53,34 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/**
+ * The zoom=1 ("actual size") target size for one canvas, in CSS px.
+ *
+ * - For a side-by-side pane (`perPane`), each pane is 1:1 to its OWN image, so
+ *   the image's natural size wins — the old (A) and new (B) panes can be
+ *   different sizes and each should be 1:1 to itself (GB-951).
+ * - For the overlay modes (difference / slice) and the single-image viewer, the
+ *   server-provided base size wins when present — for a rendered SVG that's the
+ *   parsed intrinsic size (`parseSvgDimensions`), which is more reliable than an
+ *   `<img>`'s `naturalWidth` for a viewBox-only SVG — falling back to the
+ *   image's natural size.
+ *
+ * Returns null when no positive size is available.
+ */
+export function pickActualSize(opts: {
+  perPane: boolean;
+  imgNatural: { w: number; h: number };
+  base: { w: number; h: number };
+}): { w: number; h: number } | null {
+  const { perPane, imgNatural, base } = opts;
+  const hasBase = base.w > 0 && base.h > 0;
+  const hasImg = imgNatural.w > 0 && imgNatural.h > 0;
+  if (!perPane && hasBase) return { w: base.w, h: base.h };
+  if (hasImg) return { w: imgNatural.w, h: imgNatural.h };
+  if (hasBase) return { w: base.w, h: base.h };
+  return null;
+}
+
 export function applyZoom(wrap: HTMLElement, zs: ZoomState): void {
   if (isVectorWrap(wrap)) {
     // Carry the zoom in the layout size so the SVG re-rasterizes at full

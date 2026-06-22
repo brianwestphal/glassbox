@@ -4,7 +4,7 @@ import { raw } from 'kerfjs';
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
-import { IconEdit, IconReveal, IconTrash } from '../icons.js';
+import { IconEdit, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
 import type { ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
@@ -405,17 +405,17 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
               {n.artifacts.map(a => (
                 a.content !== undefined ? (
                   <details className="ai-note-artifact">
-                    <summary>📎 {a.uri}</summary>
+                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
                     <pre className="ai-note-artifact-content"><code>{a.content}</code></pre>
                   </details>
                 ) : a.isImage === true ? (
                   <details className="ai-note-artifact">
-                    <summary>📎 {a.uri}</summary>
+                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
                     <img className="ai-note-artifact-img" loading="lazy" alt={a.uri}
                       src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
                   </details>
                 ) : (
-                  <div className="ai-note-artifact ai-note-artifact-ref">📎 {a.uri}</div>
+                  <div className="ai-note-artifact ai-note-artifact-ref ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></div>
                 )
               ))}
             </div>

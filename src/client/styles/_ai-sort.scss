@@ -387,6 +387,12 @@
   color: var(--text-dim);
   font-family: var(--font-mono);
 }
+// Paperclip icon + artifact path. Kept inline (not flex) so a <summary> keeps
+// its disclosure triangle; the icon is nudged onto the text baseline.
+.ai-note-artifact-label svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
 .ai-note-artifact-content {
   margin: 4px 0 0;
   padding: 6px 8px;

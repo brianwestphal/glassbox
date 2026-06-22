@@ -183,6 +183,10 @@ describe('DiffView', () => {
     // The binary/missing one is a reference, not a code block.
     expect(html).toContain('ai-note-artifact-ref');
     expect(html).toContain('screenshot.png');
+    // GB-950: artifacts are marked with the lucide paperclip icon (an <svg>),
+    // not the 📎 emoji.
+    expect(html).toContain('ai-note-artifact-label');
+    expect(html).not.toContain('📎');
   });
 
   it('renders an image artifact as an <img> served from the artifact route (GB-911)', () => {

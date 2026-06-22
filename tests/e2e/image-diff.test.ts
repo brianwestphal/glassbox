@@ -692,4 +692,41 @@ test.describe('Side-by-side image comparison (doc 24)', () => {
     await expect(page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment }))
       .toBeVisible({ timeout: 5000 });
   });
+
+  // GB-951: "Actual size" must make BOTH panes 1:1 to their own image, not just
+  // the first. The demo's old/new icons are 64px and 128px — different sizes, so
+  // the bug (only the A pane went 1:1) is observable here.
+  test('"Actual size" makes each pane 1:1 to its own image', async ({ page }) => {
+    await openSxs(page);
+    // Both images must be loaded before "actual size" can read their natural size.
+    await page.waitForFunction(() => {
+      const a = document.querySelector<HTMLImageElement>('[data-sxs-pane="old"] .image-layer-old');
+      const b = document.querySelector<HTMLImageElement>('[data-sxs-pane="new"] .image-layer-new');
+      return a !== null && a.complete && a.naturalWidth > 0
+        && b !== null && b.complete && b.naturalWidth > 0;
+    }, null, { timeout: 10000 });
+
+    await page.locator('.diff-toolbar-image [data-zoom-action="actual"]').click();
+
+    const sizes = await page.evaluate(() => {
+      const wrapW = (pane: string) => {
+        const w = document.querySelector<HTMLElement>(`[data-sxs-pane="${pane}"] .image-zoom-wrap`);
+        return w ? Math.round(w.offsetWidth) : 0;
+      };
+      const natW = (pane: string, cls: string) => {
+        const i = document.querySelector<HTMLImageElement>(`[data-sxs-pane="${pane}"] .${cls}`);
+        return i ? i.naturalWidth : 0;
+      };
+      return {
+        oldWrap: wrapW('old'), newWrap: wrapW('new'),
+        oldNat: natW('old', 'image-layer-old'), newNat: natW('new', 'image-layer-new'),
+      };
+    });
+
+    // The demo icons are genuinely different sizes — this is the bug's trigger.
+    expect(sizes.oldNat).not.toBe(sizes.newNat);
+    // Each pane's wrap is sized to its OWN image's natural width (1:1).
+    expect(sizes.oldWrap).toBe(sizes.oldNat);
+    expect(sizes.newWrap).toBe(sizes.newNat);
+  });
 });
