@@ -549,6 +549,7 @@ Scripts (`package.json`):
   (`setRenderTextMode`). Must run outside the command sandbox (Chromium).
 - `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
+- `release:beta:auto` — **non-interactive** equivalent of `release:beta` (`scripts/release-beta-auto.sh`) for automation/unattended cuts: no prompts, no `$EDITOR`. Smart-defaults the target version (package.json version if not yet stable-tagged, else next minor; override with `X.Y.Z` / `--version`), drafts notes via gitgist (AI → `--no-ai` → log pointer; override with `--notes`/`--notes-stdin`), runs build + tests (retry once, `--skip-tests`) + lint + tsc, then auto-increments + pushes the `v{ver}-beta.{N}` tag. `--dry-run` stops before tagging. Skips the `npm whoami` preflight (CI publishes via token). Distinct exit codes (1/2/3).
 - `commit:msg` — draft a Conventional Commit message from the staged diff via `gitgist --staged --commit-message`.
 
 `tsup.config.ts` produces:

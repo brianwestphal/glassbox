@@ -53,6 +53,7 @@
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
     "release:beta": "bash scripts/release.sh --beta",
+    "release:beta:auto": "bash scripts/release-beta-auto.sh",
     "commit:msg": "gitgist --staged --commit-message",
     "prepublishOnly": "npm run build"
   },
