@@ -242,13 +242,6 @@ npm run test:e2e      # E2E tests (Playwright, Chromium)
 npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 ```
 
-### Testing Philosophy
-
-- **Double coverage**: Every feature should be covered by both unit tests and E2E tests. Unit tests verify individual functions in isolation; E2E tests verify the full stack works end-to-end in a real browser. Neither alone is sufficient — unit tests can pass while the real UI is broken (e.g., incorrect API call serialization, CSS issues, event wiring bugs).
-- **E2E tests are not optional**: If a feature involves user interaction (clicking, typing, navigating), it must have E2E tests that exercise the real UI against a running server. E2E tests catch integration bugs that unit tests with mocked boundaries cannot.
-- **Unit tests mock at boundaries, E2E tests don't**: Unit tests mock database, filesystem, and external APIs. E2E tests run against the real server with a real database (demo mode) and real browser rendering. The only thing E2E tests don't test is external AI API calls.
-- **Coverage merging**: `npm run test:all` collects V8 coverage from the server process (via `NODE_V8_COVERAGE`), browser coverage (via Playwright's `page.coverage` API with esbuild source maps), and unit test coverage (vitest), then merges all three as lcov files via concatenation and generates a combined HTML report with `genhtml`.
-
 ### Test Infrastructure
 
 - `vitest.config.ts` — Unit test config, excludes `tests/e2e/`, coverage via `@vitest/coverage-v8`
@@ -270,7 +263,7 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 - Client CSS and JS are built separately and served as static files — never inlined in layout
 - **Always use American-English spelling and grammar** in all source files — code, comments, identifiers, log/error messages, UI strings, documentation, and commit messages. Prefer `color`/`behavior`/`canceled`/`canceling`/`finalize`/`organize`/`customize`/`optimize`/`analyze`/`initialize`/`center`/`gray` over their British variants (`colour`/`behaviour`/`cancelled`/`cancelling`/`finalise`/`organise`/`customise`/`optimise`/`analyse`/`initialise`/`centre`/`grey`). This applies equally to TypeScript, Rust, SCSS, Markdown, and shell scripts.
 
-## Ticket-Driven Work
+## Ticket References Are Local-Only
 
 > **Hot Sheet tickets are local-only.** The `.hotsheet/` directory is gitignored and lives only on the project maintainer's machine. Ticket IDs (e.g. `GB-774`) are meaningless to anyone else and there is no shared issue tracker to look them up in.
 >
@@ -283,22 +276,9 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 >
 > This section itself, and any other guidance about how *you* should interact with the local Hot Sheet workflow, is the exception — it is addressed to the AI assistant running against the maintainer's machine.
 
-When the user gives you work directly via the CLI (not via MCP channel or Hot Sheet events), analyze the request and create Hot Sheet tickets before starting implementation — especially for substantial or multi-step work. This keeps work visible, trackable, and consistent with the Hot Sheet workflow.
+(The ticket-creation workflow, follow-up rules, incomplete-work checklist, and FEEDBACK NEEDED mechanism live in the **Ticket-Driven Work** section below.)
 
-- **Do create tickets** for: feature implementation, bug fixes, refactoring, multi-step tasks, anything that involves changing code.
-- **Don't create tickets** for: simple questions, git commits, quick lookups, trivial one-line changes.
-- **When in doubt, create the tickets.** The overhead is minimal and the tracking value is high.
-- Use the Hot Sheet API to create tickets, mark them as Up Next, then work through them normally (set status to "started", implement, set to "completed" with notes).
-- **Always create follow-up tickets** for work that isn't completed in the current session: unfinished implementation steps, open design questions needing answers, known gaps discovered during work, features designed but not yet built (e.g., a requirements doc without implementation). Never leave follow-up work undocumented — if it's not in a ticket, it will be forgotten.
-- **Incomplete work checklist** — before marking a ticket as completed, verify:
-  1. **No placeholder text in the UI** (e.g., "coming soon", "coming in a future update") without a corresponding follow-up ticket
-  2. **No TODO/FIXME comments** in the code without a corresponding follow-up ticket
-  3. **No requirements doc items** that were documented but not implemented without follow-up tickets
-  4. **No empty/stub functions** that return mock data or do nothing without follow-up tickets
-  If any of the above exist, create the follow-up tickets BEFORE marking the current ticket as completed.
-- **Use FEEDBACK NEEDED before deferring or asking about follow-up tickets.** When you're about to (a) defer a ticket because it needs more work, (b) ask the user whether to file follow-up tickets, or (c) close a ticket with a question buried in the notes ("let me know if you want X" / "happy to do Y if you want"), DO NOT close it that way. Instead, leave the ticket in `started` status and add a `FEEDBACK NEEDED:` note (per `.hotsheet/worklist.md`), then signal channel done and wait for the user. Closing with an unanswered question buries the question and the user can't easily see it. The FEEDBACK NEEDED mechanism is the only way to reliably get attention on a question.
-
-### Code Organization
+## Code Organization
 
 - **One primary export per file** — each file should have one main exported function/concept, with supporting private (non-exported) functions as needed
 - **Files should not be excessively long** — break up large files by concern into smaller, focused modules
@@ -307,7 +287,7 @@ When the user gives you work directly via the CLI (not via MCP channel or Hot Sh
 - **Use TSX/SafeHtml for HTML building** — client-side code that builds HTML strings should use the JSX runtime (`.tsx` files) rather than manual string concatenation. Use `raw()` from `kerfjs` for pre-rendered HTML strings in JSX
 - **Use `toElement()` instead of `document.createElement()`** — when creating DOM elements in client code, use the `toElement()` helper from `dom.ts` with JSX: `toElement(<div className="foo">bar</div>)`. Resolve JSX to DOM elements only at the last moment. Never use `document.createElement()` directly
 
-### Client reactivity conventions (kerfjs)
+## Client reactivity conventions (kerfjs)
 
 The client uses **kerfjs** for state, render, and event delegation. Follow these patterns when writing new client features:
 
@@ -319,3 +299,61 @@ The client uses **kerfjs** for state, render, and event delegation. Follow these
 - **`data-morph-skip`** is the escape hatch for library-owned subtrees (the diff content where highlight.js / hunk expansion / image-diff zoom mutate the DOM imperatively). `data-morph-skip-children` keeps the element's attributes morphing but leaves the subtree alone (for server-rendered shells whose loading-state classes still need to flow). `data-morph-preserve` keeps an imperatively-injected child surviving the trailing-removal pass when the new template doesn't emit it. See `docs/4-render.md` in the kerfjs repo for the full taxonomy.
 
 When a feature touches DOM state that should survive re-renders (input focus + value, contenteditable cursor, `<details open>` state), kerf preserves these automatically during morph — you don't need to manage them imperatively. See kerfjs §4.4.
+
+<!-- hotsheet:begin section=ticket-driven-work v=1 -->
+## Ticket-Driven Work
+
+When the user gives you work directly (not via the Hot Sheet channel or events), create Hot Sheet tickets before starting implementation — especially for substantial or multi-step work.
+
+- **Do create tickets** for: features, bug fixes, refactoring, multi-step tasks, anything changing code. **Don't** for: simple questions, git commits, quick lookups, trivial one-liners. **When in doubt, create them.**
+- Create via the Hot Sheet API (prefer the `hotsheet_*` MCP tools), mark Up Next, then work through them: set status `started` → implement → set `completed` with notes.
+- **Always create follow-up tickets** for incomplete work (unfinished steps, open design questions, known gaps, designed-but-unbuilt features). If it's not in a ticket, it's forgotten.
+- **Incomplete-work checklist** — before marking a ticket `completed`, file follow-ups for any: (1) UI placeholder text ("coming soon"), (2) TODO/FIXME comments, (3) documented-but-unimplemented requirements, (4) empty/stub functions returning mock data.
+- **Use FEEDBACK NEEDED before deferring or asking about follow-ups.** When about to (a) defer a ticket needing more work, (b) ask whether to file follow-ups, or (c) close with a question buried in notes — DON'T. Leave the ticket `started`, add a `FEEDBACK NEEDED:` note (per `.hotsheet/worklist.md`), signal channel done, and wait. It's the only reliable way to surface a question.
+<!-- hotsheet:end section=ticket-driven-work -->
+
+<!-- hotsheet:begin section=testing-philosophy v=1 -->
+## Testing Philosophy
+
+- **Double coverage**: every feature covered by both unit tests AND E2E tests. Unit = logic in isolation; E2E = real user flows through the running app with minimal mocking.
+- **Unit tests**: Mock external deps (filesystem, network), test real logic.
+- **E2E tests**: As much as possible, use test automation tools to run realistic, user-facing flows. Minimize mocks.
+- **Coverage**: Merge all test coverage (e.g. unit, E2E server, E2E browser) into one report. Low-coverage files should get more of both test types. Aim for 100% coverage of code lines, 100% coverage of branches, and 100% of features described in the requirements documentation.
+- **Manual test plan**: keep a manual test plan doc (e.g. `docs/manual-test-plan.md`) for features that can't be reliably automated. **Keep it up to date** — add such features there; when you add automated coverage for a previously-manual item, remove it and note it in an "Automated Coverage Summary".
+- **Always fix lint and type errors before finishing**: Fix as you go, don't batch.
+
+<!-- hotsheet:begin specifics=testing-philosophy v=1 -->
+### This project's test setup
+
+- **Unit tests** (`tests/**/*.test.ts`, excluding `tests/e2e/`; sources live under `tests/unit/` and `tests/integration/`): **vitest** (`vitest.config.ts`), coverage via `@vitest/coverage-v8`. Shared fixtures/helpers live in `tests/fixtures/` and `tests/helpers/`.
+- **E2E tests** (`tests/e2e/*.test.ts`): **Playwright**, Chromium only (`playwright.config.ts`). They run against a real server started in demo mode (`--demo:4 --ai-service-test`) on port 4183 — no real AI calls, no dependency on a machine API key, and a disposable per-pid config dir. Always use the shared fixtures: `tests/e2e/coverage-fixture.ts` (per-test browser V8 coverage) and `tests/e2e/memoryHelper.ts` (`measureHeap` / `expectStableHeap`).
+- **Smoke tests** (`tests/smoke/*.sh`): shell scripts run via `npm run test:smoke` and `npm run test:smoke:difftool`.
+- **Commands**: unit `npm test` · E2E `npm run test:e2e` · merged coverage `npm run test:all` · CI-parity E2E in Docker `npm run test:e2e:docker` · lint `npm run lint` · types `npm run typecheck`.
+- **Coverage merging**: `npm run test:all` (`scripts/test-all.sh`) collects server V8 coverage (`NODE_V8_COVERAGE`), browser coverage (Playwright `page.coverage` + esbuild source maps), and unit coverage (vitest), concatenates them as lcov, and runs `genhtml` for a combined HTML report.
+- **Manual test plan**: there is no `docs/manual-test-plan.md` yet — create one (and reference it here) the first time a feature can't be reliably automated.
+<!-- hotsheet:end specifics=testing-philosophy -->
+<!-- hotsheet:end section=testing-philosophy -->
+
+<!-- hotsheet:begin section=requirements-documentation v=1 -->
+## Requirements Documentation
+
+Keep human-readable requirements documents as the source of truth for what the project does, and **keep them up to date in the same change as the code** (add/remove/modify a requirement → update its doc). Create new docs for major new functional areas. Cross-reference related docs with relative links.
+
+### AI Summaries
+
+Maintain two synthesis docs an AI assistant reads at the start of a fresh session — keep them in sync with reality (source doc/code wins on conflict), and prefer small targeted edits over rewrites:
+
+- A **codebase map** — directory tree, entry points, data schema, build, tests, settings, and a "where do I look for X" index. Update it in the same change when you add a file or directory, add a route/endpoint, change the schema, add a client module, or add a setting key.
+- A **requirements summary** — a synthesized view of every requirements doc with status markers (e.g. Shipped / Partial / Design only / Deferred). Update it in the same change when you add a requirements doc, ship a design-only feature, or defer/regress a shipped one.
+
+<!-- hotsheet:begin specifics=requirements-documentation v=1 -->
+### This project's docs layout
+
+- **Docs folder**: `docs/`.
+- **Requirements docs**: numbered `docs/N-topic.md` (linear reading order), containing functional (`FR-`) and non-functional (`NFR-`) requirements. The full index lives in the **Documentation** section near the top of this file. Architecture docs sit alongside them: `docs/ARCHITECTURE.md`, `docs/tauri-architecture.md`, `docs/tauri-setup.md`.
+- **Codebase map**: `docs/ai/code-summary.md` — directory tree, routes catalog, schema, client modules, build pipeline, and a "where do I look for X" index.
+- **Requirements summary**: `docs/ai/requirements-summary.md` — synthesized view of every requirements doc with status markers.
+
+Both AI-summary files already exist and are actively maintained; update them in the same change as the code (see the per-file triggers in each).
+<!-- hotsheet:end specifics=requirements-documentation -->
+<!-- hotsheet:end section=requirements-documentation -->
