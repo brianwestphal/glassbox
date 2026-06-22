@@ -31,7 +31,7 @@ vi.mock('../../../src/db/connection.js', () => ({
 // want diffRawContent's actual behavior).
 import { difftoolApiRoutes } from '../../../src/routes/difftool-api.js';
 import { imageRoutes } from '../../../src/routes/api/image.js';
-import { clearDifftoolBlobs } from '../../../src/difftool/blob-store.js';
+import { clearImageBlobs } from '../../../src/git/image-blobs.js';
 import {
   endDifftoolSession,
   getDifftoolSession,
@@ -71,7 +71,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   resetDifftoolSessionForTest();
-  clearDifftoolBlobs(BLOB_DATA_DIR);
+  clearImageBlobs(BLOB_DATA_DIR);
   shutdown.mockClear();
   await testDb.query('DELETE FROM review_files WHERE review_id = $1', [REVIEW_ID]);
   await testDb.query('DELETE FROM reviews WHERE id = $1', [REVIEW_ID]);
@@ -207,7 +207,7 @@ describe('image comparison for a difftool session', () => {
 
   it('404s when no blob was stored (e.g. session torn down)', async () => {
     const fileId = await appendImageAndGetId('assets/icon.png');
-    clearDifftoolBlobs(BLOB_DATA_DIR);
+    clearImageBlobs(BLOB_DATA_DIR);
     const res = await app.request(`/api/image/${fileId}/new`);
     expect(res.status).toBe(404);
   });

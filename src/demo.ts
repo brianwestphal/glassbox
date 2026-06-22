@@ -1,8 +1,30 @@
 import { saveGuidedReviewConfig } from './ai/config.js';
 import { appendFileScores, createAnalysis, saveUserPreferences, updateAnalysisStatus } from './db/ai-queries.js';
+import { getDataDir } from './db/connection.js';
 import { addAnnotation, addReviewFile, createReview } from './db/queries.js';
 import type { FileDiff } from './git/diff.js';
+import { writeImageBlob } from './git/image-blobs.js';
 import type { ReviewNoteView } from './review-notes/view.js';
+
+/**
+ * The SVG demo files are seeded into the DB, not committed to disk, so the
+ * live-rendered `<img>` view (GB-932) — which fetches `/api/image/:fileId/:side`
+ * — would 404 on the synthetic giant `src/assets/icons.min.svg` (GB-947). The
+ * full bytes of each side live in the diff hunks, so we persist them to the
+ * image-blob store, which the image route serves as a fallback. SVGs are
+ * single-hunk full-file diffs here, so each side is the join of the lines it
+ * keeps (old drops adds; new drops removes).
+ */
+function seedSvgBlobs(fileId: string, diff: FileDiff): void {
+  if (!diff.filePath.toLowerCase().endsWith('.svg')) return;
+  const dataDir = getDataDir();
+  if (dataDir === null) return;
+  const lines = diff.hunks.flatMap(h => h.lines);
+  const sideBytes = (keep: (type: string) => boolean): Buffer =>
+    Buffer.from(lines.filter(l => keep(l.type)).map(l => l.content).join('\n'), 'utf8');
+  writeImageBlob(dataDir, fileId, 'old', sideBytes(t => t !== 'add'));
+  writeImageBlob(dataDir, fileId, 'new', sideBytes(t => t !== 'remove'));
+}
 
 /**
  * Illustrative AI-authored review notes for the demo (docs/20 P2). Demo runs
@@ -495,6 +517,7 @@ export async function setupDemoReview(scenario: number): Promise<{ reviewId: str
     };
     const rf = await addReviewFile(review.id, file.path, JSON.stringify(diff));
     fileIdMap.set(file.path, rf.id);
+    seedSvgBlobs(rf.id, diff);
   }
 
   // Common: mark some files as reviewed

@@ -31,6 +31,21 @@ async function openFileList(page: import('@playwright/test').Page) {
 }
 
 /**
+ * Force the SVG *code* (text) view, the subject of these tests. `svg_view_mode`
+ * is a server-persisted preference (see `app.tsx`), and the suite shares one
+ * demo server — so an earlier spec that toggled an SVG to the Rendered view
+ * (e.g. `image-diff.test.ts`) leaves the giant SVG opening as a live `<img>`
+ * with no `.diff-line` rows. Click Code to pin the text view regardless of what
+ * ran before, then wait for the diff rows to (re)render.
+ */
+async function ensureCodeView(page: import('@playwright/test').Page) {
+  const codeToggle = page.locator('[data-svg-mode="code"]');
+  await expect(codeToggle).toBeVisible({ timeout: 5000 });
+  await codeToggle.click();
+  await expect(page.locator('.diff-line').first()).toBeVisible({ timeout: 5000 });
+}
+
+/**
  * Install a Long Tasks observer that accumulates total main-thread blocking
  * time (the sum of every task longer than 50 ms — the browser only reports
  * those). A freeze is felt as the *sum* of back-to-back long tasks, not any
@@ -57,7 +72,7 @@ test.describe('Large file performance (GB-821)', () => {
     await page.locator('.file-item .file-name', { hasText: SVG_FILE }).click();
     await expect(page.locator('.diff-view')).toHaveAttribute(
       'data-file-path', new RegExp(SVG_FILE), { timeout: 5000 });
-    await expect(page.locator('.diff-line').first()).toBeVisible({ timeout: 5000 });
+    await ensureCodeView(page);
 
     // Every `.code` cell's rendered text must be bounded — the giant line is
     // never put into the DOM in full. (The fixture builds ~850 KB lines; after
@@ -77,6 +92,12 @@ test.describe('Large file performance (GB-821)', () => {
 
   test('selecting a large minified SVG does not freeze the main thread', async ({ page }) => {
     await openFileList(page);
+
+    // Pin the SVG code view (server-persisted; a prior spec may have left it on
+    // Rendered) so the timed selection below opens the text diff directly and
+    // the recorder measures code-view layout, not a live-rendered `<img>`.
+    await page.locator('.file-item .file-name', { hasText: SVG_FILE }).click();
+    await ensureCodeView(page);
 
     // Land on a normal file first, so the recorder measures *only* the work of
     // selecting the large SVG — independent of which file the app auto-selects

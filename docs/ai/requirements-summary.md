@@ -568,7 +568,7 @@ launcher shim in `--difftool-serve` mode and later invocations append to the
 running session; closing the window kills the sidecar and ends the session
 (`src-tauri/src/lib.rs`). Image/SVG visual comparison works too: the append
 endpoint persists each binary/SVG file's raw bytes to an on-disk blob store
-(`src/difftool/blob-store.ts`, under the session data dir, cleared on teardown)
+(`src/git/image-blobs.ts`, under the session data dir, cleared on teardown)
 and the `/image` route reads from there for a difftool review (GB-863). Internal
 git subprocesses run with `git difftool`'s leaked `GIT_EXTERNAL_DIFF` /
 `GIT_DIFF_PATH_*` scrubbed (`scrubbedGitEnv()` in `src/git/repo.ts`) so Glassbox's

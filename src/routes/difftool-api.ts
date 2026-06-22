@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { AppendDifftoolFileReqSchema, RegisterDifftoolReqSchema } from '../api/index.js';
 import { getDataDir } from '../db/connection.js';
 import { addReviewFile, getAnnotationCountsForReview, getReviewFiles, updateFileDiff } from '../db/queries.js';
-import { writeDifftoolBlob } from '../difftool/blob-store.js';
 import {
   addDifftoolHold,
   endDifftoolSession,
@@ -13,6 +12,7 @@ import {
 import { diffRawContent } from '../git/diff.js';
 import { getDifftoolStatus, registerDifftool, unregisterDifftool } from '../git/difftool.js';
 import { isSvgFile } from '../git/image.js';
+import { writeImageBlob } from '../git/image-blobs.js';
 import type { AppEnv } from '../types.js';
 import { errorResponse, parseBody } from '../utils/parseBody.js';
 
@@ -86,8 +86,8 @@ difftoolApiRoutes.post('/append', async (c) => {
   if (diff.isBinary || isSvgFile(diff.filePath)) {
     const dataDir = getDataDir();
     if (dataDir !== null) {
-      writeDifftoolBlob(dataDir, fileId, 'old', oldContent);
-      writeDifftoolBlob(dataDir, fileId, 'new', newContent);
+      writeImageBlob(dataDir, fileId, 'old', oldContent);
+      writeImageBlob(dataDir, fileId, 'new', newContent);
     }
   }
 

@@ -99,7 +99,7 @@ How the layer is used:
 | `api/outline.ts` | `/outline/:fileId` and `/symbol-definition` go-to-definition repo scan. |
 | `api/context.ts` | `/context/:fileId` line-range fetch for hunk expansion. |
 | `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`). |
-| `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side` with SVG rasterization. For a difftool review (doc 19) the bytes come from the persisted blob store (`src/difftool/blob-store.ts`) instead of git refs / disk — a difftool session has neither (GB-863). |
+| `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side`; SVGs served as raw `image/svg+xml` for live `<img>` render. `resolveImageSide()` reads from git refs / disk, then falls back to the persisted blob store (`src/git/image-blobs.ts`) — used outright for a difftool review (doc 19, no git/working tree, GB-863) and as a fallback for demo SVGs seeded into the DB with no on-disk file (GB-947). |
 | `api/share-prompt.ts` | Share prompt state / dismiss / tick (uses `global-config.ts`). |
 | `api/system.ts` | `POST /open-external` — opens a validated http(s) URL via `openOS` (same OS-open path as file reveal). |
 | `ai-api.ts` | Router that mounts ai-config + ai-analysis handlers under `/api/ai/*`. |
@@ -332,10 +332,11 @@ path), `GET /poll` (live file list + `active` flag for the client sidebar),
 attached; resolves on session end), `POST /end` ("Done" / tab-close
 `sendBeacon`). Session state + lifecycle live in `src/difftool/session.ts`;
 the detached server is started by `glassbox --difftool-serve`. On append, an
-image/SVG file's raw old/new bytes are persisted by `src/difftool/blob-store.ts`
-(content under `<dataDir>/difftool-blobs/`, keyed by `fileId`+side, cleared on
+image/SVG file's raw old/new bytes are persisted by `src/git/image-blobs.ts`
+(content under `<dataDir>/image-blobs/`, keyed by `fileId`+side, cleared on
 session start + teardown) so the `/image` route can serve them — a difftool
-review has no git refs / working tree to re-read (GB-863).
+review has no git refs / working tree to re-read (GB-863). The same store also
+backs demo SVGs, which are seeded into the DB with no on-disk file (GB-947).
 
 ## 6. Database schema
 

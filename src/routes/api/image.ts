@@ -2,25 +2,55 @@ import { Hono } from 'hono';
 
 import { getDataDir } from '../../db/connection.js';
 import { getReview, getReviewFile } from '../../db/queries.js';
-import { readDifftoolBlob } from '../../difftool/blob-store.js';
+import type { ReviewMode } from '../../git/diff.js';
 import { parseDiffData, parseModeString } from '../../git/diff.js';
 import type { ImageSide } from '../../git/image.js';
 import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage } from '../../git/image.js';
+import { readImageBlob } from '../../git/image-blobs.js';
 import type { AppEnv } from '../../types.js';
 import { requirePathParam } from '../../utils/parseBody.js';
 
 export const imageRoutes = new Hono<AppEnv>();
 
 /**
- * A difftool review (doc 19) has no git refs or working tree, so its image bytes
- * come from the blobs persisted at append time (GB-863) rather than
- * `getOldImage`/`getNewImage`. Returns null if nothing was stored for this side.
+ * Read a side's bytes from the on-disk blob store (`src/git/image-blobs.ts`).
+ * Returns null if nothing was stored for this side / there's no data dir.
  */
-function difftoolImageSide(fileId: string, side: 'old' | 'new'): ImageSide | null {
+function blobImageSide(fileId: string, side: 'old' | 'new'): ImageSide | null {
   const dataDir = getDataDir();
   if (dataDir === null) return null;
-  const bytes = readDifftoolBlob(dataDir, fileId, side);
+  const bytes = readImageBlob(dataDir, fileId, side);
   return bytes !== null ? { data: bytes, size: bytes.length } : null;
+}
+
+/**
+ * Resolve one side's image bytes for any review mode, honoring add/delete (the
+ * absent side has no bytes).
+ *
+ * - A difftool review (doc 19) has no git refs or working tree, so its bytes
+ *   come only from the blobs persisted at append time (GB-863).
+ * - Every other mode reads from git / the working tree, but falls back to the
+ *   blob store when that yields nothing — demo mode (GB-947) seeds synthetic
+ *   SVGs that exist nowhere on disk, so the live-rendered `<img>` view (GB-932)
+ *   would otherwise 404.
+ */
+function resolveImageSide(
+  fileId: string,
+  side: 'old' | 'new',
+  status: string,
+  mode: ReviewMode,
+  filePath: string,
+  oldPath: string | null,
+  repoRoot: string,
+  isDifftool: boolean,
+): ImageSide | null {
+  if (side === 'old' && status === 'added') return null;
+  if (side === 'new' && status === 'deleted') return null;
+  if (isDifftool) return blobImageSide(fileId, side);
+  const fromGit = side === 'old'
+    ? getOldImage(mode, filePath, oldPath, repoRoot)
+    : getNewImage(mode, filePath, repoRoot);
+  return fromGit ?? blobImageSide(fileId, side);
 }
 
 // Metadata route must come before the :side wildcard route
@@ -40,12 +70,8 @@ imageRoutes.get('/image/:fileId/metadata', async (c) => {
   const status = diff?.status ?? 'modified';
   const isDifftool = review.mode === 'difftool';
 
-  const oldImage = status === 'added' ? null
-    : isDifftool ? difftoolImageSide(fileIdParam.data, 'old')
-    : getOldImage(mode, file.file_path, oldPath, repoRoot);
-  const newImage = status === 'deleted' ? null
-    : isDifftool ? difftoolImageSide(fileIdParam.data, 'new')
-    : getNewImage(mode, file.file_path, repoRoot);
+  const oldImage = resolveImageSide(fileIdParam.data, 'old', status, mode, file.file_path, oldPath, repoRoot, isDifftool);
+  const newImage = resolveImageSide(fileIdParam.data, 'new', status, mode, file.file_path, oldPath, repoRoot, isDifftool);
 
   const oldMeta = oldImage !== null ? extractMetadata(oldImage.data, oldPath ?? file.file_path) : null;
   const newMeta = newImage !== null ? extractMetadata(newImage.data, file.file_path) : null;
@@ -72,12 +98,12 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
   const mode = parseModeString(review.mode);
   const diff = parseDiffData(file.diff_data);
   const oldPath: string | null = diff?.oldPath ?? null;
+  const status = diff?.status ?? 'modified';
 
-  const image = review.mode === 'difftool'
-    ? difftoolImageSide(fileIdParam.data, side)
-    : side === 'old'
-      ? getOldImage(mode, file.file_path, oldPath, repoRoot)
-      : getNewImage(mode, file.file_path, repoRoot);
+  const image = resolveImageSide(
+    fileIdParam.data, side, status, mode, file.file_path, oldPath, repoRoot,
+    review.mode === 'difftool',
+  );
 
   if (!image) return c.text('Image not available', 404);
 
