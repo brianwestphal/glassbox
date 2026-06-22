@@ -59,6 +59,8 @@ export function bindImageDiff(): void {
     const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
     if (wrap === null) return;
     applyZoom(wrap, sharedZoom);
+    // Show a grab affordance whenever the image is zoomed (and thus pannable).
+    canvas.style.cursor = sharedZoom.zoom > 1 ? 'grab' : '';
     notifyZoomChange(canvas);
   }
 
@@ -141,6 +143,7 @@ export function bindImageDiff(): void {
       panning = true;
       startX = e.clientX; startY = e.clientY;
       baseX = sharedZoom.panX; baseY = sharedZoom.panY;
+      canvas.style.cursor = 'grabbing';
       e.preventDefault();
     });
     document.addEventListener('mousemove', (e) => {
@@ -150,7 +153,11 @@ export function bindImageDiff(): void {
       clampPan(sharedZoom, canvas, wrap);
       applyToAll();
     });
-    document.addEventListener('mouseup', () => { panning = false; });
+    document.addEventListener('mouseup', () => {
+      if (!panning) return;
+      panning = false;
+      canvas.style.cursor = sharedZoom.zoom > 1 ? 'grab' : '';
+    });
   }
 
   imageToolbar?.querySelectorAll<HTMLElement>('[data-zoom-action]').forEach(btn => {

@@ -449,6 +449,34 @@ test.describe('SVG vector zoom (GB-941)', () => {
     expect(imgBox.width).toBeGreaterThan(cw);
   });
 
+  // GB-941 follow-up: once zoomed past the viewport, the image must be pannable.
+  test('a zoomed SVG can be panned', async ({ page }) => {
+    await openRenderedSvg(page);
+
+    const zoomIn = page.locator('.diff-toolbar-image [data-zoom-action="in"]');
+    for (let i = 0; i < 6; i++) await zoomIn.click();
+
+    const img = page.locator('[data-panel="difference"] .image-layer-old');
+    const before = await img.boundingBox();
+    const canvas = page.locator('[data-panel="difference"] .image-visual-canvas');
+    const cbox = await canvas.boundingBox();
+    if (!before || !cbox) throw new Error('missing boxes');
+
+    // Drag from the canvas center toward the top-left.
+    const cx = cbox.x + cbox.width / 2;
+    const cy = cbox.y + cbox.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx - 120, cy - 90, { steps: 10 });
+    await page.mouse.up();
+
+    const after = await img.boundingBox();
+    if (!after) throw new Error('image vanished after pan');
+    // The image actually moved with the drag (up and to the left).
+    expect(after.x).toBeLessThan(before.x - 20);
+    expect(after.y).toBeLessThan(before.y - 20);
+  });
+
   test('raster images still zoom via transform scale (layout size constant)', async ({ page }) => {
     // Regression guard: the PNG path must keep the cheap transform-scale model.
     await page.goto('/');

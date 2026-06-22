@@ -77,13 +77,18 @@ export function clampPan(zs: ZoomState, canvas: HTMLElement, wrap: HTMLElement):
   const ch = canvas.clientHeight;
 
   if (isVectorWrap(wrap)) {
-    // The wrapper's layout size already includes the zoom and it is flex-centered,
-    // so the pannable range is symmetric about the center.
-    const base = zoomBase(wrap);
-    const ww = (base?.w ?? wrap.offsetWidth) * zs.zoom;
-    const wh = (base?.h ?? wrap.offsetHeight) * zs.zoom;
-    zs.panX = ww <= cw ? 0 : clamp(zs.panX, -(ww - cw) / 2, (ww - cw) / 2);
-    zs.panY = wh <= ch ? 0 : clamp(zs.panY, -(wh - ch) / 2, (wh - ch) / 2);
+    // The wrapper's layout size already includes the zoom (set by applyZoom).
+    // Clamp against its REAL flow position (offsetLeft/offsetTop) rather than
+    // assuming the flex parent centers an overflowing child — engines differ on
+    // that (some pin the start), and a wrong assumption makes panning feel stuck.
+    // Allowed translate keeps the image covering the viewport: the left/top edge
+    // can go to 0 and the right/bottom edge down to the canvas edge.
+    const ww = wrap.offsetWidth;
+    const wh = wrap.offsetHeight;
+    const wbx = wrap.offsetLeft;
+    const wby = wrap.offsetTop;
+    zs.panX = ww <= cw ? 0 : clamp(zs.panX, cw - ww - wbx, -wbx);
+    zs.panY = wh <= ch ? 0 : clamp(zs.panY, ch - wh - wby, -wby);
     return;
   }
 
@@ -115,21 +120,24 @@ export function zoomAt(
   if (isVectorWrap(wrap)) {
     const base = zoomBase(wrap);
     if (base === null) return;
-    const cw = canvas.clientWidth;
-    const ch = canvas.clientHeight;
     const oldZoom = zs.zoom;
     const newZoom = Math.max(1, Math.min(10, oldZoom * factor));
-    // The wrapper is flex-centered, so its left/top shift as it grows. Solve for
-    // the new pan that keeps the content point under the cursor fixed.
-    const leftOld = (cw - base.w * oldZoom) / 2;
-    const topOld = (ch - base.h * oldZoom) / 2;
-    const mx = (clientX - contentX - leftOld - zs.panX) / oldZoom;
-    const my = (clientY - contentY - topOld - zs.panY) / oldZoom;
-    const leftNew = (cw - base.w * newZoom) / 2;
-    const topNew = (ch - base.h * newZoom) / 2;
-    zs.panX = clientX - contentX - leftNew - mx * newZoom;
-    zs.panY = clientY - contentY - topNew - my * newZoom;
+    // Content fraction under the cursor, measured against the wrapper's real
+    // current box (offsetLeft/Width already include the old zoom).
+    const wwOld = wrap.offsetWidth;
+    const whOld = wrap.offsetHeight;
+    const fx = wwOld > 0 ? (clientX - contentX - wrap.offsetLeft - zs.panX) / wwOld : 0.5;
+    const fy = whOld > 0 ? (clientY - contentY - wrap.offsetTop - zs.panY) / whOld : 0.5;
+    // Apply the new layout size now so offsetLeft/Top reflect where the (re-
+    // centered or re-pinned) wrapper actually lands, then solve for the pan that
+    // keeps that same content fraction under the cursor.
     zs.zoom = newZoom;
+    wrap.style.width = `${base.w * newZoom}px`;
+    wrap.style.height = `${base.h * newZoom}px`;
+    const wwNew = wrap.offsetWidth;
+    const whNew = wrap.offsetHeight;
+    zs.panX = clientX - contentX - wrap.offsetLeft - fx * wwNew;
+    zs.panY = clientY - contentY - wrap.offsetTop - fy * whNew;
     clampPan(zs, canvas, wrap);
     return;
   }
