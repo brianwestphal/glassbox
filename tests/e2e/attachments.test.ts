@@ -85,9 +85,9 @@ test.describe('Annotation attachments (doc 25)', () => {
 
     // Click opens the in-app overlay with the image; Escape closes it.
     await chip.click();
-    const overlay = page.locator('.attachment-overlay');
+    const overlay = page.locator('.lightbox-overlay');
     await expect(overlay).toBeVisible({ timeout: 5000 });
-    await expect(overlay.locator('img.attachment-overlay-img')).toBeVisible();
+    await expect(overlay.locator('img.lightbox-img')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(overlay).toHaveCount(0, { timeout: 3000 });
 

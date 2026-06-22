@@ -84,6 +84,11 @@ export const ImageRegionSchema = z.object({
   // the region applies to both sides (the default), which is how every region
   // created before this field existed is interpreted.
   side: z.enum(['old', 'new']).optional(),
+  // Optional artifact uri (doc 25 / GB-953): when a region is drawn on an AI
+  // review note's image artifact (doc 20) and carried into a reply, this names
+  // the artifact the rectangle belongs to so the reply can re-render the marked
+  // image. Absent for ordinary image-diff regions (doc 23).
+  artifact: z.string().optional(),
 });
 export type ImageRegion = z.infer<typeof ImageRegionSchema>;
 

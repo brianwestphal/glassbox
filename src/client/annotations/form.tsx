@@ -3,6 +3,7 @@ import { delegate } from 'kerfjs';
 import type { AnnotationCategory, AnnotationSide } from '../../api/index.js';
 import { createAnnotation } from '../../api/index.js';
 import { IconCornerDownRight } from '../../icons.js';
+import { takePendingArtifactRegion } from '../diff/noteArtifactRegions.js';
 import { asTextarea, toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
 import { editFormSignal, reviewStore, setEditForm } from '../stores/index.js';
@@ -98,6 +99,12 @@ async function saveNewAnnotation(): Promise<void> {
   const lineNumber = parseInt(lineNumberStr, 10);
   if (isNaN(lineNumber)) return;
 
+  // A reply to a note may carry a region the reviewer marked on the note's
+  // image artifact (doc 25 / GB-953) — attach it so the reply shows the spot.
+  const region = state.replyToNoteId !== undefined
+    ? takePendingArtifactRegion(state.replyToNoteId)
+    : undefined;
+
   const annotation = await createAnnotation({
     reviewFileId: reviewStore.state.value.currentFileId ?? '',
     lineNumber,
@@ -105,6 +112,7 @@ async function saveNewAnnotation(): Promise<void> {
     category: state.category as AnnotationCategory,
     content,
     replyToNoteId: state.replyToNoteId,
+    ...(region !== undefined ? { region } : {}),
   });
 
   document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${state.formKey}"]`).forEach(el => { el.remove(); });

@@ -417,6 +417,45 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
   });
 
+  // GB-953 — click a note image artifact to open the full-screen lightbox, drag
+  // a region, and reply: the reply carries a marked-region thumbnail.
+  test('marking a region on a note image artifact carries it into the reply', async ({ page }) => {
+    await openModifiedFile(page);
+    await page.getByText('demo-annotations.png').click();
+    const artImg = page.locator('.ai-note-artifact-img');
+    await expect.poll(() => artImg.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    await artImg.click();
+
+    const lb = page.locator('.lightbox-overlay');
+    await expect(lb.locator('.lightbox-img')).toBeVisible({ timeout: 5000 });
+    const frame = lb.locator('.lightbox-frame');
+    await expect.poll(async () => (await frame.boundingBox())?.width ?? 0).toBeGreaterThan(20);
+    const box = await frame.boundingBox();
+    if (!box) throw new Error('lightbox frame has no box');
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.65, { steps: 10 });
+    await page.mouse.up();
+
+    // The lightbox closes and the note's reply form opens with the region armed.
+    await expect(lb).toHaveCount(0, { timeout: 5000 });
+    const form = page.locator('.annotation-form-container[data-form-key]');
+    await expect(form).toBeVisible({ timeout: 5000 });
+    const marker = `note-region-${Date.now().toString(36)}`;
+    await form.locator('textarea').fill(marker);
+    await form.locator('textarea').press('Control+Enter');
+
+    // The reply renders the artifact with the marked rectangle.
+    const reply = page.locator('.annotation-item', { hasText: marker });
+    await expect(reply).toBeVisible({ timeout: 5000 });
+    await expect(reply.locator('.ai-note-reply-region-box')).toBeVisible();
+    await expect(reply.locator('.ai-note-reply-region-img')).toHaveAttribute('src', /demo-annotations\.png/);
+
+    // Cleanup so the shared session doesn't accumulate.
+    await reply.locator('[data-action="delete"]').click();
+    await expect(page.locator('.annotation-item', { hasText: marker })).toHaveCount(0, { timeout: 5000 });
+  });
+
   test('a review note renders an attached proof artifact (GB-898)', async ({ page }) => {
     await openModifiedFile(page);
     // The proof note (line 23) attaches a test-output artifact.

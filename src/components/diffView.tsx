@@ -11,6 +11,7 @@ import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { truncateDiffLine } from '../utils/lineTruncate.js';
 import { renderNoteMarkdown } from '../utils/noteMarkdown.js';
 import { ImageDiff } from './imageDiff.js';
+import { ReviewNoteRegionThumb } from './reviewNoteRegionThumb.js';
 
 export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
   file: ReviewFile;
@@ -412,6 +413,7 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                   <details className="ai-note-artifact">
                     <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
                     <img className="ai-note-artifact-img" loading="lazy" alt={a.uri}
+                      data-artifact-uri={a.uri} title="Click to view full screen and mark a region"
                       src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
                   </details>
                 ) : (
@@ -436,11 +438,13 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
 function AnnotationItem({ annotation: a }: { annotation: Annotation }) {
   return (
     <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
-      data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}>
+      data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}
+      data-region-data={a.region_data ?? undefined}>
       <span className="annotation-drag-handle" draggable={true} title="Drag to move"><IconGripVertical /></span>
       <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
       {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note"><IconCornerDownRight /> reply</span> : null}
       <span className="annotation-text">{a.content}</span>
+      {ReviewNoteRegionThumb({ regionData: a.region_data })}
       <div className="annotation-actions">
         {a.is_stale ? <button className="btn btn-xs btn-keep" data-action="keep">Keep</button> : null}
         <button className="btn btn-xs btn-icon" data-action="attach" title="Attach a file"><IconPaperclip /></button>

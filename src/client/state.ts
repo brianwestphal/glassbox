@@ -17,6 +17,9 @@ export interface Annotation {
   is_stale: boolean;
   /** SARIF guid of the AI review note this annotation replies to (doc 20 threading). */
   reply_to_note_id?: string | null;
+  /** JSON `x,y,w,h(,artifact)` for a reply that marks a region on a note's image
+   *  artifact (doc 25 / GB-953); null/undefined otherwise. */
+  region_data?: string | null;
 }
 
 export interface DragAnnotation {

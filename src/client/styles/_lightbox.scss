@@ -1,0 +1,81 @@
+// --- Shared lightbox (doc 25 / GB-953) ---
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.lightbox-frame {
+  position: relative;
+  display: inline-flex;
+  max-width: 92vw;
+  max-height: 88vh;
+
+  &.lightbox-drawable .lightbox-img { cursor: crosshair; }
+}
+
+.lightbox-img {
+  display: block;
+  max-width: 92vw;
+  max-height: 88vh;
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+.lightbox-pdf {
+  width: 86vw;
+  height: 88vh;
+  border: none;
+  border-radius: 6px;
+  background: #fff;
+}
+
+// Region-draw layer, sized exactly to the image (the frame shrinks to it).
+.lightbox-region-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lightbox-region-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  background: rgba(137, 180, 250, 0.22);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+
+  &:hover { background: rgba(255, 255, 255, 0.22); }
+}
+
+.lightbox-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+}

@@ -140,33 +140,7 @@
   white-space: nowrap;
 }
 
-// --- Attachment preview overlay (lightbox, GB-958) ---
-
-.attachment-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.78);
-  cursor: zoom-out;
-}
-
-.attachment-overlay-img {
-  max-width: 92vw;
-  max-height: 92vh;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.attachment-overlay-pdf {
-  width: 86vw;
-  height: 90vh;
-  border: none;
-  border-radius: 8px;
-  background: #fff;
-}
+// Attachment image/PDF preview uses the shared lightbox (`_lightbox.scss`).
 
 .attachment-chip-remove {
   display: flex;
@@ -181,6 +155,40 @@
   svg { width: 12px; height: 12px; }
   &:hover { color: var(--red, #f38ba8); }
 }
+
+// --- Reply region thumbnail (GB-953) ---
+
+// A reply that marks a region on a note's image artifact shows the artifact
+// with the rectangle drawn over it, on its own line.
+.ai-note-reply-region {
+  flex-basis: 100%;
+  margin-left: 22px;
+}
+
+.ai-note-reply-region-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 320px;
+}
+
+.ai-note-reply-region-img {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.ai-note-reply-region-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  background: rgba(137, 180, 250, 0.2);
+  pointer-events: none;
+}
+
+// Hint that an artifact image is clickable for full-screen + region marking.
+.ai-note-artifact-img { cursor: zoom-in; }
 
 // Highlight an annotation row while a file is dragged over it.
 .annotation-drop-target {

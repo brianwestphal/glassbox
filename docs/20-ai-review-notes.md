@@ -198,7 +198,15 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   diagram-*source* artifacts render as an inline, collapsible code block; **image
   artifacts** (`.png`/`.webp`/`.avif`/`.gif`/`.jpg`/`.svg`) render as an `<img>`
   served by `GET /api/review-notes/artifact` (path-contained, content-typed,
-  size-capped). The reader is path-contained + size-capped throughout. **Live
+  size-capped). **Clicking an image artifact** opens it in a shared full-screen
+  lightbox where the reviewer can **drag a rectangle to mark a region**; that
+  region is carried into the reply they then write — the reply renders the
+  artifact with the marked rectangle (a "see this spot" thumbnail). The region
+  reuses doc 23's normalized `{x,y,w,h}` model (plus an `artifact` uri) stored in
+  the reply annotation's `region_data`; the lightbox lives in
+  `src/client/lightbox.tsx`, the marked thumbnail in
+  `src/components/reviewNoteRegionThumb.tsx` (doc 25 / GB-953). The reader is
+  path-contained + size-capped throughout. **Live
   diagram rendering** of diagram-source (Mermaid/Graphviz/PlantUML) into actual
   diagrams is the remaining follow-up (§20.11 P4).
 - **Threading** *(shipped)* — A reviewer can reply to an AI note with their own

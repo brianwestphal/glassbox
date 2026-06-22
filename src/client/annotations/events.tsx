@@ -126,7 +126,10 @@ function readAnnotation(item: HTMLElement): Annotation | null {
   const category = item.querySelector('.annotation-category')?.textContent ?? '';
   const content = item.querySelector('.annotation-text')?.textContent ?? '';
   const isStale = item.dataset.isStale === 'true';
-  return { id, category, content, is_stale: isStale };
+  // Preserve the artifact-region marker across re-renders (GB-953) so an
+  // edit/keep morph doesn't drop a reply's marked-region thumbnail.
+  const regionData = item.dataset.regionData ?? null;
+  return { id, category, content, is_stale: isStale, region_data: regionData };
 }
 
 async function handleDelete(item: HTMLElement): Promise<void> {

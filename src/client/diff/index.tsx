@@ -10,6 +10,7 @@ import { renderAINotes } from './aiNotes.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
 import { handleHunkExpand } from './hunkExpander.js';
 import { bindImageDiff } from './imageDiff/index.js';
+import { bindNoteArtifactRegions } from './noteArtifactRegions.js';
 import { loadOutline } from './outline.js';
 import { selectFile } from './selection.js';
 import { syncSplitColumnHeights } from './splitSync.js';
@@ -45,6 +46,7 @@ export function initDiffView(): void {
   setupDelegatedHandlers(container);
   bindAnnotationEvents(container);
   bindCreateFormEvents(container);
+  bindNoteArtifactRegions(container);
 }
 
 // --- Reactive fetch ---

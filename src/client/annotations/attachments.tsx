@@ -11,6 +11,7 @@ import {
 } from '../../api/index.js';
 import { IconFile, IconTrash } from '../../icons.js';
 import { asEl, asElOrNull, toElement } from '../dom.js';
+import { isLightboxOpen, openLightbox } from '../lightbox.js';
 
 /** Which attachments preview in-app (the overlay handles these); everything
  *  else opens in the OS default app (doc 25 / GB-958). */
@@ -101,53 +102,22 @@ function openFilePicker(annotationId: string): void {
   input.click();
 }
 
-/** Preview a chip: images/PDFs open the in-app overlay (instant, stays in the
- *  app, works in any browser); everything else opens in the OS default app via
- *  the local server (GB-958). */
+/** Preview a chip: images/PDFs open the shared in-app lightbox (instant, stays
+ *  in the app, works in any browser); everything else opens in the OS default
+ *  app via the local server (GB-958). */
 function previewChip(chip: HTMLElement): void {
   const id = chip.dataset.attId;
   if (id === undefined || id === '') return;
   const mime = chip.dataset.mime ?? '';
   if (isPreviewable(mime)) {
-    showPreviewOverlay(id, mime, chip.dataset.filename ?? '');
+    openLightbox({
+      src: attachmentRawUrl(id),
+      alt: chip.dataset.filename ?? '',
+      kind: mime === 'application/pdf' ? 'pdf' : 'image',
+    });
   } else {
     void quicklookAttachment(id).catch(() => { /* best-effort */ });
   }
-}
-
-let openOverlay: HTMLElement | null = null;
-
-/** Full-screen lightbox for an image/PDF attachment. One at a time; Esc, Space,
- *  or a click on the backdrop dismisses it. */
-function showPreviewOverlay(id: string, mime: string, filename: string): void {
-  closePreviewOverlay();
-  const url = attachmentRawUrl(id);
-  const media = mime === 'application/pdf'
-    ? <iframe className="attachment-overlay-pdf" src={url} title={filename}></iframe>
-    : <img className="attachment-overlay-img" src={url} alt={filename} />;
-  const overlay = toElement(
-    <div className="attachment-overlay" role="dialog" aria-label={`Preview of ${filename}`}>
-      {media}
-    </div>,
-  );
-  overlay.addEventListener('click', () => { closePreviewOverlay(); });
-  document.addEventListener('keydown', overlayKeydown);
-  document.body.appendChild(overlay);
-  openOverlay = overlay;
-}
-
-function overlayKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape' || e.key === ' ') {
-    e.preventDefault();
-    closePreviewOverlay();
-  }
-}
-
-function closePreviewOverlay(): void {
-  if (openOverlay === null) return;
-  openOverlay.remove();
-  openOverlay = null;
-  document.removeEventListener('keydown', overlayKeydown);
 }
 
 async function removeChip(chip: HTMLElement): Promise<void> {
@@ -225,7 +195,7 @@ export function bindAttachmentEvents(root: HTMLElement): void {
   // is already open, let its own handler take Space (close) instead of reopening.
   void delegate(root, 'keydown', '.attachment-chip', (e, chip) => {
     const ke = e as KeyboardEvent;
-    if (openOverlay !== null) return;
+    if (isLightboxOpen()) return;
     if (ke.key === ' ' || ke.key === 'Enter') {
       ke.preventDefault();
       previewChip(asEl(chip));

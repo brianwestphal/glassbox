@@ -154,3 +154,8 @@ export function IconSquareDashed(): SafeHtml {
 export function IconFile(): SafeHtml {
   return <svg {...S12}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v6h6"/></svg>;
 }
+
+/** X / close icon (lucide) — dismiss the lightbox (doc 25 / GB-953). */
+export function IconX(): SafeHtml {
+  return <svg {...S14}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
+}

@@ -137,6 +137,11 @@ overlay** (lightbox) on click/Space; other types open in the OS default app.
 wired on **line annotations**, **note replies** (same `AnnotationItem`), and
 **image-feedback** comments/regions. Client:
 `src/client/annotations/attachments.tsx`; routes `src/routes/api/attachments.ts`.
+Related (GB-953): clicking an AI review note's **image artifact** (doc 20) opens
+a shared full-screen **lightbox** (`src/client/lightbox.tsx`) where the reviewer
+**drags a rectangle**; the region rides into the reply they write and renders as
+a marked thumbnail (`src/components/reviewNoteRegionThumb.tsx`), reusing doc 23's
+normalized `{x,y,w,h}` model with an `artifact` uri in `region_data`.
 
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions
