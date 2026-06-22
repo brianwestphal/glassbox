@@ -49,21 +49,35 @@ function registerOutsideClickDismiss(popup: HTMLElement): void {
   setTimeout(() => { document.addEventListener('click', close, true); }, 0);
 }
 
-/** Picker for an existing annotation row — saves via PATCH and updates the
- *  row's DOM in place. Used by the per-row reclassify badge. */
-export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, annotation: Annotation): void {
+/** Generic category picker: opens the shared popup anchored to `anchor`,
+ *  highlighting `current`, and invokes `onPick` with the chosen category value.
+ *  The two specialized entry points below build on this, as does image feedback
+ *  (doc 23). */
+export function showCategoryPicker(
+  anchor: HTMLElement,
+  current: string,
+  onPick: (value: string) => void,
+): void {
   dismissExistingPopups();
-  const popup = renderPopup(annotation.category);
+  const popup = renderPopup(current);
   positionPopup(popup, anchor);
   document.body.appendChild(popup);
 
   void delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
-    const newCategory = asEl(opt).dataset.value ?? '';
-    if (newCategory === annotation.category) {
-      popup.remove();
-      return;
-    }
+    const value = asEl(opt).dataset.value ?? '';
+    popup.remove();
+    onPick(value);
+  });
+
+  registerOutsideClickDismiss(popup);
+}
+
+/** Picker for an existing annotation row — saves via PATCH and updates the
+ *  row's DOM in place. Used by the per-row reclassify badge. */
+export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, annotation: Annotation): void {
+  showCategoryPicker(anchor, annotation.category, (newCategory) => {
+    if (newCategory === annotation.category) return;
     void (async () => {
       await updateAnnotation({
         id: annotation.id,
@@ -72,26 +86,16 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
       });
       const updated: Annotation = { ...annotation, category: newCategory };
       morph(item, buildAnnotationItemHtml(updated));
-      popup.remove();
     })();
   });
-
-  registerOutsideClickDismiss(popup);
 }
 
 /** Picker for the create / edit form's category badge — writes the chosen
  *  category into the edit-form signal AND the badge DOM so a subsequent save
  *  reads the right category from the signal. */
 export function showCategoryPickerForBadge(badge: HTMLElement): void {
-  dismissExistingPopups();
   const current = badge.dataset.category ?? '';
-  const popup = renderPopup(current);
-  positionPopup(popup, badge);
-  document.body.appendChild(popup);
-
-  void delegate(popup, 'click', '.reclassify-option', (e, opt) => {
-    e.stopPropagation();
-    const value = asEl(opt).dataset.value ?? '';
+  showCategoryPicker(badge, current, (value) => {
     const cat = CATEGORIES.find(c => c.value === value);
     badge.className = `annotation-category category-${value} form-category-badge`;
     badge.dataset.category = value;
@@ -99,8 +103,5 @@ export function showCategoryPickerForBadge(badge: HTMLElement): void {
     if (editFormSignal.value !== null) {
       setEditForm({ ...editFormSignal.value, category: value });
     }
-    popup.remove();
   });
-
-  registerOutsideClickDismiss(popup);
 }

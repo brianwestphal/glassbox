@@ -176,6 +176,15 @@ export async function deleteAnnotation(id: string): Promise<void> {
   await db.query('DELETE FROM annotations WHERE id = $1', [id]);
 }
 
+/** Rewrite an image-region annotation's geometry / per-side scope (doc 23 §23.10). */
+export async function updateAnnotationRegion(id: string, region: ImageRegion): Promise<void> {
+  const db = await getDb();
+  await db.query(
+    'UPDATE annotations SET region_data = $1, updated_at = NOW() WHERE id = $2',
+    [JSON.stringify(region), id]
+  );
+}
+
 export async function moveAnnotation(id: string, lineNumber: number, side: string): Promise<void> {
   const db = await getDb();
   await db.query(

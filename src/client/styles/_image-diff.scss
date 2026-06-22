@@ -229,6 +229,33 @@
   box-sizing: border-box;
   border: 1.5px solid var(--accent);
   background: rgba(137, 180, 250, 0.18);
+  // Boxes are individually interactive (hover-link + move/resize) even though
+  // the overlay container is transparent to pointer events, so empty space
+  // still passes drags through to zoom/pan. While drawing a new region the
+  // boxes step aside so they don't block the draw.
+  pointer-events: auto;
+}
+
+.region-overlay.draw-mode .region-box {
+  pointer-events: none;
+}
+
+// Brightened when the matching region list row is hovered (and vice versa).
+.region-box-active {
+  border-width: 2.5px;
+  background: rgba(137, 180, 250, 0.32);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+// Per-side tint (doc 23 §23.10): A-only vs B-only regions.
+.region-box-a {
+  border-color: var(--diff-removed-text, #f38ba8);
+  background: rgba(243, 139, 168, 0.18);
+}
+
+.region-box-b {
+  border-color: var(--diff-added-text, #a6e3a1);
+  background: rgba(166, 227, 161, 0.18);
 }
 
 .region-box-pending {
@@ -334,6 +361,43 @@
   background: rgba(137, 180, 250, 0.05);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
+}
+
+// Highlighted when the matching region box on the image is hovered.
+.image-feedback-item-active {
+  background: rgba(137, 180, 250, 0.16);
+}
+
+// Clickable category badge for an image comment / region (doc 23 §23.6).
+.image-feedback-cat {
+  flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+}
+
+// Clickable per-side scope badge (doc 23 §23.10): A+B / A / B.
+.image-feedback-side {
+  flex-shrink: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+
+  &.side-old {
+    border-color: var(--diff-removed-text, #f38ba8);
+    color: var(--diff-removed-text, #f38ba8);
+  }
+
+  &.side-new {
+    border-color: var(--diff-added-text, #a6e3a1);
+    color: var(--diff-added-text, #a6e3a1);
+  }
 }
 
 .image-feedback-item-body {

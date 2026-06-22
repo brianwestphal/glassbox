@@ -16,4 +16,4 @@ export function buildCategoryBadge(value: string): SafeHtml {
 // implementation. `showCategoryPickerForBadge()` is the modern entry
 // point for the form badge; `showReclassifyPopup()` is the entry point
 // for the row badge.
-export { showCategoryPickerForBadge, showReclassifyPopup } from './reclassifyPopup.js';
+export { showCategoryPicker, showCategoryPickerForBadge, showReclassifyPopup } from './reclassifyPopup.js';

@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   clientToFraction,
+  cursorForHandle,
   formatRegionPct,
+  hitTestRegion,
   isDrawnRegion,
   MIN_REGION_SIZE,
+  moveRegion,
   parseRegion,
   rectFromPoints,
   regionStyle,
+  resizeRegion,
 } from '../../../src/client/diff/imageDiff/regionGeometry.js';
 
 const RECT = { left: 100, top: 50, width: 200, height: 100 };
@@ -77,6 +81,15 @@ describe('parseRegion', () => {
     expect(parseRegion('{"x":0.1,"y":0.2,"w":0.3,"h":0.4}')).toEqual({ x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
   });
 
+  it('parses a region scoped to one side', () => {
+    expect(parseRegion('{"x":0.1,"y":0.2,"w":0.3,"h":0.4,"side":"new"}'))
+      .toEqual({ x: 0.1, y: 0.2, w: 0.3, h: 0.4, side: 'new' });
+  });
+
+  it('rejects an invalid side value', () => {
+    expect(parseRegion('{"x":0.1,"y":0.2,"w":0.3,"h":0.4,"side":"both"}')).toBeNull();
+  });
+
   it('returns null for null input', () => {
     expect(parseRegion(null)).toBeNull();
   });
@@ -87,5 +100,92 @@ describe('parseRegion', () => {
 
   it('returns null for out-of-range values', () => {
     expect(parseRegion('{"x":2,"y":0,"w":0.1,"h":0.1}')).toBeNull();
+  });
+});
+
+describe('hitTestRegion', () => {
+  // A box at client px (100,100) sized 200×100.
+  const BOX = { left: 100, top: 100, width: 200, height: 100 };
+
+  it('returns null well outside the box', () => {
+    expect(hitTestRegion(BOX, 10, 10, 8)).toBeNull();
+  });
+
+  it('returns move for the interior', () => {
+    expect(hitTestRegion(BOX, 200, 150, 8)).toBe('move');
+  });
+
+  it('detects each edge', () => {
+    expect(hitTestRegion(BOX, 100, 150, 8)).toBe('w');
+    expect(hitTestRegion(BOX, 300, 150, 8)).toBe('e');
+    expect(hitTestRegion(BOX, 200, 100, 8)).toBe('n');
+    expect(hitTestRegion(BOX, 200, 200, 8)).toBe('s');
+  });
+
+  it('detects corners', () => {
+    expect(hitTestRegion(BOX, 100, 100, 8)).toBe('nw');
+    expect(hitTestRegion(BOX, 300, 100, 8)).toBe('ne');
+    expect(hitTestRegion(BOX, 100, 200, 8)).toBe('sw');
+    expect(hitTestRegion(BOX, 300, 200, 8)).toBe('se');
+  });
+});
+
+describe('cursorForHandle', () => {
+  it('maps handles to resize cursors', () => {
+    expect(cursorForHandle('move')).toBe('move');
+    expect(cursorForHandle('n')).toBe('ns-resize');
+    expect(cursorForHandle('e')).toBe('ew-resize');
+    expect(cursorForHandle('ne')).toBe('nesw-resize');
+    expect(cursorForHandle('nw')).toBe('nwse-resize');
+  });
+});
+
+describe('resizeRegion', () => {
+  const R = { x: 0.2, y: 0.2, w: 0.4, h: 0.4 };
+
+  it('moves the dragged edge while keeping the opposite edge fixed', () => {
+    const out = resizeRegion(R, 'e', { x: 0.8, y: 0.5 });
+    expect(out.x).toBeCloseTo(0.2, 8);
+    expect(out.w).toBeCloseTo(0.6, 8);
+    expect(out.y).toBeCloseTo(0.2, 8);
+    expect(out.h).toBeCloseTo(0.4, 8);
+  });
+
+  it('resizes from a corner', () => {
+    const out = resizeRegion(R, 'se', { x: 0.9, y: 0.9 });
+    expect(out.x).toBeCloseTo(0.2, 8);
+    expect(out.y).toBeCloseTo(0.2, 8);
+    expect(out.w).toBeCloseTo(0.7, 8);
+    expect(out.h).toBeCloseTo(0.7, 8);
+  });
+
+  it('never collapses below the minimum size', () => {
+    // Drag the west edge past the east edge.
+    const out = resizeRegion(R, 'w', { x: 0.99, y: 0.5 });
+    expect(out.w).toBeCloseTo(MIN_REGION_SIZE, 8);
+  });
+
+  it('preserves the per-side scope', () => {
+    const out = resizeRegion({ ...R, side: 'new' }, 'e', { x: 0.8, y: 0.5 });
+    expect(out.side).toBe('new');
+  });
+});
+
+describe('moveRegion', () => {
+  const R = { x: 0.2, y: 0.2, w: 0.4, h: 0.4 };
+
+  it('translates by a delta keeping size', () => {
+    const out = moveRegion(R, 0.1, -0.1);
+    expect(out).toEqual({ x: expect.closeTo(0.3, 8), y: expect.closeTo(0.1, 8), w: 0.4, h: 0.4 });
+  });
+
+  it('clamps so the box stays inside the image', () => {
+    const out = moveRegion(R, 1, 1);
+    expect(out.x).toBeCloseTo(0.6, 8);
+    expect(out.y).toBeCloseTo(0.6, 8);
+  });
+
+  it('preserves the per-side scope', () => {
+    expect(moveRegion({ ...R, side: 'old' }, 0.1, 0).side).toBe('old');
   });
 });

@@ -68,6 +68,17 @@ export const MoveAnnotationBodySchema = MoveAnnotationReqSchema.omit({ id: true 
 export type MoveAnnotationResp = z.infer<typeof OkResponseSchema>;
 export const MoveAnnotationRespSchema = OkResponseSchema;
 
+/** Reposition / resize / rescope an image-region annotation (doc 23 §23.10).
+ *  Rewrites the `region_data` JSON; the region may carry an optional `side`. */
+export const UpdateRegionReqSchema = z.object({
+  id: z.string(),
+  region: ImageRegionSchema,
+});
+export type UpdateRegionReq = z.infer<typeof UpdateRegionReqSchema>;
+export const UpdateRegionBodySchema = UpdateRegionReqSchema.omit({ id: true });
+export type UpdateRegionResp = z.infer<typeof OkResponseSchema>;
+export const UpdateRegionRespSchema = OkResponseSchema;
+
 export const KeepAnnotationReqSchema = z.object({ id: z.string() });
 export type KeepAnnotationReq = z.infer<typeof KeepAnnotationReqSchema>;
 export type KeepAnnotationResp = z.infer<typeof OkResponseSchema>;
@@ -102,6 +113,11 @@ export async function deleteAnnotation(req: DeleteAnnotationReq): Promise<Delete
 export async function moveAnnotation(req: MoveAnnotationReq): Promise<MoveAnnotationResp> {
   const { id, ...body } = req;
   return apiCall(MoveAnnotationRespSchema, `/annotations/${id}/move`, { method: 'PATCH', body });
+}
+
+export async function updateAnnotationRegion(req: UpdateRegionReq): Promise<UpdateRegionResp> {
+  const { id, ...body } = req;
+  return apiCall(UpdateRegionRespSchema, `/annotations/${id}/region`, { method: 'PATCH', body });
 }
 
 export async function keepAnnotation(req: KeepAnnotationReq): Promise<KeepAnnotationResp> {

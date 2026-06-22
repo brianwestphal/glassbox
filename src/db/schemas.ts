@@ -79,6 +79,11 @@ export const ImageRegionSchema = z.object({
   y: z.number().min(0).max(1),
   w: z.number().min(0).max(1),
   h: z.number().min(0).max(1),
+  // Optional per-side scope (doc 23 §23.6 / §23.10): `old` = applies to the A
+  // (old) image only, `new` = applies to the B (new) image only. Absent means
+  // the region applies to both sides (the default), which is how every region
+  // created before this field existed is interpreted.
+  side: z.enum(['old', 'new']).optional(),
 });
 export type ImageRegion = z.infer<typeof ImageRegionSchema>;
 

@@ -4,8 +4,9 @@ import {
   CreateAnnotationReqSchema,
   MoveAnnotationBodySchema,
   UpdateAnnotationBodySchema,
+  UpdateRegionBodySchema,
 } from '../../api/annotations.js';
-import { addAnnotation, deleteAnnotation, deleteStaleAnnotations, getAnnotationsForReview, keepAllStaleAnnotations, markAnnotationCurrent, moveAnnotation, updateAnnotation } from '../../db/queries.js';
+import { addAnnotation, deleteAnnotation, deleteStaleAnnotations, getAnnotationsForReview, keepAllStaleAnnotations, markAnnotationCurrent, moveAnnotation, updateAnnotation, updateAnnotationRegion } from '../../db/queries.js';
 import { scheduleAutoExport } from '../../export/auto-export.js';
 import type { AppEnv } from '../../types.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -46,6 +47,17 @@ annotationsRoutes.delete('/annotations/:id', async (c) => {
   const id = requirePathParam(c, 'id');
   if (!id.ok) return id.response;
   await deleteAnnotation(id.data);
+  autoExport(c);
+  return c.json({ ok: true } as const);
+});
+
+annotationsRoutes.patch('/annotations/:id/region', async (c) => {
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
+  const parsed = await parseBody(c, UpdateRegionBodySchema);
+  if (!parsed.ok) return parsed.response;
+
+  await updateAnnotationRegion(id.data, parsed.data.region);
   autoExport(c);
   return c.json({ ok: true } as const);
 });

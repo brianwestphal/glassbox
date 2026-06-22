@@ -115,10 +115,16 @@ reviewer add general comments about an image and draw rectangle regions
 across the comparison modes, each region carrying a comment. Persisted as
 image-level annotations (`line_number 0` + a `region_data` JSON column,
 reusing the annotations table) and folded into the markdown export as
-`Image comment` / `Image region (x%, y%, w%×h%)`. First iteration —
-move/resize, hover-linking, and category selection are deferred follow-ups.
-Client: `src/client/diff/imageDiff/imageFeedback.tsx` + pure
-`regionGeometry.ts`.
+`Image comment` / `Image region (x%, y%, w%×h%)`. A second pass added:
+reviewer-selectable **category** per comment/region (shared annotation
+picker); **per-side scope** — a region can apply to A-only, B-only, or both,
+stored as an optional `side` inside `region_data`, shown as an `A+B`/`A`/`B`
+badge + box tint + export qualifier; **hover-linking** a list row to its box;
+and **move/resize** of an existing box (drag interior to move, edges/corners to
+resize), persisted via `PATCH /annotations/:id/region`. Drawing while
+zoomed/panned lands the box where drawn (overlay-relative coord math). Client:
+`src/client/diff/imageDiff/imageFeedback.tsx` + pure `regionGeometry.ts`
+(now also `hitTestRegion` / `resizeRegion` / `moveRegion`).
 
 Other controls: wrap toggle, ignore-whitespace toggle (regenerates with
 `-w`, persisted in user_preferences), syntax highlighting (auto-detected

@@ -167,3 +167,193 @@ test.describe('Image feedback (doc 23)', () => {
       .toContainText('This corner is misaligned');
   });
 });
+
+// Doc 23 §23.6 / §23.10 — image-feedback follow-ups (GB-936..GB-940).
+test.describe('Image feedback follow-ups', () => {
+  async function showDifference(page: import('@playwright/test').Page) {
+    await page.locator('[data-image-mode="difference"]').click();
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>('[data-panel="difference"] .image-layer-old');
+      return img !== null && img.complete && img.naturalWidth > 0;
+    }, null, { timeout: 10000 });
+  }
+
+  // The demo review persists annotations across tests, so each test scopes its
+  // assertions to the specific region it creates (identified by annotation id),
+  // not `.first()`, which could resolve to a region left over from an earlier test.
+  interface DrawnRegion {
+    id: string;
+    row: import('@playwright/test').Locator;
+    box: import('@playwright/test').Locator;
+  }
+
+  /** Enter draw mode and drag a rectangle (in overlay fractions) across the
+   *  difference overlay, add `comment`, and return locators scoped to the new
+   *  region by its annotation id. */
+  async function drawRegion(
+    page: import('@playwright/test').Page,
+    comment: string,
+    f0: { x: number; y: number } = { x: 0.3, y: 0.3 },
+    f1: { x: number; y: number } = { x: 0.6, y: 0.6 },
+  ): Promise<DrawnRegion> {
+    await page.locator('[data-action="toggle-draw"]').click();
+    const overlay = page.locator('[data-panel="difference"] [data-region-overlay]');
+    const box = await overlay.boundingBox();
+    if (!box) throw new Error('region overlay has no box');
+    await page.mouse.move(box.x + box.width * f0.x, box.y + box.height * f0.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * f1.x, box.y + box.height * f1.y, { steps: 8 });
+    await page.mouse.up();
+    const pendingInput = page.locator('[data-role="pending-input"]');
+    await expect(pendingInput).toBeVisible({ timeout: 5000 });
+    await pendingInput.fill(comment);
+    await page.locator('[data-action="save-pending"]').click();
+
+    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment });
+    await expect(row).toBeVisible({ timeout: 5000 });
+    const id = await row.getAttribute('data-id');
+    if (id === null || id === 'pending') throw new Error(`region row has no saved id (${id})`);
+    const regionBox = page.locator(`[data-panel="difference"] .region-box[data-region-id="${id}"]`);
+    await expect(regionBox).toBeVisible({ timeout: 5000 });
+    return { id, row, box: regionBox };
+  }
+
+  // GB-938: pick a category for image feedback (not always `note`).
+  test('a general comment can be given a non-default category that persists', async ({ page }) => {
+    await openImageDiff(page);
+    const panel = page.locator('[data-image-feedback]');
+    await expect(panel.locator('[data-role="general-input"]')).toBeVisible({ timeout: 5000 });
+
+    // Composer badge defaults to Note; open the picker and choose Bug.
+    await panel.locator('[data-action="pick-general-cat"]').click();
+    await page.locator('.reclassify-popup .reclassify-option[data-value="bug"]').click();
+    const text = 'Wrong corner radius';
+    await panel.locator('[data-role="general-input"]').fill(text);
+    await panel.locator('[data-action="add-general"]').click();
+
+    const item = panel.locator('[data-list="general"] .image-feedback-item', { hasText: text });
+    await expect(item.locator('[data-action="pick-category"]')).toHaveAttribute('data-category', 'bug', { timeout: 5000 });
+
+    await openImageDiff(page);
+    await expect(page.locator('[data-image-feedback] [data-list="general"] .image-feedback-item', { hasText: text })
+      .locator('[data-action="pick-category"]'))
+      .toHaveAttribute('data-category', 'bug', { timeout: 5000 });
+  });
+
+  // GB-937: hovering a region list row highlights its box on the image.
+  test('hovering a region row highlights its box (and vice versa)', async ({ page }) => {
+    await openImageDiff(page);
+    await showDifference(page);
+    const region = await drawRegion(page, 'Halo around the glyph');
+
+    await region.row.hover();
+    await expect(region.box).toHaveClass(/region-box-active/, { timeout: 5000 });
+    // Moving away from the row clears the highlight.
+    await page.locator('.image-feedback-heading').first().hover();
+    await expect(region.box).not.toHaveClass(/region-box-active/, { timeout: 5000 });
+  });
+
+  // GB-939: scope a region to one side (A-only / B-only).
+  test('a region can be scoped to one side and persists', async ({ page }) => {
+    await openImageDiff(page);
+    await showDifference(page);
+    const region = await drawRegion(page, 'Artifact only in the new image');
+
+    const sideBadge = region.row.locator('[data-action="cycle-side"]');
+    await expect(sideBadge).toHaveText('A+B');
+    // Cycle both -> A -> B.
+    await sideBadge.click();
+    await expect(sideBadge).toHaveText('A');
+    await sideBadge.click();
+    await expect(sideBadge).toHaveText('B');
+    await expect(region.box).toHaveClass(/region-box-b/);
+
+    await openImageDiff(page);
+    await showDifference(page);
+    await expect(page.locator('[data-list="regions"] .image-feedback-item', { hasText: 'Artifact only in the new image' })
+      .locator('[data-action="cycle-side"]'))
+      .toHaveText('B', { timeout: 5000 });
+  });
+
+  // GB-936: an existing region can be dragged to a new position; it persists.
+  test('a region box can be moved and the new position persists', async ({ page }) => {
+    await openImageDiff(page);
+    await showDifference(page);
+    const region = await drawRegion(page, 'Misplaced badge', { x: 0.25, y: 0.25 }, { x: 0.45, y: 0.45 });
+
+    const before = await region.box.boundingBox();
+    if (!before) throw new Error('region box has no box');
+
+    // Grab the interior (center) and drag right + down.
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(before.x + before.width / 2 + 60, before.y + before.height / 2 + 40, { steps: 10 });
+    await page.mouse.up();
+
+    await expect.poll(async () => {
+      const b = await region.box.boundingBox();
+      return b ? Math.round(b.x - before.x) : 0;
+    }, { timeout: 5000 }).toBeGreaterThan(30);
+
+    const moved = await region.box.boundingBox();
+    if (!moved) throw new Error('region box vanished after move');
+
+    // Reload: the moved position is restored from the database.
+    await openImageDiff(page);
+    await showDifference(page);
+    const reloadedBox = page.locator(`[data-panel="difference"] .region-box[data-region-id="${region.id}"]`);
+    const reloaded = await reloadedBox.boundingBox();
+    if (!reloaded) throw new Error('region box missing after reload');
+    expect(Math.abs(reloaded.x - moved.x)).toBeLessThan(8);
+    expect(Math.abs(reloaded.y - moved.y)).toBeLessThan(8);
+  });
+
+  // GB-940: drawing while zoomed/panned stores coords that match the on-screen
+  // rectangle, because clientToFraction uses the overlay's live (transformed) rect.
+  test('drawing while zoomed and panned lands the box where it was drawn', async ({ page }) => {
+    await openImageDiff(page);
+    await showDifference(page);
+
+    // Zoom in (>1) so panning is enabled, then pan the canvas.
+    const zoomIn = page.locator('.diff-toolbar-image [data-zoom-action="in"]');
+    await zoomIn.click();
+    await zoomIn.click();
+    const canvas = page.locator('[data-panel="difference"] .image-visual-canvas');
+    const cbox = await canvas.boundingBox();
+    if (!cbox) throw new Error('canvas has no box');
+    await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(cbox.x + cbox.width / 2 + 30, cbox.y + cbox.height / 2 + 20, { steps: 6 });
+    await page.mouse.up();
+
+    // Draw a rectangle at known screen coordinates near the canvas center.
+    await page.locator('[data-action="toggle-draw"]').click();
+    const cx = cbox.x + cbox.width / 2;
+    const cy = cbox.y + cbox.height / 2;
+    const x0 = cx - 40, y0 = cy - 30, x1 = cx + 40, y1 = cy + 30;
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move(x1, y1, { steps: 10 });
+    await page.mouse.up();
+    const comment = 'Drawn while zoomed';
+    await page.locator('[data-role="pending-input"]').fill(comment);
+    await page.locator('[data-action="save-pending"]').click();
+
+    // Scope to the region we just drew (not a leftover from an earlier test).
+    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment });
+    await expect(row).toBeVisible({ timeout: 5000 });
+    const id = await row.getAttribute('data-id');
+    const regionBox = page.locator(`[data-panel="difference"] .region-box[data-region-id="${id}"]`);
+    await expect(regionBox).toBeVisible({ timeout: 5000 });
+    const drawn = await regionBox.boundingBox();
+    if (!drawn) throw new Error('drawn region box has no box');
+
+    // The rendered box must match the screen rectangle we dragged (a few px
+    // tolerance for border width / rounding). This is the core GB-940 assertion:
+    // no drift between the drawn rectangle and the stored/rendered region.
+    expect(Math.abs(drawn.x - x0)).toBeLessThan(6);
+    expect(Math.abs(drawn.y - y0)).toBeLessThan(6);
+    expect(Math.abs(drawn.width - (x1 - x0))).toBeLessThan(6);
+    expect(Math.abs(drawn.height - (y1 - y0))).toBeLessThan(6);
+  });
+});
