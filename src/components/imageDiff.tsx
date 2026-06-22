@@ -41,6 +41,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
             <div className="image-zoom-wrap">
               <img className="image-layer image-layer-old" src={`/api/image/${fileId}/old`} alt="Old version" />
               <img className="image-layer image-layer-new image-blend" src={`/api/image/${fileId}/new`} alt="New version" />
+              <div className="region-overlay" data-region-overlay></div>
             </div>
           </div>
         </div>
@@ -53,6 +54,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
             <div className="image-zoom-wrap">
               <img className="image-layer image-layer-old" src={`/api/image/${fileId}/old`} alt="Old version" />
               <img className="image-layer image-layer-new image-slice-clipped" src={`/api/image/${fileId}/new`} alt="New version" />
+              <div className="region-overlay" data-region-overlay></div>
             </div>
             <div className="slice-line"></div>
             <div className="slice-handle slice-handle-a"></div>
@@ -68,10 +70,15 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
             <div className="image-zoom-wrap">
               <img className="image-layer image-layer-old" src={`/api/image/${fileId}/${isAdded ? 'new' : 'old'}`}
                 alt={isAdded ? 'New image' : 'Deleted image'} />
+              <div className="region-overlay" data-region-overlay></div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Image feedback (doc 23): general comments + drawn rectangle regions.
+          Populated client-side by initImageFeedback(). */}
+      <div className="image-feedback" data-image-feedback></div>
     </div>
   );
 }

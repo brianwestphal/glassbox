@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { getDb } from './connection.js';
 import { generateId } from './ids.js';
-import type { Annotation, AnnotationWithFilePath, Review, ReviewFile } from './schemas.js';
+import type { Annotation, AnnotationWithFilePath, ImageRegion, Review, ReviewFile } from './schemas.js';
 import {
   AnnotationSchema,
   AnnotationWithFilePathSchema,
@@ -127,14 +127,15 @@ export async function deleteReviewFile(id: string): Promise<void> {
 
 export async function addAnnotation(
   reviewFileId: string, lineNumber: number, side: string, category: string, content: string,
-  replyToNoteId?: string
+  replyToNoteId?: string, region?: ImageRegion,
 ): Promise<Annotation> {
   const db = await getDb();
   const id = generateId();
   const result = await db.query(
-    `INSERT INTO annotations (id, review_file_id, line_number, side, category, content, reply_to_note_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [id, reviewFileId, lineNumber, side, category, content, replyToNoteId ?? null]
+    `INSERT INTO annotations (id, review_file_id, line_number, side, category, content, reply_to_note_id, region_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [id, reviewFileId, lineNumber, side, category, content, replyToNoteId ?? null,
+     region !== undefined ? JSON.stringify(region) : null]
   );
   const annotation = parseRow(AnnotationSchema, result.rows[0]);
   if (annotation === undefined) throw new Error('addAnnotation: INSERT did not return a row');

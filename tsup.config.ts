@@ -2,16 +2,12 @@ import { defineConfig } from 'tsup';
 import { execSync } from 'child_process';
 
 export default defineConfig([
-  // Server bundle (CLI entry point + channel server + SVG rasterization worker).
-  // Object form pins output filenames so the worker lands at
-  // dist/svg-rasterize-worker.js (a sibling of cli.js), which the rasterization
-  // manager resolves at runtime via `new URL('./svg-rasterize-worker.js', …)`.
+  // Server bundle (CLI entry point + channel server).
   {
     entry: {
       cli: 'src/cli.ts',
       'cli-difftool': 'src/cli-difftool.ts',
       channel: 'src/channel.ts',
-      'svg-rasterize-worker': 'src/git/svg-rasterize-worker.ts',
     },
     format: 'esm',
     outDir: 'dist',
@@ -24,7 +20,7 @@ export default defineConfig([
     // external: it locates its bundled native helper (`bin/apple-fm-helper`)
     // relative to its own package directory, so it has to live in the sidecar's
     // node_modules rather than being inlined into cli.js.
-    noExternal: [/^(?!@electric-sql|hono|@hono|@resvg|@modelcontextprotocol|kerfjs|@preact|apple-fm)/],
+    noExternal: [/^(?!@electric-sql|hono|@hono|@modelcontextprotocol|kerfjs|@preact|apple-fm)/],
     define: {
       'process.env.BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
     },

@@ -131,6 +131,24 @@ describe('generateReviewExport', () => {
     expect(content).toContain('**Line 10** [fix]: Fix null check');
   });
 
+  it('renders image-level annotations distinctly (doc 23)', async () => {
+    mockGetReview.mockResolvedValueOnce({
+      id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'commit', mode_args: 'abc123',
+      head_commit: 'abc', status: 'in_progress', created_at: '2025-01-01',
+    } as any);
+    mockGetReviewFiles.mockResolvedValueOnce([]);
+    mockGetAnnotations.mockResolvedValueOnce([
+      { id: 'i1', file_path: 'logo.png', line_number: 0, side: 'new', category: 'note', content: 'Looks washed out', stale: false, region_data: null },
+      { id: 'i2', file_path: 'logo.png', line_number: 0, side: 'new', category: 'bug', content: 'Misaligned mark', stale: false, region_data: '{"x":0.1,"y":0.2,"w":0.3,"h":0.25}' },
+    ] as any);
+
+    const result = await generateReviewExport('r1', tempDir, true);
+    const content = readFileSync(result, 'utf-8');
+    expect(content).toContain('### logo.png');
+    expect(content).toContain('**Image comment** [note]: Looks washed out');
+    expect(content).toContain('**Image region (10%, 20%, 30%×25%)** [bug]: Misaligned mark');
+  });
+
   it('includes AI tool instructions', async () => {
     mockGetReview.mockResolvedValueOnce({
       id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'uncommitted', mode_args: null,

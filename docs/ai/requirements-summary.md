@@ -97,13 +97,28 @@ text selection is single-column. Status badges indicate added / modified
 headers (no native deps); difference mode uses CSS `mix-blend-mode:
 difference`; slice mode overlays center-to-center with a draggable cut
 line at any angle. Added/deleted images show metadata + zoom/pan viewer
-only. **SVGs** get a Code/Rendered toggle; Rendered rasterizes via
-`@resvg/resvg-wasm` at 10× (max 4000 px in largest dimension — GB-838
-lowered it from 8000 to stay under the 15s per-job worker timeout),
-default 300×150 per HTML spec. Rasterization runs in a worker thread so the
-synchronous WASM render never blocks the HTTP event loop (falls back to
-in-process if a worker can't start). The user's Code/Rendered choice is
+only. **SVGs** get a Code/Rendered toggle; Rendered renders the SVG **live
+in the browser** (GB-932) — the image route serves raw `image/svg+xml` into
+a native `<img>`, so animated SVGs animate and text uses the browser's font
+stack, and the same difference/slice/metadata modes apply. A font-caveat
+banner appears when the SVG uses text/`font-family`/`@font-face` (external
+font URLs don't load in an `<img>`). This replaced the prior server-side
+`@resvg/resvg-wasm` rasterizer + worker thread, which flattened animations
+and could take tens of seconds on large SVGs; that dependency was removed.
+`parseSvgDimensions`/`svgUsesExternalFonts` (`src/git/svg-meta.ts`) supply
+the actual-size target + caveat. The user's Code/Rendered choice is
 remembered across files.
+
+**Image feedback** (doc 23): a panel below the image canvas lets the
+reviewer add general comments about an image and draw rectangle regions
+(stored as normalized `{x,y,w,h}` fractions) that show on both A/B sides
+across the comparison modes, each region carrying a comment. Persisted as
+image-level annotations (`line_number 0` + a `region_data` JSON column,
+reusing the annotations table) and folded into the markdown export as
+`Image comment` / `Image region (x%, y%, w%×h%)`. First iteration —
+move/resize, hover-linking, and category selection are deferred follow-ups.
+Client: `src/client/diff/imageDiff/imageFeedback.tsx` + pure
+`regionGeometry.ts`.
 
 Other controls: wrap toggle, ignore-whitespace toggle (regenerates with
 `-w`, persisted in user_preferences), syntax highlighting (auto-detected

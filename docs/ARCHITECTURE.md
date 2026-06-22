@@ -114,7 +114,7 @@ Provided by **kerfjs** (`kerfjs/jsx-runtime`). Shared between server (page rende
 
 Uses tsup to produce two bundles:
 
-1. **Server** (`dist/cli.js`) — ESM, Node 20 target, shebang. External deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`).
+1. **Server** (`dist/cli.js`) — ESM, Node 20 target, shebang. External deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`), `apple-fm`.
 2. **Client** (`dist/client/app.global.js`) — IIFE, es2020, minified. SCSS compiled separately via sass. Separate entry `dist/client/history.global.js` for the review-history page.
 
 Both bundles use the kerfjs JSX runtime via `tsup.config.ts`'s `options.jsxImportSource = 'kerfjs'` setting.

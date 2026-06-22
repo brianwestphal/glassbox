@@ -25,6 +25,7 @@ annotationsRoutes.post('/annotations', async (c) => {
 
   const annotation = await addAnnotation(
     body.reviewFileId, body.lineNumber, body.side, body.category, body.content, body.replyToNoteId,
+    body.region,
   );
   autoExport(c);
   return c.json(annotation, 201);

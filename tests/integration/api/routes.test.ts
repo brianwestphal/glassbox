@@ -83,17 +83,11 @@ vi.mock('../../../src/git/image.js', () => ({
   formatMetadataLines: vi.fn(() => []),
 }));
 
-// Mock svg-rasterize to avoid WASM dependency
-vi.mock('../../../src/git/svg-rasterize.js', () => ({
-  rasterizeSvg: vi.fn(),
-}));
-
 // Import the routes after mocks are set up (vi.mock is hoisted)
 import { apiRoutes } from '../../../src/routes/api.js';
 // Imports of the mocked modules so individual tests can override their
 // behavior via `vi.mocked(...).mockImplementation(...)`.
 import { getNewImage, getOldImage, getContentType, isSvgFile } from '../../../src/git/image.js';
-import { rasterizeSvg } from '../../../src/git/svg-rasterize.js';
 
 // Build the test Hono app, mirroring the server middleware
 function createTestApp(currentReviewId: string = TEST_REVIEW_ID): Hono<AppEnv> {
@@ -408,6 +402,65 @@ describe('POST /api/annotations', () => {
       const annotation = await res.json();
       expect(annotation.category).toBe(category);
     }
+  });
+});
+
+// Doc 23 — image feedback. Image-level annotations use line_number 0; a region
+// comment additionally carries a normalized {x,y,w,h} rectangle in region_data.
+describe('POST /api/annotations — image feedback (doc 23)', () => {
+  it('creates a general image comment (lineNumber 0, no region)', async () => {
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 0,
+        side: 'new',
+        category: 'note',
+        content: 'The overall contrast dropped',
+      }),
+    });
+    expect(res.status).toBe(201);
+    const annotation = await res.json();
+    expect(annotation.line_number).toBe(0);
+    expect(annotation.region_data).toBeNull();
+    expect(annotation.content).toBe('The overall contrast dropped');
+  });
+
+  it('creates a region comment and stores the normalized rectangle', async () => {
+    const region = { x: 0.1, y: 0.2, w: 0.3, h: 0.25 };
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 0,
+        side: 'new',
+        category: 'note',
+        content: 'This logo is misaligned',
+        region,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const annotation = await res.json();
+    expect(annotation.line_number).toBe(0);
+    expect(JSON.parse(annotation.region_data)).toEqual(region);
+  });
+
+  it('rejects a region with out-of-range coordinates', async () => {
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewFileId: TEST_FILE_ID,
+        lineNumber: 0,
+        side: 'new',
+        category: 'note',
+        content: 'bad region',
+        region: { x: 1.5, y: 0, w: 0.2, h: 0.2 },
+      }),
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -1409,14 +1462,22 @@ describe('Stale annotation lifecycle', () => {
 
 // GB-836 — `--diff foo.png foo.svg` returned an empty image-comparison panel
 // because the route looked up `isSvgFile(file.file_path)`, which is always the
-// new-side path. For a PNG→SVG rename, the old side's PNG bytes were then
-// rasterized as if they were SVG and the request 500'd, leaving both layers
-// invisible (`<img>` failed to decode). The fix decides per side.
-describe('GET /api/image/:fileId/:side — side-aware content-type (GB-836)', () => {
+// new-side path; the content-type was decided from the wrong side. The fix
+// decides per side.
+//
+// GB-932 — SVGs are no longer rasterized server-side: each side is served as
+// raw bytes with the content-type of its *own* path, so an SVG side comes back
+// as `image/svg+xml` and the browser renders it live (animations included).
+describe('GET /api/image/:fileId/:side — side-aware content-type (GB-836, GB-932)', () => {
   const SVG_BYTES = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>');
   const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG magic
-  const RASTERIZED_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x99]);
   const RENAME_FILE_ID = 'gb836-rename-file';
+
+  function contentTypeForPath(p: string): string {
+    if (p.endsWith('.png')) return 'image/png';
+    if (p.endsWith('.svg')) return 'image/svg+xml';
+    return 'application/octet-stream';
+  }
 
   beforeAll(async () => {
     await testDb.query(
@@ -1439,40 +1500,31 @@ describe('GET /api/image/:fileId/:side — side-aware content-type (GB-836)', ()
   });
 
   beforeEach(() => {
-    // Reset call history (the suite's global mocks don't, so without this the
-    // inverse test sees calls from the earlier two tests).
-    vi.mocked(rasterizeSvg).mockClear();
     vi.mocked(getOldImage).mockClear();
     vi.mocked(getNewImage).mockClear();
     // Route off the global mocks for this block — we need real path-based
     // decisions so we can verify the side-aware branching.
     vi.mocked(isSvgFile).mockImplementation((p: string) => p.endsWith('.svg'));
-    vi.mocked(getContentType).mockImplementation((p: string) =>
-      p.endsWith('.png') ? 'image/png' : 'application/octet-stream',
-    );
+    vi.mocked(getContentType).mockImplementation(contentTypeForPath);
     vi.mocked(getOldImage).mockReturnValue({ data: PNG_BYTES, size: PNG_BYTES.length });
     vi.mocked(getNewImage).mockReturnValue({ data: SVG_BYTES, size: SVG_BYTES.length });
-    vi.mocked(rasterizeSvg).mockResolvedValue(RASTERIZED_PNG);
   });
 
-  it('serves the old PNG side without rasterizing (uses the side path, not file.file_path)', async () => {
+  it('serves the old PNG side with the PNG content-type (from the side path, not file.file_path)', async () => {
     const res = await app.request(`/api/image/${RENAME_FILE_ID}/old`);
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('image/png');
-    // The bug: rasterizeSvg was called on PNG bytes and threw → 500. Fix: it
-    // must not be called for an old side that's a PNG.
-    expect(rasterizeSvg).not.toHaveBeenCalled();
     const body = Buffer.from(await res.arrayBuffer());
     expect(body.equals(PNG_BYTES)).toBe(true);
   });
 
-  it('rasterizes the new SVG side and serves image/png', async () => {
+  it('serves the new SVG side as raw image/svg+xml for live browser rendering', async () => {
     const res = await app.request(`/api/image/${RENAME_FILE_ID}/new`);
     expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Type')).toBe('image/png');
-    expect(rasterizeSvg).toHaveBeenCalledTimes(1);
+    expect(res.headers.get('Content-Type')).toBe('image/svg+xml');
     const body = Buffer.from(await res.arrayBuffer());
-    expect(body.equals(RASTERIZED_PNG)).toBe(true);
+    // The SVG bytes are passed through untouched — no rasterization.
+    expect(body.equals(SVG_BYTES)).toBe(true);
   });
 
   it('also handles the inverse rename (SVG→PNG): old is SVG, new is PNG', async () => {
@@ -1500,14 +1552,11 @@ describe('GET /api/image/:fileId/:side — side-aware content-type (GB-836)', ()
 
     const oldRes = await app.request(`/api/image/${inverseId}/old`);
     expect(oldRes.status).toBe(200);
-    expect(oldRes.headers.get('Content-Type')).toBe('image/png'); // rasterized
-    expect(rasterizeSvg).toHaveBeenCalledTimes(1);
+    expect(oldRes.headers.get('Content-Type')).toBe('image/svg+xml');
 
     const newRes = await app.request(`/api/image/${inverseId}/new`);
     expect(newRes.status).toBe(200);
     expect(newRes.headers.get('Content-Type')).toBe('image/png');
-    // No second rasterize call — the new side is the raw PNG, not an SVG.
-    expect(rasterizeSvg).toHaveBeenCalledTimes(1);
   });
 });
 

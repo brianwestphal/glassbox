@@ -91,11 +91,6 @@ cp dist/cli.js "$SERVER_DIR/"
 # `git difftool` into "command not found" for desktop-install users
 # (GB-853).
 cp dist/cli-difftool.js "$SERVER_DIR/"
-# SVG rasterization worker — spawned by cli.js as a sibling worker thread.
-# Must sit next to cli.js so `new URL('./svg-rasterize-worker.js', import.meta.url)`
-# resolves at runtime; forgetting this makes SVG image-diff rasterization fall
-# back to blocking in-process rendering.
-cp dist/svg-rasterize-worker.js "$SERVER_DIR/"
 # Claude Code MCP channel server — spawned by Claude Code via `.mcp.json`.
 # `channel-config.ts` (bundled into cli.js) resolves it as a sibling of cli.js
 # via `import.meta.url`, so it MUST sit next to cli.js. Forgetting this makes the
@@ -123,7 +118,7 @@ cp dist/client/styles.css "$SERVER_DIR/client/"
 # required by the channel server (dist/channel.js); @preact/signals-core is a
 # transitive dep of kerfjs; apple-fm carries the on-device helper binary that its
 # library resolves relative to its own package, so it must stay external.
-for pkg in @electric-sql/pglite hono @hono/node-server @resvg/resvg-wasm @modelcontextprotocol/sdk kerfjs @preact/signals-core apple-fm; do
+for pkg in @electric-sql/pglite hono @hono/node-server @modelcontextprotocol/sdk kerfjs @preact/signals-core apple-fm; do
   dest="$SERVER_DIR/node_modules/$pkg"
   mkdir -p "$(dirname "$dest")"
   cp -R "node_modules/$pkg" "$dest"

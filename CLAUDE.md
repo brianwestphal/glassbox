@@ -58,6 +58,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `19-difftool-integration.md` — Using Glassbox as a registered `git difftool`; the `glassbox-difftool` companion binary, `--dir-diff` vs per-file modes, and the accumulating single-session model for per-file mode
 - `20-ai-review-notes.md` — AI-authored, line-anchored review notes (rationale/proof) emitted by the generating AI, stored as committed SARIF in `.pr-notes/`, rendered review-comment-style in the diff (P1 shipped: the `.pr-notes/` SARIF format + the `glassbox note` producer CLI; reader/render and later phases pending)
 - `21-sidebar-context-menu.md` — Right-click context menu on sidebar file rows; the cross-platform "reveal in file manager" action
+- `23-image-feedback.md` — Textual feedback on images: general image comments + comments anchored to reviewer-drawn rectangle regions (normalized `{x,y,w,h}` coords, shown on both A/B sides). Reuses the `annotations` table with `line_number = 0` + a `region_data` JSON column; client UI under `src/client/diff/imageDiff/` (`imageFeedback.tsx` + pure `regionGeometry.ts`)
 - `22-local-and-on-device-models.md` — Local OpenAI-compatible (Ollama/LM Studio) and Apple Foundation Models (on-device) as AI platforms (P1 local platform shipped; Apple FM shipped — its 4096-token window can't fit larger diffs, so selecting Apple lets the user pick a **secondary fallback model** that absorbs any batch the on-device model can't handle, applied per-batch in `runAnalysisBatch`; `APPLE_FM_ANALYSIS_ENABLED` is the kill-switch, §22.10)
 
 **Architecture documents** describe system design and setup:
@@ -98,7 +99,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `src/ai/analyze-narrative.ts` — Narrative ordering analysis with multi-turn context loop
 - `src/git/diff.ts` — Git operations: diff generation, parsing, file listing
 - `src/git/image.ts` — Image diff support: old/new image retrieval from git, metadata extraction from headers
-- `src/git/svg-rasterize.ts` — SVG to PNG rasterization for rendered comparison mode. `rasterizeSvg()` offloads the synchronous `@resvg/resvg-wasm` render to a worker thread (`svg-rasterize-worker.ts`, shared render core in `svg-rasterize-render.ts`) so it never blocks the HTTP event loop; a render exceeding a 15s timeout terminates the worker and fails fast (re-queuing other jobs on a fresh worker); falls back to in-process rendering if a worker can't start. tsup emits the worker as `dist/svg-rasterize-worker.js` and `build-sidecar.sh` copies it next to `cli.js`; `svg-rasterize-worker-boot.mjs` is the dev-only tsx shim
+- `src/git/svg-meta.ts` — Pure SVG metadata helpers (`parseSvgDimensions`, `svgUsesExternalFonts`) for the rendered-view shell. No rendering. SVGs are rendered **live in the browser** (GB-932): the image route serves them as raw `image/svg+xml` and the diff view shows them in a native `<img>`, so animated SVGs animate and the same image-comparison modes (difference/slice/metadata) apply. The old `@resvg/resvg-wasm` rasterizer, its worker thread (`svg-rasterize*.ts`), and the dependency were removed — `<img>` with an SVG source neither executes scripts nor loads external resources, so passing the bytes through is safe
 - `src/themes/built-in.ts` — Built-in theme definitions (Dark, Light, High Contrast, Dracula, Tokyo Night), ThemeColors type
 - `src/themes/config.ts` — Theme persistence: active theme in config.json, custom themes in ~/.glassbox/themes/
 - `src/routes/theme-api.ts` — Theme REST API: list, get/set active, create/update/delete custom themes
@@ -217,7 +218,7 @@ npm run tauri:build    # Build sidecar + package native desktop app
 
 The build produces:
 
-- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs`, `apple-fm`) are kept external.
+- `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@modelcontextprotocol/sdk`, `kerfjs`, `apple-fm`) are kept external.
 - `dist/client/app.global.js` — Client JS bundle (IIFE, minified, es2020 target)
 - `dist/client/styles.css` — Compiled and compressed CSS from SCSS
 
@@ -225,13 +226,13 @@ The build produces:
 
 **CRITICAL**: When adding a new server-side npm dependency that is kept external (not bundled by tsup), you MUST update **three places** or the production desktop app will break:
 
-1. **`tsup.config.ts`** — Add to the `noExternal` exclusion regex so tsup keeps it external (e.g., `/^(?!@electric-sql|hono|@hono|@resvg)/`)
+1. **`tsup.config.ts`** — Add to the `noExternal` exclusion regex so tsup keeps it external (e.g., `/^(?!@electric-sql|hono|@hono|@modelcontextprotocol)/`)
 2. **`scripts/build-sidecar.sh`** — Add to the `for pkg in ...` loop that copies external deps into the sidecar's `node_modules/`
 3. **This section** — Update the list above
 
 In dev mode (`npm run dev` or `tauri:dev`), external packages resolve from the project's `node_modules/` automatically. In production Tauri builds, the sidecar runs from `src-tauri/server/` with only the explicitly copied packages available. Forgetting step 2 causes "module not found" errors that only appear in production.
 
-Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`), `apple-fm` (carries the on-device helper binary it resolves relative to its own package, so it must stay external)
+Current external deps: `@electric-sql/pglite`, `hono`, `@hono/node-server`, `@modelcontextprotocol/sdk`, `kerfjs` (pulls in `@preact/signals-core`), `apple-fm` (carries the on-device helper binary it resolves relative to its own package, so it must stay external)
 
 ## Testing
 

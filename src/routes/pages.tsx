@@ -15,7 +15,7 @@ import type { FileDiff } from '../git/diff.js';
 import { getSingleFileDiff, parseDiffData, parseModeString } from '../git/diff.js';
 import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
 import { emptyFileDiff } from '../git/parseDiffData.js';
-import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-rasterize.js';
+import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-meta.js';
 import { IconReveal } from '../icons.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';

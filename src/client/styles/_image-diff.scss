@@ -211,6 +211,168 @@
   }
 }
 
+// --- Image Feedback: region overlay (doc 23) ---
+
+// Sits inside .image-zoom-wrap so it transforms with zoom/pan and tracks the
+// image. Above the image layers (z 1-2), below the slice line (z 10). Pointer
+// events are off by default (so zoom/pan works) and flipped to `auto` by JS
+// only while drawing.
+.region-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.region-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  background: rgba(137, 180, 250, 0.18);
+}
+
+.region-box-pending {
+  border-style: dashed;
+  background: rgba(137, 180, 250, 0.3);
+}
+
+.region-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-bottom-right-radius: 3px;
+}
+
+// --- Image Feedback: panel (doc 23) ---
+
+.image-feedback {
+  flex: 0 0 auto;
+  max-height: 42%;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.image-feedback-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.image-feedback-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+}
+
+.image-feedback-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.image-feedback-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.image-feedback-composer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.image-feedback-input {
+  flex: 1;
+  width: 100%;
+  min-height: 42px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 13px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+}
+
+.image-feedback-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.image-feedback-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(137, 180, 250, 0.05);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.image-feedback-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.image-feedback-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.image-feedback-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.image-feedback-region-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+// The numbered badge as shown statically in the region list (not over the image).
+.region-badge-list {
+  position: static;
+  flex-shrink: 0;
+}
+
+.image-feedback-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 // --- Single Image (added/deleted) ---
 
 .image-diff-single {

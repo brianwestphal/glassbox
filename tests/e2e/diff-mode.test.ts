@@ -55,12 +55,12 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     await expect(page.locator('.diff-line.add').filter({ hasText: 'export const d = 4;' })).toBeVisible();
   });
 
-  test('SVG file uses the image-diff view with both old/new sides rasterized from disk', async ({ page }) => {
+  test('SVG file uses the image-diff view with both old/new sides rendered live from disk (GB-932)', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
     await page.locator('.file-item .file-name', { hasText: 'icon.svg' }).click();
     // SVG defaults to the text-diff "Code" view; flip to "Rendered" so the
-    // image-comparison panel mounts and the rasterizer runs.
+    // image-comparison panel mounts.
     await page.locator('[data-svg-mode="rendered"]').click();
 
     const imageDiff = page.locator('.image-diff');
@@ -68,12 +68,11 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     await expect(imageDiff).toHaveAttribute('data-has-old', 'true');
     await expect(imageDiff).toHaveAttribute('data-has-new', 'true');
 
-    // The browser must successfully decode both sides — proves the disk-read
-    // path in `getOldImage`/`getNewImage` is wired correctly (returns the SVG
-    // bytes from `rootA`/`rootB`) AND that the rasterizer turns them into a
-    // real PNG the browser will actually load (not just a 200 OK). The
-    // rasterized PNGs take a few hundred ms to fetch + decode on first hit,
-    // so wait for the `<img>` elements to fully load before sampling.
+    // GB-932: SVGs are served as raw `image/svg+xml` and rendered live by the
+    // browser (no server-side rasterization), so animated SVGs animate. The
+    // browser must still successfully decode both sides — proves the disk-read
+    // path in `getOldImage`/`getNewImage` returns the SVG bytes and the route
+    // serves them with a content-type the browser will render.
     await page.waitForFunction(() => {
       const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('.image-diff .image-layer'));
       return imgs.length >= 2 && imgs.every((img) => img.complete && img.naturalWidth > 0);
@@ -88,6 +87,14 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
       expect(d.w, `image ${d.src} should have decoded to a non-zero width`).toBeGreaterThan(0);
       expect(d.h).toBeGreaterThan(0);
     }
+
+    // The image bytes come back as a live SVG document, not a rasterized PNG.
+    const fileId = await imageDiff.getAttribute('data-file-id');
+    const ct = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/image/${id}/new`);
+      return res.headers.get('Content-Type');
+    }, fileId);
+    expect(ct).toBe('image/svg+xml');
   });
 
   test('clicking a diff line on a direct-comparison file opens the annotation form and saves', async ({ page }) => {

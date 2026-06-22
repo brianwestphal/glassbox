@@ -33,6 +33,8 @@ export const SCHEMA_CORE_SQL = `
   CREATE TABLE IF NOT EXISTS annotations (
     id TEXT PRIMARY KEY,
     review_file_id TEXT NOT NULL REFERENCES review_files(id) ON DELETE CASCADE,
+    -- 0 marks an image-level annotation (doc 23); line annotations use the
+    -- real 1-based line number.
     line_number INTEGER NOT NULL,
     side TEXT NOT NULL DEFAULT 'new',
     category TEXT NOT NULL DEFAULT 'note',
@@ -40,6 +42,9 @@ export const SCHEMA_CORE_SQL = `
     is_stale BOOLEAN NOT NULL DEFAULT FALSE,
     original_content TEXT,
     reply_to_note_id TEXT,
+    -- JSON {x,y,w,h} normalized fractions for an image-region annotation
+    -- (doc 23), or NULL for line annotations and general image comments.
+    region_data TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   );

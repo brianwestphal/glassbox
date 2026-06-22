@@ -64,7 +64,6 @@
     "@electric-sql/pglite": "^0.4.5",
     "@hono/node-server": "^2.0.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@resvg/resvg-wasm": "^2.6.2",
     "apple-fm": "^1.0.0",
     "hono": "^4.12.25",
     "kerfjs": "^0.14.0",

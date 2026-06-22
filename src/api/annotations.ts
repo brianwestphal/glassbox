@@ -6,8 +6,11 @@
  */
 import { z } from 'zod';
 
-import { AnnotationSchema } from '../db/schemas.js';
+import { AnnotationSchema, ImageRegionSchema } from '../db/schemas.js';
 import { apiCall, OkResponseSchema } from './_runner.js';
+
+export { ImageRegionSchema };
+export type { ImageRegion } from '../db/schemas.js';
 
 // --- Schemas ---
 
@@ -21,12 +24,17 @@ export type AnnotationSide = z.infer<typeof AnnotationSideSchema>;
 
 export const CreateAnnotationReqSchema = z.object({
   reviewFileId: z.string().min(1),
-  lineNumber: z.number().int().min(1),
+  // `0` creates an image-level annotation (doc 23): a general image comment, or
+  // — when `region` is set — a comment anchored to a rectangle on the image.
+  // Line-anchored annotations pass the real 1-based line number.
+  lineNumber: z.number().int().min(0),
   side: AnnotationSideSchema,
   category: AnnotationCategorySchema,
   content: z.string().min(1),
   /** SARIF guid of the AI review note this annotation replies to (doc 20 threading). */
   replyToNoteId: z.string().optional(),
+  /** Normalized rectangle for an image-region annotation (doc 23). */
+  region: ImageRegionSchema.optional(),
 });
 export type CreateAnnotationReq = z.infer<typeof CreateAnnotationReqSchema>;
 export const CreateAnnotationRespSchema = AnnotationSchema;

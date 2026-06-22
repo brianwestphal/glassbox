@@ -72,7 +72,7 @@ Requirements for building, packaging, and distributing the application.
 
 ### 11.5 Build Pipeline
 
-- The server shall be built with tsup as an ESM bundle, with external dependencies (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@resvg/resvg-wasm`, `@modelcontextprotocol/sdk`, `kerfjs`).
+- The server shall be built with tsup as an ESM bundle, with external dependencies (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@modelcontextprotocol/sdk`, `kerfjs`, `apple-fm`).
 - The client shall be built as an IIFE bundle (es2020 target, minified) via esbuild.
 - SCSS shall be compiled to CSS separately via sass.
 - Both server and client builds shall use the **kerfjs** JSX runtime via `jsxImportSource: 'kerfjs'` in `tsconfig.json` and `tsup.config.ts`.

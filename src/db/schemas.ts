@@ -68,10 +68,27 @@ export type ReviewFile = z.infer<typeof ReviewFileSchema>;
 
 // --- Annotations ---
 
+/**
+ * A rectangular region on an image, in normalized [0,1] fractions of the image's
+ * natural dimensions (doc 23). Normalized coords keep a region pinned to the
+ * same place on both the A and B sides regardless of display size or zoom. The
+ * region is persisted as JSON in the annotation's `region_data` column.
+ */
+export const ImageRegionSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().min(0).max(1),
+  h: z.number().min(0).max(1),
+});
+export type ImageRegion = z.infer<typeof ImageRegionSchema>;
+
 export const AnnotationSchema = z.object({
   id: z.string(),
-  review_file_id: z.string(),
+  // 0 marks an image-level annotation (doc 23): a general image comment, or —
+  // when `region_data` is set — a comment anchored to a rectangle on the image.
+  // Line-anchored text-diff annotations use the real 1-based line number.
   line_number: z.number(),
+  review_file_id: z.string(),
   side: z.string(),
   category: z.string(),
   content: z.string(),
@@ -81,6 +98,10 @@ export const AnnotationSchema = z.object({
   // threading), or null for a normal annotation. `.default(null)` tolerates
   // rows written before the column existed.
   reply_to_note_id: z.string().nullable().default(null),
+  // JSON-encoded {@link ImageRegion} for image-region annotations (doc 23), or
+  // null for line annotations and general image comments. `.default(null)`
+  // tolerates rows written before the column existed.
+  region_data: z.string().nullable().default(null),
   created_at: TimestampSchema,
   updated_at: TimestampSchema,
 });

@@ -1,6 +1,7 @@
 import { ImageModeSchema, saveAIPreferences } from '../../../api/index.js';
 import { asEl } from '../../dom.js';
 import { diffViewStore } from '../../stores/index.js';
+import { initImageFeedback } from './imageFeedback.js';
 import { loadMetadata } from './metadata.js';
 import { initSliceTool } from './sliceTool.js';
 import { applyZoom, clampPan, notifyZoomChange, setZoomState, zoomAt,type ZoomState } from './zoom.js';
@@ -169,4 +170,7 @@ export function bindImageDiff(): void {
     const sliceCanvas = container.querySelector('[data-panel="slice"] .image-visual-canvas');
     if (sliceCanvas) initSliceTool(sliceCanvas);
   }
+
+  // Image feedback (doc 23): general comments + drawn rectangle regions.
+  initImageFeedback(asEl(container));
 }

@@ -5,6 +5,7 @@ import { join } from 'path';
 import { z } from 'zod';
 
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
+import { ImageRegionSchema } from '../db/schemas.js';
 import { isGitRepo } from '../git/repo.js';
 import { reviewNotesExportSection } from '../review-notes/format.js';
 
@@ -75,6 +76,25 @@ export function deleteReviewExport(reviewId: string, repoRoot: string): void {
   if (existsSync(archivePath)) unlinkSync(archivePath);
 }
 
+/**
+ * The anchor label for an annotation in the markdown export. Line annotations
+ * read `**Line N**`; image-level annotations (doc 23, `line_number === 0`) read
+ * `**Image region (x%, y%, w%×h%)**` when anchored to a rectangle, or
+ * `**Image comment**` for a general comment.
+ */
+function annotationAnchorLabel(a: { line_number: number; region_data: string | null }): string {
+  if (a.line_number !== 0) return `**Line ${a.line_number}**`;
+  if (a.region_data !== null) {
+    const parsed = ImageRegionSchema.safeParse(JSON.parse(a.region_data) as unknown);
+    if (parsed.success) {
+      const { x, y, w, h } = parsed.data;
+      const pct = (n: number) => `${Math.round(n * 100)}%`;
+      return `**Image region (${pct(x)}, ${pct(y)}, ${pct(w)}×${pct(h)})**`;
+    }
+  }
+  return '**Image comment**';
+}
+
 export async function generateReviewExport(reviewId: string, repoRoot: string, isCurrent: boolean): Promise<string> {
   const review = await getReview(reviewId);
   if (!review) throw new Error('Review not found');
@@ -127,7 +147,8 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
     lines.push('> project configuration (CLAUDE.md, .cursorrules, etc.) with these preferences/rules.');
     lines.push('');
     for (const item of rememberItems) {
-      lines.push(`- **${item.file_path}:${item.line_number}** - ${item.content}`);
+      const anchor = item.line_number === 0 ? `${item.file_path} (image)` : `${item.file_path}:${item.line_number}`;
+      lines.push(`- **${anchor}** - ${item.content}`);
     }
     lines.push('');
   }
@@ -141,7 +162,7 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
     lines.push(`### ${filePath}`);
     lines.push('');
     for (const a of fileAnns) {
-      lines.push(`- **Line ${a.line_number}** [${a.category}]: ${a.content}`);
+      lines.push(`- ${annotationAnchorLabel(a)} [${a.category}]: ${a.content}`);
     }
     lines.push('');
   }

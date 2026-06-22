@@ -5,8 +5,7 @@ import { getReview, getReviewFile } from '../../db/queries.js';
 import { readDifftoolBlob } from '../../difftool/blob-store.js';
 import { parseDiffData, parseModeString } from '../../git/diff.js';
 import type { ImageSide } from '../../git/image.js';
-import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isSvgFile } from '../../git/image.js';
-import { rasterizeSvg } from '../../git/svg-rasterize.js';
+import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage } from '../../git/image.js';
 import type { AppEnv } from '../../types.js';
 import { requirePathParam } from '../../utils/parseBody.js';
 
@@ -82,25 +81,18 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
 
   if (!image) return c.text('Image not available', 404);
 
-  // GB-836: pick whether to rasterize / what content-type to send based on the
-  // side's *own* path. `file.file_path` is always the new-side path, so using
-  // it on the old side broke rename-shaped comparisons across image types
-  // (e.g. `--diff foo.png foo.svg` rasterized the PNG bytes as if they were
-  // SVG and returned 500, leaving the comparison panel empty).
+  // GB-836: pick the content-type from the side's *own* path. `file.file_path`
+  // is always the new-side path, so using it on the old side broke rename-shaped
+  // comparisons across image types (e.g. `--diff foo.png foo.svg` mislabeled the
+  // PNG bytes, leaving the comparison panel empty).
+  //
+  // GB-932: SVGs are served as raw `image/svg+xml` and rendered live by the
+  // browser, so animated SVGs animate and text renders with the browser's own
+  // font stack. `<img>` does not execute scripts or load external resources, so
+  // serving the bytes directly is safe. The comparison modes (difference via
+  // `mix-blend-mode`, slice via `clip-path`, zoom/pan) all work on a native-SVG
+  // `<img>` exactly as they do for raster images.
   const sidePath = side === 'old' ? (oldPath ?? file.file_path) : file.file_path;
-
-  // SVGs need rasterization for image comparison modes (difference, slice)
-  if (isSvgFile(sidePath)) {
-    try {
-      const png = await rasterizeSvg(image.data);
-      return new Response(new Uint8Array(png), {
-        headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
-      });
-    } catch {
-      return c.text('SVG rasterization failed', 500);
-    }
-  }
-
   const contentType = getContentType(sidePath);
   return new Response(new Uint8Array(image.data), {
     headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' },

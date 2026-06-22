@@ -31,10 +31,6 @@ describe('build-sidecar.sh', () => {
     expect(sidecarScript).toMatch(/cp\s+dist\/cli-difftool\.js\s+"\$SERVER_DIR\/"/);
   });
 
-  it('copies svg-rasterize-worker.js into the sidecar server dir', () => {
-    expect(sidecarScript).toMatch(/cp\s+dist\/svg-rasterize-worker\.js\s+"\$SERVER_DIR\/"/);
-  });
-
   it('copies channel.js into the sidecar server dir (GB-887)', () => {
     // The Claude MCP channel server. `channel-config.ts` (bundled into cli.js)
     // resolves it as a sibling of cli.js via `import.meta.url`, so it MUST sit
