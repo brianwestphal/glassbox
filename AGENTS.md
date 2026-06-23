@@ -27,7 +27,9 @@ You are an AI tool in a project that **uses** Glassbox to review your work. Read
 | Open a diff for review | `glassbox --uncommitted` (or `--commit`/`--branch`/`--files`/`--diff`/`--ground-truth`) | [2](docs/2-cli-and-server.md), [18](docs/18-direct-comparison.md) |
 | Record your rationale/proof on a line | `glassbox note add --file <p> --lines <A[-B]> --kind <k> --body <text\|->` → commit `.pr-notes/` | [20](docs/20-ai-review-notes.md) |
 | Prove a visual/behavioral change | write a `version: 2` manifest, run `glassbox --ground-truth <manifest>` | [26](docs/26-ground-truth-comparison.md), [proof-export-guidance](docs/proof-export-guidance.md) |
-| Apply the reviewer's feedback | read `<repo>/.glassbox/latest-review.md` and act on each annotation by category | [6](docs/6-export.md) |
+| Apply the reviewer's feedback | read `<repo>/.glassbox/latest-review.md` (prose) and act on each annotation by category | [6](docs/6-export.md) |
+| Consume feedback programmatically | read the structured `<repo>/.glassbox/latest-review.json` (annotations grouped by comparison, region pixel coords, ground-truth context) | [6](docs/6-export.md) |
+| Act automatically on completion | launch with `--on-complete "<cmd>"`; `<cmd>` runs at Complete Review with `GLASSBOX_REVIEW_JSON`/`_MD`/`_ID`/`GLASSBOX_REPO_ROOT` in env (e.g. file tickets, no AI in the loop) | [2](docs/2-cli-and-server.md) §2.3a |
 | Get feedback pushed to you | respond to the `glassbox-channel` MCP event: read `latest-review.md`, apply | [17](docs/17-claude-channel.md) |
 
 The CLI is `glassbox` (`npm install -g glassbox`, or `npx glassbox`); it binds to
