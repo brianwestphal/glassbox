@@ -58,5 +58,23 @@ export function formatReviewMode(mode: string, modeArgs: string | null): string 
     }
     return 'compare';
   }
+  if (mode === 'ground-truth' || mode.startsWith('ground-truth:')) {
+    // Ground-truth (doc 26). The mode string is `ground-truth:{manifestPath,
+    // comparisons}` JSON — the comparisons array can be huge, so never render it
+    // raw (GB-971). Show a short "ground truth: <manifest basename>" label.
+    if (modeArgs !== null && modeArgs !== '') return `ground truth: ${modeArgs}`;
+    if (mode.startsWith('ground-truth:')) {
+      try {
+        const parsed: unknown = JSON.parse(mode.slice('ground-truth:'.length));
+        if (parsed !== null && typeof parsed === 'object' && 'manifestPath' in parsed) {
+          const manifestPath: unknown = parsed.manifestPath;
+          if (typeof manifestPath === 'string' && manifestPath !== '') {
+            return `ground truth: ${manifestPath.split('/').pop() ?? manifestPath}`;
+          }
+        }
+      } catch { /* fall through */ }
+    }
+    return 'ground truth';
+  }
   return mode;
 }

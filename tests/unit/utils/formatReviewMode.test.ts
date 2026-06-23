@@ -118,6 +118,50 @@ describe('formatReviewMode', () => {
     });
   });
 
+  describe('ground-truth mode (doc 26)', () => {
+    // The real serialized shape `getModeString` produces: a `ground-truth:` prefix
+    // followed by the full {manifestPath, comparisons[]} JSON. The comparisons
+    // array can carry dozens of absolute-path entries, so rendering it raw made
+    // the sidebar "source" label gigantic and useless (GB-971).
+    const bigMode =
+      'ground-truth:' +
+      JSON.stringify({
+        manifestPath: '/Users/me/project/tests/fixtures/ground-truth/manifest.json',
+        comparisons: Array.from({ length: 20 }, (_, i) => ({
+          key: `actual/img${String(i)}.png`,
+          actualPath: `/Users/me/project/tests/fixtures/ground-truth/actual/img${String(i)}.png`,
+          expectedPath: `/Users/me/project/tests/fixtures/ground-truth/expected/img${String(i)}.png`,
+          label: `Image ${String(i)}`,
+          expectedKind: 'spec',
+        })),
+      });
+
+    it('renders a short "ground truth: <manifest basename>" label, not the raw JSON', () => {
+      expect(formatReviewMode(bigMode, null)).toBe('ground truth: manifest.json');
+    });
+
+    it('never leaks the serialized comparisons payload into the label (GB-971 regression)', () => {
+      const out = formatReviewMode(bigMode, null);
+      // The label must be short and free of the payload's tell-tale tokens.
+      expect(out.length).toBeLessThan(60);
+      expect(out).not.toContain('comparisons');
+      expect(out).not.toContain('expectedPath');
+      expect(out).not.toContain('{');
+    });
+
+    it('prefers a non-empty mode_args label when present', () => {
+      expect(formatReviewMode(bigMode, 'manifest.json')).toBe('ground truth: manifest.json');
+    });
+
+    it('falls back to a bare label on malformed JSON', () => {
+      expect(formatReviewMode('ground-truth:garbage', null)).toBe('ground truth');
+    });
+
+    it('falls back to a bare label when manifestPath is missing', () => {
+      expect(formatReviewMode('ground-truth:{"comparisons":[]}', null)).toBe('ground truth');
+    });
+  });
+
   describe('unknown mode', () => {
     it('passes through an unrecognized mode unchanged', () => {
       expect(formatReviewMode('weird-mode', null)).toBe('weird-mode');

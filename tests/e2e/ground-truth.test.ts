@@ -29,6 +29,18 @@ test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
     await expect(page.locator('.file-name[title="actual/card.svg"]')).toHaveCount(1);
   });
 
+  // GB-971 — the sidebar "source" (review-mode) label must be a short manifest
+  // name, never the raw serialized `ground-truth:{...comparisons...}` JSON.
+  test('the source label is a short manifest name, not the serialized mode JSON', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    const label = page.locator('.review-mode');
+    await expect(label).toHaveText('ground truth: manifest.json');
+    const text = (await label.textContent()) ?? '';
+    expect(text).not.toContain('comparisons');
+    expect(text).not.toContain('{');
+  });
+
   // GB-965 (doc 26 §26.1) — source list reads as named comparisons.
   test('source list shows the manifest label and an expectedKind badge', async ({ page }) => {
     await page.goto('/');
