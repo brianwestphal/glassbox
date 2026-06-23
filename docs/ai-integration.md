@@ -179,6 +179,23 @@ internalize — a `remember` item is meant to be persisted into your tool's
 durable config such as `CLAUDE.md` / `.cursorrules`). Format spec + the embedded
 AI-tool instructions: [doc 6](6-export.md).
 
+**Programmatic consumers** (filing tickets, dashboards) should read the
+**structured JSON** companion instead of the prose: `<repo>/.glassbox/latest-review.json`
+(+ archive `review-<id>.json`), written alongside the markdown. It groups
+annotations by comparison (only annotated ones), with per-comparison ground-truth
+context (label / expectedKind / actual+expected paths / difference score / set
+grouping) and each region as normalized **and** pixel coordinates + scope. Schema:
+`ReviewExportSchema` in `src/api/export.ts` (doc 6 §6.2a).
+
+To act **automatically on completion** with no AI in the loop, launch with a
+**completion hook**: `glassbox --ground-truth <manifest> --on-complete "<command>"`.
+When the reviewer clicks Complete Review, Glassbox runs `<command>` with
+`GLASSBOX_REVIEW_JSON` / `GLASSBOX_REVIEW_MD` / `GLASSBOX_REVIEW_ID` /
+`GLASSBOX_REPO_ROOT` in its environment (cwd = repo root). A project ships a small
+adapter as `<command>` that reads the JSON and files one ticket per
+comparison-with-feedback. This is the generic generalization of §5's channel
+button. See doc [2](2-cli-and-server.md) §2.3a.
+
 If your tool was invoked specifically to apply Glassbox feedback (e.g. via the
 channel, §5), the canonical action is exactly: **read `.glassbox/latest-review.md`
 and apply the feedback.**

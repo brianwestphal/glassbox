@@ -29,7 +29,12 @@ export default defineConfig([
       options.jsxImportSource = 'kerfjs';
     },
     banner: {
-      js: '#!/usr/bin/env node',
+      // Shebang + a createRequire shim. The bundle is ESM, but some bundled
+      // CJS deps (e.g. pngjs, used by the ground-truth perceptual diff) call
+      // `require('util')` internally; without this shim esbuild's `__require`
+      // throws "Dynamic require of \"util\" is not supported" at runtime, which
+      // crashed `glassbox --ground-truth` in the production bundle (GB-976).
+      js: "#!/usr/bin/env node\nimport { createRequire as __createRequire } from 'module';\nconst require = __createRequire(import.meta.url);",
     },
   },
   // Client bundle (browser JS + SCSS)

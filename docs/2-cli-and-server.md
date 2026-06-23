@@ -36,6 +36,7 @@ The CLI shall accept the following options:
 | `--no-open` | Don't open browser automatically |
 | `--strict-port` | Fail if the requested port is in use |
 | `--project-dir <dir>` | Run as if invoked from `<dir>` (used by Tauri desktop app) |
+| `--on-complete <cmd>` | Run `<cmd>` when a review is **explicitly completed** (doc [6](6-export.md), GB-974) |
 | `--check-for-updates` | Check for a newer version on npm |
 | `--debug` | Show build timestamp and debug info |
 | `--ai-service-test` | Use mock AI responses (no API calls) |
@@ -48,6 +49,28 @@ The CLI shall accept the following options:
 - **Instance locking** — Instance locking shall be acquired after argument parsing but before database access (see doc 1, section 1.5).
 - **Git repo check** — The CLI shall verify it is running inside a git repository before proceeding (unless in demo mode, or in `--diff` mode per doc 18).
 - **Update check** — An npm update check shall run once per day (or immediately with `--check-for-updates`) before starting the server.
+
+### 2.3a Completion hook (`--on-complete`)
+
+- **FR-2.3a — Completion hook.** When `--on-complete <command>` is given, the
+  server shall run `<command>` (via the shell) when a review is **explicitly
+  completed** (the Complete Review button / `POST /api/review/complete`) — never
+  on the debounced per-annotation auto-export (doc [6](6-export.md)). It is the
+  generic, AI-free generalization of the channel's "Send to Claude" button
+  (doc [17](17-claude-channel.md)): a project wires it to act on the structured
+  JSON export (e.g. file tickets). Implemented in `src/export/on-complete-hook.ts`.
+- **Environment** — the command receives the export locations via
+  `GLASSBOX_REVIEW_JSON` (the structured JSON, doc 6 §6.2a), `GLASSBOX_REVIEW_MD`,
+  `GLASSBOX_REVIEW_ID`, and `GLASSBOX_REPO_ROOT`; its cwd is the repo root. Output
+  is captured to `<repo>/.glassbox/on-complete.log`.
+- **Robustness** — the review is marked completed and exported **before** the
+  hook runs, so an absent, failing, or unspawnable hook never affects the review
+  state; the hook outcome (`{ ran, ok, exitCode, error? }`) is reported back on
+  the completion response but is advisory.
+- **Security (doc [14](14-security.md))** — the command is supplied by the user
+  on their **own** CLI invocation and runs on a localhost-only server. There is
+  no API to set it, so it is **never** taken from network input and introduces no
+  remote-execution surface beyond what the user already controls locally.
 
 ### 2.4 HTTP Server
 

@@ -7,8 +7,13 @@ import { z } from 'zod';
 import { getAttachmentsForReview } from '../db/attachment-queries.js';
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
 import { ImageRegionSchema } from '../db/schemas.js';
+import { parseModeString } from '../git/diff.js';
+import { extractMetadata } from '../git/image-metadata.js';
 import { isGitRepo } from '../git/repo.js';
 import { reviewNotesExportSection } from '../review-notes/format.js';
+import { formatReviewMode } from '../utils/formatReviewMode.js';
+import type { ImageDims } from './build-data.js';
+import { buildReviewExportData } from './build-data.js';
 
 const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
 const DISMISS_DAYS = 30;
@@ -73,8 +78,10 @@ export function dismissGitignorePrompt(repoRoot: string): void {
 
 export function deleteReviewExport(reviewId: string, repoRoot: string): void {
   const exportDir = join(repoRoot, '.glassbox');
-  const archivePath = join(exportDir, `review-${reviewId}.md`);
-  if (existsSync(archivePath)) unlinkSync(archivePath);
+  for (const ext of ['md', 'json'] as const) {
+    const archivePath = join(exportDir, `review-${reviewId}.${ext}`);
+    if (existsSync(archivePath)) unlinkSync(archivePath);
+  }
 }
 
 /**
@@ -117,12 +124,17 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
 
   const lines: string[] = [];
 
+  // A clean, short mode label — never the raw serialized mode string, which for
+  // ground-truth (doc 26) is a large JSON payload (the GB-971 bug class).
+  const modeLabel = formatReviewMode(review.mode, review.mode_args);
+  const exportDate = new Date().toISOString();
+
   lines.push('# Code Review');
   lines.push('');
   lines.push(`- **Repository**: ${review.repo_name}`);
-  lines.push(`- **Review mode**: ${review.mode}`);
+  lines.push(`- **Review mode**: ${modeLabel}`);
   lines.push(`- **Review ID**: ${review.id}`);
-  lines.push(`- **Date**: ${new Date().toISOString()}`);
+  lines.push(`- **Date**: ${exportDate}`);
   lines.push(`- **Files reviewed**: ${files.filter(f => f.status === 'reviewed').length}/${files.length}`);
   lines.push(`- **Total annotations**: ${annotations.length}`);
   lines.push('');
@@ -206,16 +218,48 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
 
   const content = lines.join('\n');
 
-  // Always write the per-ID archive
+  // Structured JSON companion (doc 6) for programmatic consumers (e.g. a
+  // --on-complete hook that files tickets). Built from the same data so it never
+  // drifts from the markdown's annotation set.
+  const exportData = buildReviewExportData({
+    review,
+    files,
+    annotations,
+    attachments,
+    mode: parseModeString(review.mode),
+    modeLabel,
+    date: exportDate,
+    isCurrent,
+    resolveDims: resolveImageDims,
+  });
+  const json = JSON.stringify(exportData, null, 2);
+
+  // Always write the per-ID archive (markdown + json)
   const archivePath = join(exportDir, `review-${review.id}.md`);
   writeFileSync(archivePath, content, 'utf-8');
+  writeFileSync(join(exportDir, `review-${review.id}.json`), json, 'utf-8');
 
-  // Only write latest-review.md for the current review
+  // Only write the latest-* files for the current review
   if (isCurrent) {
     const latestPath = join(exportDir, 'latest-review.md');
     writeFileSync(latestPath, content, 'utf-8');
+    writeFileSync(join(exportDir, 'latest-review.json'), json, 'utf-8');
     return latestPath;
   }
 
   return archivePath;
+}
+
+/** Resolve an image's natural pixel size from its absolute path via a cheap
+ *  header read (PNG/JPEG bytes, SVG header), for denormalizing region rectangles
+ *  in the JSON export. Returns null when the file is unreadable or its size can't
+ *  be determined; pixel coords are then omitted (the normalized rect still rides). */
+function resolveImageDims(absPath: string): ImageDims {
+  try {
+    const meta = extractMetadata(readFileSync(absPath), absPath);
+    if (meta.width !== null && meta.height !== null) {
+      return { width: meta.width, height: meta.height };
+    }
+  } catch { /* unreadable / undecodable — no pixel coords */ }
+  return null;
 }

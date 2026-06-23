@@ -45,6 +45,7 @@
     "test:e2e:docker": "bash scripts/test-e2e-docker.sh",
     "test:smoke": "bash tests/smoke/smoke-test.sh",
     "test:smoke:difftool": "bash tests/smoke/difftool-accumulate.sh",
+    "test:smoke:ground-truth": "bash tests/smoke/ground-truth.sh",
     "demo:capture": "npm run build:client && tsx scripts/demo/capture-demo.ts",
     "demo:capture-stills": "npm run build:client && tsx scripts/demo/capture-stills.ts",
     "lint": "eslint src/",

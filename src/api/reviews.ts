@@ -13,12 +13,22 @@ export type ListReviewsResp = z.infer<typeof ListReviewsRespSchema>;
 export const GetCurrentReviewRespSchema = ReviewSchema.nullable();
 export type GetCurrentReviewResp = z.infer<typeof GetCurrentReviewRespSchema>;
 
+/** Outcome of the `--on-complete` hook (doc 2 / GB-974). `ran: false` when no
+ *  hook was configured. */
+export const OnCompleteHookResultSchema = z.object({
+  ran: z.boolean(),
+  ok: z.boolean(),
+  exitCode: z.number().nullable(),
+  error: z.string().optional(),
+});
+
 export const CompleteReviewRespSchema = z.object({
   status: z.literal('completed'),
   exportPath: z.string(),
   isCurrent: z.boolean(),
   reviewId: z.string(),
   gitignorePrompt: z.boolean(),
+  hook: OnCompleteHookResultSchema,
 });
 export type CompleteReviewResp = z.infer<typeof CompleteReviewRespSchema>;
 

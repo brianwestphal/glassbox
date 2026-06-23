@@ -30,6 +30,8 @@ interface CompleteResult {
   reviewId: string;
   exportPath: string;
   gitignorePrompt: boolean;
+  /** Outcome of the --on-complete hook (doc 2 §2.3a / GB-974), if one was set. */
+  hook?: { ran: boolean; ok: boolean; exitCode: number | null; error?: string };
 }
 
 type ModalStage =
@@ -240,6 +242,11 @@ function renderDone(
         <div className="modal-gitignore">
           <p className="modal-label" style="color:var(--green)">Added .glassbox/ to .gitignore</p>
         </div>
+      )}
+      {result.hook?.ran === true && (
+        result.hook.ok
+          ? <p className="modal-label" style="color:var(--green)">Ran the on-complete hook</p>
+          : <p className="modal-label" style="color:var(--red)">{`on-complete hook failed${result.hook.exitCode !== null ? ` (exit ${String(result.hook.exitCode)})` : ''} — see .glassbox/on-complete.log`}</p>
       )}
       <div className="modal-actions">
         {channelConnected && (

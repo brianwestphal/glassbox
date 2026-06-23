@@ -22,6 +22,7 @@ Requirements for network security, input validation, and safe system interaction
 - All external process invocations shall use `spawnSync()`, `execFileSync()`, or equivalent functions that accept argument arrays, avoiding shell interpretation of arguments.
 - File paths, git refs, and user-provided values shall never be interpolated into shell command strings.
 - The "Open in Default Editor" action (doc 21) opens the file through the OS default-open handler (`open` / `start` / `xdg-open`) via `openOS(path, 'edit')`, with the file path passed as a separate argv (never interpolated into a shell command string), so a path containing spaces or shell metacharacters is safe.
+- The `--on-complete <command>` hook (doc [2](2-cli-and-server.md) §2.3a) is the one place a **whole command string** is run through the shell. This is deliberate and safe within the threat model: the command comes **only** from the user's own CLI invocation — there is no API or network input that can set it — and the server binds to localhost only (14.1/14.6). Glassbox passes data to it via **environment variables** (`GLASSBOX_REVIEW_JSON` etc.), never by interpolating values into the command string, so review content can't inject shell syntax. It runs no command unless the user explicitly opted in by passing `--on-complete`.
 
 ### 14.4 API Key Storage
 

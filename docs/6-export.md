@@ -22,9 +22,37 @@ The exported markdown shall include:
 - **File Annotations** — A section grouping annotations by file, each showing the line number, category, and content.
 - **AI Instructions** — An "Instructions for AI Tools" section explaining the semantics of each annotation category and how to act on them.
 
+### 6.2a Structured JSON export (machine-readable)
+
+Alongside the markdown, the system shall write a **structured JSON** companion so
+external tools can act on a review programmatically (e.g. file one ticket per
+comparison) without parsing prose. Same trigger points and lifecycle as the
+markdown.
+
+- **Output paths** — `<repo>/.glassbox/latest-review.json` (current review) and
+  the archive `<repo>/.glassbox/review-{reviewId}.json`.
+- **Shape** — validated by a zod schema (`ReviewExportSchema` in
+  `src/api/export.ts`, the SSOT; the export is `.parse()`d before writing).
+  `schemaVersion: 1`; a `review` block (`id`, `repoName`, a **clean** `mode`
+  label — never the raw serialized mode string — plus the raw `modeType`, `date`,
+  `isCurrent`); and `comparisons[]` grouped by review file, **only those with at
+  least one annotation**. Each comparison carries `fileId`, `path`, `status`, an
+  optional `groundTruth` block (doc [26](26-ground-truth-comparison.md):
+  `label`, `expectedKind`, `actualPath`, `expectedPath`, `differenceScore`, and
+  set grouping `setLabel`/`stepIndex`/`stepCount`), and `annotations[]` with
+  `id`, `category`, `content`, `lineNumber`, optional `region` (the doc-23
+  rectangle as both `normalized` fractions and, when the image's natural size is
+  resolvable, denormalized `pixel` coords, plus `scope` = `old`/`new`/`both` —
+  for ground-truth, `old` = expected, `new` = actual), and `attachments[]`
+  (`storedPath`, `originalFilename`). Built by `buildReviewExportData`
+  (`src/export/build-data.ts`, pure) from the same data as the markdown, so the
+  two never drift.
+- **Consumed by** the `--on-complete` hook (doc [2](2-cli-and-server.md)) and any
+  external integration (see [ai-integration.md](ai-integration.md)).
+
 ### 6.3 Export Lifecycle
 
-- **Deletion cleanup** — When a review is deleted, its corresponding export file shall also be deleted.
+- **Deletion cleanup** — When a review is deleted, its corresponding export files (markdown **and** JSON) shall also be deleted.
 - **Reopen preservation** — When a review is reopened, the `latest-review.md` export shall be preserved (still reflects the last completion).
 
 ## Non-Functional Requirements

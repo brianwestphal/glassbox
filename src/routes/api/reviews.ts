@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 
 import { deleteReview, getReview, listReviews, updateReviewStatus } from '../../db/queries.js';
 import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt, generateReviewExport, shouldPromptGitignore } from '../../export/generate.js';
+import { runOnCompleteHook } from '../../export/on-complete-hook.js';
 import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js';
 import { updateReviewDiffs } from '../../review-update.js';
 import type { AppEnv } from '../../types.js';
@@ -30,7 +31,18 @@ reviewsRoutes.post('/review/complete', async (c) => {
   const isCurrent = reviewId === currentReviewId;
   const exportPath = await generateReviewExport(reviewId, repoRoot, isCurrent);
   const gitignorePrompt = shouldPromptGitignore(repoRoot);
-  return c.json({ status: 'completed' as const, exportPath, isCurrent, reviewId, gitignorePrompt });
+
+  // Fire the --on-complete hook (doc 2 / GB-974) AFTER the review is completed +
+  // exported, so a failing/absent hook never affects the review state. The JSON
+  // export (doc 6) sits next to the markdown — same path, .json extension.
+  const hook = await runOnCompleteHook(c.get('onCompleteCommand') ?? null, {
+    reviewId,
+    repoRoot,
+    jsonPath: exportPath.replace(/\.md$/, '.json'),
+    markdownPath: exportPath,
+  });
+
+  return c.json({ status: 'completed' as const, exportPath, isCurrent, reviewId, gitignorePrompt, hook });
 });
 
 reviewsRoutes.post('/gitignore/add', (c) => {

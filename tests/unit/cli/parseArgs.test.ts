@@ -69,6 +69,12 @@ describe('parseArgs', () => {
       expect(result!.dataDir).toBeNull();
       expect(result!.demo).toBeNull();
       expect(result!.projectDir).toBeNull();
+      expect(result!.onComplete).toBeNull();
+    });
+
+    it('parses --on-complete <command> (doc 2 / GB-974)', () => {
+      const result = parseArgs(argv('--on-complete', 'tsx scripts/file-tickets.ts'));
+      expect(result!.onComplete).toBe('tsx scripts/file-tickets.ts');
     });
   });
 

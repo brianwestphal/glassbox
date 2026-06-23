@@ -54,13 +54,25 @@ PID-based in `~/.glassbox/`; demo mode bypasses the lock.
 
 CLI: `glassbox [options]`, default `--uncommitted`. `--help`/`-h`, unknown
 options error. Options cover all review modes plus `--port`, `--resume`,
-`--no-open`, `--strict-port`, `--project-dir`, `--check-for-updates`,
-`--debug`, `--ai-service-test`, `--demo:N`.
+`--no-open`, `--strict-port`, `--project-dir`, `--on-complete <cmd>`,
+`--check-for-updates`, `--debug`, `--ai-service-test`, `--demo:N`. Standalone
+subcommands (dispatched before arg parsing): `glassbox note …` (doc 20) and
+`glassbox ground-truth promote <manifest>` (doc 26 P3d).
+
+**Completion hook (§2.3a, GB-974):** `--on-complete <command>` runs a
+user-supplied shell command on **explicit** completion only (not the auto-export),
+after the export, passing the export paths via `GLASSBOX_REVIEW_JSON`/`_MD`/`_ID`/
+`GLASSBOX_REPO_ROOT` env (cwd = repo root; output → `.glassbox/on-complete.log`).
+Never breaks completion (runs after the review is completed + exported); outcome
+reported on the completion response. The generic, AI-free generalization of the
+channel's "Send to Claude" button. Command comes only from the user's own CLI
+(never network input); values pass via env, never interpolated (doc 14 §14.3).
+`src/export/on-complete-hook.ts`; verified end-to-end by `tests/smoke/ground-truth.sh`.
 
 Server is Hono on `@hono/node-server`, bound to `127.0.0.1`, default port
 `4183` with up to 20-port auto-fallback (unless `--strict-port`). Context
-middleware injects `reviewId`, `currentReviewId`, `repoRoot` via
-`AppEnv`. Static assets come from co-located `client/` (prod) or
+middleware injects `reviewId`, `currentReviewId`, `repoRoot`, `onCompleteCommand`
+via `AppEnv`. Static assets come from co-located `client/` (prod) or
 `../dist/client/` (dev). Startup stdout line `Glassbox running at
 http://localhost:{port}` is parsed by the Tauri sidecar to detect
 readiness.
@@ -258,7 +270,15 @@ tools to persist to their config), per-file grouped annotations with
 line + category + content, and an **Instructions for AI Tools** section
 with category semantics. Paths are relative to repo root. When a review
 is deleted its export file is deleted too; reopening a review preserves
-the existing export.
+the existing export. The mode line uses the clean `formatReviewMode` label
+(never the raw serialized mode string — GB-971/GB-973). A **structured JSON
+companion** (`latest-review.json` + `review-{id}.json`) is written alongside the
+markdown for programmatic consumers (`buildReviewExportData` →
+`ReviewExportSchema` SSOT in `src/api/export.ts`): `schemaVersion: 1`,
+annotations grouped **by comparison** (annotated review files only), each with
+ground-truth context (label/expectedKind/paths/score/set) and region geometry
+(normalized + denormalized pixel + scope) + attachments. Consumed by the
+`--on-complete` hook and external integrations (`docs/ai-integration.md`).
 
 ## 8. AI analysis (`7-ai-analysis.md`) — **Shipped**
 

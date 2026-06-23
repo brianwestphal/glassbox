@@ -29,14 +29,16 @@ function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<{ port
  * the detached difftool session (doc 19) uses both to record its port and to
  * shut itself down on end-of-session.
  */
-export async function startServer(port: number, reviewId: string, repoRoot: string, options?: { noOpen?: boolean; strictPort?: boolean }): Promise<{ port: number; server: ServerType }> {
+export async function startServer(port: number, reviewId: string, repoRoot: string, options?: { noOpen?: boolean; strictPort?: boolean; onComplete?: string | null }): Promise<{ port: number; server: ServerType }> {
   const app = new Hono<AppEnv>();
+  const onCompleteCommand = options?.onComplete ?? null;
 
   // Inject context
   app.use('*', async (c, next) => {
     c.set('reviewId', reviewId);
     c.set('currentReviewId', reviewId);
     c.set('repoRoot', repoRoot);
+    c.set('onCompleteCommand', onCompleteCommand);
     await next();
   });
 

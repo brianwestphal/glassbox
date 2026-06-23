@@ -46,7 +46,7 @@ glassbox/
 
 | File | Purpose |
 |------|---------|
-| `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. Also handles the repo-less `--diff` (doc 18) and `--ground-truth <manifest>` (doc 26) launches, and dispatches standalone subcommands before arg parsing: `glassbox note …` (doc 20 producer) and `glassbox ground-truth promote <manifest>` (doc 26 P3d baseline rotation). |
+| `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. Also handles the repo-less `--diff` (doc 18) and `--ground-truth <manifest>` (doc 26) launches, the `--on-complete <command>` completion hook (doc 2 §2.3a, threaded into `startServer`), and dispatches standalone subcommands before arg parsing: `glassbox note …` (doc 20 producer) and `glassbox ground-truth promote <manifest>` (doc 26 P3d baseline rotation). |
 | `cli-difftool.ts` | Standalone `glassbox-difftool` bin entry — bridges `git difftool` into a Glassbox review. Built to `dist/cli-difftool.js` and shipped via `package.json`'s `"bin"` map. **`--dir-diff` (any target):** the **blocking** path — dereferences git's symlinked snapshot dirs into a temp tree (git uses symlinks on the right side of `--dir-diff`) and launches `glassbox --diff` (desktop launcher shim with `GLASSBOX_DIFFTOOL_BLOCK=1`, or sibling `cli.js`); blocking keeps the temp tree alive for the whole session. **Per-file (doc 19, accumulating):** a **thin client** — reads `$LOCAL`/`$REMOTE` content into memory (before git deletes the temp files), discovers-or-starts a single accumulating session (`src/git/difftool-client.ts`), appends the file (labeled by git's repo-relative `$MERGED` path when the registered cmd passes it, else the working-tree basename — GB-864), and returns immediately, except on the last file (`GIT_DIFF_PATH_COUNTER == GIT_DIFF_PATH_TOTAL`) where it holds so `git difftool` stays attached until "Done"/tab-or-window-close. The session start differs by target: **browser** spawns `cli.js --difftool-serve` (opens a tab); **desktop** launches the launcher shim in `--difftool-serve` mode so the review opens in one Tauri window and later invocations append to it (GB-861 — closing the window kills the sidecar, ending the session). Pure decisions live in `src/git/difftool-launch.ts`. |
 | `server.ts` | Hono app bootstrap. Middleware for `reviewId`/`currentReviewId`/`repoRoot`. Static asset routes. Registers route groups. |
 | `types.ts` | `AppEnv` (Hono `Env` with typed Variables). |
@@ -490,18 +490,39 @@ Theme manager + editor UI live under `src/client/settings/`.
 
 ## 11. Export
 
-`src/export/generate.ts` produces two files on each export:
+`src/export/generate.ts` produces **markdown + JSON** on each export:
 
-- `.glassbox/latest-review.md` — always the current state (overwritten)
-- `.glassbox/review-{id}.md` — archived copy
+- `.glassbox/latest-review.md` / `.glassbox/latest-review.json` — current state (overwritten)
+- `.glassbox/review-{id}.md` / `.glassbox/review-{id}.json` — archived copies
 
 Auto-export (`auto-export.ts`) debounces writes at **2s** after any
 annotation mutation. Completion exports immediately.
 
-Format includes: header (repo/mode/date/counts), category summary table,
-Items to Remember section (from `remember` category), per-file grouped
-annotations with line number + category, and an Instructions for AI Tools
-section explaining category semantics.
+Markdown format: header (repo / clean mode label / date / counts), category
+summary table, Items to Remember section (from `remember` category), per-file
+grouped annotations with line number + category, and an Instructions for AI Tools
+section explaining category semantics. The mode line routes through
+`formatReviewMode` (never the raw serialized mode string — GB-971/GB-973).
+
+The **structured JSON** (`buildReviewExportData` in `src/export/build-data.ts`,
+pure; schema `ReviewExportSchema` in `src/api/export.ts`, the SSOT, `.parse()`d
+before write) is the machine-readable companion for programmatic consumers (the
+`--on-complete` hook, external integrations). `schemaVersion: 1`; annotations
+grouped **by comparison** (only annotated review files), each carrying ground-truth
+context (label/expectedKind/actual+expected paths/score/set) and region geometry
+(normalized + denormalized `pixel` via a cheap header read of the image dims,
+`extractMetadata`) + `scope` + attachments. Same data as the markdown, so they
+never drift.
+
+**Completion hook** (`src/export/on-complete-hook.ts`, `runOnCompleteHook`): the
+`--on-complete <command>` CLI option (threaded via `startServer` →
+`AppEnv.onCompleteCommand` → the `POST /api/review/complete` route) runs a
+user-supplied shell command **only** on explicit completion (not the auto-export),
+after the export is written, passing `GLASSBOX_REVIEW_JSON`/`_MD`/`_ID`/
+`GLASSBOX_REPO_ROOT` in env (cwd = repo root; output → `.glassbox/on-complete.log`).
+Never throws — a failing/absent hook can't break completion; the outcome rides on
+the completion response. The generic, AI-free generalization of the channel's
+"Send to Claude" button (doc 17). Verified end-to-end by `tests/smoke/ground-truth.sh`.
 
 ## 12. Channel (MCP → Claude Code)
 

@@ -43,6 +43,7 @@ Options:
   --no-open           Don't open browser automatically
   --strict-port       Fail if the requested port is in use
   --project-dir <dir> Run as if invoked from <dir> (used by Tauri desktop app)
+  --on-complete <cmd> Run <cmd> when a review is completed (local command; receives the export paths via GLASSBOX_REVIEW_JSON/_MD/_ID env vars)
   --check-for-updates Check for a newer version on npm
   --ai-service-test   Use mock AI responses (no API calls, no tokens used)
   --help              Show this help message
@@ -77,6 +78,7 @@ export function parseArgs(
   noOpen: boolean;
   strictPort: boolean;
   projectDir: string | null;
+  onComplete: string | null;
   difftoolAction: 'register' | 'unregister' | null;
   difftoolLocal: boolean;
   difftoolForce: boolean;
@@ -94,6 +96,7 @@ export function parseArgs(
   let noOpen = false;
   let strictPort = false;
   let projectDir: string | null = null;
+  let onComplete: string | null = null;
   let difftoolAction: 'register' | 'unregister' | null = null;
   let difftoolLocal = false;
   let difftoolForce = false;
@@ -184,6 +187,11 @@ export function parseArgs(
       case "--project-dir":
         projectDir = args[++i];
         break;
+      case "--on-complete":
+        // A command run when a review is explicitly completed (doc 2 / GB-974).
+        // Local, user-supplied; never taken from network input.
+        onComplete = args[++i];
+        break;
       case "--register-difftool":
         difftoolAction = "register";
         break;
@@ -220,7 +228,7 @@ export function parseArgs(
     mode = { type: "uncommitted" };
   }
 
-  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce, difftoolServe };
+  return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, onComplete, difftoolAction, difftoolLocal, difftoolForce, difftoolServe };
 }
 
 async function main() {
@@ -274,7 +282,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce, difftoolServe } = parsed;
+  const { port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, onComplete, difftoolAction, difftoolLocal, difftoolForce, difftoolServe } = parsed;
   // `mode` is reassigned for ground-truth (the manifest is loaded here, not in
   // arg parsing) so the resolved comparisons ride in the mode.
   let { mode, dataDir } = parsed;
@@ -350,7 +358,7 @@ async function main() {
     clearImageBlobs(sessionDataDir);
     const repoRoot = process.cwd();
     const review = await createReview(repoRoot, "git difftool", "difftool");
-    const { port: actualPort, server } = await startServer(port, review.id, repoRoot, { noOpen, strictPort });
+    const { port: actualPort, server } = await startServer(port, review.id, repoRoot, { noOpen, strictPort, onComplete });
     initDifftoolSession({
       reviewId: review.id,
       repoRoot,
@@ -398,7 +406,7 @@ async function main() {
 
   if (demo !== null) {
     const { reviewId } = await setupDemoReview(demo);
-    await startServer(port, reviewId, process.cwd(), { noOpen, strictPort });
+    await startServer(port, reviewId, process.cwd(), { noOpen, strictPort, onComplete });
     return;
   }
 
@@ -500,14 +508,14 @@ async function main() {
       const diffs = getFileDiffs(mode, cwd);
       const result = await updateReviewDiffs(existing.id, diffs, headCommit);
       console.log(`Updated ${result.updated} file(s), ${result.added} added, ${result.stale} stale annotation(s)`);
-      await startServer(port, existing.id, repoRoot, { noOpen, strictPort });
+      await startServer(port, existing.id, repoRoot, { noOpen, strictPort, onComplete });
       return;
     }
 
     // Different HEAD but --resume: reopen as-is
     if (resume) {
       console.log(`Resuming review ${existing.id} (started ${existing.created_at})`);
-      await startServer(port, existing.id, repoRoot, { noOpen, strictPort });
+      await startServer(port, existing.id, repoRoot, { noOpen, strictPort, onComplete });
       return;
     }
   } else if (resume) {
@@ -535,7 +543,7 @@ async function main() {
 
   console.log(`Review ${review.id} created.`);
 
-  await startServer(port, review.id, repoRoot, { noOpen, strictPort });
+  await startServer(port, review.id, repoRoot, { noOpen, strictPort, onComplete });
 }
 
 // Only run main() when executed as entry point (not when imported for testing).
