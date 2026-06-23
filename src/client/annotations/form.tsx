@@ -3,7 +3,7 @@ import { delegate } from 'kerfjs';
 import type { AnnotationCategory, AnnotationSide } from '../../api/index.js';
 import { createAnnotation } from '../../api/index.js';
 import { IconCornerDownRight } from '../../icons.js';
-import { takePendingArtifactRegion } from '../diff/noteArtifactRegions.js';
+import { clearPendingArtifactRegions, takePendingArtifactRegions } from '../diff/noteArtifactRegions.js';
 import { asTextarea, toElement } from '../dom.js';
 import { CATEGORIES } from '../state.js';
 import { editFormSignal, reviewStore, setEditForm } from '../stores/index.js';
@@ -86,6 +86,9 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
 function cancelNewAnnotation(): void {
   const cur = editFormSignal.value;
   if (cur?.formKey === null || cur?.formKey === undefined) return;
+  // Drop any regions the reviewer marked for this note's reply (doc 25 / GB-959)
+  // so they don't leak into a later reply.
+  if (cur.replyToNoteId !== undefined) clearPendingArtifactRegions(cur.replyToNoteId);
   document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${cur.formKey}"]`).forEach(el => { el.remove(); });
   setEditForm(null);
 }
@@ -99,11 +102,12 @@ async function saveNewAnnotation(): Promise<void> {
   const lineNumber = parseInt(lineNumberStr, 10);
   if (isNaN(lineNumber)) return;
 
-  // A reply to a note may carry a region the reviewer marked on the note's
-  // image artifact (doc 25 / GB-953) — attach it so the reply shows the spot.
-  const region = state.replyToNoteId !== undefined
-    ? takePendingArtifactRegion(state.replyToNoteId)
-    : undefined;
+  // A reply to a note may carry one or more regions the reviewer marked on the
+  // note's image artifact(s) (doc 25 / GB-953, GB-959) — attach them so the
+  // reply shows the spots.
+  const regions = state.replyToNoteId !== undefined
+    ? takePendingArtifactRegions(state.replyToNoteId)
+    : [];
 
   const annotation = await createAnnotation({
     reviewFileId: reviewStore.state.value.currentFileId ?? '',
@@ -112,7 +116,7 @@ async function saveNewAnnotation(): Promise<void> {
     category: state.category as AnnotationCategory,
     content,
     replyToNoteId: state.replyToNoteId,
-    ...(region !== undefined ? { region } : {}),
+    ...(regions.length > 0 ? { regions } : {}),
   });
 
   document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-form-key="${state.formKey}"]`).forEach(el => { el.remove(); });

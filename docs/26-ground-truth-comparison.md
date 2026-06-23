@@ -1,8 +1,8 @@
 # 26. Ground-Truth Image Comparison
 
-> **Status: Design only.** This document captures the agreed shape of the
-> feature; nothing here is implemented yet. Implementation is phased into the
-> follow-up tickets listed under "Phasing".
+> **Status: P1 shipped** (manifest + single-image actual-vs-expected mode).
+> The perceptual metric (P2) and sets/flows + capture pipeline (P3) remain
+> design-only; see "Phasing".
 
 Glassbox's image comparison (doc [4](4-diff-viewing.md) §4.3, doc
 [24](24-image-comparison-layouts.md)) compares an image's **old vs new** sides
@@ -38,12 +38,29 @@ against design references.
   maps each actual image to its expected image (and, later, actual *sets* to
   expected *sets* for flows). This handles renamed files, expecteds that live
   outside the repo, and multi-step flows that a folder convention can't express.
-  - The manifest format (location, schema, relative vs absolute paths, how a
-    "set" is expressed) is to be specified in P1; it should tolerate expected
-    files anywhere on disk (design specs are often not committed).
+  - **Shipped format (P1).** A JSON file with `version: 1` and a `comparisons`
+    array; each entry has `actual` + `expected` paths and optional `label` +
+    `expectedKind` (`spec` | `reference` | `previous-actual`):
+
+    ```json
+    {
+      "version": 1,
+      "comparisons": [
+        { "actual": "out/login.png", "expected": "design/login.png",
+          "label": "Login screen", "expectedKind": "spec" }
+      ]
+    }
+    ```
+
+    Paths resolve **relative to the manifest file's own directory** (so the
+    manifest is portable), absolute paths are kept as-is, and either side may
+    live **outside the repo** — design specs are often not committed. v1 is
+    single still images only; the set/flow shape is P3 (§26.3). Loaded +
+    validated by `src/ground-truth/manifest.ts` (`loadGroundTruthManifest`).
   - Glassbox already reads two arbitrary files/folders by path for
     `--diff` (doc [18](18-direct-comparison.md)); the manifest mode builds on the
-    same "image bytes from an arbitrary path" plumbing rather than git refs.
+    same "image bytes from an arbitrary path" plumbing rather than git refs — the
+    expected image is the old (A) side, the actual the new (B) side.
 
 ## 26.3 Scope of comparison
 
@@ -81,20 +98,67 @@ against design references.
 - **NFR-26.1 — Reuse, don't fork.** Reuse the doc-24 comparison modes, the doc-23
   region model, and the doc-18 arbitrary-path image plumbing. The new surface is
   the source list + the manifest + (later) the metric — not a second image viewer.
-- **Open:** manifest schema + location; how the mode is launched (a new CLI flag,
-  e.g. `--ground-truth <manifest>`, vs an in-app picker); how expected files
-  outside the repo are referenced safely (path containment); whether previous-
-  actual baselines are stored by Glassbox or supplied by the capture tooling.
+- **Resolved in P1:**
+  - **Launch** — a CLI flag, `glassbox --ground-truth <manifest.json>` (no
+    in-app picker yet). The resolved comparisons ride in the review mode, so
+    resume + the image route need no manifest re-read.
+  - **Path safety** — consistent with doc 18 (FR-18.9) / doc [14](14-security.md):
+    paths come from a local manifest the user controls, the server binds to
+    localhost only, and git is never shelled with these paths, so **no
+    repo-containment restriction** is imposed on the expected side (the point is
+    that specs live outside the repo). Each path is validated to be a readable
+    image at launch.
+  - **Previous-actual baselines** — handled purely via the manifest in P1
+    (`expected` points at the prior actual; `expectedKind: "previous-actual"`
+    is a display hint). Glassbox stores no baseline itself; automatic
+    "keep last actual" tooling is P3 (capture pipeline).
+- **Still open (later phases):** how a "set" is expressed in the manifest (P3);
+  whether the capture pipeline writes/rotates baselines (P3).
 
 ## Phasing (follow-up tickets)
 
-- **P1 — Manifest + single-image actual-vs-expected**, using the existing
-  difference/slice/side-by-side + region UI. Defines the manifest format and the
-  mode launch. (No metric yet.)
+- **P1 — Manifest + single-image actual-vs-expected** *(shipped)*, using the
+  existing difference/slice/side-by-side + region UI. Defines the manifest format
+  (`src/ground-truth/manifest.ts`) and the `--ground-truth <manifest>` launch.
+  The expected image is the old/A side, the actual the new/B side; each manifest
+  comparison is one synthetic binary image entry whose bytes the image route
+  reads from the resolved paths (`getOldImage`/`getNewImage`, doc 18 plumbing).
+  No perceptual metric yet (P2). Implementation notes below.
 - **P2 — Perceptual diff + pre-processing**: identical-filtering,
   anti-aliasing tolerance, a difference score that sorts the review list.
 - **P3 — Sets / multi-step flows + capture pipeline** (incl. domotion
   animated-SVG capture) and the previous-actual-baseline tooling.
+
+## Implementation pointers (P1)
+
+- **Mode + manifest:** `ReviewMode` `ground-truth` variant + `GroundTruthEntry`
+  (`src/git/types.ts`); loader `src/ground-truth/manifest.ts`
+  (`loadGroundTruthManifest`).
+- **CLI:** `--ground-truth <manifest>` in `src/cli.ts` (`parseArgs` + the
+  no-repo launch branch in `main()`, alongside `--diff`).
+- **Diff + mode round-trip:** `getFileDiffs` / `getModeString` /
+  `parseModeString` / `getModeArgs` / `getModeFileContent` ground-truth branches
+  in `src/git/diff.ts`. Each comparison becomes one `isBinary` image `FileDiff`
+  keyed by the manifest's `actual` path (the expected path rides in `oldPath`
+  for the right content-type when sides differ in format).
+- **Image bytes:** `getOldImage` (→ expected) / `getNewImage` (→ actual) in
+  `src/git/image.ts` look the comparison up by key; the existing image route
+  (`src/routes/api/image.ts`) is reused unchanged.
+- **UI:** reuses the doc-24 image-comparison view (`src/components/imageDiff.tsx`)
+  and the doc-23 region/feedback overlay with no changes — a manifest comparison
+  is just a binary image pair.
+
+## Tests (P1)
+
+- Unit: `tests/unit/ground-truth/manifest.test.ts` (load / resolve / dedup /
+  validation), ground-truth blocks in `tests/unit/git/diff.test.ts` (mode
+  round-trip, file diffs) and `tests/unit/git/image.test.ts` (expected→old /
+  actual→new reads), plus the `--ground-truth` case in
+  `tests/unit/cli/parseArgs.test.ts`.
+- E2E: `tests/e2e/ground-truth.test.ts` (dedicated `--ground-truth` server on
+  port 4185; source list, image-comparison render with the expected/actual side
+  mapping, an image comment on a repo-less review, and completion). Fixtures
+  under `tests/fixtures/ground-truth/`.
 
 ## Relationship to existing docs
 

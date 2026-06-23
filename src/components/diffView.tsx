@@ -412,9 +412,12 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                 ) : a.isImage === true ? (
                   <details className="ai-note-artifact">
                     <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
-                    <img className="ai-note-artifact-img" loading="lazy" alt={a.uri}
-                      data-artifact-uri={a.uri} title="Click to view full screen and mark a region"
-                      src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
+                    <div className="ai-note-artifact-imgwrap">
+                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable={false}
+                        data-artifact-uri={a.uri} title="Drag to mark a region, or click to view full screen"
+                        src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
+                      <div className="ai-note-artifact-region-overlay" data-artifact-uri={a.uri}></div>
+                    </div>
                   </details>
                 ) : (
                   <div className="ai-note-artifact ai-note-artifact-ref ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></div>

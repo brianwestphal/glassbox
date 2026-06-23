@@ -1,0 +1,91 @@
+import { test, expect } from './coverage-fixture.js';
+
+/**
+ * Browser-driven coverage for ground-truth comparison mode (doc 26 P1).
+ *
+ * The unit suite covers the manifest loader, the mode round-trip, the synthetic
+ * file diffs, and the expected→old / actual→new image reads. What only an
+ * in-browser test catches is whether the UI renders a no-git-repo review whose
+ * entries are manifest-driven image pairs — i.e. that the `--ground-truth`
+ * bootstrap wires server to client end-to-end and the existing image-comparison
+ * view (doc 24) lights up against the expected/actual bytes.
+ *
+ * Playwright boots a dedicated `npx tsx src/cli.ts --ground-truth
+ * tests/fixtures/ground-truth/manifest.json …` server on port 4185; this project
+ * sets `baseURL` to that port (`playwright.config.ts`).
+ */
+
+// State-mutating tests (annotate, complete) run after the read-only checks.
+test.describe.configure({ mode: 'serial' });
+
+test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
+  test('source list shows one entry per manifest comparison', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    // Two comparisons in the fixture manifest; each actual path keys an entry,
+    // grouped under its `actual/` folder in the sidebar tree.
+    await expect(page.locator('.file-name[title="actual/button.svg"]')).toHaveCount(1);
+    await expect(page.locator('.file-name[title="actual/card.svg"]')).toHaveCount(1);
+  });
+
+  test('a comparison renders the image-diff view with expected as old (A) and actual as new (B)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-name[title="actual/button.svg"]').click();
+
+    // Manifest entries are binary image pairs, so the image-comparison view
+    // (doc 24) mounts directly — no Code/Rendered toggle.
+    const imageDiff = page.locator('.image-diff');
+    await expect(imageDiff).toBeVisible({ timeout: 5000 });
+    await expect(imageDiff).toHaveAttribute('data-has-old', 'true');
+    await expect(imageDiff).toHaveAttribute('data-has-new', 'true');
+
+    // Both sides decode from disk (served as raw image/svg+xml, GB-932 path).
+    await page.waitForFunction(() => {
+      const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('.image-diff .image-layer'));
+      return imgs.length >= 2 && imgs.every((img) => img.complete && img.naturalWidth > 0);
+    }, null, { timeout: 10000 });
+
+    // Confirm the side mapping: the old (A) bytes are the *expected* spec
+    // (fill #3b82f6) and the new (B) bytes are the *actual* (fill #2563eb).
+    const fileId = await imageDiff.getAttribute('data-file-id');
+    const sides = await page.evaluate(async (id) => {
+      const [oldRes, newRes] = await Promise.all([
+        fetch(`/api/image/${id}/old`),
+        fetch(`/api/image/${id}/new`),
+      ]);
+      return {
+        oldType: oldRes.headers.get('Content-Type'),
+        oldBody: await oldRes.text(),
+        newBody: await newRes.text(),
+      };
+    }, fileId);
+    expect(sides.oldType).toBe('image/svg+xml');
+    expect(sides.oldBody).toContain('#3b82f6'); // expected/button.svg
+    expect(sides.newBody).toContain('#2563eb'); // actual/button.svg
+  });
+
+  test('an image comment can be added on a ground-truth comparison (no git repo)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-name[title="actual/card.svg"]').click();
+    await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
+
+    // The image-feedback panel (doc 23) offers a general comment box; adding one
+    // proves annotations persist for a manifest-driven, repo-less review.
+    const commentInput = page.locator('[data-image-feedback] [data-role="general-input"]');
+    await expect(commentInput).toBeVisible({ timeout: 5000 });
+    await commentInput.fill('The avatar green is a touch too saturated vs the spec');
+    await commentInput.press('Control+Enter');
+    await expect(page.locator('[data-image-feedback]'))
+      .toContainText('too saturated vs the spec', { timeout: 5000 });
+  });
+
+  test('Complete Review opens the completion modal (finalizes outside a repo)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('#complete-review').click();
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
+  });
+});

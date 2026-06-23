@@ -39,6 +39,30 @@ export const FileDiffSchema = z.object({
 });
 export type FileDiff = z.infer<typeof FileDiffSchema>;
 
+/**
+ * One actual↔expected image pairing in a ground-truth comparison (doc 26). The
+ * manifest is loaded once at launch and the resolved entries are carried in the
+ * review mode, so the image route and diff builder need no file I/O at request
+ * time. `expectedPath` is the old/A side, `actualPath` the new/B side.
+ *
+ * Defined as a schema so the round-trip through the `reviews.mode` string column
+ * (a trust boundary) is validated, not asserted.
+ */
+export const GroundTruthEntrySchema = z.object({
+  /** Stable display + lookup id; carries an image extension so the image viewer
+   *  engages (defaults to the actual path as written in the manifest). */
+  key: z.string(),
+  /** Absolute path to the actual image (new / B side). */
+  actualPath: z.string(),
+  /** Absolute path to the expected / ground-truth image (old / A side). */
+  expectedPath: z.string(),
+  /** Optional reviewer-facing label. */
+  label: z.string().optional(),
+  /** What the expected image represents (display hint only). */
+  expectedKind: z.enum(['spec', 'reference', 'previous-actual']).optional(),
+});
+export type GroundTruthEntry = z.infer<typeof GroundTruthEntrySchema>;
+
 export type ReviewMode =
   | { type: 'uncommitted' }
   | { type: 'staged' }
@@ -51,4 +75,9 @@ export type ReviewMode =
   // Direct comparison of two arbitrary paths (files or folders), independent
   // of git history and usable outside a repository (doc 18). `pathA` is the
   // old/left side, `pathB` the new/right side; both are absolute paths.
-  | { type: 'diff'; pathA: string; pathB: string };
+  | { type: 'diff'; pathA: string; pathB: string }
+  // Ground-truth image comparison (doc 26): each entry pairs an actual image
+  // with an expected/ground-truth image, loaded from a manifest. `comparisons`
+  // is the resolved manifest (absolute paths); `manifestPath` is kept for
+  // display + re-run matching.
+  | { type: 'ground-truth'; manifestPath: string; comparisons: GroundTruthEntry[] };

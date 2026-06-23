@@ -31,6 +31,7 @@ Modes (pick one):
   --files <patterns>  Review specific files (glob patterns, comma-separated)
   --all               Review entire codebase
   --diff <a> <b>      Compare two arbitrary files or folders by path (no git repo required)
+  --ground-truth <m>  Compare actual images against expected/ground-truth images from a manifest (no git repo required)
 
 Options:
   --port <number>     Port to run on (default: 4183)
@@ -55,6 +56,7 @@ Examples:
   glassbox --all --resume
   glassbox --diff ./before.svg ./after.svg
   glassbox --diff ./dist-old ./dist-new
+  glassbox --ground-truth ./screenshots/ground-truth.json
 `);
 }
 
@@ -138,6 +140,18 @@ export function parseArgs(
         }
         // Store absolute paths so the mode is stable regardless of later cwd.
         mode = { type: "diff", pathA: resolve(args[++i]), pathB: resolve(args[++i]) };
+        break;
+      }
+      case "--ground-truth": {
+        // Ground-truth comparison (doc 26): a manifest mapping actual images to
+        // expected/ground-truth images. The manifest is loaded in main() (file
+        // I/O + validation belong there, not in arg parsing); comparisons are
+        // filled in then.
+        if (i + 1 >= args.length || args[i + 1].startsWith("-")) {
+          console.error("--ground-truth requires a manifest path: --ground-truth <manifest.json>");
+          process.exit(1);
+        }
+        mode = { type: "ground-truth", manifestPath: resolve(args[++i]), comparisons: [] };
         break;
       }
       case "--port":
@@ -228,8 +242,10 @@ async function main() {
     process.exit(1);
   }
 
-  const { mode, port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce, difftoolServe } = parsed;
-  let { dataDir } = parsed;
+  const { port, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, difftoolAction, difftoolLocal, difftoolForce, difftoolServe } = parsed;
+  // `mode` is reassigned for ground-truth (the manifest is loaded here, not in
+  // arg parsing) so the resolved comparisons ride in the mode.
+  let { mode, dataDir } = parsed;
 
   // GB-850 — `--register-difftool` / `--unregister-difftool` are standalone
   // CLI actions: run the git config write and exit, without booting the
@@ -386,6 +402,29 @@ async function main() {
     // No repo: anchor data/export at the working directory, label by basenames.
     repoRoot = cwd;
     repoName = `${basename(pathA)} ↔ ${basename(pathB)}`;
+  } else if (mode.type === "ground-truth") {
+    // Ground-truth (doc 26): load + validate the manifest, resolve each
+    // actual/expected pair, and confirm the images exist. Like --diff, this
+    // needs no git repository.
+    const { loadGroundTruthManifest } = await import("./ground-truth/manifest.js");
+    let comparisons;
+    try {
+      comparisons = loadGroundTruthManifest(mode.manifestPath);
+    } catch (err) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+    for (const entry of comparisons) {
+      for (const [role, p] of [["actual", entry.actualPath], ["expected", entry.expectedPath]] as const) {
+        if (!existsSync(p)) {
+          console.error(`Error: ${role} image does not exist: ${p}`);
+          process.exit(1);
+        }
+      }
+    }
+    mode = { ...mode, comparisons };
+    repoRoot = cwd;
+    repoName = `Ground truth: ${basename(mode.manifestPath)}`;
   } else {
     if (!isGitRepo(cwd)) {
       console.error("Error: Not a git repository. Run this from inside a git repo.");

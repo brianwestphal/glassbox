@@ -35,6 +35,9 @@ export const CreateAnnotationReqSchema = z.object({
   replyToNoteId: z.string().optional(),
   /** Normalized rectangle for an image-region annotation (doc 23). */
   region: ImageRegionSchema.optional(),
+  /** One or more rectangles a reply marks on a note's image artifact(s)
+   *  (doc 25 / GB-959). Takes precedence over `region` when present. */
+  regions: z.array(ImageRegionSchema).optional(),
 });
 export type CreateAnnotationReq = z.infer<typeof CreateAnnotationReqSchema>;
 export const CreateAnnotationRespSchema = AnnotationSchema;

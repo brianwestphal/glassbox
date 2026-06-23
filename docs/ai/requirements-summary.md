@@ -137,20 +137,29 @@ overlay** (lightbox) on click/Space; other types open in the OS default app.
 wired on **line annotations**, **note replies** (same `AnnotationItem`), and
 **image-feedback** comments/regions. Client:
 `src/client/annotations/attachments.tsx`; routes `src/routes/api/attachments.ts`.
-Related (GB-953): clicking an AI review note's **image artifact** (doc 20) opens
-a shared full-screen **lightbox** (`src/client/lightbox.tsx`) where the reviewer
-**drags a rectangle**; the region rides into the reply they write and renders as
-a marked thumbnail (`src/components/reviewNoteRegionThumb.tsx`), reusing doc 23's
-normalized `{x,y,w,h}` model with an `artifact` uri in `region_data`.
+Related (GB-953, GB-959): a reviewer marks a rectangle on an AI review note's
+**image artifact** (doc 20) either **inline** — dragging on the thumbnail
+(`src/client/diff/noteArtifactRegions.tsx`; a plain click opens the full-screen
+**lightbox**, `src/client/lightbox.tsx`) — or in the lightbox. The mark(s) ride
+into the reply and render as marked thumbnail(s)
+(`src/components/reviewNoteRegionThumb.tsx`); a reply may carry **several**
+regions, stored as a JSON array in `region_data` (decode/group helpers in
+`src/utils/artifactRegions.ts`). Reuses doc 23's normalized `{x,y,w,h}` model
+with an `artifact` uri.
 
-**Ground-truth comparison** (doc 26, **Design only**): a planned separate mode to
-compare an **actual** image against an **expected**/ground-truth image (design
-spec, reference render, or previous-actual baseline), even when the expected
-lives outside the repo. **Manifest-driven** actual→expected mapping; reuses the
-doc-24 comparison modes + doc-23 region marking + doc-18 arbitrary-path plumbing.
-v1 = single still images; a perceptual diff (filter identical / anti-aliasing-
-tolerant / difference score) is a fast-follow; sets/flows + a capture pipeline
-(incl. domotion animated SVGs) are later. No code yet — phased follow-up tickets.
+**Ground-truth comparison** (doc 26, **P1 shipped**): a separate mode to compare
+an **actual** image against an **expected**/ground-truth image (design spec,
+reference render, or previous-actual baseline), even when the expected lives
+outside the repo. Launched via `glassbox --ground-truth <manifest.json>` (no git
+repo required). The **manifest** (`src/ground-truth/manifest.ts`, JSON
+`version:1` + `comparisons[]` of `actual`/`expected`/optional `label`+
+`expectedKind`; paths relative to the manifest dir, may be outside the repo)
+becomes one synthetic binary image pair per entry — expected = old/A, actual =
+new/B — served by the existing image route, so the doc-24 comparison modes +
+doc-23 region marking + doc-18 arbitrary-path plumbing all light up unchanged.
+**P2** (perceptual diff: filter identical / anti-aliasing-tolerant / difference
+score) and **P3** (sets/flows + capture pipeline incl. domotion animated SVGs;
+baseline rotation) remain design-only — phased follow-up tickets.
 
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions

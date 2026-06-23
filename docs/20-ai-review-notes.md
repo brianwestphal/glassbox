@@ -198,14 +198,19 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   diagram-*source* artifacts render as an inline, collapsible code block; **image
   artifacts** (`.png`/`.webp`/`.avif`/`.gif`/`.jpg`/`.svg`) render as an `<img>`
   served by `GET /api/review-notes/artifact` (path-contained, content-typed,
-  size-capped). **Clicking an image artifact** opens it in a shared full-screen
-  lightbox where the reviewer can **drag a rectangle to mark a region**; that
-  region is carried into the reply they then write — the reply renders the
-  artifact with the marked rectangle (a "see this spot" thumbnail). The region
-  reuses doc 23's normalized `{x,y,w,h}` model (plus an `artifact` uri) stored in
-  the reply annotation's `region_data`; the lightbox lives in
-  `src/client/lightbox.tsx`, the marked thumbnail in
-  `src/components/reviewNoteRegionThumb.tsx` (doc 25 / GB-953). The reader is
+  size-capped). The reviewer can **mark a rectangle on an image artifact** two
+  ways: **inline** — drag directly on the thumbnail (a plain click instead opens
+  the full-screen lightbox) — or in the **lightbox** itself. Either way the
+  rectangle is carried into the reply they then write, and a reply can carry
+  **several** marks (GB-959): the reply renders each artifact with its
+  rectangle(s) over it (a "see this spot" thumbnail). Each region reuses doc 23's
+  normalized `{x,y,w,h}` model (plus an `artifact` uri); a multi-mark reply
+  stores a JSON **array** of them in the reply annotation's `region_data` (a
+  single object is still read for back-compat). The lightbox lives in
+  `src/client/lightbox.tsx`, inline marking in
+  `src/client/diff/noteArtifactRegions.tsx`, the array decode/group helpers in
+  `src/utils/artifactRegions.ts`, and the marked thumbnail in
+  `src/components/reviewNoteRegionThumb.tsx` (doc 25 / GB-953, GB-959). The reader is
   path-contained + size-capped throughout. **Live
   diagram rendering** of diagram-source (Mermaid/Graphviz/PlantUML) into actual
   diagrams is the remaining follow-up (§20.11 P4).

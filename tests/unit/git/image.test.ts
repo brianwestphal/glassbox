@@ -685,3 +685,45 @@ describe('direct comparison (diff mode) image reads', () => {
     expect(getNewImage(mode, 'does-not-exist.png', root)).toBeNull();
   });
 });
+
+describe('ground-truth image reads (doc 26)', () => {
+  let root: string;
+  let mode: ReviewMode;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const actual = await vi.importActual<typeof import('fs')>('fs');
+    vi.mocked(readFileSync).mockImplementation(actual.readFileSync);
+    root = mkdtempSync(join(tmpdir(), 'gb-gt-'));
+    writeFileSync(join(root, 'expected.png'), Buffer.from('EXPECTED-BYTES'));
+    writeFileSync(join(root, 'actual.png'), Buffer.from('ACTUAL-BYTES-LONGER'));
+    mode = {
+      type: 'ground-truth',
+      manifestPath: join(root, 'manifest.json'),
+      comparisons: [
+        { key: 'out/login.png', actualPath: join(root, 'actual.png'), expectedPath: join(root, 'expected.png') },
+      ],
+    };
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('serves the expected image as the old (A) side', () => {
+    const result = getOldImage(mode, 'out/login.png', join(root, 'expected.png'), root);
+    expect(spawnSync).not.toHaveBeenCalled();
+    expect(result!.data.toString()).toBe('EXPECTED-BYTES');
+  });
+
+  it('serves the actual image as the new (B) side', () => {
+    const result = getNewImage(mode, 'out/login.png', root);
+    expect(spawnSync).not.toHaveBeenCalled();
+    expect(result!.data.toString()).toBe('ACTUAL-BYTES-LONGER');
+  });
+
+  it('returns null for an unknown comparison key', () => {
+    expect(getOldImage(mode, 'nope.png', null, root)).toBeNull();
+    expect(getNewImage(mode, 'nope.png', root)).toBeNull();
+  });
+});

@@ -456,6 +456,49 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.annotation-item', { hasText: marker })).toHaveCount(0, { timeout: 5000 });
   });
 
+  // GB-959 — drag directly on the inline thumbnail (no lightbox), marking
+  // several regions that all ride into one reply.
+  test('marking multiple regions inline on a note artifact carries them all into the reply', async ({ page }) => {
+    await openModifiedFile(page);
+    await page.getByText('demo-annotations.png').click();
+    const artImg = page.locator('.ai-note-artifact-img');
+    await expect.poll(() => artImg.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+
+    const dragOn = async (x0: number, y0: number, x1: number, y1: number) => {
+      const box = await artImg.boundingBox();
+      if (!box) throw new Error('artifact image has no box');
+      await page.mouse.move(box.x + box.width * x0, box.y + box.height * y0);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width * x1, box.y + box.height * y1, { steps: 8 });
+      await page.mouse.up();
+    };
+
+    // First inline drag opens the reply form (no lightbox) with one region armed.
+    await dragOn(0.15, 0.15, 0.4, 0.4);
+    await expect(page.locator('.lightbox-overlay')).toHaveCount(0);
+    const form = page.locator('.annotation-form-container[data-form-key]');
+    await expect(form).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ai-note-artifact-region-overlay .ai-note-artifact-region-box')).toHaveCount(1);
+
+    // A second inline drag adds another region without reopening the form.
+    await dragOn(0.55, 0.55, 0.85, 0.85);
+    await expect(page.locator('.ai-note-artifact-region-overlay .ai-note-artifact-region-box')).toHaveCount(2);
+
+    const marker = `inline-regions-${Date.now().toString(36)}`;
+    await form.locator('textarea').fill(marker);
+    await form.locator('textarea').press('Control+Enter');
+
+    // The reply renders both marked rectangles over the artifact.
+    const reply = page.locator('.annotation-item', { hasText: marker });
+    await expect(reply).toBeVisible({ timeout: 5000 });
+    await expect(reply.locator('.ai-note-reply-region-box')).toHaveCount(2);
+    await expect(reply.locator('.ai-note-reply-region-img')).toHaveAttribute('src', /demo-annotations\.png/);
+
+    // Cleanup so the shared session doesn't accumulate.
+    await reply.locator('[data-action="delete"]').click();
+    await expect(page.locator('.annotation-item', { hasText: marker })).toHaveCount(0, { timeout: 5000 });
+  });
+
   test('a review note renders an attached proof artifact (GB-898)', async ({ page }) => {
     await openModifiedFile(page);
     // The proof note (line 23) attaches a test-output artifact.

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comparisons": [
+    {
+      "actual": "actual/button.svg",
+      "expected": "expected/button.svg",
+      "label": "Submit button",
+      "expectedKind": "spec"
+    },
+    {
+      "actual": "actual/card.svg",
+      "expected": "expected/card.svg",
+      "label": "Profile card",
+      "expectedKind": "previous-actual"
+    }
+  ]
+}

@@ -135,6 +135,19 @@ describe('parseArgs', () => {
     it('exits when --diff is missing its second path', () => {
       expect(() => parseArgs(argv('--diff', 'only-one'))).toThrow('process.exit');
     });
+
+    it('parses --ground-truth into an absolute manifest path (comparisons loaded later)', () => {
+      const result = parseArgs(argv('--ground-truth', './screens/manifest.json'));
+      expect(result!.mode).toEqual({
+        type: 'ground-truth',
+        manifestPath: resolve('./screens/manifest.json'),
+        comparisons: [],
+      });
+    });
+
+    it('exits when --ground-truth is missing its manifest path', () => {
+      expect(() => parseArgs(argv('--ground-truth'))).toThrow('process.exit');
+    });
   });
 
   describe('options', () => {

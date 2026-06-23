@@ -10,6 +10,10 @@ import { defineConfig } from '@playwright/test';
 // invocation a fresh review.
 const DIFF_WORK_DIR = join(tmpdir(), `glassbox-e2e-diff-${process.pid}`);
 
+// The ground-truth E2E project (doc 26) likewise needs an isolated cwd/data-dir
+// so its `.glassbox/` artifacts don't collide with the other servers.
+const GT_WORK_DIR = join(tmpdir(), `glassbox-e2e-gt-${process.pid}`);
+
 // Isolate the demo server's GLOBAL config (`~/.glassbox/config.json` + custom
 // themes) under a disposable pid-scoped dir via GLASSBOX_CONFIG_DIR (GB-923).
 // Without this the suite reads/writes the developer's real `~/.glassbox`, so
@@ -25,6 +29,7 @@ const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-config-${process.pid}`);
 // Doing it in Node keeps it cross-platform (`mkdir -p` isn't valid on Windows
 // `cmd`, where it spuriously creates a `-p` dir and then errors on reruns).
 mkdirSync(DIFF_WORK_DIR, { recursive: true });
+mkdirSync(GT_WORK_DIR, { recursive: true });
 mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 
 // Optionally launch a branded, system-installed browser instead of Playwright's
@@ -99,17 +104,31 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 15000,
     },
+    {
+      // Ground-truth E2E server (doc 26). Boots `--ground-truth` against the
+      // checked-in manifest under `tests/fixtures/ground-truth/` and anchors its
+      // `.glassbox/` data + export under a pid-scoped tmpdir.
+      command: `npx tsx src/cli.ts --ground-truth tests/fixtures/ground-truth/manifest.json --no-open --strict-port --port 4185 --data-dir ${JSON.stringify(join(GT_WORK_DIR, '.glassbox'))} --project-dir ${JSON.stringify(GT_WORK_DIR)}`,
+      port: 4185,
+      reuseExistingServer: false,
+      timeout: 15000,
+    },
   ],
   projects: [
     {
       name: 'chromium',
-      testIgnore: /diff-mode\.test\.ts$/,
+      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/],
       use: { browserName: 'chromium' },
     },
     {
       name: 'chromium-diff',
       testMatch: /diff-mode\.test\.ts$/,
       use: { browserName: 'chromium', baseURL: 'http://localhost:4184' },
+    },
+    {
+      name: 'chromium-ground-truth',
+      testMatch: /ground-truth\.test\.ts$/,
+      use: { browserName: 'chromium', baseURL: 'http://localhost:4185' },
     },
   ],
 });

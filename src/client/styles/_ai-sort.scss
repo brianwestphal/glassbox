@@ -404,13 +404,31 @@
   border-radius: 3px;
   white-space: pre;
 }
+// Inline artifact thumbnail + its region-draw overlay (doc 25 / GB-959). The
+// wrapper shrinks to the image so the overlay (inset:0) lines up exactly.
+.ai-note-artifact-imgwrap {
+  position: relative;
+  display: inline-block;
+  margin: 4px 0 0;
+}
 .ai-note-artifact-img {
   display: block;
-  margin: 4px 0 0;
   max-width: 100%;
   max-height: 400px;
   border: 1px solid var(--border);
   border-radius: 3px;
+}
+.ai-note-artifact-region-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ai-note-artifact-region-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  background: rgba(137, 180, 250, 0.2);
+  pointer-events: none;
 }
 .ai-note-discard-btn:hover { color: var(--red, #f38ba8); border-color: var(--red, #f38ba8); }
 

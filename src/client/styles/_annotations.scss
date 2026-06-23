@@ -163,6 +163,9 @@
 .ai-note-reply-region {
   flex-basis: 100%;
   margin-left: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .ai-note-reply-region-frame {
@@ -187,8 +190,8 @@
   pointer-events: none;
 }
 
-// Hint that an artifact image is clickable for full-screen + region marking.
-.ai-note-artifact-img { cursor: zoom-in; }
+// Drag to mark a region inline (doc 25 / GB-959), or click for full-screen.
+.ai-note-artifact-img { cursor: crosshair; }
 
 // Highlight an annotation row while a file is dragged over it.
 .annotation-drop-target {

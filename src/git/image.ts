@@ -26,6 +26,7 @@ function getOldRef(mode: ReviewMode): string | null {
     case 'files': return 'HEAD';
     case 'all': return null;
     case 'diff': return null; // direct comparison reads from disk, not a ref
+    case 'ground-truth': return null; // reads expected/actual from disk, not a ref
   }
 }
 
@@ -44,6 +45,7 @@ function getNewRef(mode: ReviewMode): string | null {
     case 'files': return null;
     case 'all': return null;
     case 'diff': return null; // direct comparison reads from disk, not a ref
+    case 'ground-truth': return null; // reads expected/actual from disk, not a ref
   }
 }
 
@@ -79,10 +81,22 @@ function readDiskImage(absPath: string): ImageSide | null {
   }
 }
 
+/** Find a ground-truth comparison by its lookup key (the review file's path). */
+function groundTruthEntry(mode: ReviewMode, filePath: string) {
+  return mode.type === 'ground-truth'
+    ? mode.comparisons.find(e => e.key === filePath) ?? null
+    : null;
+}
+
 /** Get the old (A) version of an image file. */
 export function getOldImage(mode: ReviewMode, filePath: string, oldPath: string | null, repoRoot: string): ImageSide | null {
   if (mode.type === 'diff') {
     return readDiskImage(join(directComparisonRoots(mode).rootA, oldPath ?? filePath));
+  }
+  if (mode.type === 'ground-truth') {
+    // The expected / ground-truth image is the old (A) side (doc 26).
+    const entry = groundTruthEntry(mode, filePath);
+    return entry !== null ? readDiskImage(entry.expectedPath) : null;
   }
   const ref = getOldRef(mode);
   const path = oldPath ?? filePath;
@@ -102,6 +116,11 @@ export function getOldImage(mode: ReviewMode, filePath: string, oldPath: string 
 export function getNewImage(mode: ReviewMode, filePath: string, repoRoot: string): ImageSide | null {
   if (mode.type === 'diff') {
     return readDiskImage(join(directComparisonRoots(mode).rootB, filePath));
+  }
+  if (mode.type === 'ground-truth') {
+    // The actual image is the new (B) side (doc 26).
+    const entry = groundTruthEntry(mode, filePath);
+    return entry !== null ? readDiskImage(entry.actualPath) : null;
   }
   const ref = getNewRef(mode);
   if (ref === null) {

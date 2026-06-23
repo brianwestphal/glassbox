@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
+import { z } from 'zod';
 
 import { debugLog } from '../debug.js';
 import { getRepoRoot } from './repo.js';
 import { git } from './spawn.js';
 import type { DiffHunk, DiffLine, FileDiff, ReviewMode } from './types.js';
+import { GroundTruthEntrySchema } from './types.js';
 
 // Re-export types and repo functions so existing importers don't break
 export { parseDiffData } from './parseDiffData.js';
@@ -62,6 +64,10 @@ export function getDiffArgs(mode: ReviewMode): string[] {
       return ['diff', '--no-index', '/dev/null', '.'];
     case 'diff':
       return ['diff', '--no-index', mode.pathA, mode.pathB];
+    case 'ground-truth':
+      // Ground-truth never runs `git diff` — its files come from the manifest
+      // (see getFileDiffs). Unreachable; present only for switch exhaustiveness.
+      throw new Error('getDiffArgs: ground-truth mode does not use git diff');
   }
 }
 
@@ -182,6 +188,23 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
   // never touches a repository, so resolve it before the repo-root lookup.
   if (mode.type === 'diff') {
     return getDirectComparisonFiles(mode, cwd);
+  }
+
+  // Ground-truth (doc 26): one synthetic binary image entry per manifest
+  // comparison. Bytes are served from the resolved paths by the image route;
+  // here we only need each entry to render as an image pair (isBinary + an
+  // image-extensioned key), so no git is touched.
+  if (mode.type === 'ground-truth') {
+    return mode.comparisons.map(entry => ({
+      filePath: entry.key,
+      // The old (A) side is the expected image. Carrying its path lets the image
+      // route pick the right content-type when the two sides differ in format
+      // (e.g. expected .png vs actual .jpg); byte resolution looks up by key.
+      oldPath: entry.expectedPath,
+      status: 'modified' as const,
+      hunks: [],
+      isBinary: true,
+    }));
   }
 
   const repoRoot = getRepoRoot(cwd);
@@ -383,6 +406,9 @@ export function getModeFileContent(mode: ReviewMode, filePath: string, side: 'ol
       return '';
     }
   }
+  // Ground-truth entries are images with no text hunks, so context expansion is
+  // never requested; reading the bytes as text would be meaningless.
+  if (mode.type === 'ground-truth') return '';
   return getFileContent(filePath, side === 'old' ? 'HEAD' : 'working', cwd);
 }
 
@@ -407,6 +433,16 @@ export function parseModeString(modeStr: string): ReviewMode {
       }
     } catch { /* fall through to default */ }
   }
+  if (modeStr.startsWith('ground-truth:')) {
+    // JSON-encoded { manifestPath, comparisons } — validated, not asserted,
+    // because it round-trips through the DB (doc 26).
+    try {
+      const parsed = z
+        .object({ manifestPath: z.string(), comparisons: z.array(GroundTruthEntrySchema) })
+        .safeParse(JSON.parse(modeStr.slice('ground-truth:'.length)));
+      if (parsed.success) return { type: 'ground-truth', ...parsed.data };
+    } catch { /* fall through to default */ }
+  }
   return { type: 'uncommitted' };
 }
 
@@ -415,6 +451,9 @@ export function getSingleFileDiff(mode: ReviewMode, filePath: string, repoRoot: 
   if (mode.type === 'all') {
     return createNewFileDiff(filePath, repoRoot);
   }
+  // Ground-truth files are binary images with no text hunks, so there is
+  // nothing to re-collapse for a whitespace toggle — keep the stored diff.
+  if (mode.type === 'ground-truth') return null;
   if (mode.type === 'diff') {
     // Re-diff just this file's two sides under their roots. `filePath` is the
     // new-side relative path; for the common modified case the old side shares
@@ -451,6 +490,8 @@ export function getModeString(mode: ReviewMode): string {
     case 'files': return `files:${mode.patterns.join(',')}`;
     case 'all': return 'all';
     case 'diff': return `diff:${JSON.stringify([mode.pathA, mode.pathB])}`;
+    case 'ground-truth':
+      return `ground-truth:${JSON.stringify({ manifestPath: mode.manifestPath, comparisons: mode.comparisons })}`;
   }
 }
 
@@ -463,6 +504,7 @@ export function getModeArgs(mode: ReviewMode): string | undefined {
     // A short, human-readable label for the sidebar/history. Full path
     // disambiguation lives in the mode string, so basenames are fine here.
     case 'diff': return `${basename(mode.pathA)} ↔ ${basename(mode.pathB)}`;
+    case 'ground-truth': return basename(mode.manifestPath);
     case 'uncommitted':
     case 'staged':
     case 'unstaged':

@@ -574,3 +574,50 @@ describe('direct comparison mode (doc 18)', () => {
     });
   });
 });
+
+describe('ground-truth comparison mode (doc 26)', () => {
+  const mode: ReviewMode = {
+    type: 'ground-truth',
+    manifestPath: '/proj/screens/manifest.json',
+    comparisons: [
+      { key: 'out/login.png', actualPath: '/proj/out/login.png', expectedPath: '/spec/login.png', label: 'Login', expectedKind: 'spec' },
+      { key: 'out/home.svg', actualPath: '/proj/out/home.svg', expectedPath: '/proj/out/home.svg', expectedKind: 'previous-actual' },
+    ],
+  };
+
+  describe('getModeString / parseModeString round-trip', () => {
+    it('round-trips the manifest path + resolved comparisons', () => {
+      const str = getModeString(mode);
+      expect(str.startsWith('ground-truth:')).toBe(true);
+      expect(parseModeString(str)).toEqual(mode);
+    });
+
+    it('falls back to uncommitted on malformed / wrong-shaped payloads', () => {
+      expect(parseModeString('ground-truth:not json')).toEqual({ type: 'uncommitted' });
+      expect(parseModeString('ground-truth:{"manifestPath":"x"}')).toEqual({ type: 'uncommitted' });
+      expect(parseModeString('ground-truth:{"manifestPath":"x","comparisons":[{"key":"k"}]}')).toEqual({ type: 'uncommitted' });
+    });
+  });
+
+  describe('getModeArgs', () => {
+    it('labels the review by the manifest basename', () => {
+      expect(getModeArgs(mode)).toBe('manifest.json');
+    });
+  });
+
+  describe('getDiffArgs', () => {
+    it('throws — ground-truth never shells out to git', () => {
+      expect(() => getDiffArgs(mode)).toThrow(/does not use git diff/);
+    });
+  });
+
+  describe('getFileDiffs', () => {
+    it('produces one binary image entry per comparison (expected as oldPath)', () => {
+      const diffs = getFileDiffs(mode, '/proj');
+      expect(diffs).toEqual([
+        { filePath: 'out/login.png', oldPath: '/spec/login.png', status: 'modified', hunks: [], isBinary: true },
+        { filePath: 'out/home.svg', oldPath: '/proj/out/home.svg', status: 'modified', hunks: [], isBinary: true },
+      ]);
+    });
+  });
+});
