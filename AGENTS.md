@@ -1,0 +1,36 @@
+# AGENTS.md
+
+Guidance for AI coding agents. There are **two distinct audiences** — pick yours:
+
+## You are modifying the Glassbox codebase
+
+Read **[`CLAUDE.md`](CLAUDE.md)** (project overview, architecture, conventions,
+the ticket-driven workflow, testing) and the maintained AI summaries in
+**[`docs/ai/`](docs/ai/)**:
+
+- [`docs/ai/code-summary.md`](docs/ai/code-summary.md) — codebase map (directory
+  tree, routes, schema, client modules, "where do I look for X").
+- [`docs/ai/requirements-summary.md`](docs/ai/requirements-summary.md) —
+  synthesized requirements with status markers.
+
+Read those before diving into source. Run `npm test`, `npm run lint`, and
+`npm run typecheck` before finishing; keep the requirements docs + AI summaries in
+sync with code changes.
+
+## You are integrating *with* Glassbox from your own project
+
+You are an AI tool in a project that **uses** Glassbox to review your work. Read
+**[`docs/ai-integration.md`](docs/ai-integration.md)** — the full hub. Quick map:
+
+| You want to… | Do this | Doc |
+| --- | --- | --- |
+| Open a diff for review | `glassbox --uncommitted` (or `--commit`/`--branch`/`--files`/`--diff`/`--ground-truth`) | [2](docs/2-cli-and-server.md), [18](docs/18-direct-comparison.md) |
+| Record your rationale/proof on a line | `glassbox note add --file <p> --lines <A[-B]> --kind <k> --body <text\|->` → commit `.pr-notes/` | [20](docs/20-ai-review-notes.md) |
+| Prove a visual/behavioral change | write a `version: 2` manifest, run `glassbox --ground-truth <manifest>` | [26](docs/26-ground-truth-comparison.md), [proof-export-guidance](docs/proof-export-guidance.md) |
+| Apply the reviewer's feedback | read `<repo>/.glassbox/latest-review.md` and act on each annotation by category | [6](docs/6-export.md) |
+| Get feedback pushed to you | respond to the `glassbox-channel` MCP event: read `latest-review.md`, apply | [17](docs/17-claude-channel.md) |
+
+The CLI is `glassbox` (`npm install -g glassbox`, or `npx glassbox`); it binds to
+`localhost` only. Textual proof (logs, values) belongs in a `proof`/`test-evidence`
+review **note**, not a screenshot. See [`docs/ai-integration.md`](docs/ai-integration.md)
+for the exact commands, flags, and contracts.

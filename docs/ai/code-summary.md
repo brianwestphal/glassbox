@@ -26,12 +26,13 @@ specific files only when you need detail beyond what is here.
 glassbox/
 ├── src/                    # TypeScript source (server + client)
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
-├── docs/                   # Requirements (1-19) + ARCHITECTURE, tauri-*
+├── docs/                   # Requirements (numbered) + ARCHITECTURE, tauri-*, ai-integration.md, proof-export-guidance.md, skills/, ai/ (these summaries)
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
 ├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT)
 ├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
 ├── assets/                 # Static assets shipped with the app
-├── CLAUDE.md               # Project rules for AI sessions
+├── CLAUDE.md               # Project rules for AI sessions (working ON Glassbox)
+├── AGENTS.md               # AI-agent router: contributors → CLAUDE.md/docs/ai; integrators → docs/ai-integration.md
 ├── package.json            # npm scripts, deps
 ├── tsup.config.ts          # Server + client build config
 ├── tsconfig.json           # TS config (jsxImportSource: kerfjs)

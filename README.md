@@ -188,6 +188,12 @@ See [docs/20-ai-review-notes.md](docs/20-ai-review-notes.md) for the format and 
 
 ---
 
+## For AI tools: integrating with Glassbox
+
+If you're an AI coding tool or agent working in a project that uses Glassbox, **[docs/ai-integration.md](docs/ai-integration.md)** is the integration hub — how to launch a review, record line-anchored rationale/proof (`glassbox note`), export ground-truth image proof, consume the exported feedback (`.glassbox/latest-review.md`), and respond to the MCP/Claude channel. The repo's [AGENTS.md](AGENTS.md) is a one-screen router to it (and, separately, to the contributor docs for agents hacking on Glassbox itself).
+
+---
+
 ## Install
 
 ### Desktop app (recommended)

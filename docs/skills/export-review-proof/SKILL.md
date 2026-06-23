@@ -42,10 +42,14 @@ Write a line-anchored **review-note text artifact** with the Glassbox producer C
 attached to the code it proves:
 
 ```sh
-glassbox note add <file> <line> --kind proof --body "What this proves" --artifact run.log
+glassbox note add --file <file> --lines <A[-B]> --kind proof --body "What this proves" --artifact run.log
 ```
 
-(See the project's Glassbox doc 20 for the exact `glassbox note` flags.)
+`--kind` is one of `rationale`, `proof`, `assumption`, `alternative-considered`,
+`risk`, `test-evidence`; `--lines` is 1-based (`A` or `A-B`); `--body` accepts `-`
+to read from stdin; `--artifact` (repeatable) attaches a committed proof file.
+Commit `.pr-notes/` alongside the code. See the project's Glassbox doc 20 (or run
+`glassbox note instructions`) for the full contract.
 
 ## Emit the manifest and hand it off
 

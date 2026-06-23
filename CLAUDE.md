@@ -70,6 +70,12 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `tauri-architecture.md` — Tauri desktop integration (sidecar, launch flows, CLI wrappers)
 - `tauri-setup.md` — Tauri setup guide (certificates, signing keys, GitHub secrets)
 
+**AI-integration docs** target an AI tool/agent **consuming** Glassbox from another project (distinct from `docs/ai/*`, which target an AI working **on** this codebase, and from this `CLAUDE.md`):
+
+- `AGENTS.md` (repo root) — one-screen router: contributors → `CLAUDE.md` + `docs/ai/`; integrators → `docs/ai-integration.md`. Keep its quick-reference table in sync with the integration surfaces.
+- `docs/ai-integration.md` — the integration hub: launch a review, write `glassbox note` review notes (`.pr-notes/`), export ground-truth proof, consume `.glassbox/latest-review.md`, MCP/Claude channel. Cross-links the deep docs (2/3/6/17/18/20/26). Update it when a launch mode, a `glassbox note` flag, the export path/format, or the channel contract changes.
+- `docs/proof-export-guidance.md` + `docs/skills/export-review-proof/SKILL.md` — proof-export convention + portable per-project agent skill (doc 26 P3c).
+
 **When making changes, keep docs in sync:**
 
 - If a change affects existing requirements, update the relevant requirements document.
