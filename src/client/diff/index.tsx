@@ -5,6 +5,7 @@ import { hydrateAttachments } from '../annotations/attachments.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
 import { asEl, asElement } from '../dom.js';
+import { openLightbox } from '../lightbox.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
@@ -411,6 +412,24 @@ function setupDelegatedHandlers(container: HTMLElement): void {
   // Hunk expanders
   void delegate(container, 'click', '.hunk-separator', (_e, el) => {
     handleHunkExpand(asEl(el));
+  });
+
+  // Ground-truth per-step navigator (doc 26 §26.3): Prev/Next select the
+  // sibling step's review file (bounded to the set; disabled at the boundary).
+  void delegate(container, 'click', '.gt-step-btn', (_e, btn) => {
+    const fid = asEl(btn).dataset.stepFileId;
+    if (fid !== undefined && fid !== '') void selectFile(fid);
+  });
+
+  // Image-diff "view full screen" button (doc 24/25, GB-966): open one diff side
+  // in the shared lightbox (supplementary to the in-place pan/zoom/slice). The
+  // mousedown stopPropagation keeps a zoomed canvas from starting a pan first.
+  void delegate(container, 'mousedown', '.image-expand-btn', (e) => { e.stopPropagation(); });
+  void delegate(container, 'click', '.image-expand-btn', (e, btn) => {
+    e.stopPropagation();
+    const el = asEl(btn);
+    const src = el.dataset.imageSrc;
+    if (src !== undefined && src !== '') openLightbox({ src, alt: el.dataset.imageAlt ?? '' });
   });
 
   // Diff line click → annotation form

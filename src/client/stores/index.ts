@@ -1,7 +1,8 @@
 import { computed, defineStore, signal } from 'kerfjs';
 
 import type { GroundTruthMeta } from '../../api/files.js';
-import { buildFolderTree, sortFilesByScore, walkTreeFiles } from '../sidebar/folderTree.js';
+import { buildFolderTree, walkTreeFiles } from '../sidebar/folderTree.js';
+import { buildGroundTruthSourceList, groundTruthFileOrder } from '../sidebar/groundTruthGroups.js';
 import type {
   AnalysisModeState,
   DragAnnotation,
@@ -306,10 +307,12 @@ export function groundTruthMeta(fileId: string): GroundTruthMeta | undefined {
 
 function folderViewFileOrder(): string[] {
   const files = folderModeFiles();
-  // Ground-truth reviews render a flat, most-different-first list (doc 26
-  // §26.1), so keyboard-nav order must follow the same global score sort rather
-  // than the folder-tree walk.
-  if (isGroundTruthReview()) return sortFilesByScore(files).map(f => f.id);
+  // Ground-truth reviews render a flat, most-different-first list (doc 26 §26.1),
+  // with `version: 2` sets grouped (doc 26 §26.3) so a flow's steps are walked
+  // consecutively. Keyboard-nav order must match that source-list order.
+  if (isGroundTruthReview()) {
+    return groundTruthFileOrder(buildGroundTruthSourceList(files, groundTruthMeta));
+  }
   const tree = buildFolderTree(files);
   const ids: string[] = [];
   walkTreeFiles(tree, ids);

@@ -39,7 +39,10 @@ for which UI surfaces are wired today.
   region fractions stay correct under any transform because they're read from the
   overlay's live post-transform bounding rect. PDFs are not zoomed (native
   iframe). The lightbox (`src/client/lightbox.tsx`) is shared by attachment
-  previews and AI-note image artifacts (doc 20 §20.5).
+  previews, AI-note image artifacts (doc 20 §20.5), and **image-file diffs**
+  (doc 24 — GB-966): a hover "view full screen" button on each image canvas (each
+  side-by-side pane, and the single-image added/deleted viewer) opens that side
+  in the same lightbox, supplementary to the in-place pan/zoom/slice.
 - **FR-25.5 — OS opener for other types.** A non-previewable attachment shall
   open in the OS default application: macOS **Quick Look** (`qlmanage -p`), the
   platform default opener on Windows (`start`) and Linux (`xdg-open`). Because

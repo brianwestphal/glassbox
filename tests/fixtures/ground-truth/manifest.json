@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "comparisons": [
     {
       "actual": "actual/button.svg",
@@ -24,6 +24,24 @@
       "expected": "expected/logo.png",
       "label": "Logo",
       "expectedKind": "spec"
+    }
+  ],
+  "sets": [
+    {
+      "label": "Checkout flow",
+      "expectedKind": "spec",
+      "steps": [
+        {
+          "actual": "actual/checkout/1-cart.png",
+          "expected": "expected/checkout/1-cart.png",
+          "label": "Cart"
+        },
+        {
+          "actual": "actual/checkout/2-pay.png",
+          "expected": "expected/checkout/2-pay.png",
+          "label": "Payment"
+        }
+      ]
     }
   ]
 }

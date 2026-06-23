@@ -89,6 +89,32 @@
   align-items: center;
   overflow: hidden;
   position: relative;
+
+  &:hover .image-expand-btn { opacity: 1; }
+}
+
+// "View full screen" button overlaid on an image canvas (doc 24/25, GB-966).
+// Fades in on hover so it never obscures the comparison; opens the side in the
+// shared lightbox for a supplementary full-screen look.
+.image-expand-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+
+  &:hover { background: rgba(0, 0, 0, 0.8); }
+  &:focus-visible { opacity: 1; outline: 2px solid var(--accent, #89b4fa); }
 }
 
 // Zoom wrapper: sized by JS to match image aspect ratio, centered by flex

@@ -1,12 +1,16 @@
 # 26. Ground-Truth Image Comparison
 
-> **Status: P1 + P2 shipped** (manifest + single-image actual-vs-expected mode;
-> perceptual diff + identical-filtering + difference-score triage). **P3
-> (sets/flows + capture-pipeline guidance + baseline rotation) is now fully
-> designed below** — `version: 2` manifest, ordered multi-step flows with per-step
-> navigation, a **consumer-only** capture contract + proof-export guidance, and
-> external baseline rotation. Implementation is not yet built; it is tracked in
-> phased follow-up tickets (see "Phasing").
+> **Status: P1–P3 shipped.** P1 + P2: manifest + single-image actual-vs-expected
+> mode; perceptual diff + identical-filtering + difference-score triage. P3a +
+> P3b: the `version: 2` manifest loader + set/flow model; the source-list **set
+> groups** (collapsible, max-aggregate badge, ordered step rows) + diff-header
+> **per-step navigator**. P3c: the **proof-export guidance** doc + portable AI
+> skill ([`docs/proof-export-guidance.md`](proof-export-guidance.md),
+> [`docs/skills/export-review-proof/`](skills/export-review-proof/SKILL.md)). P3d:
+> the optional **`glassbox ground-truth promote`** baseline-rotation helper.
+> Glassbox stays **consumer-only** throughout (runs no capturer, owns no baseline
+> state). Out-of-scope refinements (cross-step diffs, contact-sheet views) remain
+> possible later work (§26.3).
 
 Glassbox's image comparison (doc [4](4-diff-viewing.md) §4.3, doc
 [24](24-image-comparison-layouts.md)) compares an image's **old vs new** sides
@@ -223,7 +227,12 @@ Glassbox — **without Glassbox running any capturer itself**.
 - This proof-export guidance is broader than ground-truth (it touches logs +
   note artifacts too), so the **authoring of the guidance doc / AI skill** for
   Glassbox/Hot-Sheet–integrated projects is tracked as its own follow-up rather
-  than inlined here.
+  than inlined here. **Shipped (P3c):** the guidance lives in
+  [`docs/proof-export-guidance.md`](proof-export-guidance.md), with a portable
+  per-project AI skill at
+  [`docs/skills/export-review-proof/SKILL.md`](skills/export-review-proof/SKILL.md)
+  (copy into an integrated project's `.claude/skills/`). Glassbox stays
+  consumer-only — these are documentation/convention, no runtime capturer.
 
 ## 26.6 Non-functional / open questions
 
@@ -254,8 +263,13 @@ Glassbox — **without Glassbox running any capturer itself**.
     *next* run's manifest points its `expected` steps at (`expectedKind:
     "previous-actual"`). An **optional convenience** — a `glassbox ground-truth
     promote <manifest>` helper that copies the current actuals over the baseline
-    tree — is **not** part of P3's core and is filed as its own follow-up, so the
-    core feature ships without Glassbox ever owning baseline state.
+    tree — ships as P3d but is **not** part of P3's core, so the feature works
+    without it and Glassbox never owns baseline state. *(Shipped, P3d.)* The
+    helper (`src/ground-truth/promote.ts`, dispatched as a standalone subcommand
+    in `src/cli.ts`) copies **only** `expectedKind: "previous-actual"` entries'
+    actual→expected — spec / reference expecteds are never overwritten, so a
+    stray `promote` can't clobber a committed design spec. It runs no server and
+    touches no review DB; it is a pure, explicit file copy.
 
 ## Phasing (follow-up tickets)
 
@@ -282,19 +296,39 @@ Glassbox — **without Glassbox running any capturer itself**.
   domotion dependency — plus **proof-export guidance** for projects (screenshots,
   logs-as-note-artifacts, animated-SVG flows; §26.5); and **external** baseline
   rotation (FR-26.15). Suggested implementation sub-phases:
-  - **P3a — `version: 2` loader + set model.** Extend `manifest.ts` to parse
-    `sets`/`steps` (back-compat with v1), resolve each step to a synthetic image
-    pair keyed `set:<i>/<j>-<basename>`, and carry set grouping/order in the
-    review mode. Pure + unit-tested; no UI yet.
-  - **P3b — Source-list set groups + per-step nav + aggregate scoring.** Render
-    set groups in the §26.1 named list, per-step + max-aggregate difference
-    badges (reusing the P2 score), and the diff-header "Step k of N" navigator.
+  - **P3a — `version: 2` loader + set model** *(shipped)*. `manifest.ts` parses
+    `sets`/`steps` (back-compat with v1), resolves each step to a synthetic image
+    pair keyed `set:<i>/<j>-<basename>` (shared dedup with singles), and carries
+    set grouping/order on each resolved `GroundTruthEntry` (`setIndex`,
+    `setLabel`, `stepIndex`, `stepCount`) — so the flat entry array rides the
+    existing mode round-trip and the image route / scoring need no changes. Steps
+    inherit the set's `expectedKind` default (a step may override); a step's
+    `label` is its own (the set `label` captions only the group header). Pure +
+    unit-tested; no UI yet (P3b).
+  - **P3b — Source-list set groups + per-step nav + aggregate scoring**
+    *(shipped)*. Sets render as collapsible named groups in the §26.1 named list
+    (`buildGroundTruthSourceList` in `src/client/sidebar/groundTruthGroups.ts` —
+    pure, shared by the sidebar render and the keyboard-nav order so a flow's
+    steps walk consecutively); the header carries the set's **max-aggregate**
+    perceptual score and each step row its own P2 score; identical hiding is
+    per-step (an all-identical set drops out as a unit). The diff header shows a
+    **"Step k of N — ‹ Prev · Next ›"** navigator bounded to the current set
+    (`groundTruthStepNav` in `src/ground-truth/presentation.ts`; the Prev/Next
+    buttons carry the sibling step's review-file id and select it via the diff
+    container's delegate handler). `GroundTruthMeta` (`src/api/files.ts`) carries
+    the set grouping to the client.
   - **P3c — Proof-export guidance doc / AI skill** for Glassbox/Hot-Sheet–
     integrated projects (screenshots, logs as note artifacts, animated-SVG flows
     via domotion; suggested manifest-emitting layout). Broader than ground-truth.
-  - **P3d — (optional) `glassbox ground-truth promote` baseline helper** — copy
-    current actuals over the baseline tree for next-run regression. Optional;
-    Glassbox still owns no baseline state.
+    *(shipped)* — [`docs/proof-export-guidance.md`](proof-export-guidance.md) +
+    the portable [`docs/skills/export-review-proof/SKILL.md`](skills/export-review-proof/SKILL.md).
+  - **P3d — (optional) `glassbox ground-truth promote` baseline helper**
+    *(shipped)* — `glassbox ground-truth promote <manifest>` copies current
+    actuals over the baseline tree for next-run regression. Promotes **only**
+    `expectedKind: "previous-actual"` entries (specs/references are never
+    overwritten); standalone subcommand (`src/ground-truth/promote.ts`), no
+    server / no review DB. Glassbox still owns no baseline state — promote is an
+    explicit user action.
 
 ## Implementation pointers (P1)
 
@@ -351,6 +385,19 @@ Glassbox — **without Glassbox running any capturer itself**.
   `src/client/stores/index.ts`), and `groundTruthListJsx` renders the flat named
   list with the `.gt-kind` badge (`src/client/sidebar/fileListView.tsx`,
   `_ai-sort.scss`).
+
+## Tests (P3a / P3b)
+
+- Unit: the `version: 2` blocks in `tests/unit/ground-truth/manifest.test.ts`
+  (set parse, step key derivation/dedup, `expectedKind` inheritance + override,
+  ordering, validation errors, unsupported version), `groundTruthStepNav` cases
+  in `tests/unit/ground-truth/presentation.test.ts`, and
+  `tests/unit/client/groundTruthGroups.test.ts` (single/set grouping, max
+  aggregate, step ordering, intermixed sort, nav-order flattening).
+- E2E: the `version: 2` set fixture (a 2-step "Checkout flow" of scored PNGs) in
+  `tests/fixtures/ground-truth/manifest.json`, asserted by
+  `tests/e2e/ground-truth.test.ts` (set group with aggregate badge + ordered
+  step rows; the diff-header step navigator walking Prev/Next bounded to the set).
 
 ## Tests (P1 + P2)
 

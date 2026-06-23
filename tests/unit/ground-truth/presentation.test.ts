@@ -5,6 +5,7 @@ import {
   EXPECTED_KIND_LABELS,
   groundTruthMetaByFileId,
   groundTruthSideLabels,
+  groundTruthStepNav,
 } from '../../../src/ground-truth/presentation.js';
 
 // doc 26 §26.1 — ground-truth source-list / side-label presentation helpers.
@@ -65,6 +66,54 @@ describe('ground-truth presentation', () => {
       spec: 'Spec',
       reference: 'Reference',
       'previous-actual': 'Baseline',
+    });
+  });
+
+  // doc 26 §26.3 FR-26.12 — per-step navigator for version: 2 sets.
+  describe('groundTruthStepNav', () => {
+    const setMode: ReviewMode = {
+      type: 'ground-truth',
+      manifestPath: '/m/manifest.json',
+      comparisons: [
+        { key: 'single.png', actualPath: '/m/single.png', expectedPath: '/m/single-spec.png' },
+        { key: 'set:0/0-cart.png', actualPath: '/m/cart.png', expectedPath: '/m/cart-spec.png', label: 'Cart', setIndex: 0, setLabel: 'Checkout', stepIndex: 0, stepCount: 2 },
+        { key: 'set:0/1-pay.png', actualPath: '/m/pay.png', expectedPath: '/m/pay-spec.png', label: 'Pay', setIndex: 0, setLabel: 'Checkout', stepIndex: 1, stepCount: 2 },
+      ],
+    };
+    const files = [
+      { id: 'f-single', file_path: 'single.png' },
+      { id: 'f-cart', file_path: 'set:0/0-cart.png' },
+      { id: 'f-pay', file_path: 'set:0/1-pay.png' },
+    ];
+
+    it('returns undefined for a single (non-set) file', () => {
+      expect(groundTruthStepNav(setMode, 'f-single', files)).toBeUndefined();
+    });
+
+    it('returns undefined for a non-ground-truth mode', () => {
+      expect(groundTruthStepNav(gitMode, 'f-single', files)).toBeUndefined();
+    });
+
+    it('reports step 1 of 2 with only a next sibling at the set start', () => {
+      expect(groundTruthStepNav(setMode, 'f-cart', files)).toEqual({
+        setLabel: 'Checkout',
+        stepIndex: 0,
+        stepCount: 2,
+        label: 'Cart',
+        prevFileId: null,
+        nextFileId: 'f-pay',
+      });
+    });
+
+    it('reports step 2 of 2 with only a prev sibling at the set end', () => {
+      expect(groundTruthStepNav(setMode, 'f-pay', files)).toEqual({
+        setLabel: 'Checkout',
+        stepIndex: 1,
+        stepCount: 2,
+        label: 'Pay',
+        prevFileId: 'f-cart',
+        nextFileId: null,
+      });
     });
   });
 });

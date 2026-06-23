@@ -54,6 +54,16 @@ and the same drawn-region feedback model.
   renders over the panes. A region scoped to one side (A-only / B-only, doc 23
   §23.10) shall render only on the matching pane; an unscoped (A+B) region renders
   on both. General (non-anchored) image comments are unchanged.
+- **FR-24.9 — Full-screen view of a side (shipped, GB-966).** Each image canvas
+  (each Side-by-Side pane, and the single-image added/deleted **Image** viewer)
+  shall offer a hover **"view full screen"** button that opens *that side's* image
+  in the shared lightbox ([doc 25](25-attachments.md) FR-25.7 — zoom/pan, up to
+  8×). This is **supplementary** to the in-place synced zoom/pan + comparison
+  modes (a quick distraction-free look at one side), not a replacement; it is an
+  explicit button because the canvas already binds click/drag for
+  pan/zoom/slice/region-draw. The difference/slice blend canvases (two overlaid
+  images, not one src) have no full-screen button. The lightbox here is read-only
+  (no region draw — region marking stays the in-place doc-23 model).
 
 ## 24.4 Non-functional
 

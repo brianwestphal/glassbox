@@ -136,6 +136,71 @@ test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
     await expect(toggle).toContainText('Hide 1 identical');
   });
 
+  // GB-968 (doc 26 §26.3 P3b) — version: 2 sets render as named groups with
+  // per-step rows, a max-aggregate badge, and a diff-header step navigator.
+  test('a version: 2 set renders as a named group with ordered step rows', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    const setGroup = page.locator('.folder-group.gt-set', { has: page.locator('.gt-set-name', { hasText: 'Checkout flow' }) });
+    await expect(setGroup).toHaveCount(1);
+
+    // The group header carries the worst-step aggregate (max of 10% / 40%).
+    await expect(setGroup.locator('.gt-set-header .diff-badge')).toHaveText('40%');
+
+    // Its step rows are present, in declared order, each with its own score.
+    const stepRows = setGroup.locator('.folder-content .file-item.gt-comparison');
+    await expect(stepRows).toHaveCount(2);
+    await expect(stepRows.nth(0).locator('.file-name')).toHaveText('Cart');
+    await expect(stepRows.nth(0).locator('.diff-badge')).toHaveText('10%');
+    await expect(stepRows.nth(1).locator('.file-name')).toHaveText('Payment');
+    await expect(stepRows.nth(1).locator('.diff-badge')).toHaveText('40%');
+  });
+
+  test('the diff header step navigator walks the set bounded to its steps', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    // Open the first step. The header shows "Step 1 of 2" with Prev disabled.
+    await page.locator('.file-name[title="set:0/0-1-cart.png"]').click();
+    await expect(page.locator('.gt-step-nav .gt-step-label')).toHaveText('Step 1 of 2', { timeout: 5000 });
+    const [prev, next] = [page.locator('.gt-step-btn').nth(0), page.locator('.gt-step-btn').nth(1)];
+    await expect(prev).toBeDisabled();
+    await expect(next).toBeEnabled();
+
+    // Next advances to step 2; now Next is disabled and Prev enabled.
+    await next.click();
+    await expect(page.locator('.gt-step-nav .gt-step-label')).toHaveText('Step 2 of 2', { timeout: 5000 });
+    await expect(page.locator('.diff-view')).toHaveAttribute('data-file-path', 'set:0/1-2-pay.png');
+    await expect(page.locator('.gt-step-btn').nth(0)).toBeEnabled();
+    await expect(page.locator('.gt-step-btn').nth(1)).toBeDisabled();
+
+    // Prev returns to step 1.
+    await page.locator('.gt-step-btn').nth(0).click();
+    await expect(page.locator('.gt-step-nav .gt-step-label')).toHaveText('Step 1 of 2', { timeout: 5000 });
+    await expect(page.locator('.diff-view')).toHaveAttribute('data-file-path', 'set:0/0-1-cart.png');
+  });
+
+  // GB-966 (doc 24/25) — a side of an image comparison opens full-screen in the
+  // shared lightbox (supplementary to the in-place pan/zoom).
+  test('the expand button opens a comparison side in the shared lightbox', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-name[title="actual/button.svg"]').click();
+    await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
+
+    const fileId = await page.locator('.image-diff').getAttribute('data-file-id');
+    // Open the actual (new / B) side full screen.
+    await page.locator('.image-sxs-pane[data-sxs-pane="new"] .image-expand-btn').click();
+    const lightbox = page.locator('.lightbox-overlay');
+    await expect(lightbox).toBeVisible({ timeout: 5000 });
+    await expect(lightbox.locator('.lightbox-img')).toHaveAttribute('src', `/api/image/${fileId}/new`);
+
+    // Esc dismisses it, returning to the diff.
+    await page.keyboard.press('Escape');
+    await expect(lightbox).toHaveCount(0);
+  });
+
   test('Complete Review opens the completion modal (finalizes outside a repo)', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });

@@ -4,7 +4,8 @@ import { raw } from 'kerfjs';
 import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
-import { IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
+import type { GroundTruthStepNav } from '../ground-truth/presentation.js';
+import { IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
 import type { ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
@@ -14,7 +15,7 @@ import { renderNoteMarkdown } from '../utils/noteMarkdown.js';
 import { ImageDiff } from './imageDiff.js';
 import { ReviewNoteRegionThumb } from './reviewNoteRegionThumb.js';
 
-export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imageSideLabels }: {
+export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imageSideLabels, stepNav }: {
   file: ReviewFile;
   diff: FileDiff;
   annotations: Annotation[];
@@ -22,6 +23,8 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imag
   reviewNotes?: ReviewNoteView[];
   /** Ground-truth mode (doc 26 §26.1) overrides the image pane captions. */
   imageSideLabels?: { old: string; new: string };
+  /** Ground-truth set step navigator (doc 26 §26.3 FR-26.12); absent for singles. */
+  stepNav?: GroundTruthStepNav;
 }) {
   // Replies (annotations linked to a review note on this file) render nested
   // beneath their note, not on their line; everything else goes by line. An
@@ -56,6 +59,7 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imag
           <button className="reveal-btn" data-file-id={file.id} title="Reveal in file manager"><IconReveal /></button>
         </div>
         <div className="diff-header-actions">
+          {stepNav ? <StepNav nav={stepNav} /> : null}
           {file.difference_score !== null ? (
             <span className="diff-score-badge" title="Perceptual difference from the expected image (doc 26)">{formatDiffPct(file.difference_score)} different</span>
           ) : null}
@@ -72,6 +76,24 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imag
         <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} />
       )}
     </div>
+  );
+}
+
+/** Ground-truth per-step navigator (doc 26 §26.3 FR-26.12): "Step k of N" with
+ *  Prev/Next bounded to the current set. The buttons carry the sibling step's
+ *  review-file id; the diff container's delegate handler calls `selectFile`.
+ *  A button with no sibling renders disabled (set boundary). */
+function StepNav({ nav }: { nav: GroundTruthStepNav }) {
+  const human = nav.stepIndex + 1;
+  const setName = nav.setLabel !== '' ? nav.setLabel : 'Set';
+  return (
+    <span className="gt-step-nav" title={`${setName}: ${nav.label}`}>
+      <button className="gt-step-btn" data-step-file-id={nav.prevFileId ?? undefined}
+        disabled={nav.prevFileId === null} title="Previous step"><IconChevronLeft /></button>
+      <span className="gt-step-label">Step {String(human)} of {String(nav.stepCount)}</span>
+      <button className="gt-step-btn" data-step-file-id={nav.nextFileId ?? undefined}
+        disabled={nav.nextFileId === null} title="Next step"><IconChevronRight /></button>
+    </span>
   );
 }
 

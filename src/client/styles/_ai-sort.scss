@@ -111,6 +111,59 @@
 .gt-kind-reference { background: rgba(203,166,247,0.15); color: var(--mauve, #cba6f7); }
 .gt-kind-previous-actual { background: rgba(148,226,213,0.15); color: var(--teal, #94e2d5); }
 
+// Ground-truth `version: 2` set group (doc 26 §26.3): a collapsible header
+// captioning the flow + its worst-step aggregate difference, over its step rows.
+.gt-set-header {
+  .gt-set-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gt-set-count {
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    padding: 0 5px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-dim);
+  }
+  .diff-badge { margin-left: auto; }
+  // When the active step lives inside this set, mark the (possibly collapsed)
+  // header so the reviewer can still find the open step.
+  &.has-active .gt-set-name { color: var(--text); }
+}
+
+// Ground-truth per-step navigator in the diff header (doc 26 §26.3 FR-26.12):
+// "‹ Step k of N ›" bounded to the current set.
+.gt-step-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+  .gt-step-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .gt-step-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    &:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    &:disabled { opacity: 0.3; cursor: default; }
+  }
+}
+
 // "Show/Hide N identical" toggle above the ground-truth source list.
 .identical-toggle {
   display: block;

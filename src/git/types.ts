@@ -60,6 +60,18 @@ export const GroundTruthEntrySchema = z.object({
   label: z.string().optional(),
   /** What the expected image represents (display hint only). */
   expectedKind: z.enum(['spec', 'reference', 'previous-actual']).optional(),
+  // ---- Set / multi-step flow grouping (doc 26 §26.3, P3a). Present only on
+  // entries that belong to a `version: 2` manifest `sets[]` step; singles
+  // (`comparisons`) omit them entirely. Grouping + order ride here so the
+  // source list and per-step navigator need no manifest re-read.
+  /** 0-based index of the owning set (the group id). */
+  setIndex: z.number().optional(),
+  /** The owning set's display label (the group header caption). */
+  setLabel: z.string().optional(),
+  /** 0-based order of this step within its set. */
+  stepIndex: z.number().optional(),
+  /** Total number of steps in the owning set (for "Step k of N"). */
+  stepCount: z.number().optional(),
 });
 export type GroundTruthEntry = z.infer<typeof GroundTruthEntrySchema>;
 

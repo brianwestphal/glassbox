@@ -20,6 +20,7 @@ import {
 } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
 import { buildFolderTree, sortFilesByScore, type TreeNode } from './folderTree.js';
+import { buildGroundTruthSourceList, type GroundTruthSetItem } from './groundTruthGroups.js';
 
 export function fileListJsx(): SafeHtml {
   const ai = aiStore.state.value;
@@ -220,15 +221,56 @@ function folderListJsx(): SafeHtml {
   return <>{identicalToggleJsx()}{treeNodeJsx(tree, 0, '')}</>;
 }
 
-/** Ground-truth source list (doc 26 §26.1): one row per comparison, most-
- *  different-first, captioned by the manifest label + expectedKind. */
+/** Ground-truth source list (doc 26 §26.1/§26.3): singles render one row per
+ *  comparison; `version: 2` sets render as a collapsible named group of ordered
+ *  step rows. Both sort most-different-first (sets by their max-aggregate score),
+ *  captioned by the manifest label + expectedKind. */
 function groundTruthListJsx(): SafeHtml {
   const review = reviewStore.state.value;
-  const files = sortFilesByScore(folderModeFiles());
-  return <>{identicalToggleJsx()}{files.map(f => groundTruthRowJsx(f, review))}</>;
+  const items = buildGroundTruthSourceList(folderModeFiles(), groundTruthMeta);
+  return (
+    <>
+      {identicalToggleJsx()}
+      {items.map(item =>
+        item.type === 'single'
+          ? groundTruthRowJsx(item.file, review, 16)
+          : groundTruthSetJsx(item, review))}
+    </>
+  );
 }
 
-function groundTruthRowJsx(f: typeof reviewStore.state.value['files'][number], review: typeof reviewStore.state.value): SafeHtml {
+/** A `version: 2` set: a collapsible header (label + aggregate difference)
+ *  expandable to its ordered step rows (doc 26 §26.3 FR-26.10). Reuses the
+ *  folder collapse machinery (`collapsedFolders` keyed `gt-set:<i>`). */
+function groundTruthSetJsx(item: GroundTruthSetItem, review: typeof reviewStore.state.value): SafeHtml {
+  const collapsed = diffViewStore.state.value.collapsedFolders;
+  const folderPath = `gt-set:${String(item.setIndex)}`;
+  const isCollapsed = collapsed.has(folderPath);
+  const score = item.aggregate;
+  const hasActiveStep = item.steps.some(s => s.id === review.currentFileId);
+  return (
+    <div data-key={folderPath} className="folder-group gt-set">
+      <div className={`folder-header collapsible gt-set-header${isCollapsed ? ' collapsed' : ''}${hasActiveStep ? ' has-active' : ''}`}
+        style="padding-left: 16px" data-action="toggle-folder" data-folder-path={folderPath}>
+        <span className="folder-arrow"><IconChevronDown /></span>
+        <span className="folder-name gt-set-name" title={item.label}>{item.label}</span>
+        {score !== null
+          ? <span className={`diff-badge diff-${diffScoreLevel(score)}`} title="Worst-step perceptual difference for this set">{formatDiffPct(score)}</span>
+          : null}
+        <span className="gt-set-count" title={`${String(item.steps.length)} step${item.steps.length === 1 ? '' : 's'}`}>{String(item.steps.length)}</span>
+      </div>
+      <div className="folder-content" style={isCollapsed ? 'display:none' : ''}>
+        {item.steps.map(f => groundTruthRowJsx(f, review, 28))}
+      </div>
+    </div>
+  );
+}
+
+function groundTruthRowJsx(
+  f: typeof reviewStore.state.value['files'][number],
+  review: typeof reviewStore.state.value,
+  padLeft: number,
+): SafeHtml {
   const meta = groundTruthMeta(f.id);
   const basename = f.file_path.split('/').pop() ?? f.file_path;
   const name = meta?.label ?? basename;
@@ -239,7 +281,7 @@ function groundTruthRowJsx(f: typeof reviewStore.state.value['files'][number], r
   return (
     <div data-key={f.id}
       className={`file-item gt-comparison${f.id === review.currentFileId ? ' active' : ''}`}
-      {...ACTIONS.selectFile.attrs} data-file-id={f.id} style="padding-left: 16px">
+      {...ACTIONS.selectFile.attrs} data-file-id={f.id} style={`padding-left: ${String(padLeft)}px`}>
       <span className="file-name" title={f.file_path}>{name}</span>
       {kind ? <span className={`gt-kind gt-kind-${kind}`} title={`Expected image is a ${EXPECTED_KIND_LABELS[kind].toLowerCase()}`}>{EXPECTED_KIND_LABELS[kind]}</span> : null}
       {score !== null && score !== undefined

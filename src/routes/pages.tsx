@@ -16,8 +16,8 @@ import { getSingleFileDiff, parseDiffData, parseModeString } from '../git/diff.j
 import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
 import { emptyFileDiff } from '../git/parseDiffData.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-meta.js';
-import { groundTruthSideLabels } from '../ground-truth/presentation.js';
-import { IconReveal } from '../icons.js';
+import { groundTruthSideLabels, groundTruthStepNav } from '../ground-truth/presentation.js';
+import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
@@ -72,6 +72,11 @@ pageRoutes.get('/file/:fileId', async (c) => {
   const review = await getReview(file.review_id);
   const reviewMode = review ? parseModeString(review.mode) : null;
   const imageSideLabels = reviewMode ? groundTruthSideLabels(reviewMode) : undefined;
+  // Ground-truth set step navigator (doc 26 §26.3): needs the sibling steps'
+  // review-file ids, so load the review file list for a ground-truth review.
+  const stepNav = reviewMode?.type === 'ground-truth'
+    ? groundTruthStepNav(reviewMode, file.id, await getReviewFiles(file.review_id))
+    : undefined;
 
   // SVG rendered view: return ImageDiff component
   if (view === 'rendered' && isSvgFile(file.file_path)) {
@@ -102,6 +107,15 @@ pageRoutes.get('/file/:fileId', async (c) => {
             <button className="reveal-btn" data-file-id={file.id} title="Reveal in file manager"><IconReveal /></button>
           </div>
           <div className="diff-header-actions">
+            {stepNav ? (
+              <span className="gt-step-nav" title={`${stepNav.setLabel !== '' ? stepNav.setLabel : 'Set'}: ${stepNav.label}`}>
+                <button className="gt-step-btn" data-step-file-id={stepNav.prevFileId ?? undefined}
+                  disabled={stepNav.prevFileId === null} title="Previous step"><IconChevronLeft /></button>
+                <span className="gt-step-label">Step {String(stepNav.stepIndex + 1)} of {String(stepNav.stepCount)}</span>
+                <button className="gt-step-btn" data-step-file-id={stepNav.nextFileId ?? undefined}
+                  disabled={stepNav.nextFileId === null} title="Next step"><IconChevronRight /></button>
+              </span>
+            ) : null}
             <span className={`file-status ${diff.status}`}>{diff.status}</span>
           </div>
         </div>
@@ -133,7 +147,7 @@ pageRoutes.get('/file/:fileId', async (c) => {
     : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
   const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff);
 
-  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} />;
+  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} stepNav={stepNav} />;
   return c.html(html.toString());
 });
 

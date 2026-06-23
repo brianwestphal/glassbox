@@ -120,7 +120,11 @@ sized to its own image (differently-sized A/B aren't distorted), and doc-23
 drawn-region feedback works per pane (A-only on the A pane, B-only on the B
 pane, unscoped on both). Layout-only — no new server route. Client wiring:
 `adaptImageToolbar`/`setupImageModeEffect` in `src/client/diff/index.tsx`,
-panes + per-pane sizing in `src/client/diff/imageDiff/index.ts`.
+panes + per-pane sizing in `src/client/diff/imageDiff/index.ts`. **Full-screen
+view (FR-24.9, shipped, GB-966):** each pane + the single-image viewer carry a
+hover "view full screen" button that opens that side in the shared lightbox
+(`src/client/lightbox.tsx`, zoom/pan up to 8×) — supplementary to the in-place
+zoom/comparison modes; the blend difference/slice canvases get no button.
 
 **Feedback attachments** (doc 25, P1 shipped): a reviewer can attach any file
 type to a feedback item via an **attach button** or **drag-and-drop**; the files
@@ -147,7 +151,7 @@ regions, stored as a JSON array in `region_data` (decode/group helpers in
 `src/utils/artifactRegions.ts`). Reuses doc 23's normalized `{x,y,w,h}` model
 with an `artifact` uri.
 
-**Ground-truth comparison** (doc 26, **P1 + P2 shipped**): a separate mode to compare
+**Ground-truth comparison** (doc 26, **P1–P3 shipped**): a separate mode to compare
 an **actual** image against an **expected**/ground-truth image (design spec,
 reference render, or previous-actual baseline), even when the expected lives
 outside the repo. Launched via `glassbox --ground-truth <manifest.json>` (no git
@@ -174,9 +178,26 @@ source-list **set groups** with per-step rows + max-aggregate perceptual score +
 a per-step Prev/Next navigator, a **consumer-only** capture contract (Glassbox
 runs no capturer / takes no domotion dependency) plus **proof-export guidance**
 for projects (screenshots, logs-as-note-artifacts, animated-SVG flows), and
-**external** baseline rotation. Implementation is **design-only** — tracked in
-phased follow-up tickets (P3a loader/model, P3b UI, P3c guidance doc/skill, P3d
-optional `promote` helper).
+**external** baseline rotation. **P3a + P3b (shipped)**: the `version: 2` loader
+parses optional ordered `sets[].steps[]` (back-compat with v1), flattening each
+step into one `GroundTruthEntry` keyed `set:<i>/<j>-<basename>` carrying
+`setIndex`/`setLabel`/`stepIndex`/`stepCount` (steps inherit the set's
+`expectedKind`); the flat array rides the existing mode round-trip so the image
+route + scoring are unchanged. The sidebar renders sets as **collapsible named
+groups** (max-aggregate score badge + ordered per-step rows;
+`buildGroundTruthSourceList` in `src/client/sidebar/groundTruthGroups.ts`, shared
+with keyboard-nav order so a flow's steps walk consecutively), and the diff
+header shows a **"Step k of N — ‹ Prev · Next ›"** navigator bounded to the set
+(`groundTruthStepNav`). **P3c (shipped):** proof-export guidance
+(`docs/proof-export-guidance.md`) + a portable per-project AI skill
+(`docs/skills/export-review-proof/SKILL.md`) covering the three proof modalities
+(screenshots → ground-truth, flows → animated SVG / per-frame sets, logs → doc-20
+note text artifacts) and the suggested `version: 2` manifest-emitting layout;
+Glassbox stays consumer-only. **P3d (shipped):** an optional `glassbox
+ground-truth promote <manifest>` subcommand (`src/ground-truth/promote.ts`) copies
+the current actuals over their `previous-actual` baselines for next-run
+regression — specs/references are never overwritten; no server, no review DB,
+Glassbox still owns no baseline state. **Doc 26 P1–P3 are now fully shipped.**
 
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions

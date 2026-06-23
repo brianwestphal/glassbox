@@ -19,6 +19,13 @@ export type FileStatus = z.infer<typeof FileStatusSchema>;
 export const GroundTruthMetaSchema = z.object({
   label: z.string().optional(),
   expectedKind: z.enum(['spec', 'reference', 'previous-actual']).optional(),
+  // Set / multi-step flow grouping (doc 26 §26.3, P3b). Present only on files
+  // that belong to a `version: 2` manifest set step; singles omit them. Lets the
+  // sidebar render set groups with ordered step rows + an aggregate score.
+  setIndex: z.number().optional(),
+  setLabel: z.string().optional(),
+  stepIndex: z.number().optional(),
+  stepCount: z.number().optional(),
 });
 export type GroundTruthMeta = z.infer<typeof GroundTruthMetaSchema>;
 

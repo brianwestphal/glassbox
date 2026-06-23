@@ -1,5 +1,19 @@
 import type { ReviewFile } from '../db/queries.js';
 import type { FileDiff } from '../git/diff.js';
+import { IconMaximize } from '../icons.js';
+
+/** A corner "view full screen" button overlaid on an image canvas (doc 24/25,
+ *  GB-966). Carries the side's image src + alt; the diff container's delegate
+ *  handler opens the shared lightbox. An explicit button (not click-to-open)
+ *  because the canvas already binds click/drag for pan/zoom/slice/region-draw. */
+function ExpandButton({ src, alt }: { src: string; alt: string }) {
+  return (
+    <button className="image-expand-btn" type="button" title="View full screen"
+      data-image-src={src} data-image-alt={alt}>
+      <IconMaximize />
+    </button>
+  );
+}
 
 interface ImageDiffProps {
   file: ReviewFile;
@@ -48,6 +62,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight, side
           <div className="image-sxs-pane" data-sxs-pane="old">
             <div className="image-sxs-label">{oldLabel}</div>
             <div className="image-visual-canvas" data-zoomable="true">
+              <ExpandButton src={`/api/image/${fileId}/old`} alt={oldLabel} />
               <div className="image-zoom-wrap">
                 <img className="image-layer image-layer-old" src={`/api/image/${fileId}/old`} alt="Old version" />
                 <div className="region-overlay" data-region-overlay data-region-side="old"></div>
@@ -57,6 +72,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight, side
           <div className="image-sxs-pane" data-sxs-pane="new">
             <div className="image-sxs-label">{newLabel}</div>
             <div className="image-visual-canvas" data-zoomable="true">
+              <ExpandButton src={`/api/image/${fileId}/new`} alt={newLabel} />
               <div className="image-zoom-wrap">
                 <img className="image-layer image-layer-new" src={`/api/image/${fileId}/new`} alt="New version" />
                 <div className="region-overlay" data-region-overlay data-region-side="new"></div>
@@ -99,6 +115,8 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight, side
       {!hasComparison && (
         <div className="image-diff-panel image-diff-visual" data-panel="image">
           <div className="image-visual-canvas" data-zoomable="true">
+            <ExpandButton src={`/api/image/${fileId}/${isAdded ? 'new' : 'old'}`}
+              alt={isAdded ? 'New image' : 'Deleted image'} />
             <div className="image-zoom-wrap">
               <img className="image-layer image-layer-old" src={`/api/image/${fileId}/${isAdded ? 'new' : 'old'}`}
                 alt={isAdded ? 'New image' : 'Deleted image'} />

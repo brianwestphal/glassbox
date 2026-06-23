@@ -33,6 +33,9 @@ Modes (pick one):
   --diff <a> <b>      Compare two arbitrary files or folders by path (no git repo required)
   --ground-truth <m>  Compare actual images against expected/ground-truth images from a manifest (no git repo required)
 
+Subcommands:
+  ground-truth promote <m>  Copy a manifest's current actuals over their previous-actual baselines (rotate baselines for next-run regression)
+
 Options:
   --port <number>     Port to run on (default: 4183)
   --data-dir <path>   Store data in an alternative location (default: .glassbox/)
@@ -229,6 +232,35 @@ async function main() {
     const { runNoteCli } = await import('./review-notes/cli.js');
     try {
       await runNoteCli(rawArgs.slice(1));
+      process.exit(0);
+    } catch (err) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  }
+
+  // `glassbox ground-truth promote <manifest>` (doc 26 §26.6 P3d) — an optional,
+  // explicit baseline rotation: copy the current actuals over the previous-actual
+  // baselines so the next run regresses against this one. Standalone subcommand;
+  // no server, no review DB. Glassbox still stores no baseline state itself.
+  if (rawArgs[0] === 'ground-truth' && rawArgs[1] === 'promote') {
+    const manifestArg = rawArgs[2] as string | undefined;
+    if (manifestArg === undefined || manifestArg === '') {
+      console.error('Usage: glassbox ground-truth promote <manifest.json>');
+      process.exit(1);
+    }
+    const { promoteGroundTruthBaselines } = await import('./ground-truth/promote.js');
+    try {
+      const res = promoteGroundTruthBaselines(resolve(manifestArg));
+      for (const p of res.promoted) console.log(`Promoted ${p.key}\n  ${p.from}\n  -> ${p.to}`);
+      if (res.promoted.length === 0) {
+        console.log('Nothing to promote: no comparison has expectedKind "previous-actual".');
+        console.log('Mark a comparison\'s expectedKind as "previous-actual" to rotate its baseline.');
+      } else {
+        console.log(`Promoted ${String(res.promoted.length)} baseline(s).`);
+      }
+      const realSkips = res.skipped.filter(s => !s.reason.startsWith('expectedKind'));
+      for (const s of realSkips) console.warn(`Skipped ${s.key}: ${s.reason}`);
       process.exit(0);
     } catch (err) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
