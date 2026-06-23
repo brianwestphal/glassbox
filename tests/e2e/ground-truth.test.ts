@@ -23,10 +23,26 @@ test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
     await page.goto('/');
     await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
 
-    // Two comparisons in the fixture manifest; each actual path keys an entry,
-    // grouped under its `actual/` folder in the sidebar tree.
+    // Each actual path keys one comparison row (flat named list, doc 26 §26.1);
+    // the row's title still carries the raw key for stable selection.
     await expect(page.locator('.file-name[title="actual/button.svg"]')).toHaveCount(1);
     await expect(page.locator('.file-name[title="actual/card.svg"]')).toHaveCount(1);
+  });
+
+  // GB-965 (doc 26 §26.1) — source list reads as named comparisons.
+  test('source list shows the manifest label and an expectedKind badge', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    // The row text is the manifest label, not the raw `button.svg` basename.
+    const buttonRow = page.locator('.file-item.gt-comparison', { has: page.locator('.file-name[title="actual/button.svg"]') });
+    await expect(buttonRow.locator('.file-name')).toHaveText('Submit button');
+    await expect(buttonRow.locator('.gt-kind')).toHaveText('Spec');
+
+    // `previous-actual` surfaces as the "Baseline" badge.
+    const cardRow = page.locator('.file-item.gt-comparison', { has: page.locator('.file-name[title="actual/card.svg"]') });
+    await expect(cardRow.locator('.file-name')).toHaveText('Profile card');
+    await expect(cardRow.locator('.gt-kind')).toHaveText('Baseline');
   });
 
   test('a comparison renders the image-diff view with expected as old (A) and actual as new (B)', async ({ page }) => {
@@ -64,6 +80,11 @@ test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
     expect(sides.oldType).toBe('image/svg+xml');
     expect(sides.oldBody).toContain('#3b82f6'); // expected/button.svg
     expect(sides.newBody).toContain('#2563eb'); // actual/button.svg
+
+    // GB-965 (doc 26 §26.1): the side-by-side captions read Expected/Actual,
+    // not the generic Old/New, in ground-truth mode.
+    await expect(page.locator('.image-sxs-label').nth(0)).toHaveText('Expected (A)');
+    await expect(page.locator('.image-sxs-label').nth(1)).toHaveText('Actual (B)');
   });
 
   test('an image comment can be added on a ground-truth comparison (no git repo)', async ({ page }) => {

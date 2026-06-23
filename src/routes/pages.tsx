@@ -16,6 +16,7 @@ import { getSingleFileDiff, parseDiffData, parseModeString } from '../git/diff.j
 import { getNewImage, getOldImage,isSvgFile  } from '../git/image.js';
 import { emptyFileDiff } from '../git/parseDiffData.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-meta.js';
+import { groundTruthSideLabels } from '../ground-truth/presentation.js';
 import { IconReveal } from '../icons.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';
@@ -66,15 +67,19 @@ pageRoutes.get('/file/:fileId', async (c) => {
 
   const diff: FileDiff = parseDiffData(file.diff_data) ?? emptyFileDiff(file.file_path);
 
+  // The review mode is needed for ground-truth side labels (doc 26 §26.1) and
+  // for whitespace re-diff / SVG render; load it once.
+  const review = await getReview(file.review_id);
+  const reviewMode = review ? parseModeString(review.mode) : null;
+  const imageSideLabels = reviewMode ? groundTruthSideLabels(reviewMode) : undefined;
+
   // SVG rendered view: return ImageDiff component
   if (view === 'rendered' && isSvgFile(file.file_path)) {
     const repoRoot = c.get('repoRoot');
-    const review = await getReview(file.review_id);
     let fontWarning = false;
     let svgBaseWidth = 300;
     let svgBaseHeight = 150;
-    if (review) {
-      const reviewMode = parseModeString(review.mode);
+    if (reviewMode) {
       const oldImg = diff.status !== 'added' ? getOldImage(reviewMode, file.file_path, diff.oldPath ?? null, repoRoot) : null;
       const newImg = diff.status !== 'deleted' ? getNewImage(reviewMode, file.file_path, repoRoot) : null;
       // Use the new-side SVG for dimensions (or old-side for deletions)
@@ -101,7 +106,7 @@ pageRoutes.get('/file/:fileId', async (c) => {
           </div>
         </div>
         <ImageDiff file={file} diff={diff} fontWarning={fontWarning}
-          baseWidth={svgBaseWidth} baseHeight={svgBaseHeight} />
+          baseWidth={svgBaseWidth} baseHeight={svgBaseHeight} sideLabels={imageSideLabels} />
       </div>
     );
     return c.html(html.toString());
@@ -111,15 +116,11 @@ pageRoutes.get('/file/:fileId', async (c) => {
   const annotations = await getAnnotationsForFile(fileId);
   let finalDiff = diff;
 
-  if (ignoreWhitespace) {
+  if (ignoreWhitespace && reviewMode) {
     const repoRoot = c.get('repoRoot');
-    const review = await getReview(file.review_id);
-    if (review) {
-      const reviewMode = parseModeString(review.mode);
-      const regenerated = getSingleFileDiff(reviewMode, file.file_path, repoRoot, '-w');
-      if (regenerated) {
-        finalDiff = regenerated;
-      }
+    const regenerated = getSingleFileDiff(reviewMode, file.file_path, repoRoot, '-w');
+    if (regenerated) {
+      finalDiff = regenerated;
     }
   }
 
@@ -132,7 +133,7 @@ pageRoutes.get('/file/:fileId', async (c) => {
     : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
   const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff);
 
-  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} />;
+  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} />;
   return c.html(html.toString());
 });
 

@@ -1,6 +1,7 @@
 import { computed, defineStore, signal } from 'kerfjs';
 
-import { buildFolderTree, walkTreeFiles } from '../sidebar/folderTree.js';
+import type { GroundTruthMeta } from '../../api/files.js';
+import { buildFolderTree, sortFilesByScore, walkTreeFiles } from '../sidebar/folderTree.js';
 import type {
   AnalysisModeState,
   DragAnnotation,
@@ -19,6 +20,9 @@ interface ReviewState {
   annotationCounts: Record<string, number>;
   staleCounts: Record<string, number>;
   filterText: string;
+  /** Ground-truth (doc 26 §26.1): per-file label/expectedKind, keyed by file id.
+   *  Non-empty only for ground-truth reviews, so its keys also signal the mode. */
+  groundTruth: Record<string, GroundTruthMeta>;
 }
 
 export const reviewStore = defineStore({
@@ -29,6 +33,7 @@ export const reviewStore = defineStore({
     annotationCounts: {},
     staleCounts: {},
     filterText: '',
+    groundTruth: {},
   }),
   actions: (set, get) => ({
     update: (partial: Partial<ReviewState>) => { set({ ...get(), ...partial }); },
@@ -271,7 +276,12 @@ export function folderModeFiles(): ReviewFile[] {
   const q = review.filterText.toLowerCase();
   const hideIdentical = diffViewStore.state.value.hideIdentical;
   return review.files.filter(f => {
-    if (q !== '' && f.file_path.toLowerCase().indexOf(q) === -1) return false;
+    if (q !== '') {
+      // Match the comparison label too, so filtering a ground-truth review by
+      // its named comparisons works even though the key is the raw image path.
+      const label = groundTruthMeta(f.id)?.label?.toLowerCase() ?? '';
+      if (f.file_path.toLowerCase().indexOf(q) === -1 && label.indexOf(q) === -1) return false;
+    }
     if (hideIdentical && f.difference_score === 0) return false;
     return true;
   });
@@ -283,8 +293,24 @@ export function hasIdenticalFiles(): boolean {
   return reviewStore.state.value.files.some(f => f.difference_score === 0);
 }
 
+/** Ground-truth review (doc 26 §26.1): the file list carries comparison metadata
+ *  for at least one file, so the sidebar renders named comparisons not a tree. */
+export function isGroundTruthReview(): boolean {
+  return Object.keys(reviewStore.state.value.groundTruth).length > 0;
+}
+
+/** This file's ground-truth display metadata (label / expectedKind), if any. */
+export function groundTruthMeta(fileId: string): GroundTruthMeta | undefined {
+  return reviewStore.state.value.groundTruth[fileId];
+}
+
 function folderViewFileOrder(): string[] {
-  const tree = buildFolderTree(folderModeFiles());
+  const files = folderModeFiles();
+  // Ground-truth reviews render a flat, most-different-first list (doc 26
+  // §26.1), so keyboard-nav order must follow the same global score sort rather
+  // than the folder-tree walk.
+  if (isGroundTruthReview()) return sortFilesByScore(files).map(f => f.id);
+  const tree = buildFolderTree(files);
   const ids: string[] = [];
   walkTreeFiles(tree, ids);
   return ids;

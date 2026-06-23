@@ -456,6 +456,38 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.annotation-item', { hasText: marker })).toHaveCount(0, { timeout: 5000 });
   });
 
+  // GB-963 — the shared lightbox zooms via its controls (also pans / pinches),
+  // so a reviewer can mark a precise region on a large artifact.
+  test('the note-artifact lightbox zooms via its controls', async ({ page }) => {
+    await openModifiedFile(page);
+    await page.getByText('demo-annotations.png').click();
+    const artImg = page.locator('.ai-note-artifact-img');
+    await expect.poll(() => artImg.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    await artImg.click();
+
+    const lb = page.locator('.lightbox-overlay');
+    await expect(lb.locator('.lightbox-img')).toBeVisible({ timeout: 5000 });
+    const frame = lb.locator('.lightbox-frame');
+    await expect(lb.locator('.lightbox-zoom-level')).toHaveText('100%');
+    // At rest, no scale transform.
+    expect(await frame.evaluate((el) => getComputedStyle(el).transform)).toBe('none');
+
+    // Zooming in scales the frame and bumps the readout past 100%.
+    await lb.locator('[data-zoom="in"]').click();
+    await lb.locator('[data-zoom="in"]').click();
+    await expect(lb.locator('.lightbox-zoom-level')).not.toHaveText('100%');
+    await expect(lb).toHaveClass(/lightbox-zoomed/);
+    expect(await frame.evaluate((el) => getComputedStyle(el).transform)).not.toBe('none');
+
+    // Reset returns to 100% and clears the transform.
+    await lb.locator('[data-zoom="reset"]').click();
+    await expect(lb.locator('.lightbox-zoom-level')).toHaveText('100%');
+    expect(await frame.evaluate((el) => getComputedStyle(el).transform)).toBe('none');
+
+    await page.keyboard.press('Escape');
+    await expect(lb).toHaveCount(0, { timeout: 3000 });
+  });
+
   // GB-959 — drag directly on the inline thumbnail (no lightbox), marking
   // several regions that all ride into one reply.
   test('marking multiple regions inline on a note artifact carries them all into the reply', async ({ page }) => {

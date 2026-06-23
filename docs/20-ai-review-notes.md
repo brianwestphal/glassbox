@@ -200,7 +200,9 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   served by `GET /api/review-notes/artifact` (path-contained, content-typed,
   size-capped). The reviewer can **mark a rectangle on an image artifact** two
   ways: **inline** — drag directly on the thumbnail (a plain click instead opens
-  the full-screen lightbox) — or in the **lightbox** itself. Either way the
+  the full-screen lightbox, which can be **zoomed/panned** to mark a precise spot
+  on a large artifact — doc 25 FR-25.7 / GB-963) — or in the **lightbox** itself.
+  Either way the
   rectangle is carried into the reply they then write, and a reply can carry
   **several** marks (GB-959): the reply renders each artifact with its
   rectangle(s) over it (a "see this spot" thumbnail). Each region reuses doc 23's

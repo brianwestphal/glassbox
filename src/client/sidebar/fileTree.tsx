@@ -7,5 +7,6 @@ export async function loadFiles(): Promise<void> {
     files: data.files,
     annotationCounts: data.annotationCounts,
     staleCounts: data.staleCounts,
+    groundTruth: data.groundTruth ?? {},
   });
 }

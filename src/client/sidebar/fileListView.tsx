@@ -2,6 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 import { raw } from 'kerfjs';
 
 import { parseDiffData } from '../../git/parseDiffData.js';
+import { EXPECTED_KIND_LABELS } from '../../ground-truth/presentation.js';
 import { IconChevronDown } from '../../icons.js';
 import { diffScoreLevel, formatDiffPct } from '../../utils/diffScore.js';
 import type { AnalysisModeState, NarrativeFileOrder, RiskFileScore } from '../state.js';
@@ -9,7 +10,9 @@ import {
   aiStore,
   diffViewStore,
   folderModeFiles,
+  groundTruthMeta,
   hasIdenticalFiles,
+  isGroundTruthReview,
   reviewStore,
   sortedNarrativeOrder,
   sortedRiskScores,
@@ -210,8 +213,42 @@ function flatRowJsx(file: typeof reviewStore.state.value['files'][number], revie
 // --- Folder view ---
 
 function folderListJsx(): SafeHtml {
+  // Ground-truth reviews (doc 26 §26.1) read as a flat list of named
+  // comparisons (label + expectedKind), not an `actual/` file tree.
+  if (isGroundTruthReview()) return groundTruthListJsx();
   const tree = buildFolderTree(folderModeFiles());
   return <>{identicalToggleJsx()}{treeNodeJsx(tree, 0, '')}</>;
+}
+
+/** Ground-truth source list (doc 26 §26.1): one row per comparison, most-
+ *  different-first, captioned by the manifest label + expectedKind. */
+function groundTruthListJsx(): SafeHtml {
+  const review = reviewStore.state.value;
+  const files = sortFilesByScore(folderModeFiles());
+  return <>{identicalToggleJsx()}{files.map(f => groundTruthRowJsx(f, review))}</>;
+}
+
+function groundTruthRowJsx(f: typeof reviewStore.state.value['files'][number], review: typeof reviewStore.state.value): SafeHtml {
+  const meta = groundTruthMeta(f.id);
+  const basename = f.file_path.split('/').pop() ?? f.file_path;
+  const name = meta?.label ?? basename;
+  const kind = meta?.expectedKind;
+  const count = review.annotationCounts[f.id] ?? 0;
+  const staleCount = review.staleCounts[f.id] ?? 0;
+  const score = f.difference_score;
+  return (
+    <div data-key={f.id}
+      className={`file-item gt-comparison${f.id === review.currentFileId ? ' active' : ''}`}
+      {...ACTIONS.selectFile.attrs} data-file-id={f.id} style="padding-left: 16px">
+      <span className="file-name" title={f.file_path}>{name}</span>
+      {kind ? <span className={`gt-kind gt-kind-${kind}`} title={`Expected image is a ${EXPECTED_KIND_LABELS[kind].toLowerCase()}`}>{EXPECTED_KIND_LABELS[kind]}</span> : null}
+      {score !== null && score !== undefined
+        ? <span className={`diff-badge diff-${diffScoreLevel(score)}`} title="Perceptual difference from the expected image">{formatDiffPct(score)}</span>
+        : null}
+      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
+      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+    </div>
+  );
 }
 
 /** Ground-truth (doc 26 P2): a toggle to reveal/hide identical (0-difference)

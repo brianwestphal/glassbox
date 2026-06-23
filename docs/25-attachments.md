@@ -31,6 +31,15 @@ for which UI surfaces are wired today.
   when clicked or activated with **Space**, shall open in a full-screen in-app
   overlay (lightbox) — instant, stays in the app, and works in any browser.
   Esc, Space, or a backdrop click dismisses it.
+- **FR-25.7 — Zoom/pan in the lightbox (shipped, GB-963).** An image in the
+  lightbox can be **zoomed** (wheel / pinch / the on-screen +/− controls, up to
+  8×) and **panned** (drag a zoomed image, or two-finger / wheel), so a reviewer
+  can inspect — and, on a markable artifact, precisely mark — a region on a large
+  image. The zoom/pan math is pure + unit-tested (`src/client/lightboxZoom.ts`);
+  region fractions stay correct under any transform because they're read from the
+  overlay's live post-transform bounding rect. PDFs are not zoomed (native
+  iframe). The lightbox (`src/client/lightbox.tsx`) is shared by attachment
+  previews and AI-note image artifacts (doc 20 §20.5).
 - **FR-25.5 — OS opener for other types.** A non-previewable attachment shall
   open in the OS default application: macOS **Quick Look** (`qlmanage -p`), the
   platform default opener on Windows (`start`) and Linux (`xdg-open`). Because

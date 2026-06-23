@@ -1,8 +1,12 @@
 # 26. Ground-Truth Image Comparison
 
 > **Status: P1 + P2 shipped** (manifest + single-image actual-vs-expected mode;
-> perceptual diff + identical-filtering + difference-score triage). Sets/flows +
-> capture pipeline (P3) remain design-only; see "Phasing".
+> perceptual diff + identical-filtering + difference-score triage). **P3
+> (sets/flows + capture-pipeline guidance + baseline rotation) is now fully
+> designed below** — `version: 2` manifest, ordered multi-step flows with per-step
+> navigation, a **consumer-only** capture contract + proof-export guidance, and
+> external baseline rotation. Implementation is not yet built; it is tracked in
+> phased follow-up tickets (see "Phasing").
 
 Glassbox's image comparison (doc [4](4-diff-viewing.md) §4.3, doc
 [24](24-image-comparison-layouts.md)) compares an image's **old vs new** sides
@@ -30,6 +34,25 @@ against design references.
   image, the reviewer can compare the **current actual** against the **previous
   actual** (the last captured version), as a regression check. This is the same
   comparison UI with a different "expected" source.
+- **FR-26.7 — Expected/Actual side labels (shipped).** In ground-truth mode the
+  side-by-side comparison panes read **"Expected (A)"** / **"Actual (B)"** rather
+  than the generic "Old (A)" / "New (B)". The expected image is the old/A side,
+  the actual is the new/B side. The server-rendered diff view passes the label
+  override into `ImageDiff` only when the review mode is ground-truth; every
+  other mode keeps the Old/New defaults. (`groundTruthSideLabels` in
+  `src/ground-truth/presentation.ts`.)
+- **FR-26.8 — Source list reads as named comparisons (shipped).** For a
+  ground-truth review the sidebar is a **flat list of named comparisons**, not an
+  `actual/` file tree: each row is captioned by the manifest **`label`** (falling
+  back to the actual-image basename when no label is given) and carries a small
+  **`expectedKind` badge** — **Spec** / **Reference** / **Baseline** (for
+  `previous-actual`). Rows sort most-different-first (reusing the P2 perceptual
+  score) and the text filter matches the label as well as the raw key. The raw
+  key remains the row's `title` for hover + stable selection. (Built from a
+  `fileId → {label, expectedKind}` map the `/files` response carries only for
+  ground-truth reviews; `groundTruthMetaByFileId` in
+  `src/ground-truth/presentation.ts`, rendered by `groundTruthListJsx` in
+  `src/client/sidebar/fileListView.tsx`.)
 
 ## 26.2 Source of the expected images — a manifest
 
@@ -57,19 +80,91 @@ against design references.
     live **outside the repo** — design specs are often not committed. v1 is
     single still images only; the set/flow shape is P3 (§26.3). Loaded +
     validated by `src/ground-truth/manifest.ts` (`loadGroundTruthManifest`).
+  - **Designed format (P3 — `version: 2`, additive).** v2 keeps `comparisons`
+    (singles) exactly as v1 and adds an optional **`sets`** array for ordered
+    multi-step flows. A v2 manifest must have at least one non-empty of
+    `comparisons` / `sets`. Each **step** is exactly a v1 comparison shape
+    (`actual` + `expected` + optional `label`/`expectedKind`), so the per-pair
+    resolver is reused unchanged; a set-level `label`/`expectedKind` is the
+    default its steps inherit (a step may override):
+
+    ```json
+    {
+      "version": 2,
+      "comparisons": [
+        { "actual": "out/login.png", "expected": "design/login.png",
+          "label": "Login screen", "expectedKind": "spec" }
+      ],
+      "sets": [
+        {
+          "label": "Checkout flow",
+          "expectedKind": "spec",
+          "steps": [
+            { "actual": "out/checkout/1-cart.png",    "expected": "design/checkout/1-cart.png",    "label": "Cart" },
+            { "actual": "out/checkout/2-address.png", "expected": "design/checkout/2-address.png", "label": "Address" },
+            { "actual": "out/checkout/3-confirm.svg", "expected": "design/checkout/3-confirm.svg", "label": "Confirmation (animated)" }
+          ]
+        }
+      ]
+    }
+    ```
+
+    - **Back-compat.** A `version: 1` manifest stays valid forever (no `sets`).
+      `version: 2` is accepted by the same loader; an unknown `version` is a
+      descriptive load error (as today).
+    - **Animated flows are just steps** whose `actual`/`expected` happen to be
+      **animated SVGs** (e.g. domotion output). They render live in the browser
+      (the GB-932 raw-`image/svg+xml` `<img>` path), so the flow animates inside
+      the existing comparison view — no new viewer.
+    - **Key derivation.** Each step resolves to one synthetic image pair keyed
+      `set:<setIndex>/<stepIndex>-<actualBasename>` (deduped like v1 keys), so
+      steps are stable, ordered, and distinct in the review even when basenames
+      repeat across sets.
   - Glassbox already reads two arbitrary files/folders by path for
     `--diff` (doc [18](18-direct-comparison.md)); the manifest mode builds on the
     same "image bytes from an arbitrary path" plumbing rather than git refs — the
-    expected image is the old (A) side, the actual the new (B) side.
+    expected image is the old (A) side, the actual the new (B) side. Sets add
+    **grouping + order** on top of the same per-pair plumbing.
 
 ## 26.3 Scope of comparison
 
 - **FR-26.5 — Single still images (v1).** v1 compares **one actual image against
   one expected image** at a time (with the previous-actual baseline option).
-- **Sets / flows (later).** Comparing a **set** of actuals against a set of
-  expecteds — a multi-step flow, potentially captured as animated SVGs via
-  domotion — is a later phase. A "compare this actual set against this expected
-  set" view, with per-step navigation, is the eventual goal.
+
+### Sets / multi-step flows (P3 — designed)
+
+- **FR-26.9 — A set is an ordered flow.** A **set** compares an actual *set* of
+  images against an expected *set* — a multi-step flow (e.g. a checkout journey,
+  an onboarding sequence). Steps are **ordered** (step 1..N) and navigated
+  sequentially. An "unordered group" is not a separate concept — it's just a
+  flow whose order the reviewer doesn't care about; modeling only the ordered
+  case keeps the UI and manifest simple. Declared via the `version: 2`
+  manifest's `sets` (§26.2).
+- **FR-26.10 — Source list: sets are named groups of steps.** The flat
+  named-comparison list (§26.1 / FR-26.8) gains a **group** level for sets: the
+  set `label` is a header carrying the set's aggregate difference (FR-26.11) and
+  expandable to its **ordered step rows**, each step captioned by its own label
+  (basename fallback) + per-step difference badge + `expectedKind`. Singles
+  (`comparisons`) continue to render as today, intermixed with set groups.
+  Reuses the existing collapsible folder/group rendering rather than a new tree.
+- **FR-26.11 — Per-step + aggregate scoring.** Each step is scored by the P2
+  perceptual diff exactly like a single (PNG/JPEG; animated SVG/other formats
+  show with no score). A set's **aggregate** difference is the **max** of its
+  steps' scores (matching the risk aggregate convention — the worst step drives
+  triage), shown on the set header; the set sorts among singles by that
+  aggregate, most-different-first. Identical-pair hiding (P2) applies per step;
+  a set all of whose steps are identical is hidden as a unit.
+- **FR-26.12 — Per-step navigation.** When viewing a step, the diff header shows
+  a **"Step k of N — ‹ Prev · Next ›"** control plus the step label, so the
+  reviewer can walk the flow without returning to the sidebar. Steps of a set are
+  consecutive in the keyboard/file nav order, so existing prev/next file
+  navigation already walks a flow; the header control is the explicit affordance
+  and bounds movement to the current set. Region marking (doc 23) + the doc-24
+  comparison modes work per step unchanged (each step is one image pair).
+- **Out of scope for P3:** cross-step diffs ("what changed between step 2 and
+  step 3 of the actual"), and side-by-side *all-steps* contact-sheet views. Both
+  are possible later refinements; P3 is "review each step of a flow against its
+  expected, in order."
 
 ## 26.4 Difference metric & pre-processing (P2 — shipped)
 
@@ -90,13 +185,45 @@ against design references.
     (`review_files.difference_score`), so the sidebar sorts/filters without
     re-decoding.
 
-## 26.5 Capture pipeline (later)
+## 26.5 Capture pipeline (P3 — designed, consumer-only)
 
-- The expected/actual images often come from **test suites that proactively
-  capture screenshots** (and multi-step flows). A later phase defines how those
-  captures feed the manifest — potentially leveraging domotion to render flows to
-  animated SVGs — so a suite run produces a comparable "actual set". Out of scope
-  for the design here beyond noting the integration point.
+The expected/actual images often come from **test suites that proactively
+capture screenshots** (and multi-step flows). P3 defines how those captures feed
+Glassbox — **without Glassbox running any capturer itself**.
+
+- **FR-26.13 — Consumer-only contract.** Glassbox **does not invoke** domotion,
+  a browser, or any capture tool, and takes on **no new runtime dependency** on
+  them. It consumes whatever a project's own test suite / capture step has
+  **already written to disk**, declared via the `version: 2` manifest. This
+  mirrors how Glassbox consumes producer-written `.pr-notes/` SARIF (doc
+  [20](20-ai-review-notes.md)) and arbitrary-path images (doc
+  [18](18-direct-comparison.md)), and upholds NFR-26.1 ("reuse, don't fork").
+  The integration point is exactly: *a project emits image/SVG files + a
+  manifest; `glassbox --ground-truth <manifest>` reviews them.*
+- **FR-26.14 — Proof-export guidance.** Glassbox (and Glassbox/Hot-Sheet–
+  integrated projects) should ship **guidance** that hints how a software project
+  can export reviewable **proof** for ground-truth review. The guidance is
+  documentation/convention, not a Glassbox runtime feature, and covers the
+  common proof modalities:
+  - **Screenshots** (PNG/JPEG) — still-state proof; one file per step. The
+    natural output of most e2e/visual-test runners.
+  - **Logs / textual proof** — already a first-class Glassbox concept as AI
+    review-note **text artifacts** (doc 20 §20.5); cross-referenced here so a
+    project exports run logs as note artifacts, not as ground-truth images.
+  - **Complex animated flows** — render a multi-step interaction to a **single
+    animated SVG** (e.g. via [domotion](https://github.com/brianwestphal/domotion))
+    and reference it as one step's `actual`; it animates live in the comparison
+    view (§26.2). This lets a whole interaction be reviewed as one artifact, or
+    decomposed into per-frame still steps — the project's choice.
+  - **Suggested layout convention.** A capture step writes
+    `<proof-dir>/<flow>/NN-step.{png,svg}` for actuals (and a parallel
+    expected/baseline tree) plus a generated `manifest.json`, so a single suite
+    run produces a directly-reviewable "actual set". The exact directory names
+    are a project convention, not enforced by Glassbox.
+- This proof-export guidance is broader than ground-truth (it touches logs +
+  note artifacts too), so the **authoring of the guidance doc / AI skill** for
+  Glassbox/Hot-Sheet–integrated projects is tracked as its own follow-up rather
+  than inlined here.
 
 ## 26.6 Non-functional / open questions
 
@@ -117,8 +244,18 @@ against design references.
     (`expected` points at the prior actual; `expectedKind: "previous-actual"`
     is a display hint). Glassbox stores no baseline itself; automatic
     "keep last actual" tooling is P3 (capture pipeline).
-- **Still open (later phases):** how a "set" is expressed in the manifest (P3);
-  whether the capture pipeline writes/rotates baselines (P3).
+- **Resolved in P3 design:**
+  - **How a "set" is expressed** — the `version: 2` manifest's `sets` array of
+    ordered `steps` (§26.2); each step is a v1 comparison shape.
+  - **FR-26.15 — Baseline rotation stays external.** Consistent with P1/P2 and
+    the consumer-only contract (FR-26.13), **Glassbox does not store or rotate
+    baselines.** Previous-actual regression over a flow works by the capture
+    pipeline writing this run's actual set into the baseline location that the
+    *next* run's manifest points its `expected` steps at (`expectedKind:
+    "previous-actual"`). An **optional convenience** — a `glassbox ground-truth
+    promote <manifest>` helper that copies the current actuals over the baseline
+    tree — is **not** part of P3's core and is filed as its own follow-up, so the
+    core feature ships without Glassbox ever owning baseline state.
 
 ## Phasing (follow-up tickets)
 
@@ -136,8 +273,28 @@ against design references.
   decode (`pngjs`/`jpeg-js`) + `pixelmatch`; scores stored on
   `review_files.difference_score`. PNG/JPEG only — other formats show with no
   score. Implementation notes below.
-- **P3 — Sets / multi-step flows + capture pipeline** (incl. domotion
-  animated-SVG capture) and the previous-actual-baseline tooling.
+- **P3 — Sets / multi-step flows + capture-pipeline guidance + baseline
+  rotation** *(designed above; implementation in phased follow-ups)*. Resolved
+  design: a `version: 2` additive manifest with ordered `sets`/`steps` (§26.2);
+  source-list **set groups** with per-step rows, per-step + max-aggregate
+  perceptual scoring, and a **per-step Prev/Next** navigator (§26.3); a
+  **consumer-only** capture contract — Glassbox runs no capturer and gains no
+  domotion dependency — plus **proof-export guidance** for projects (screenshots,
+  logs-as-note-artifacts, animated-SVG flows; §26.5); and **external** baseline
+  rotation (FR-26.15). Suggested implementation sub-phases:
+  - **P3a — `version: 2` loader + set model.** Extend `manifest.ts` to parse
+    `sets`/`steps` (back-compat with v1), resolve each step to a synthetic image
+    pair keyed `set:<i>/<j>-<basename>`, and carry set grouping/order in the
+    review mode. Pure + unit-tested; no UI yet.
+  - **P3b — Source-list set groups + per-step nav + aggregate scoring.** Render
+    set groups in the §26.1 named list, per-step + max-aggregate difference
+    badges (reusing the P2 score), and the diff-header "Step k of N" navigator.
+  - **P3c — Proof-export guidance doc / AI skill** for Glassbox/Hot-Sheet–
+    integrated projects (screenshots, logs as note artifacts, animated-SVG flows
+    via domotion; suggested manifest-emitting layout). Broader than ground-truth.
+  - **P3d — (optional) `glassbox ground-truth promote` baseline helper** — copy
+    current actuals over the baseline tree for next-run regression. Optional;
+    Glassbox still owns no baseline state.
 
 ## Implementation pointers (P1)
 
@@ -176,6 +333,25 @@ against design references.
 - **Deps:** `pixelmatch`, `pngjs`, `jpeg-js` — pure JS, **bundled** by tsup (not
   in the external list), so no sidecar/Tauri changes.
 
+## Implementation pointers (UX polish — FR-26.7 / FR-26.8)
+
+- **Presentation helpers:** `src/ground-truth/presentation.ts` — pure, shared by
+  the diff page and the file-list route. `groundTruthSideLabels(mode)` →
+  Expected/Actual captions; `groundTruthMetaByFileId(mode, files)` → the per-file
+  `{label, expectedKind}` map; `EXPECTED_KIND_LABELS` → Spec / Reference /
+  Baseline.
+- **Side labels:** optional `sideLabels` prop on `ImageDiff`
+  (`src/components/imageDiff.tsx`), threaded through `DiffView`'s
+  `imageSideLabels` and set in `src/routes/pages.tsx` (both the binary-image and
+  rendered-SVG paths) only for ground-truth reviews.
+- **Source list:** `/files` response carries an optional `groundTruth`
+  (`fileId → {label, expectedKind}`) map (`src/api/files.ts` +
+  `src/routes/api/files.ts`); the client stores it on `reviewStore.groundTruth`
+  (`isGroundTruthReview` / `groundTruthMeta` helpers in
+  `src/client/stores/index.ts`), and `groundTruthListJsx` renders the flat named
+  list with the `.gt-kind` badge (`src/client/sidebar/fileListView.tsx`,
+  `_ai-sort.scss`).
+
 ## Tests (P1 + P2)
 
 - Unit: `tests/unit/ground-truth/manifest.test.ts` (load / resolve / dedup /
@@ -191,6 +367,10 @@ against design references.
   badge on a scored PNG pair, and the hide/show-identical toggle). Fixtures
   under `tests/fixtures/ground-truth/` (SVG pairs + a differing and an identical
   PNG pair).
+- UX polish (FR-26.7 / FR-26.8): unit `tests/unit/ground-truth/presentation.test.ts`
+  (side labels, per-file metadata map, kind labels); E2E assertions in
+  `tests/e2e/ground-truth.test.ts` for the manifest label + `expectedKind` badge
+  in the source list and the Expected (A) / Actual (B) pane captions.
 
 ## Relationship to existing docs
 

@@ -163,8 +163,20 @@ pair is (fraction of changed pixels, anti-aliasing-tolerant); identical pairs ar
 hidden by default (toggle to show), the score shows per source-list entry + in
 the diff header, and the list sorts most-different-first. Score stored on
 `review_files.difference_score`. PNG/JPEG only; other formats show with no score.
-**P3** (sets/flows + capture pipeline incl. domotion animated SVGs; baseline
-rotation) remains design-only — phased follow-up ticket.
+**UX polish** (shipped, FR-26.7/26.8): in ground-truth mode the side-by-side panes
+read **Expected (A)** / **Actual (B)**, and the sidebar is a **flat list of named
+comparisons** — each row captioned by the manifest `label` (basename fallback)
+with a **Spec / Reference / Baseline** `expectedKind` badge, most-different-first
+(`src/ground-truth/presentation.ts`). **P3** (sets/multi-step flows +
+capture-pipeline guidance + baseline rotation) is now **fully designed** (doc 26
+§26.2/§26.3/§26.5): a `version: 2` additive manifest with ordered `sets`/`steps`,
+source-list **set groups** with per-step rows + max-aggregate perceptual score +
+a per-step Prev/Next navigator, a **consumer-only** capture contract (Glassbox
+runs no capturer / takes no domotion dependency) plus **proof-export guidance**
+for projects (screenshots, logs-as-note-artifacts, animated-SVG flows), and
+**external** baseline rotation. Implementation is **design-only** — tracked in
+phased follow-up tickets (P3a loader/model, P3b UI, P3c guidance doc/skill, P3d
+optional `promote` helper).
 
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions

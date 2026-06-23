@@ -14,12 +14,14 @@ import { renderNoteMarkdown } from '../utils/noteMarkdown.js';
 import { ImageDiff } from './imageDiff.js';
 import { ReviewNoteRegionThumb } from './reviewNoteRegionThumb.js';
 
-export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
+export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imageSideLabels }: {
   file: ReviewFile;
   diff: FileDiff;
   annotations: Annotation[];
   mode: 'split' | 'unified';
   reviewNotes?: ReviewNoteView[];
+  /** Ground-truth mode (doc 26 §26.1) overrides the image pane captions. */
+  imageSideLabels?: { old: string; new: string };
 }) {
   // Replies (annotations linked to a review note on this file) render nested
   // beneath their note, not on their line; everything else goes by line. An
@@ -61,7 +63,7 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
         </div>
       </div>
       {diff.isBinary && isImageFile(diff.filePath) ? (
-        <ImageDiff file={file} diff={diff} />
+        <ImageDiff file={file} diff={diff} sideLabels={imageSideLabels} />
       ) : diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
       ) : (diff.status === 'added' || diff.status === 'deleted' || mode === 'unified') ? (

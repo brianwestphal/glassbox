@@ -9,10 +9,25 @@ import { apiCall, OkResponseSchema } from './_runner.js';
 export const FileStatusSchema = z.enum(['pending', 'reviewed']);
 export type FileStatus = z.infer<typeof FileStatusSchema>;
 
+/**
+ * Per-file ground-truth presentation metadata (doc 26 §26.1). Present only for
+ * ground-truth reviews; lets the sidebar read like a list of named comparisons
+ * (label + what the expected image represents) rather than a raw `actual/` file
+ * tree. An entry exists for every ground-truth file even when both fields are
+ * absent, so the map's keys also signal "this is a ground-truth review".
+ */
+export const GroundTruthMetaSchema = z.object({
+  label: z.string().optional(),
+  expectedKind: z.enum(['spec', 'reference', 'previous-actual']).optional(),
+});
+export type GroundTruthMeta = z.infer<typeof GroundTruthMetaSchema>;
+
 export const ListFilesRespSchema = z.object({
   files: z.array(ReviewFileSchema),
   annotationCounts: z.record(z.string(), z.number()),
   staleCounts: z.record(z.string(), z.number()),
+  /** Keyed by review-file id; omitted/empty for non-ground-truth reviews. */
+  groundTruth: z.record(z.string(), GroundTruthMetaSchema).optional(),
 });
 export type ListFilesResp = z.infer<typeof ListFilesRespSchema>;
 

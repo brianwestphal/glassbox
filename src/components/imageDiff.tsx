@@ -7,15 +7,20 @@ interface ImageDiffProps {
   fontWarning?: boolean;
   baseWidth?: number;
   baseHeight?: number;
+  /** Override the side-by-side pane captions. Ground-truth mode (doc 26 §26.1)
+   *  reads "Expected (A)" / "Actual (B)" instead of the default Old/New. */
+  sideLabels?: { old: string; new: string };
 }
 
-export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: ImageDiffProps) {
+export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight, sideLabels }: ImageDiffProps) {
   const fileId = file.id;
   const isAdded = diff.status === 'added';
   const isDeleted = diff.status === 'deleted';
   const hasOld = !isAdded;
   const hasNew = !isDeleted;
   const hasComparison = hasOld && hasNew;
+  const oldLabel = sideLabels?.old ?? 'Old (A)';
+  const newLabel = sideLabels?.new ?? 'New (B)';
 
   return (
     <div className="image-diff" data-file-id={fileId} data-file-path={file.file_path}
@@ -41,7 +46,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
       {hasComparison && (
         <div className="image-diff-panel image-diff-sxs" data-panel="side-by-side" data-sxs-orientation="left-right">
           <div className="image-sxs-pane" data-sxs-pane="old">
-            <div className="image-sxs-label">Old (A)</div>
+            <div className="image-sxs-label">{oldLabel}</div>
             <div className="image-visual-canvas" data-zoomable="true">
               <div className="image-zoom-wrap">
                 <img className="image-layer image-layer-old" src={`/api/image/${fileId}/old`} alt="Old version" />
@@ -50,7 +55,7 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight }: Im
             </div>
           </div>
           <div className="image-sxs-pane" data-sxs-pane="new">
-            <div className="image-sxs-label">New (B)</div>
+            <div className="image-sxs-label">{newLabel}</div>
             <div className="image-visual-canvas" data-zoomable="true">
               <div className="image-zoom-wrap">
                 <img className="image-layer image-layer-new" src={`/api/image/${fileId}/new`} alt="New version" />

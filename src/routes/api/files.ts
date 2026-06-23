@@ -2,8 +2,10 @@ import { Hono } from 'hono';
 import { resolve } from 'path';
 
 import { SetFileStatusBodySchema } from '../../api/files.js';
-import { getAnnotationCountsForReview, getAnnotationsForFile, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
+import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
 import { debugLog } from '../../debug.js';
+import { parseModeString } from '../../git/diff.js';
+import { groundTruthMetaByFileId } from '../../ground-truth/presentation.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -13,12 +15,16 @@ export const filesRoutes = new Hono<AppEnv>();
 
 filesRoutes.get('/files', async (c) => {
   const reviewId = resolveReviewId(c);
-  const [files, annotationCounts, staleCounts] = await Promise.all([
+  const [files, annotationCounts, staleCounts, review] = await Promise.all([
     getReviewFiles(reviewId),
     getAnnotationCountsForReview(reviewId),
     getStaleCountsForReview(reviewId),
+    getReview(reviewId),
   ]);
-  return c.json({ files, annotationCounts, staleCounts });
+  // Ground-truth reviews (doc 26 §26.1) carry per-file display metadata (label +
+  // expectedKind) so the sidebar reads like named comparisons; omitted otherwise.
+  const groundTruth = review ? groundTruthMetaByFileId(parseModeString(review.mode), files) : undefined;
+  return c.json({ files, annotationCounts, staleCounts, ...(groundTruth ? { groundTruth } : {}) });
 });
 
 filesRoutes.get('/files/:fileId', async (c) => {
