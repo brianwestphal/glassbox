@@ -55,6 +55,9 @@ interface DiffViewState {
   highlightAuto: boolean;
   detectedLang: string;
   collapsedFolders: Set<string>;
+  /** Ground-truth (doc 26 P2): hide pairs with a 0 difference score (identical /
+   *  anti-aliasing-only). On by default — nothing to review there. */
+  hideIdentical: boolean;
 }
 
 export const diffViewStore = defineStore({
@@ -69,6 +72,7 @@ export const diffViewStore = defineStore({
     highlightAuto: true,
     detectedLang: 'plaintext',
     collapsedFolders: new Set(),
+    hideIdentical: true,
   }),
   actions: (set, get) => ({
     update: (partial: Partial<DiffViewState>) => { set({ ...get(), ...partial }); },
@@ -258,11 +262,29 @@ export const visibleFileOrder = computed<string[]>(() => {
   return folderViewFileOrder();
 });
 
-function folderViewFileOrder(): string[] {
+/** Files shown in folder mode: the text filter plus, for ground-truth reviews
+ *  (doc 26 P2), dropping identical pairs when the hide-identical toggle is on.
+ *  Used by both the sidebar render and `folderViewFileOrder` so the visible list
+ *  and keyboard-nav order stay in sync. */
+export function folderModeFiles(): ReviewFile[] {
   const review = reviewStore.state.value;
   const q = review.filterText.toLowerCase();
-  const filtered = q === '' ? review.files : review.files.filter(f => f.file_path.toLowerCase().indexOf(q) !== -1);
-  const tree = buildFolderTree(filtered);
+  const hideIdentical = diffViewStore.state.value.hideIdentical;
+  return review.files.filter(f => {
+    if (q !== '' && f.file_path.toLowerCase().indexOf(q) === -1) return false;
+    if (hideIdentical && f.difference_score === 0) return false;
+    return true;
+  });
+}
+
+/** Whether any file carries a 0 difference score (ground-truth identical pair),
+ *  so the sidebar knows to offer the hide-identical toggle. */
+export function hasIdenticalFiles(): boolean {
+  return reviewStore.state.value.files.some(f => f.difference_score === 0);
+}
+
+function folderViewFileOrder(): string[] {
+  const tree = buildFolderTree(folderModeFiles());
   const ids: string[] = [];
   walkTreeFiles(tree, ids);
   return ids;

@@ -139,6 +139,7 @@ See §6 for the schema itself.
 | `repo.ts` | `getRepoRoot`, `getRepoName`, `getHeadCommit`, `isGitRepo`. Also exports `scrubbedGitEnv()` — the env every internal git subprocess runs with, with `git difftool`'s leaked `GIT_EXTERNAL_DIFF` / `GIT_DIFF_PATH_COUNTER` / `GIT_DIFF_PATH_TOTAL` stripped (used by `repo.ts`, `diff.ts`, and `image.ts`'s `git show`). Left in place those would make Glassbox's own `git diff`/`git show` re-invoke the difftool helper → recursion + empty diff ("No changes found"). See doc 19 NFR-19.12. |
 | `types.ts` | `ReviewMode` (incl. the doc-18 `diff` + doc-26 `ground-truth` variants), `GroundTruthEntry`, `FileDiff`, `DiffHunk`, `DiffLine`. |
 | `../ground-truth/manifest.ts` | doc 26 — `loadGroundTruthManifest(path)`: read/validate (`version:1` + `comparisons[]`), resolve actual/expected paths relative to the manifest dir, image-only check, dedup keys. |
+| `../ground-truth/perceptual-diff.ts` | doc 26 P2 — `comparePerceptual(actual, expected)`: decode PNG/JPEG to RGBA (`pngjs`/`jpeg-js`) + `pixelmatch` (YIQ, threshold 0.1, AA-tolerant) → difference score (fraction of changed pixels); `dimension-mismatch`→1, SVG/WebP/corrupt→`undecodable`. Score computed at launch + stored on `review_files.difference_score`. Format helpers in `src/utils/diffScore.ts`. |
 | `image.ts` | Image side retrieval from git (old/new), binary detection, format identification. |
 | `image-metadata.ts` | Parse image headers (PNG IHDR, JPEG SOF/JFIF, GIF, WebP VP8/VP8L/VP8X) — no native deps. |
 | `svg-meta.ts` | Pure SVG metadata helpers for the "Rendered" view: `parseSvgDimensions` (base size from width/height/viewBox) and `svgUsesExternalFonts` (font-caveat banner trigger). No rendering. SVGs are rendered live in the browser (GB-932): the image route serves them as raw `image/svg+xml` and the diff shows them in a native `<img>`, so animated SVGs animate. The old `@resvg/resvg-wasm` rasterizer + worker thread were removed. |
@@ -347,7 +348,7 @@ See `src/db/schema.ts` for the authoritative SQL. Quick reference:
 **Core tables:**
 
 - `reviews(id, repo_path, repo_name, mode, mode_args, head_commit, status, created_at, updated_at)`
-- `review_files(id, review_id →reviews, file_path, status, diff_data, created_at)`
+- `review_files(id, review_id →reviews, file_path, status, diff_data, difference_score, created_at)` — `difference_score` is the ground-truth perceptual difference in [0,1] (doc 26 P2); NULL for non-ground-truth files and undecodable pairs
   — `diff_data` is a **JSON-serialized `FileDiff`** (hunks, paths, binary flag)
 - `annotations(id, review_file_id →review_files, line_number, side, category, content, is_stale, original_content, reply_to_note_id, region_data, created_at, updated_at)` — `line_number 0` marks an image-level annotation (doc 23): a general image comment, or — when `region_data` holds a JSON `{x,y,w,h}` normalized rectangle (with an optional `side` for an A-only/B-only region) — a comment anchored to a region on the image; `PATCH /annotations/:id/region` rewrites that geometry/scope for move/resize. `reply_to_note_id` links a reply to an AI review note (doc 20).
 
@@ -526,7 +527,7 @@ section explaining category semantics.
 | files `<patterns>` | `git diff HEAD -- <patterns>` |
 | all | custom walk of all tracked files |
 | diff `<A> <B>` | `git diff --no-index <A> <B>` (doc 18 — works outside a repo) |
-| ground-truth `<manifest>` | none — one synthetic binary image pair per manifest comparison (doc 26 — works outside a repo). Expected = old/A, actual = new/B; bytes served from the resolved manifest paths by the image route. Manifest loaded by `src/ground-truth/manifest.ts`. |
+| ground-truth `<manifest>` | none — one synthetic binary image pair per manifest comparison (doc 26 — works outside a repo). Expected = old/A, actual = new/B; bytes served from the resolved manifest paths by the image route. Manifest loaded by `src/ground-truth/manifest.ts`. P2: a perceptual difference score (`src/ground-truth/perceptual-diff.ts`) is computed at launch, stored on `review_files.difference_score`, shown as a badge + used to sort/filter identical pairs. |
 
 All invocations use argv arrays (`spawnSync` / `execFileSync`) — never
 string interpolation into a shell (FR-14.3). Binary detection: git's own

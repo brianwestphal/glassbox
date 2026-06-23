@@ -7,4 +7,5 @@ export const ACTIONS = {
   toggleFolder: attr('data-action', 'toggle-folder'),
   showRiskPopover: attr('data-action', 'show-risk-popover'),
   retryAnalysis: attr('data-action', 'retry-analysis'),
+  toggleHideIdentical: attr('data-action', 'toggle-hide-identical'),
 } as const;

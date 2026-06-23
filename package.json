@@ -67,7 +67,10 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "apple-fm": "^1.0.0",
     "hono": "^4.12.25",
+    "jpeg-js": "^0.4.4",
     "kerfjs": "^0.14.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -75,6 +78,7 @@
     "@playwright/test": "^1.61.0",
     "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^25.9.3",
+    "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.9",
     "c8": "^11.0.0",
     "domotion-svg": "0.13.3",

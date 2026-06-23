@@ -167,7 +167,7 @@ pageRoutes.get('/file-raw', (c) => {
     }],
   };
 
-  const fakeFile: ReviewFile = { id: '', review_id: '', file_path: filePath, status: 'reviewed', diff_data: null, created_at: '' };
+  const fakeFile: ReviewFile = { id: '', review_id: '', file_path: filePath, status: 'reviewed', diff_data: null, difference_score: null, created_at: '' };
   const html = <DiffView file={fakeFile} diff={diff} annotations={[]} mode="unified" />;
   return c.html(html.toString());
 });

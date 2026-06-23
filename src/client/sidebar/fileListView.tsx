@@ -3,17 +3,20 @@ import { raw } from 'kerfjs';
 
 import { parseDiffData } from '../../git/parseDiffData.js';
 import { IconChevronDown } from '../../icons.js';
+import { diffScoreLevel, formatDiffPct } from '../../utils/diffScore.js';
 import type { AnalysisModeState, NarrativeFileOrder, RiskFileScore } from '../state.js';
 import {
   aiStore,
   diffViewStore,
+  folderModeFiles,
+  hasIdenticalFiles,
   reviewStore,
   sortedNarrativeOrder,
   sortedRiskScores,
   unscoredFiles,
 } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
-import { buildFolderTree, type TreeNode } from './folderTree.js';
+import { buildFolderTree, sortFilesByScore, type TreeNode } from './folderTree.js';
 
 export function fileListJsx(): SafeHtml {
   const ai = aiStore.state.value;
@@ -207,11 +210,25 @@ function flatRowJsx(file: typeof reviewStore.state.value['files'][number], revie
 // --- Folder view ---
 
 function folderListJsx(): SafeHtml {
-  const review = reviewStore.state.value;
-  const q = review.filterText.toLowerCase();
-  const filtered = q === '' ? review.files : review.files.filter(f => f.file_path.toLowerCase().indexOf(q) !== -1);
-  const tree = buildFolderTree(filtered);
-  return <>{treeNodeJsx(tree, 0, '')}</>;
+  const tree = buildFolderTree(folderModeFiles());
+  return <>{identicalToggleJsx()}{treeNodeJsx(tree, 0, '')}</>;
+}
+
+/** Ground-truth (doc 26 P2): a toggle to reveal/hide identical (0-difference)
+ *  pairs. Only shown when such pairs exist, so it never appears for git diffs. */
+function identicalToggleJsx(): SafeHtml {
+  if (!hasIdenticalFiles()) return raw('');
+  const hidden = diffViewStore.state.value.hideIdentical;
+  const count = reviewStore.state.value.files.filter(f => f.difference_score === 0).length;
+  const label = hidden
+    ? `Show ${String(count)} identical`
+    : `Hide ${String(count)} identical`;
+  return (
+    <button className={`identical-toggle${hidden ? '' : ' active'}`} {...ACTIONS.toggleHideIdentical.attrs}
+      title="Identical comparisons have nothing to review">
+      {label}
+    </button>
+  );
 }
 
 function treeNodeJsx(node: TreeNode, depth: number, pathPrefix: string): SafeHtml {
@@ -246,7 +263,7 @@ function treeNodeJsx(node: TreeNode, depth: number, pathPrefix: string): SafeHtm
           </div>
         );
       })}
-      {node.files.map(f => fileRowJsx(f, depth, review))}
+      {sortFilesByScore(node.files).map(f => fileRowJsx(f, depth, review))}
     </>
   );
 }
@@ -257,13 +274,16 @@ function fileRowJsx(f: typeof reviewStore.state.value['files'][number], depth: n
   const staleCount = review.staleCounts[f.id] ?? 0;
   const fileName = f.file_path.split('/').pop() ?? '';
   const pad = `padding-left: ${String(16 + depth * 12)}px`;
+  const score = f.difference_score;
   return (
     <div data-key={f.id}
       className={`file-item${f.id === review.currentFileId ? ' active' : ''}`}
       {...ACTIONS.selectFile.attrs} data-file-id={f.id} style={pad}>
       <span className={`status-dot ${f.status}`}></span>
       <span className="file-name" title={f.file_path}>{fileName}</span>
-      <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>
+      {score !== null && score !== undefined
+        ? <span className={`diff-badge diff-${diffScoreLevel(score)}`} title="Perceptual difference from the expected image">{formatDiffPct(score)}</span>
+        : <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>}
       {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
       {count > 0 ? <span className="annotation-count">{count}</span> : null}
     </div>

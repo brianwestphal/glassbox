@@ -40,12 +40,20 @@ function compressFolderTree(node: TreeNode): void {
   }
 }
 
+/** Order a folder's files most-different-first by perceptual difference score
+ *  (doc 26 P2), then by path. Files without a score (every non-ground-truth
+ *  review) sort by path, so this is a no-op outside ground-truth mode. */
+export function sortFilesByScore(files: ReviewFile[]): ReviewFile[] {
+  return files.slice().sort((a, b) =>
+    (b.difference_score ?? -1) - (a.difference_score ?? -1) || a.file_path.localeCompare(b.file_path));
+}
+
 /** Append every file ID in folder-traversal order (alphabetical children,
- *  then own files) into `out`. Used by `visibleFileOrder` so keyboard
- *  navigation (j/k) traverses files in the same order they appear on
- *  screen in folder sort mode. */
+ *  then own files by difference score) into `out`. Used by `visibleFileOrder`
+ *  so keyboard navigation (j/k) traverses files in the same order they appear
+ *  on screen in folder sort mode. */
 export function walkTreeFiles(node: TreeNode, out: string[]): void {
   const sortedChildren = node.children.slice().sort((a, b) => a.name.localeCompare(b.name));
   for (const child of sortedChildren) walkTreeFiles(child, out);
-  for (const f of node.files) out.push(f.id);
+  for (const f of sortFilesByScore(node.files)) out.push(f.id);
 }

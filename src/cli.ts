@@ -386,6 +386,9 @@ async function main() {
   let repoRoot: string;
   let repoName: string;
   let headCommit = "";
+  // Ground-truth (doc 26 P2): perceptual difference score per comparison key,
+  // computed at launch and stored on each review file. Empty for other modes.
+  const groundTruthScores = new Map<string, number | null>();
 
   if (mode.type === "diff") {
     const { pathA, pathB } = mode;
@@ -421,6 +424,23 @@ async function main() {
           process.exit(1);
         }
       }
+    }
+    // Perceptual diff (doc 26 P2): score each pair so the review can be triaged
+    // and identical pairs hidden. Scores are stored per file at creation below.
+    const { comparePerceptual } = await import("./ground-truth/perceptual-diff.js");
+    let identical = 0;
+    let undecodable = 0;
+    for (const entry of comparisons) {
+      const result = comparePerceptual(entry.actualPath, entry.expectedPath);
+      groundTruthScores.set(entry.key, result.score);
+      if (result.reason === "undecodable") undecodable++;
+      else if (result.score === 0) identical++;
+    }
+    if (identical > 0 || undecodable > 0) {
+      const parts: string[] = [];
+      if (identical > 0) parts.push(`${identical} identical (hidden by default)`);
+      if (undecodable > 0) parts.push(`${undecodable} not scored (unsupported format)`);
+      console.log(`Perceptual diff: ${parts.join(", ")}.`);
     }
     mode = { ...mode, comparisons };
     repoRoot = cwd;
@@ -476,9 +496,9 @@ async function main() {
   // Create review
   const review = await createReview(repoRoot, repoName, modeStr, modeArgs, headCommit);
 
-  // Add files
+  // Add files (with the ground-truth perceptual score when present, doc 26 P2)
   for (const diff of diffs) {
-    await addReviewFile(review.id, diff.filePath, JSON.stringify(diff));
+    await addReviewFile(review.id, diff.filePath, JSON.stringify(diff), groundTruthScores.get(diff.filePath) ?? null);
   }
 
   console.log(`Review ${review.id} created.`);

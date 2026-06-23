@@ -147,7 +147,7 @@ regions, stored as a JSON array in `region_data` (decode/group helpers in
 `src/utils/artifactRegions.ts`). Reuses doc 23's normalized `{x,y,w,h}` model
 with an `artifact` uri.
 
-**Ground-truth comparison** (doc 26, **P1 shipped**): a separate mode to compare
+**Ground-truth comparison** (doc 26, **P1 + P2 shipped**): a separate mode to compare
 an **actual** image against an **expected**/ground-truth image (design spec,
 reference render, or previous-actual baseline), even when the expected lives
 outside the repo. Launched via `glassbox --ground-truth <manifest.json>` (no git
@@ -157,9 +157,14 @@ repo required). The **manifest** (`src/ground-truth/manifest.ts`, JSON
 becomes one synthetic binary image pair per entry — expected = old/A, actual =
 new/B — served by the existing image route, so the doc-24 comparison modes +
 doc-23 region marking + doc-18 arbitrary-path plumbing all light up unchanged.
-**P2** (perceptual diff: filter identical / anti-aliasing-tolerant / difference
-score) and **P3** (sets/flows + capture pipeline incl. domotion animated SVGs;
-baseline rotation) remain design-only — phased follow-up tickets.
+**P2** (shipped) adds a **perceptual diff**: pure-JS decode (`pngjs`/`jpeg-js`) +
+`pixelmatch` (`src/ground-truth/perceptual-diff.ts`) score how different each
+pair is (fraction of changed pixels, anti-aliasing-tolerant); identical pairs are
+hidden by default (toggle to show), the score shows per source-list entry + in
+the diff header, and the list sorts most-different-first. Score stored on
+`review_files.difference_score`. PNG/JPEG only; other formats show with no score.
+**P3** (sets/flows + capture pipeline incl. domotion animated SVGs; baseline
+rotation) remains design-only — phased follow-up ticket.
 
 **Image feedback** (doc 23): a panel below the image canvas lets the
 reviewer add general comments about an image and draw rectangle regions

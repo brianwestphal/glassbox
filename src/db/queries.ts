@@ -80,13 +80,13 @@ export async function getLatestInProgressReview(repoPath: string, mode: string, 
 
 // --- Review Files ---
 
-export async function addReviewFile(reviewId: string, filePath: string, diffData: string): Promise<ReviewFile> {
+export async function addReviewFile(reviewId: string, filePath: string, diffData: string, differenceScore: number | null = null): Promise<ReviewFile> {
   const db = await getDb();
   const id = generateId();
   const result = await db.query(
-    `INSERT INTO review_files (id, review_id, file_path, diff_data)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [id, reviewId, filePath, diffData]
+    `INSERT INTO review_files (id, review_id, file_path, diff_data, difference_score)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [id, reviewId, filePath, diffData, differenceScore]
   );
   const file = parseRow(ReviewFileSchema, result.rows[0]);
   if (file === undefined) throw new Error('addReviewFile: INSERT did not return a row');

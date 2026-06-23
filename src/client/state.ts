@@ -7,6 +7,9 @@ export interface ReviewFile {
   file_path: string;
   status: string;
   diff_data: string | null;
+  /** Ground-truth perceptual difference score in [0,1] (doc 26 P2); null for
+   *  non-ground-truth files and undecodable pairs. */
+  difference_score?: number | null;
   created_at: string;
 }
 

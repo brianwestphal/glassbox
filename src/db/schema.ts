@@ -25,6 +25,9 @@ export const SCHEMA_CORE_SQL = `
     file_path TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     diff_data TEXT,
+    -- Ground-truth perceptual difference score in [0,1] (doc 26 P2); NULL for
+    -- non-ground-truth files and for pairs whose format can't be decoded.
+    difference_score REAL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
   );
 

@@ -82,6 +82,39 @@ test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
       .toContainText('too saturated vs the spec', { timeout: 5000 });
   });
 
+  // GB-961 (doc 26 P2) — perceptual difference score.
+  test('a scored PNG comparison shows a difference badge in the sidebar and header', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    // widget.png differs from its expected by ~25% of pixels (a red stripe over
+    // 1/4 of a blue field). The sidebar row carries a difference badge.
+    const row = page.locator('.file-item', { has: page.locator('.file-name[title="actual/widget.png"]') });
+    await expect(row.locator('.diff-badge')).toHaveText('25%');
+
+    // Opening it surfaces the same score in the diff header.
+    await page.locator('.file-name[title="actual/widget.png"]').click();
+    await expect(page.locator('.diff-score-badge')).toContainText('25% different', { timeout: 5000 });
+  });
+
+  test('identical pairs are hidden by default and revealed by the toggle', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    // logo.png is byte-identical to its expected (0% difference) → hidden.
+    await expect(page.locator('.file-name[title="actual/logo.png"]')).toHaveCount(0);
+
+    const toggle = page.locator('.identical-toggle');
+    await expect(toggle).toContainText('Show 1 identical');
+    await toggle.click();
+
+    // Revealed, and its badge reads 0%.
+    await expect(page.locator('.file-name[title="actual/logo.png"]')).toHaveCount(1);
+    const row = page.locator('.file-item', { has: page.locator('.file-name[title="actual/logo.png"]') });
+    await expect(row.locator('.diff-badge')).toHaveText('0%');
+    await expect(toggle).toContainText('Hide 1 identical');
+  });
+
   test('Complete Review opens the completion modal (finalizes outside a repo)', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });

@@ -62,6 +62,10 @@ export const ReviewFileSchema = z.object({
   file_path: z.string(),
   status: z.string(),
   diff_data: z.string().nullable(),
+  // Ground-truth perceptual difference score in [0,1] (doc 26 P2); null for
+  // non-ground-truth files and undecodable pairs. `.default(null)` tolerates
+  // rows written before the column existed.
+  difference_score: z.number().nullable().default(null),
   created_at: TimestampSchema,
 });
 export type ReviewFile = z.infer<typeof ReviewFileSchema>;

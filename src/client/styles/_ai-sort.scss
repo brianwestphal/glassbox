@@ -68,6 +68,50 @@
 .risk-medium { background: rgba(249,226,175,0.15) !important; }
 .risk-low { background: rgba(166,227,161,0.15) !important; }
 
+// Ground-truth perceptual difference score (doc 26 P2). Sidebar badge on a file
+// row + the larger badge in the diff header; color tiers by severity.
+.diff-badge {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 0 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  min-width: 32px;
+  text-align: center;
+}
+.diff-score-badge {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(137,180,250,0.15);
+  color: var(--blue, #89b4fa);
+}
+.diff-none { background: rgba(166,227,161,0.15); color: var(--green, #a6e3a1); }
+.diff-low { background: rgba(249,226,175,0.15); color: var(--yellow, #f9e2af); }
+.diff-medium { background: rgba(250,179,135,0.15); color: var(--orange, #fab387); }
+.diff-high { background: rgba(243,139,168,0.15); color: var(--red, #f38ba8); }
+
+// "Show/Hide N identical" toggle above the ground-truth source list.
+.identical-toggle {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 4px 8px 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  text-align: left;
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+  &.active { color: var(--text); border-color: var(--accent); }
+}
+
 // --- Risk Popover ---
 
 .risk-popover {

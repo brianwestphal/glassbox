@@ -130,6 +130,10 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
     const mode = asEl(btn).dataset.mode as 'risk' | 'narrative';
     void import('./sortMode.js').then(m => { m.triggerAnalysis(mode); });
   });
+
+  void delegate(sidebar, 'click', ACTIONS.toggleHideIdentical.selector, () => {
+    diffViewStore.actions.update({ hideIdentical: !diffViewStore.state.value.hideIdentical });
+  });
 }
 
 function bindSidebarResize(): void {

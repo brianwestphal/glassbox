@@ -8,6 +8,7 @@ import { IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, Ic
 import type { ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
+import { formatDiffPct } from '../utils/diffScore.js';
 import { truncateDiffLine } from '../utils/lineTruncate.js';
 import { renderNoteMarkdown } from '../utils/noteMarkdown.js';
 import { ImageDiff } from './imageDiff.js';
@@ -53,6 +54,9 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [] }: {
           <button className="reveal-btn" data-file-id={file.id} title="Reveal in file manager"><IconReveal /></button>
         </div>
         <div className="diff-header-actions">
+          {file.difference_score !== null ? (
+            <span className="diff-score-badge" title="Perceptual difference from the expected image (doc 26)">{formatDiffPct(file.difference_score)} different</span>
+          ) : null}
           <span className={`file-status ${diff.status}`}>{diff.status}</span>
         </div>
       </div>

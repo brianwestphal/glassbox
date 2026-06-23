@@ -1,8 +1,8 @@
 # 26. Ground-Truth Image Comparison
 
-> **Status: P1 shipped** (manifest + single-image actual-vs-expected mode).
-> The perceptual metric (P2) and sets/flows + capture pipeline (P3) remain
-> design-only; see "Phasing".
+> **Status: P1 + P2 shipped** (manifest + single-image actual-vs-expected mode;
+> perceptual diff + identical-filtering + difference-score triage). Sets/flows +
+> capture pipeline (P3) remain design-only; see "Phasing".
 
 Glassbox's image comparison (doc [4](4-diff-viewing.md) §4.3, doc
 [24](24-image-comparison-layouts.md)) compares an image's **old vs new** sides
@@ -71,19 +71,24 @@ against design references.
   domotion — is a later phase. A "compare this actual set against this expected
   set" view, with per-step navigation, is the eventual goal.
 
-## 26.4 Difference metric & pre-processing (fast-follow)
+## 26.4 Difference metric & pre-processing (P2 — shipped)
 
-- **FR-26.6 — Perceptual diff (fast-follow, not v1).** Beyond the visual overlay,
-  the tool should score *how different* two images are and pre-filter the noise:
-  - **Identical** pairs are filtered out (nothing to review).
-  - **Anti-aliasing-only / sub-threshold** differences are tolerated (not flagged
-    as real changes) — e.g. a pixelmatch-style threshold or an SSIM-like metric.
-  - A **general difference score** sensitive enough to surface meaningful changes
-    while ignoring the above, used to sort/triage the review list.
-  - This is a **fast-follow** after the visual comparison + region marking work;
-    see the follow-up ticket. It likely wants a small, dependency-light image
-    decode + compare (consistent with the no-native-deps stance of the existing
-    `src/git/image-metadata.ts`).
+- **FR-26.6 — Perceptual diff.** Beyond the visual overlay, the tool scores *how
+  different* two images are and pre-filters the noise:
+  - **Identical** pairs (0 difference) are **hidden by default** — nothing to
+    review — with a "Show N identical" toggle in the source list to reveal them.
+  - **Anti-aliasing-only / sub-threshold** differences are tolerated (not counted
+    as changes) via a pixelmatch YIQ threshold (0.1).
+  - A **general difference score** (fraction of changed pixels, 0–1) surfaces on
+    each source-list entry and in the diff header, and sorts the list
+    **most-different-first** for triage.
+  - The decode + compare is pure JS (no native bindings): **pngjs** + **jpeg-js**
+    decode PNG/JPEG to RGBA and **pixelmatch** computes the score
+    (`src/ground-truth/perceptual-diff.ts`). Formats that can't be pixel-decoded
+    without rasterizing (SVG/WebP/GIF) are surfaced with **no score** rather than
+    dropped. Scores are computed once at launch and stored on each review file
+    (`review_files.difference_score`), so the sidebar sorts/filters without
+    re-decoding.
 
 ## 26.5 Capture pipeline (later)
 
@@ -124,8 +129,13 @@ against design references.
   comparison is one synthetic binary image entry whose bytes the image route
   reads from the resolved paths (`getOldImage`/`getNewImage`, doc 18 plumbing).
   No perceptual metric yet (P2). Implementation notes below.
-- **P2 — Perceptual diff + pre-processing**: identical-filtering,
-  anti-aliasing tolerance, a difference score that sorts the review list.
+- **P2 — Perceptual diff + pre-processing** *(shipped)*: identical-filtering
+  (hidden by default + toggle), anti-aliasing tolerance (pixelmatch YIQ
+  threshold), and a difference score (fraction of changed pixels) shown per entry
+  + in the diff header and used to sort the list most-different-first. Pure-JS
+  decode (`pngjs`/`jpeg-js`) + `pixelmatch`; scores stored on
+  `review_files.difference_score`. PNG/JPEG only — other formats show with no
+  score. Implementation notes below.
 - **P3 — Sets / multi-step flows + capture pipeline** (incl. domotion
   animated-SVG capture) and the previous-actual-baseline tooling.
 
@@ -148,17 +158,39 @@ against design references.
   and the doc-23 region/feedback overlay with no changes — a manifest comparison
   is just a binary image pair.
 
-## Tests (P1)
+## Implementation pointers (P2)
+
+- **Metric:** `src/ground-truth/perceptual-diff.ts` (`decodeImage` PNG/JPEG→RGBA
+  via `pngjs`/`jpeg-js`; `comparePerceptual` runs `pixelmatch` at YIQ threshold
+  0.1 → difference score; `isIdentical`). Formatting helpers shared by server +
+  client live in `src/utils/diffScore.ts` (`formatDiffPct`, `diffScoreLevel`).
+- **Storage:** `review_files.difference_score REAL` (DDL in `src/db/schema.ts`,
+  migration in `src/db/connection.ts`, `ReviewFileSchema`, `addReviewFile` param).
+  Computed once at launch in `src/cli.ts` (ground-truth branch) and flows to the
+  client via the existing `/api/files`.
+- **UI:** diff-header "% different" badge (`src/components/diffView.tsx`); sidebar
+  per-file badge + most-different-first sort (`src/client/sidebar/fileListView.tsx`
+  + `folderTree.ts` `sortFilesByScore`); "Show/Hide N identical" toggle
+  (`diffViewStore.hideIdentical`, default on; `folderModeFiles`/`hasIdenticalFiles`
+  in `src/client/stores/index.ts`).
+- **Deps:** `pixelmatch`, `pngjs`, `jpeg-js` — pure JS, **bundled** by tsup (not
+  in the external list), so no sidecar/Tauri changes.
+
+## Tests (P1 + P2)
 
 - Unit: `tests/unit/ground-truth/manifest.test.ts` (load / resolve / dedup /
-  validation), ground-truth blocks in `tests/unit/git/diff.test.ts` (mode
+  validation), `tests/unit/ground-truth/perceptual-diff.test.ts` (decode, score,
+  identical, dimension-mismatch, undecodable), `tests/unit/utils/diffScore.test.ts`
+  (formatting), ground-truth blocks in `tests/unit/git/diff.test.ts` (mode
   round-trip, file diffs) and `tests/unit/git/image.test.ts` (expected→old /
   actual→new reads), plus the `--ground-truth` case in
   `tests/unit/cli/parseArgs.test.ts`.
 - E2E: `tests/e2e/ground-truth.test.ts` (dedicated `--ground-truth` server on
   port 4185; source list, image-comparison render with the expected/actual side
-  mapping, an image comment on a repo-less review, and completion). Fixtures
-  under `tests/fixtures/ground-truth/`.
+  mapping, an image comment on a repo-less review, completion, the difference
+  badge on a scored PNG pair, and the hide/show-identical toggle). Fixtures
+  under `tests/fixtures/ground-truth/` (SVG pairs + a differing and an identical
+  PNG pair).
 
 ## Relationship to existing docs
 

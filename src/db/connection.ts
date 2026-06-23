@@ -72,6 +72,7 @@ async function initSchema(db: PGlite): Promise<void> {
   await addColumnIfMissing(db, 'annotations', 'original_content', 'TEXT');
   await addColumnIfMissing(db, 'annotations', 'reply_to_note_id', 'TEXT');
   await addColumnIfMissing(db, 'annotations', 'region_data', 'TEXT');
+  await addColumnIfMissing(db, 'review_files', 'difference_score', 'REAL');
   await addColumnIfMissing(db, 'ai_file_scores', 'notes', 'TEXT');
   await addColumnIfMissing(db, 'ai_analyses', 'progress_completed', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing(db, 'ai_analyses', 'progress_total', 'INTEGER NOT NULL DEFAULT 0');
