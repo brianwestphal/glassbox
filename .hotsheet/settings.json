@@ -1,15 +1,10 @@
 {
   "appName": "Glassbox",
-  "appIcon": "variant-5",
-  "backupDir": "/Users/westphal/Library/CloudStorage/GoogleDrive-brian.westphal@bleugris.com/My Drive/hotsheet-backups/glassbox",
   "ticketPrefix": "GB",
-  "port": 4174,
-  "detail_width": "360",
-  "detail_height": "300",
+  "appIcon": "variant-5",
   "trash_cleanup_days": "3",
   "completed_cleanup_days": "30",
   "verified_cleanup_days": "30",
-  "detail_position": "side",
   "channel_enabled": "true",
   "custom_commands": [
     {
@@ -103,9 +98,7 @@
       "launchInNewTerminal": true
     }
   ],
-  "layout": "columns",
   "custom_views": [],
-  "notify_permission": "once",
   "auto_context": [
     {
       "type": "category",
@@ -123,9 +116,6 @@
       "text": "Read docs/ai/code-summary.md and docs/ai/requirements-summary.md if you haven't yet or if you feel you might be out-of-date.\n\nEvaluate current tests and add unit tests or test automation to protected against this kind of bug going forward, if applicable.\n"
     }
   ],
-  "drawer_open": "true",
-  "drawer_active_tab": "terminal:t-moj7fzo1-4uie",
-  "drawer_expanded": "false",
   "terminals": [
     {
       "id": "t-moj7fzo1-4uie",
@@ -133,25 +123,5 @@
       "lazy": false,
       "name": "Claude"
     }
-  ],
-  "terminal_default": {
-    "theme": "github-dark",
-    "fontSize": 17
-  },
-  "terminal_prompt_allow_rules": [
-    {
-      "id": "tp_momezcht_551e56",
-      "parser_id": "claude-numbered",
-      "question_hash": "03018162",
-      "question_preview": "WARNING: Loading development channels",
-      "choice_index": 0,
-      "choice_label": "I am using this for local development",
-      "created_at": "2026-05-01T04:30:05.825Z"
-    }
-  ],
-  "telemetry_enabled": true,
-  "announcer_enabled": "true",
-  "announcer_ai_key_id": "d68695d5-0eb2-4972-9997-000468afa2a2",
-  "announcer_last_listened_at": "2026-06-22T02:12:54.222Z",
-  "ai_instructions_nudge_dismissed": true
+  ]
 }
