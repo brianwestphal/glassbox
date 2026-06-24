@@ -118,6 +118,7 @@ The server shall expose three route groups:
 | GET | `/api/review` | Get the current review's details |
 | POST | `/api/review/complete` | Mark review as completed, generate export |
 | POST | `/api/review/reopen` | Reopen a completed review |
+| POST | `/api/review/refresh` | Re-scan the working tree and update the current review's files/diffs |
 | DELETE | `/api/review/:id` | Delete a past review (not the current one) |
 | POST | `/api/reviews/delete-completed` | Bulk delete all completed reviews |
 | POST | `/api/reviews/delete-all` | Bulk delete all reviews except the current one |
@@ -129,10 +130,14 @@ The server shall expose three route groups:
 | GET | `/api/files` | List files with annotation and stale counts |
 | GET | `/api/files/:fileId` | Get file details and its annotations |
 | PATCH | `/api/files/:fileId/status` | Mark file as reviewed or pending |
+| GET | `/api/files/:fileId/path` | Get the file's absolute on-disk path |
+| POST | `/api/files/:fileId/reveal` | Reveal the file in the OS file manager |
+| POST | `/api/files/:fileId/open` | Open the file with the OS default application |
 | POST | `/api/annotations` | Create an annotation |
 | PATCH | `/api/annotations/:id` | Update annotation content or category |
 | DELETE | `/api/annotations/:id` | Delete an annotation |
 | PATCH | `/api/annotations/:id/move` | Move annotation to a different line/side |
+| PATCH | `/api/annotations/:id/region` | Update an image-region annotation's `{x,y,w,h}` region |
 | POST | `/api/annotations/:id/keep` | Mark a stale annotation as current |
 | POST | `/api/annotations/stale/delete-all` | Batch delete all stale annotations |
 | POST | `/api/annotations/stale/keep-all` | Batch keep all stale annotations |
@@ -144,6 +149,7 @@ The server shall expose three route groups:
 |--------|------|-------------|
 | GET | `/api/context/:fileId` | Fetch lines from the working directory file |
 | GET | `/api/outline/:fileId` | Parse and return code symbols/functions |
+| GET | `/api/symbol-definition` | Resolve a symbol to its definition location (go-to-definition, doc 13) |
 | GET | `/api/project-settings` | Read project-specific settings |
 | PATCH | `/api/project-settings` | Save project-specific settings |
 | POST | `/api/gitignore/add` | Add `.glassbox/` to `.gitignore` |
@@ -164,7 +170,22 @@ The server shall expose three route groups:
 | GET | `/api/ai/preferences` | Get user sort/display preferences |
 | POST | `/api/ai/preferences` | Save user sort/display preferences |
 
-### 2.12 Server-Rendered Pages
+### 2.12 API Endpoints — Attachments and Review Notes
+
+Reviewer file attachments on annotations (doc 25) and AI-authored review notes (doc 20).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/attachments/all` | List all attachments for the current review |
+| GET | `/api/annotations/:id/attachments` | List attachments on an annotation |
+| POST | `/api/annotations/:id/attachments` | Upload an attachment onto an annotation |
+| GET | `/api/attachments/:id/raw` | Fetch an attachment's bytes (used for image thumbnails/lightbox) |
+| POST | `/api/attachments/:id/quicklook` | Open an attachment via OS Quick Look / default opener |
+| DELETE | `/api/attachments/:id` | Delete an attachment |
+| GET | `/api/review-notes/artifact` | Serve a path-contained `.pr-notes/` note artifact (text/image) |
+| DELETE | `/api/review-notes/:guid` | Discard a stale AI review note from `.pr-notes/` |
+
+### 2.13 Server-Rendered Pages
 
 | Path | Description |
 |------|-------------|
@@ -173,7 +194,7 @@ The server shall expose three route groups:
 | `/review/:reviewId` | View a past review (read-only or reopenable) |
 | `/history` | Review history listing |
 
-### 2.13 Browser Launch
+### 2.14 Browser Launch
 
 - **Auto-open** — On startup, the server shall automatically open the review URL in the user's default browser.
 - **Suppress flag** — `--no-open` shall suppress automatic browser opening (used by the Tauri sidecar, which navigates its own webview instead).
@@ -181,17 +202,17 @@ The server shall expose three route groups:
 
 ## Non-Functional Requirements
 
-### 2.14 Response Format
+### 2.15 Response Format
 
 - **API format** — API routes shall return JSON responses.
 - **Page format** — Page routes shall return server-rendered HTML using the kerfjs JSX runtime.
 
-### 2.15 Error Handling
+### 2.16 Error Handling
 
 - **HTTP status codes** — API routes shall return appropriate HTTP status codes (404 for not found, 400 for bad input).
 - **CLI error handling** — Unhandled errors in the CLI `main()` function shall be caught, logged to stderr, and cause a non-zero exit.
 
-### 2.16 Startup Output
+### 2.17 Startup Output
 
 - **Stdout readiness** — The `Glassbox running at http://localhost:{port}` message shall be printed to stdout (not stderr), as it is parsed by the Tauri sidecar to detect when the server is ready.
 - **Port conflict logging** — If the port was changed due to a conflict, the server shall log a message indicating the original and actual ports.

@@ -15,6 +15,8 @@
  */
 import { spawnSync } from 'node:child_process';
 
+import { scrubbedGitEnv } from './spawn.js';
+
 /** The git config value we write to `difftool.glassbox.cmd`. `$MERGED` is git's
  *  repo-relative path of the file under diff; the wrapper uses it to label the
  *  appended file with its full path (`src/app.ts`) instead of a bare basename
@@ -49,7 +51,11 @@ export interface UnregisterResult {
 }
 
 function git(args: string[], cwd?: string): { status: number; stdout: string; stderr: string } {
-  const r = spawnSync('git', args, { encoding: 'utf-8', cwd });
+  // Scrub `git difftool`'s leaked GIT_EXTERNAL_DIFF / counter env (see
+  // `scrubbedGitEnv`) so these config reads/writes behave as plain git even
+  // when Glassbox is itself running as the registered difftool — every other
+  // internal git caller does the same.
+  const r = spawnSync('git', args, { encoding: 'utf-8', cwd, env: scrubbedGitEnv() });
   // `spawnSync` returns `error` (with a `.code` like ENOENT / EACCES) when the
   // child fails to launch at all — in that case `status` is null and `stderr`
   // is empty, so the caller can't tell what went wrong. Surface the error's

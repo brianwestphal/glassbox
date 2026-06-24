@@ -121,7 +121,11 @@ aiConfigRoutes.post('/key', async (c) => {
   const parsed = await parseBody(c, SaveAIKeyReqSchema);
   if (!parsed.ok) return parsed.response;
 
-  saveAPIKey(parsed.data.platform, parsed.data.key, parsed.data.storage);
+  try {
+    saveAPIKey(parsed.data.platform, parsed.data.key, parsed.data.storage);
+  } catch (err) {
+    return errorResponse(c, `Failed to save API key: ${err instanceof Error ? err.message : String(err)}`, 500);
+  }
   return c.json({ ok: true } as const);
 });
 

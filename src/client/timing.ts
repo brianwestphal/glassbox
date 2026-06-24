@@ -20,3 +20,7 @@ export const TOAST_DURATION_MS = 1500;
 
 /** Duration of the go-to-definition jump highlight before it fades. */
 export const JUMP_HIGHLIGHT_DURATION_MS = 1500;
+
+/** How often the open Settings dialog re-polls `/api/channel/status` to refresh
+ *  the Claude Channel connected/disconnected indicator (doc 17.3). */
+export const CHANNEL_STATUS_POLL_MS = 4000;

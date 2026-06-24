@@ -1,12 +1,6 @@
 import { toElement } from '../dom.js';
 import type { RiskFileScore } from '../state.js';
-
-function riskColor(score: number): string {
-  if (score >= 0.7) return 'var(--red)';
-  if (score >= 0.5) return 'var(--orange)';
-  if (score >= 0.3) return 'var(--yellow)';
-  return 'var(--green)';
-}
+import { riskColor } from './riskScore.js';
 
 export function showRiskPopover(anchor: HTMLElement, score: RiskFileScore): void {
   document.querySelectorAll('.risk-popover').forEach(p => { p.remove(); });

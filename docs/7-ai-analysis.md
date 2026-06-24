@@ -8,7 +8,7 @@ Requirements for optional AI-powered code analysis features.
 
 - All AI features shall be entirely optional. The application shall be fully functional without any AI provider configured.
 - AI analysis shall only make network calls to the configured AI provider's API. No other external communication shall occur.
-- The system shall support three AI platforms: Anthropic (Claude), OpenAI (GPT), and Google (Gemini).
+- The system shall support five AI platforms: Anthropic (Claude), OpenAI (GPT), Google (Gemini), Local (an OpenAI-compatible local server such as Ollama or LM Studio), and Apple (on-device Foundation Models). The Local and Apple platforms are detailed in [22-local-and-on-device-models.md](22-local-and-on-device-models.md).
 - Users shall be able to switch platforms and models via the settings dialog.
 - **Model lists shall be discovered live from each provider's models API** when a key is configured, rather than relying solely on a hardcoded list (GB-894): Anthropic `GET /v1/models`, OpenAI `GET /v1/models` (filtered to chat models), Google `GET /v1beta/models` (filtered to `generateContent`). A curated static list (`src/ai/models.ts`) is the fallback when there is no key, the request fails, or in demo/`--ai-service-test` mode. Because the provider returns only currently-available models, retired snapshots never appear.
 - A configured model id that is no longer available (a retired snapshot, or an older version) shall be **best-effort resolved** to the current same-tier model — e.g. `claude-sonnet-4-5` or a retired `claude-sonnet-4-…` → `claude-sonnet-4-6` — falling back to the platform default, so a stale saved preference never causes a 404 (GB-893).

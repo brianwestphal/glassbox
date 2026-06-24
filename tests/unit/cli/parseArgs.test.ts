@@ -243,6 +243,51 @@ describe('parseArgs', () => {
     });
   });
 
+  describe('value-flag validation', () => {
+    it('exits cleanly when --range is missing its value (no undefined-deref crash)', () => {
+      expect(() => parseArgs(argv('--range'))).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('exits when a value flag is followed by another flag', () => {
+      expect(() => parseArgs(argv('--commit', '--debug'))).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('exits when --branch / --files / --data-dir / --project-dir lack a value', () => {
+      for (const flag of ['--branch', '--files', '--data-dir', '--project-dir']) {
+        exitSpy.mockClear();
+        expect(() => parseArgs(argv(flag))).toThrow('process.exit');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      }
+    });
+
+    it('allows a dash-prefixed --on-complete command value', () => {
+      const result = parseArgs(argv('--on-complete', '--weird-but-valid'));
+      expect(result!.onComplete).toBe('--weird-but-valid');
+    });
+
+    it('rejects a non-numeric --port', () => {
+      expect(() => parseArgs(argv('--port', 'abc'))).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('rejects an out-of-range --port', () => {
+      expect(() => parseArgs(argv('--port', '70000'))).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('rejects --port 0', () => {
+      expect(() => parseArgs(argv('--port', '0'))).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('still accepts a valid --port', () => {
+      const result = parseArgs(argv('--port', '8080'));
+      expect(result!.port).toBe(8080);
+    });
+  });
+
   describe('error handling', () => {
     it('exits for unknown options', () => {
       expect(() => parseArgs(argv('--unknown'))).toThrow('process.exit');

@@ -21,6 +21,9 @@ export type {
 
 export interface ChannelState {
   enabled: boolean;
+  /** Whether a Claude Code session is currently listening on the channel
+   *  (doc 17.3). Refreshed by the settings dialog's periodic health poll. */
+  connected: boolean;
   claudeInstalled: boolean;
   claudeVersion: string | null;
   meetsMinimum: boolean;

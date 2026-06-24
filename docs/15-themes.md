@@ -71,6 +71,7 @@ Each theme shall define the following color groups (no font customization):
 **Diff:**
 - `diff-add-bg`, `diff-add-border` — Added line colors
 - `diff-remove-bg`, `diff-remove-border` — Removed line colors
+- `diff-context-bg` — Unchanged (context) line background
 
 **Gutter:**
 - `gutter-bg` — Line number gutter background
@@ -138,6 +139,7 @@ Custom theme files (`~/.glassbox/themes/<id>.json`) shall use the following form
 
 - `GET /api/themes` — List all available themes (built-in + custom) with metadata.
 - `POST /api/themes` — Create a new custom theme (duplicate).
+- `POST /api/themes/:id/edit` — Edit a theme's colors/name. Editing a **built-in** theme auto-copies it into a new "(Customized)" theme, activates the copy, and returns `{ copied: true }`; editing a custom theme edits it in place and returns `{ copied: false }`.
 - `PATCH /api/themes/:id` — Update a custom theme (rename, edit colors).
 - `DELETE /api/themes/:id` — Delete a custom theme.
 - `POST /api/themes/active` — Set the active theme.

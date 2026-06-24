@@ -12,13 +12,7 @@
  * therefore safe to pass to `raw()`.
  */
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { escapeHtml } from './escapeHtml.js';
 
 /** Only these schemes are allowed for rendered links. */
 const SAFE_URL = /^(https?:\/\/|mailto:)/i;

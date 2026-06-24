@@ -11,6 +11,7 @@ import { sendAIRequest } from './client.js';
 import type { AIConfig } from './config.js';
 import { buildFileContexts, formatAdditionalContext, formatContextsForPrompt } from './context-builder.js';
 import { getModelContextWindow } from './models.js';
+import { CHARS_PER_TOKEN, CONTEXT_RESERVE_FRACTION } from './token-budget.js';
 
 export const NeedContextResponseSchema = z.object({
   needContext: z.array(z.string()),
@@ -99,9 +100,9 @@ async function runAnalysisBatchOnce<T>(
   options: AnalysisBatchOptions<T>,
 ): Promise<T[]> {
   const contextWindow = getModelContextWindow(config.platform, config.model);
-  // Reserve ~30% of the context window for output and system prompt.
-  // Multiply by 3 for the rough chars-to-tokens ratio.
-  const charBudget = Math.floor(contextWindow * 0.7 * 3);
+  // Reserve headroom for output + system prompt, then convert the token budget
+  // to an approximate character budget.
+  const charBudget = Math.floor(contextWindow * CONTEXT_RESERVE_FRACTION * CHARS_PER_TOKEN);
 
   const contexts = buildFileContexts(files, charBudget);
   const validPaths = new Set(files.map(f => f.file_path));

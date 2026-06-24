@@ -224,7 +224,7 @@
     flex: 1;
     min-width: 0;
     font-size: 13px;
-    color: var(--text-secondary);
+    color: var(--text-dim);
 
     code {
       font-family: var(--font-mono);
@@ -574,6 +574,33 @@
 
 .settings-hint-ok {
   color: var(--green);
+}
+
+// Claude Channel live connected/disconnected indicator (doc 17.3).
+.settings-channel-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+
+  .settings-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-dim);
+  }
+
+  &.is-connected {
+    color: var(--green);
+    .settings-status-dot { background: var(--green); }
+  }
+
+  &.is-disconnected {
+    color: var(--text-dim);
+    .settings-status-dot { background: var(--text-dim); }
+  }
 }
 
 // --- Guided Review ---

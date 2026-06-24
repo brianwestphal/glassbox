@@ -55,7 +55,7 @@ for which UI surfaces are wired today.
 
 ## 25.3 AI consumption
 
-- **FR-25.7 — Readable by the AI tool.** The completion export
+- **FR-25.8 — Readable by the AI tool.** The completion export
   (`.glassbox/latest-review.md`, doc 6) shall list each feedback item's
   attachments with their **absolute on-disk paths** under the comment, plus an
   instruction telling the AI tool the paths are real files it can read. This is

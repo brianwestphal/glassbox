@@ -181,13 +181,17 @@ against design references.
   - A **general difference score** (fraction of changed pixels, 0–1) surfaces on
     each source-list entry and in the diff header, and sorts the list
     **most-different-first** for triage.
+  - A **dimension mismatch** (the actual and expected differ in width/height, so
+    they can't be pixel-compared) is still scorable — it scores **1** (fully
+    changed) rather than yielding no score.
   - The decode + compare is pure JS (no native bindings): **pngjs** + **jpeg-js**
     decode PNG/JPEG to RGBA and **pixelmatch** computes the score
-    (`src/ground-truth/perceptual-diff.ts`). Formats that can't be pixel-decoded
-    without rasterizing (SVG/WebP/GIF) are surfaced with **no score** rather than
-    dropped. Scores are computed once at launch and stored on each review file
-    (`review_files.difference_score`), so the sidebar sorts/filters without
-    re-decoding.
+    (`src/ground-truth/perceptual-diff.ts`). The "scorable" gate is an
+    **extension allow-list** of `.png` / `.jpg` / `.jpeg`; **every other
+    extension** (SVG, WebP, GIF, …) — plus any corrupt/truncated file — is
+    surfaced with **no score** rather than dropped. Scores are computed once at
+    launch and stored on each review file (`review_files.difference_score`), so
+    the sidebar sorts/filters without re-decoding.
 
 ## 26.5 Capture pipeline (P3 — designed, consumer-only)
 

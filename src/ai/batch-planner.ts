@@ -1,6 +1,7 @@
 import type { ReviewFile } from '../db/queries.js';
 import { debugLog } from '../debug.js';
 import { emptyFileDiff,parseDiffData } from '../git/parseDiffData.js';
+import { CHARS_PER_TOKEN, CONTEXT_RESERVE_FRACTION } from './token-budget.js';
 
 export interface Batch {
   files: ReviewFile[];
@@ -17,7 +18,7 @@ function isBinary(file: ReviewFile): boolean {
   return diff.isBinary;
 }
 
-/** Estimate token count for a file's diff (rough: 1 token ~ 3 chars).
+/** Estimate token count for a file's diff (rough: 1 token ~ CHARS_PER_TOKEN chars).
  *  The schema-validated parse returns `null` only when `diff_data` is
  *  missing or corrupt; the `emptyFileDiff` fallback gives a valid empty
  *  shape with `hunks: []`, so the loop below handles every case without
@@ -36,7 +37,7 @@ function estimateFileTokens(file: ReviewFile): number {
   }
   // Add file path and formatting overhead
   charCount += file.file_path.length + 80;
-  return Math.ceil(charCount / 3);
+  return Math.ceil(charCount / CHARS_PER_TOKEN);
 }
 
 // Target batch size — small enough to stay under typical rate limits
@@ -70,7 +71,10 @@ export function planBatches(
   // Use the smaller of a fixed practical limit and context-window-derived limit.
   // The context window cap ensures we never exceed what the model can handle;
   // the practical cap keeps batches small for rate-limit friendliness.
-  const contextCap = Math.floor(contextWindowTokens * 0.7 * 0.85);
+  // CONTEXT_RESERVE_FRACTION leaves output headroom; the extra safety margin
+  // keeps a batch comfortably under that reserve.
+  const BATCH_SAFETY_MARGIN = 0.85;
+  const contextCap = Math.floor(contextWindowTokens * CONTEXT_RESERVE_FRACTION * BATCH_SAFETY_MARGIN);
   const batchTokenLimit = Math.min(DEFAULT_BATCH_TOKEN_LIMIT, contextCap);
 
   // Sort by token count descending so large files get placed first

@@ -17,7 +17,7 @@ Requirements for generating structured output from reviews.
 The exported markdown shall include:
 
 - **Header section** — Repository name, review mode, review ID, date, files reviewed count, and total annotation count.
-- **Summary table** — An annotation summary table showing counts per category.
+- **Annotation Summary** — An "Annotation Summary" section listing per-category counts as a markdown bulleted list (e.g. `- **bug**: 3`), ordered by descending count.
 - **Items to Remember** — A section listing all `remember`-category annotations, with a preamble instructing AI tools to persist these to their configuration.
 - **File Annotations** — A section grouping annotations by file, each showing the line number, category, and content.
 - **AI Instructions** — An "Instructions for AI Tools" section explaining the semantics of each annotation category and how to act on them.

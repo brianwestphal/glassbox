@@ -12,7 +12,7 @@
  *
  * The shapes mirror the on-disk table layout (snake_case columns, exactly
  * the nullability PostgreSQL stores). Keep them in lockstep with the
- * CREATE TABLE statements in `src/db/connection.ts`.
+ * CREATE TABLE statements in `src/db/ddl.ts`.
  */
 import { z } from 'zod';
 

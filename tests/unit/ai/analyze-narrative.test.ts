@@ -71,25 +71,27 @@ describe('runNarrativeAnalysisBatch', () => {
 
 describe('mergeNarrativeOrders', () => {
   it('returns positions as-is for single batch', () => {
-    const results: NarrativeFileResult[] = [
+    const batches: NarrativeFileResult[][] = [[
       { filePath: 'a.ts', position: 1, rationale: '' },
       { filePath: 'b.ts', position: 2, rationale: '' },
-    ];
-    const merged = mergeNarrativeOrders(results, 1);
+    ]];
+    const merged = mergeNarrativeOrders(batches);
     expect(merged.get('a.ts')).toBe(1);
     expect(merged.get('b.ts')).toBe(2);
   });
 
   it('interleaves multiple batches round-robin', () => {
-    const results: NarrativeFileResult[] = [
-      // Batch 1
-      { filePath: 'a.ts', position: 1, rationale: '' },
-      { filePath: 'b.ts', position: 2, rationale: '' },
-      // Batch 2 (position resets)
-      { filePath: 'c.ts', position: 1, rationale: '' },
-      { filePath: 'd.ts', position: 2, rationale: '' },
+    const batches: NarrativeFileResult[][] = [
+      [
+        { filePath: 'a.ts', position: 1, rationale: '' },
+        { filePath: 'b.ts', position: 2, rationale: '' },
+      ],
+      [
+        { filePath: 'c.ts', position: 1, rationale: '' },
+        { filePath: 'd.ts', position: 2, rationale: '' },
+      ],
     ];
-    const merged = mergeNarrativeOrders(results, 2);
+    const merged = mergeNarrativeOrders(batches);
     // Round-robin: a(1), c(2), b(3), d(4)
     expect(merged.get('a.ts')).toBe(1);
     expect(merged.get('c.ts')).toBe(2);
@@ -98,15 +100,44 @@ describe('mergeNarrativeOrders', () => {
   });
 
   it('handles uneven batch sizes', () => {
-    const results: NarrativeFileResult[] = [
-      { filePath: 'a.ts', position: 1, rationale: '' },
-      { filePath: 'b.ts', position: 2, rationale: '' },
-      { filePath: 'c.ts', position: 3, rationale: '' },
-      // Batch 2
-      { filePath: 'd.ts', position: 1, rationale: '' },
+    const batches: NarrativeFileResult[][] = [
+      [
+        { filePath: 'a.ts', position: 1, rationale: '' },
+        { filePath: 'b.ts', position: 2, rationale: '' },
+        { filePath: 'c.ts', position: 3, rationale: '' },
+      ],
+      [
+        { filePath: 'd.ts', position: 1, rationale: '' },
+      ],
     ];
-    const merged = mergeNarrativeOrders(results, 2);
+    const merged = mergeNarrativeOrders(batches);
     expect(merged.size).toBe(4);
+  });
+
+  it('sorts within a batch by model position regardless of input order', () => {
+    // Non-monotonic input order within a batch must not mis-split or mis-order —
+    // the merge sorts each group by position.
+    const batches: NarrativeFileResult[][] = [[
+      { filePath: 'b.ts', position: 2, rationale: '' },
+      { filePath: 'a.ts', position: 1, rationale: '' },
+      { filePath: 'c.ts', position: 3, rationale: '' },
+    ]];
+    const merged = mergeNarrativeOrders(batches);
+    expect(merged.get('a.ts')).toBe(1);
+    expect(merged.get('b.ts')).toBe(2);
+    expect(merged.get('c.ts')).toBe(3);
+  });
+
+  it('ignores empty batch groups', () => {
+    const batches: NarrativeFileResult[][] = [
+      [{ filePath: 'a.ts', position: 1, rationale: '' }],
+      [],
+      [{ filePath: 'b.ts', position: 1, rationale: '' }],
+    ];
+    const merged = mergeNarrativeOrders(batches);
+    expect(merged.size).toBe(2);
+    expect(merged.get('a.ts')).toBe(1);
+    expect(merged.get('b.ts')).toBe(2);
   });
 });
 

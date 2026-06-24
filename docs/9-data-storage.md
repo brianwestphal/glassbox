@@ -7,14 +7,14 @@ Requirements for data persistence, database schema, and data management.
 ### 9.1 Database
 
 - The system shall use PGLite (embedded PostgreSQL compiled to WASM) as the database engine.
-- Database files shall be stored locally in `~/.glassbox/data/reviews`.
+- Database files shall be stored locally and **project-local**, under the review's data directory at `<repo>/.glassbox/data/reviews` (the data directory defaults to `<cwd>/.glassbox` and is overridable with `--data-dir`; see `src/cli.ts` → `setDataDir` in `src/db/connection.ts`). This is distinct from the **global config** directory `~/.glassbox` (§9.3), which holds only machine-wide AI configuration and custom themes — the review database itself never lives under `~/.glassbox`.
 - The database schema shall be initialized automatically on first use.
 - Schema migrations shall be applied safely on startup without data loss.
 - The application tables shall live in the `template1` database. PGLite ≤0.3.x used `template1` as its default working database; PGLite 0.4.0 changed the default to `postgres`. To keep existing on-disk data dirs readable across that upgrade, the connection explicitly pins `database: 'template1'` (see `src/db/connection.ts`) so the storage location is identical for both pre-0.4 and freshly created databases. A future PGLite upgrade must preserve this option (or perform a one-time `template1` → `postgres` data migration) or existing users' reviews will appear to vanish.
 
 ### 9.2 Data Model
 
-The system shall persist the following entities:
+The system shall persist the following seven entities:
 
 - **reviews** — Review sessions with repository path, name, mode, mode arguments, HEAD commit, status (in_progress/completed), and timestamps.
 - **review_files** — Files within each review with file path, review status (pending/reviewed), and serialized diff data.
@@ -22,6 +22,7 @@ The system shall persist the following entities:
 - **ai_analyses** — AI analysis run records with review reference, analysis type, status, progress, and error tracking.
 - **ai_file_scores** — Per-file AI scores with analysis reference, sort order, aggregate score, dimension scores, rationale, and notes.
 - **user_preferences** — Singleton record for UI preferences (sort mode, risk dimension, score visibility).
+- **attachments** — Reviewer file attachments on an annotation (doc 25), referencing the owning annotation, with original filename, on-disk stored path, MIME type, size, and optional sha256. Bytes live on disk under `<dataDir>/attachments/`; this table holds the metadata.
 
 ### 9.3 Configuration Files
 

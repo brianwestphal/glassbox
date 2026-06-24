@@ -10,7 +10,7 @@ Requirements for the browser-based UI and user interaction patterns.
 - The sidebar shall be resizable via drag handle.
 - The navigation bar (shown once a file is open) shall include a **hide/show sidebar** toggle (a lucide panel icon, placed before the back/forward arrows). Collapsing hides the sidebar and its resize handle so the diff fills the width; the button shows a pressed state while collapsed. The state is per-session (not persisted across a full reload), so a fresh load always starts with the sidebar visible and the toggle reachable (GB-955).
 - The sidebar shall contain: repository name, review mode, file filter, sort mode control, file list, and action buttons (Complete Review, Review History).
-- The diff header shall include a "Reveal in Finder" button that opens the file's parent directory in the OS file manager.
+- The diff header shall include a "Reveal in file manager" button that opens the file's parent directory in the OS file manager. (The sidebar right-click context menu uses the OS-specific label — "Reveal in Finder" on macOS, "Reveal in File Explorer" on Windows — see doc 21.)
 
 ### 8.2 File Navigation
 
@@ -66,7 +66,7 @@ Requirements for the browser-based UI and user interaction patterns.
 - `Cmd/Ctrl+Enter` shall save the current annotation form.
 - `Escape` shall close modals and annotation forms.
 - `j`/`k` shall navigate between files in the sidebar.
-- `Cmd/Ctrl+F` shall open the find-in-diff bar (see FR-4.7 in `4-diff-viewing.md`).
+- `Cmd/Ctrl+F` shall open the find-in-diff bar (see FR-4.7 in `4-diff-viewing.md`) — **Tauri desktop app only**. In a regular browser, `Cmd/Ctrl+F` is left to the browser's own native find so the bar is not bound there.
 - `Cmd+Click` (macOS) / `Ctrl+Click` (Windows/Linux) on a symbol in the diff shall navigate to its definition — same file (scrolls) or different file in the review (switches file and scrolls). Uses the existing regex-based outline parser to build a cross-file symbol index.
 
 ### 8.7 Completion Modal

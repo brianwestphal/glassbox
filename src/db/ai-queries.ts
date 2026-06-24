@@ -74,23 +74,28 @@ export async function saveFileScores(
   await db.query('DELETE FROM ai_file_scores WHERE analysis_id = $1', [analysisId]);
 
   for (const score of scores) {
-    const id = generateId();
-    await db.query(
-      `INSERT INTO ai_file_scores (id, analysis_id, review_file_id, file_path, sort_order, aggregate_score, rationale, dimension_scores, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        id,
-        analysisId,
-        score.reviewFileId,
-        score.filePath,
-        score.sortOrder,
-        score.aggregateScore,
-        score.rationale,
-        score.dimensionScores !== null ? JSON.stringify(score.dimensionScores) : null,
-        score.notes !== null ? JSON.stringify(score.notes) : null,
-      ]
-    );
+    await insertFileScore(db, analysisId, score);
   }
+}
+
+/** Insert one `ai_file_scores` row, JSON-encoding the nullable JSON columns.
+ *  Shared by {@link saveFileScores} and {@link appendFileScores}. */
+async function insertFileScore(db: Awaited<ReturnType<typeof getDb>>, analysisId: string, score: FileScoreInput): Promise<void> {
+  await db.query(
+    `INSERT INTO ai_file_scores (id, analysis_id, review_file_id, file_path, sort_order, aggregate_score, rationale, dimension_scores, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      generateId(),
+      analysisId,
+      score.reviewFileId,
+      score.filePath,
+      score.sortOrder,
+      score.aggregateScore,
+      score.rationale,
+      score.dimensionScores !== null ? JSON.stringify(score.dimensionScores) : null,
+      score.notes !== null ? JSON.stringify(score.notes) : null,
+    ]
+  );
 }
 
 /** Append scores for a batch without deleting existing scores for this analysis.
@@ -112,22 +117,7 @@ export async function appendFileScores(
 
   for (const score of scores) {
     if (existingPaths.has(score.filePath)) continue;
-    const id = generateId();
-    await db.query(
-      `INSERT INTO ai_file_scores (id, analysis_id, review_file_id, file_path, sort_order, aggregate_score, rationale, dimension_scores, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        id,
-        analysisId,
-        score.reviewFileId,
-        score.filePath,
-        score.sortOrder,
-        score.aggregateScore,
-        score.rationale,
-        score.dimensionScores !== null ? JSON.stringify(score.dimensionScores) : null,
-        score.notes !== null ? JSON.stringify(score.notes) : null,
-      ]
-    );
+    await insertFileScore(db, analysisId, score);
   }
 }
 

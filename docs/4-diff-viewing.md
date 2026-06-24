@@ -85,4 +85,4 @@ The user's Code/Rendered choice is remembered across file selections.
 
 ### 4.9 Binary Detection
 
-- **Detection method** — Binary files shall be detected via git's binary indicator and by scanning the first 8KB for null bytes.
+- **Detection method** — For tracked files, binary status comes from git's own indicator (the `Binary files … differ` diff header). The first-8KB null-byte scan is **only** applied to **untracked/new** files (which have no git diff header to read); it is not a universal second check on tracked diffs. See doc 3 §3.4.

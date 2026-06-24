@@ -61,6 +61,13 @@ export function asElOrNull(node: unknown): HTMLElement | null {
   return node instanceof HTMLElement ? node : null;
 }
 
+/** Escape a string for safe interpolation into a CSS attribute-selector value.
+ *  `CSS.escape` isn't on every target and our ids are base36 (so a minimal
+ *  escape of quotes/backslashes is enough), but guard anyway. */
+export function cssEscape(s: string): string {
+  return s.replace(/["\\]/g, '\\$&');
+}
+
 /** Narrow an `EventTarget` (or any unknown) to `Element` — the parent
  *  type of both `HTMLElement` and `SVGElement`. Use this when an event
  *  handler reads `e.target` and only needs `.closest()` / `.tagName`,

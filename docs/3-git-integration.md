@@ -18,7 +18,7 @@ Requirements for interacting with git repositories.
   - `staged`: `git diff --cached`
   - `unstaged`: `git diff`
   - `commit <sha>`: `git diff <sha>~1 <sha>`
-  - `range <from>..<to>`: `git diff <from>..<to>`
+  - `range <from>..<to>`: `git diff <from> <to>` (the two refs passed space-separated, not as a single `<from>..<to>` argument)
   - `branch <name>`: `git diff <name>...HEAD`
   - `files <patterns>`: `git diff HEAD -- <patterns>`
   - `all`: custom walk of all tracked files
@@ -32,7 +32,7 @@ Requirements for interacting with git repositories.
 
 ### 3.4 Binary Files
 
-- **Detection** — Binary files shall be detected via git's binary indicator and by scanning the first 8KB for null bytes.
+- **Detection** — For tracked files, binary status comes from git's own indicator (the `Binary files … differ` diff header). The first-8KB null-byte scan is **only** applied to **untracked/new** files (`createNewFileDiff` in `src/git/diff.ts`), which have no git diff header to read; tracked diffs rely solely on git's header rather than a universal second scan.
 - **List only** — Binary files shall be listed in the review but not rendered as text diffs.
 
 ### 3.5 File Content Access

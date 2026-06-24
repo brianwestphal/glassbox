@@ -10,7 +10,7 @@ import {
   uploadAttachment,
 } from '../../api/index.js';
 import { IconFile, IconTrash } from '../../icons.js';
-import { asEl, asElOrNull, toElement } from '../dom.js';
+import { asEl, asElOrNull, cssEscape, toElement } from '../dom.js';
 import { isLightboxOpen, openLightbox } from '../lightbox.js';
 
 /** Which attachments preview in-app (the overlay handles these); everything
@@ -46,12 +46,6 @@ function chipJsx(att: Attachment): SafeHtml {
 
 function listContainer(root: ParentNode, annotationId: string): HTMLElement | null {
   return asElOrNull(root.querySelector(`[data-att-list="${cssEscape(annotationId)}"]`));
-}
-
-/** CSS.escape isn't on every target; ids are base36 so a minimal escape is
- *  enough, but guard anyway. */
-function cssEscape(s: string): string {
-  return s.replace(/["\\]/g, '\\$&');
 }
 
 function appendChip(container: HTMLElement, att: Attachment): void {

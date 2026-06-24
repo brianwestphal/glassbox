@@ -4,7 +4,7 @@
  */
 import { PGlite } from '@electric-sql/pglite';
 import { vi } from 'vitest';
-import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../src/db/schema.js';
+import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../src/db/ddl.js';
 
 let testDb: PGlite | null = null;
 

@@ -12,7 +12,7 @@ import { Hono } from 'hono';
 import { tmpdir } from 'os';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../../src/db/schema.js';
+import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../../src/db/ddl.js';
 import type { AppEnv } from '../../../src/types.js';
 
 let testDb: PGlite;

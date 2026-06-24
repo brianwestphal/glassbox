@@ -22,7 +22,7 @@ Requirements for integrating with Claude Code via MCP channels so users can send
 - A "Claude Channel" toggle shall be available in the Settings > Experimental tab.
 - When enabled, Glassbox shall:
   - Register the channel server in the project's `.mcp.json` file under the key `glassbox-channel`.
-  - Display instructions for the user to launch Claude Code (e.g., `claude` in the project directory).
+  - Display instructions for the user to launch Claude Code in the project directory with the full command `claude --dangerously-load-development-channels server:glassbox-channel` (the flag is required to load the development channel server).
   - Provide a "Copy" button for the launch command.
 - When disabled, Glassbox shall:
   - Remove the `glassbox-channel` entry from `.mcp.json`.

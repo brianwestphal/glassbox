@@ -120,7 +120,12 @@ test.describe('Sort mode control', () => {
     await expect(riskBtn).toBeVisible();
     await expect(narrativeBtn).toBeVisible();
 
-    // Folder mode should be active by default
+    // Selecting Folder makes it the active segment. (Folder never requires AI,
+    // so this is deterministic — unlike asserting the default, which depends on
+    // the demo server's persisted `sort_mode` that other specs in the shared
+    // run may have changed. The default-active mapping is unit-tested in
+    // tests/unit/client/sortControl.test.ts.)
+    await folderBtn.click();
     await expect(folderBtn).toHaveClass(/active/);
   });
 });

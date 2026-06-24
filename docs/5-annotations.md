@@ -41,7 +41,7 @@ The system shall support seven annotation categories, each with specific semanti
 
 - **Fuzzy migration** — When diffs are updated (e.g., on review resumption), the system shall attempt to migrate annotations to their new line positions using fuzzy matching.
 - **Match radius** — Fuzzy matching shall check line content within a 10-line radius of the original position.
-- **Stale marking** — Annotations that cannot be matched shall be marked as "stale" with a visual indicator (red strikethrough).
+- **Stale marking** — Annotations that cannot be matched shall be marked as "stale" with a visual indicator: the annotation row is dimmed (`opacity: 0.7`) and gains an orange left border plus a faint orange background tint (see `src/client/styles/_annotations.scss`).
 - **Individual keep** — Users shall be able to individually mark a stale annotation as "current" (keep it).
 - **Batch delete** — Users shall be able to batch-delete all stale annotations for a review.
 - **Batch keep** — Users shall be able to batch-keep all stale annotations for a review.

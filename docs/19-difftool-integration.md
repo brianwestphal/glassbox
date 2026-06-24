@@ -171,9 +171,12 @@ For each per-file invocation, `glassbox-difftool` shall:
   (`~/.glassbox/glassbox.lock`, doc 9). The running server is the grouping
   mechanism: git is never told the files are related, so the singleton is what
   ties them into one review.
-- **Discovery** — the wrapper shall discover a running server via a lockfile
-  that records its port (and shall fall back to starting one if none is
-  recorded or the recorded server is not answering).
+- **Discovery** — the wrapper shall discover a running server via a **separate**
+  lockfile dedicated to the difftool session, `~/.glassbox/difftool.lock` (not
+  the general single-instance `~/.glassbox/glassbox.lock` above; see
+  `src/git/difftool-discovery.ts`), which records the running server's port. The
+  wrapper shall fall back to starting one if no port is recorded or the recorded
+  server is not answering.
 - **Concurrent runs merge** — if a second, unrelated `git difftool` run starts
   while a session is active, its files shall append into the same active review
   (the Kaleidoscope behavior). Per-invocation isolation is explicitly **not** a
@@ -273,7 +276,7 @@ For each per-file invocation, `glassbox-difftool` shall:
   and an empty diff (the review then reports "No changes found for the specified
   mode", with a desktop install also surfacing "Error: Server failed to start"
   from the nested launch). The scrub lives in the shared low-level git helper
-  (`scrubbedGitEnv()` in `src/git/repo.ts`) so it applies uniformly regardless of
+  (`scrubbedGitEnv()` in `src/git/spawn.ts`, re-exported from `src/git/repo.ts`) so it applies uniformly regardless of
   how Glassbox was invoked.
 
 ### 19.13 Backward compatibility

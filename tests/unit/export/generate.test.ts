@@ -177,6 +177,22 @@ describe('generateReviewExport', () => {
     expect(content).toContain('**Image region (10%, 20%, 30%×25%)** [bug]: Misaligned mark');
   });
 
+  it('does not crash the export when an image annotation has corrupt region_data', async () => {
+    mockGetReview.mockResolvedValueOnce({
+      id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'commit', mode_args: 'abc123',
+      head_commit: 'abc', status: 'in_progress', created_at: '2025-01-01',
+    } as any);
+    mockGetReviewFiles.mockResolvedValueOnce([]);
+    mockGetAnnotations.mockResolvedValueOnce([
+      // Not valid JSON — must fall back to "**Image comment**", not throw.
+      { id: 'i1', file_path: 'logo.png', line_number: 0, side: 'new', category: 'note', content: 'Broken anchor', stale: false, region_data: '{not json' },
+    ] as any);
+
+    const result = await generateReviewExport('r1', tempDir, true);
+    const content = readFileSync(result, 'utf-8');
+    expect(content).toContain('**Image comment** [note]: Broken anchor');
+  });
+
   it('includes AI tool instructions', async () => {
     mockGetReview.mockResolvedValueOnce({
       id: 'r1', repo_path: '/repo', repo_name: 'repo', mode: 'uncommitted', mode_args: null,

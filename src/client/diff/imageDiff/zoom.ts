@@ -11,6 +11,10 @@ export interface ZoomState {
   panY: number;
 }
 
+/** Zoom bounds for the image-diff canvases: 1× (fit) to 10× (max magnification). */
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 10;
+
 const zoomStates = new WeakMap<HTMLElement, ZoomState>();
 const zoomListeners = new WeakMap<HTMLElement, () => void>();
 
@@ -149,7 +153,7 @@ export function zoomAt(
     const base = zoomBase(wrap);
     if (base === null) return;
     const oldZoom = zs.zoom;
-    const newZoom = Math.max(1, Math.min(10, oldZoom * factor));
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldZoom * factor));
     // Content fraction under the cursor, measured against the wrapper's real
     // current box (offsetLeft/Width already include the old zoom).
     const wwOld = wrap.offsetWidth;
@@ -176,7 +180,7 @@ export function zoomAt(
   const my = (clientY - contentY - wby - zs.panY) / zs.zoom;
 
   const oldZoom = zs.zoom;
-  const newZoom = Math.max(1, Math.min(10, oldZoom * factor));
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldZoom * factor));
   zs.panX += mx * (oldZoom - newZoom);
   zs.panY += my * (oldZoom - newZoom);
   zs.zoom = newZoom;

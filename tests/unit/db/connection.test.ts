@@ -12,7 +12,7 @@ vi.mock('fs', () => ({
 }));
 
 // Mock schema
-vi.mock('../../../src/db/schema.js', () => ({
+vi.mock('../../../src/db/ddl.js', () => ({
   SCHEMA_CORE_SQL: 'CREATE TABLE IF NOT EXISTS reviews();',
   SCHEMA_AI_SQL: 'CREATE TABLE IF NOT EXISTS ai_analyses();',
 }));

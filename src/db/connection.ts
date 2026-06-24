@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 
-import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './schema.js';
+import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './ddl.js';
 
 let db: PGlite | null = null;
 let currentDbPath: string | null = null;
@@ -78,7 +78,7 @@ async function initSchema(db: PGlite): Promise<void> {
   await addColumnIfMissing(db, 'ai_analyses', 'progress_total', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing(db, 'user_preferences', 'ignore_whitespace', 'BOOLEAN NOT NULL DEFAULT FALSE');
   await addColumnIfMissing(db, 'user_preferences', 'svg_view_mode', "TEXT NOT NULL DEFAULT 'code'");
-  await addColumnIfMissing(db, 'user_preferences', 'last_image_mode', "TEXT NOT NULL DEFAULT 'metadata'");
+  await addColumnIfMissing(db, 'user_preferences', 'last_image_mode', "TEXT NOT NULL DEFAULT 'side-by-side'");
   await addColumnIfMissing(db, 'user_preferences', 'image_sxs_orientation', "TEXT NOT NULL DEFAULT 'left-right'");
 
   // Mark any 'running' analyses as failed — if the server is starting up,

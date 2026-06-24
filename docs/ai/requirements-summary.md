@@ -368,9 +368,10 @@ window 800×500.
 ## 10. Data storage (`9-data-storage.md`) — **Shipped**
 
 PGLite embedded Postgres at `~/.glassbox/data/reviews`. Schema applied
-automatically; migrations safe across startups. Six tables (see
+automatically; migrations safe across startups. Seven tables (see
 `code-summary.md` §6): `reviews`, `review_files`, `annotations`,
-`ai_analyses`, `ai_file_scores`, `user_preferences`. Global AI config in
+`ai_analyses`, `ai_file_scores`, `user_preferences`, and `attachments`
+(reviewer file attachments, doc 25). Global AI config in
 `~/.glassbox/config.json` (0600 perms; API keys base64). Project-specific
 settings in `<repo>/.glassbox/settings.json` with REST at
 `/api/project-settings`. No ORM (raw SQL). IDs: `Date.now().toString(36)
@@ -683,11 +684,12 @@ endpoint persists each binary/SVG file's raw bytes to an on-disk blob store
 (`src/git/image-blobs.ts`, under the session data dir, cleared on teardown)
 and the `/image` route reads from there for a difftool review (GB-863). Internal
 git subprocesses run with `git difftool`'s leaked `GIT_EXTERNAL_DIFF` /
-`GIT_DIFF_PATH_*` scrubbed (`scrubbedGitEnv()` in `src/git/repo.ts`) so Glassbox's
+`GIT_DIFF_PATH_*` scrubbed (`scrubbedGitEnv()` in `src/git/spawn.ts`, re-exported
+from `src/git/repo.ts`) so Glassbox's
 own `git diff`/`git show` can't recurse into the difftool helper (NFR-19.12,
 GB-869). Covers FR-19.1–19.13.
 
-## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Partially built (P1)**
+## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Partially built (P1–P5; only live diagram rendering pending)**
 
 A line-anchored "review companion" the *generating* AI emits as it writes code:
 structured notes explaining why each non-obvious change is the way it is and what
@@ -820,6 +822,52 @@ on-device coverage. `APPLE_FM_ANALYSIS_ENABLED` is the platform kill-switch; the
 fallback config + execution are unit/integration-tested while the on-device path
 stays CI-unverifiable (doc 22 §22.10).
 
+## 18f. Image feedback (`23-image-feedback.md`) — **Shipped**
+
+Textual feedback on images: general image comments plus comments anchored to
+reviewer-drawn rectangle regions (normalized `{x,y,w,h}` coords shown on both
+A/B sides). Reuses the `annotations` table with `line_number = 0` + a
+`region_data` JSON column. Adds reviewer-selectable category per comment/region,
+per-side scope (A-only / B-only / both via an optional `side` in `region_data`),
+hover-linking a list row to its box, and move/resize of a box. Client UI under
+`src/client/diff/imageDiff/` (`imageFeedback.tsx` + pure `regionGeometry.ts`).
+See §5 for the full description.
+
+## 18g. Image comparison layouts (`24-image-comparison-layouts.md`) — **Shipped**
+
+The **Side by Side** image-comparison mode (old A / new B in two panes) with a
+single sub-option to flip between **left/right** (default) and **over/under**
+layouts — the default mode for two-sided image (and rendered-SVG) changes.
+Synced zoom/pan; each pane sized to its own image; doc-23 drawn-region feedback
+works per pane. Orientation persists as the `image_sxs_orientation` user
+preference. Full-screen lightbox per pane (FR-24.9). Layout-only (no new server
+route). See §5 for the full description.
+
+## 18h. Attachments (`25-attachments.md`) — **Shipped**
+
+Reviewer **file attachments** on any annotation (line comment, image
+comment/region, note reply). Attach via a button, drag-drop, or paste; bytes
+stored under `<dataDir>/attachments/` with an `attachments` table; image chips
+show a thumbnail + open a shared lightbox, other types open via OS Quick Look.
+The markdown export lists each attachment's absolute path. Also (GB-953, GB-959)
+a reviewer marks region(s) on an AI review-note image artifact (inline or in the
+lightbox) that ride into the reply as marked thumbnail(s). Client UI:
+`src/client/annotations/attachments.tsx`. See §5 for the full description.
+
+## 18i. Ground-truth comparison (`26-ground-truth-comparison.md`) — **Shipped (P1–P3)**
+
+A separate mode to compare an **actual** image against an **expected**/
+ground-truth image (design spec, reference render, or previous-actual baseline),
+even when the expected lives outside the repo. Launched via `glassbox
+--ground-truth <manifest.json>` (no git repo required). P1 = the manifest →
+synthetic image pairs; P2 = a perceptual difference score
+(`src/ground-truth/perceptual-diff.ts`, `pixelmatch`) stored on
+`review_files.difference_score`; P3a/P3b = `version: 2` manifest sets/steps with
+collapsible source-list groups + a per-step navigator; P3c = proof-export
+guidance + a portable per-project skill; P3d = an optional `glassbox ground-truth
+promote <manifest>` baseline-rotation subcommand. P1–P3 are fully shipped. See §5
+for the full description.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -829,13 +877,16 @@ navigation, security, themes, share prompt, Claude channel, direct path
 comparison. Doc **19** (git difftool integration) is **Shipped** — the
 accumulating per-file model works for both browser and desktop, plus in-session
 image/SVG comparison (GB-863). Doc **20** (AI-authored review notes) is
-**Partially built** — P1 shipped (the `.pr-notes/` SARIF format + the
-`glassbox note` producer CLI); reader/render and later phases remain. Doc
-**21** (sidebar context menu)
-is **Shipped** — right-click a file to reveal it in the OS file manager. When a
-new feature is spec'd before implementation, add a doc and mark the entry here
-**Design only** until the code lands, then **Partially built** / **Shipped** as
-it progresses.
+**Partially built** — P1–P5 plus threading / stale keep-discard / markdown
+bodies / artifact foundation (P4) shipped; only live diagram rendering remains.
+Doc **21** (sidebar context menu) is **Shipped** — right-click a file to reveal
+it in the OS file manager. Doc **22** (local & on-device AI models) is **Shipped**
+— `local` (OpenAI-compatible) + Apple Foundation Models (on-device, with a
+secondary fallback model). Docs **23** (image feedback), **24** (image comparison
+layouts), **25** (attachments), and **26** (ground-truth comparison, P1–P3) are
+all **Shipped**. When a new feature is spec'd before implementation, add a doc and
+mark the entry here **Design only** until the code lands, then **Partially
+built** / **Shipped** as it progresses.
 
 ## 20. Maintenance rules
 
@@ -878,6 +929,10 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/20-ai-review-notes.md` → §18c
 - `docs/21-sidebar-context-menu.md` → §18d
 - `docs/22-local-and-on-device-models.md` → §18e
+- `docs/23-image-feedback.md` → §18f (and §5)
+- `docs/24-image-comparison-layouts.md` → §18g (and §5)
+- `docs/25-attachments.md` → §18h (and §5)
+- `docs/26-ground-truth-comparison.md` → §18i (and §5)
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

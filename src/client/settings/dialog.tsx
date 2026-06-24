@@ -27,7 +27,7 @@ import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { aiStore } from '../stores/index.js';
 import { getTauriGlobal, getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
-import { SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
+import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
@@ -70,6 +70,7 @@ export function showSettingsDialog(onClose?: () => void): void {
 
     const channelState: ChannelState = {
       enabled: channelStatus.enabled,
+      connected: channelStatus.connected,
       claudeInstalled: channelCheck.installed,
       claudeVersion: channelCheck.version,
       meetsMinimum: channelCheck.meetsMinimum,
@@ -124,8 +125,28 @@ function renderSettingsModal(
   const actions = createActions({ ui, setUi, forceRerender, keyStatus, projectSettings, configData, channelState, overlay, modelsData, themesData });
 
   let disposeMount: (() => void) | null = null;
+
+  // Periodic Claude-channel health poll (doc 17.3). While the dialog is open we
+  // re-read `/api/channel/status` so the connected/disconnected indicator stays
+  // live as a Claude Code session attaches or drops. Mutating the shared
+  // `channelState` object + bumping the render signal is enough — the mount
+  // re-reads it. Transient fetch failures keep the last known state.
+  const channelPoll = setInterval(() => {
+    void (async () => {
+      try {
+        const s = await getChannelStatus();
+        if (s.enabled !== channelState.enabled || s.connected !== channelState.connected) {
+          channelState.enabled = s.enabled;
+          channelState.connected = s.connected;
+          forceRerender();
+        }
+      } catch { /* transient — keep last known state */ }
+    })();
+  }, CHANNEL_STATUS_POLL_MS);
+
   function closeDialog(): void {
     actions.dispose();
+    clearInterval(channelPoll);
     document.removeEventListener('keydown', handleEscape);
     if (disposeMount !== null) disposeMount();
     overlay.remove();
@@ -558,6 +579,9 @@ function setupDelegates(args: {
   void delegate(overlay, 'change', '#settings-channel-enabled', (_e, cb) => {
     const enabled = asInput(cb).checked;
     channelState.enabled = enabled;
+    // Disabling tears down the listener, so reflect "not connected" at once; the
+    // periodic poll reconciles the connected state once a session attaches.
+    if (!enabled) channelState.connected = false;
     void (enabled ? enableChannel() : disableChannel());
     forceRerender();
   });

@@ -1,6 +1,8 @@
 import type { GuidedReviewConfig } from './config.js';
 
-const TOPIC_DISPLAY: Record<string, string> = {
+/** Maps a guided-review topic id to its human-readable display name. Shared by
+ *  the prompt builders here and in `analyze-guided.ts`. */
+export const TOPIC_DISPLAY: Record<string, string> = {
   programming: 'programming in general',
   codebase: 'this codebase',
   javascript: 'JavaScript',

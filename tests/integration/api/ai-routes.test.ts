@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { AppEnv } from '../../../src/types.js';
-import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../../src/db/schema.js';
+import { SCHEMA_CORE_SQL, SCHEMA_AI_SQL } from '../../../src/db/ddl.js';
 
 let testDb: PGlite;
 const TEST_REVIEW_ID = 'ai-test-review-001';

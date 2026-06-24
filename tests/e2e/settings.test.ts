@@ -155,6 +155,30 @@ test.describe('Experimental tab', () => {
     await expect(page.locator('#settings-guided-enabled')).toBeVisible();
   });
 
+  test('Claude Channel shows a live connected/disconnected status when enabled (doc 17.3)', async ({ page }) => {
+    await page.goto('/');
+    await openSettings(page);
+    await page.locator('[data-tab="experimental"]').click();
+    await expect(page.locator('[data-panel="experimental"]')).toHaveClass(/active/);
+
+    const toggle = page.locator('#settings-channel-enabled');
+    await expect(toggle).toBeVisible();
+
+    // No status indicator until the channel is enabled.
+    await expect(page.locator('#channel-status')).toHaveCount(0);
+
+    await toggle.check();
+    // The indicator appears immediately on toggle; with no Claude session
+    // listening in CI it reports the disconnected state.
+    const status = page.locator('#channel-status');
+    await expect(status).toBeVisible();
+    await expect(status).toHaveClass(/is-disconnected/);
+
+    // Restore the disabled state so this doesn't leak into the shared demo server.
+    await toggle.uncheck();
+    await expect(page.locator('#channel-status')).toHaveCount(0);
+  });
+
   test('selecting the Local platform reveals the server URL input and an optional key', async ({ page }) => {
     await page.goto('/');
     await openSettings(page);

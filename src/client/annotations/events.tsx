@@ -2,7 +2,7 @@ import { delegate, morph } from 'kerfjs';
 
 import type { AnnotationCategory } from '../../api/index.js';
 import { deleteAnnotation, keepAnnotation, updateAnnotation } from '../../api/index.js';
-import { asEl, asElement, asElOrNull, asTextarea, toElement } from '../dom.js';
+import { asEl, asElement, asElOrNull, asTextarea, cssEscape, toElement } from '../dom.js';
 import type { Annotation } from '../state.js';
 import {
   dragStore,
@@ -239,14 +239,14 @@ function closeEditForm(): void {
   const id = state?.annotationId ?? null;
   setEditForm(null);
   if (id !== null) {
-    document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-edit-for="${id}"]`).forEach(el => { el.remove(); });
+    document.querySelectorAll<HTMLElement>(`.annotation-form-container[data-edit-for="${cssEscape(id)}"]`).forEach(el => { el.remove(); });
     const item = findAnnotationItem(id);
     if (item !== null) item.style.display = '';
   }
 }
 
 function findAnnotationItem(id: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`.annotation-item[data-annotation-id="${id}"]`);
+  return document.querySelector<HTMLElement>(`.annotation-item[data-annotation-id="${cssEscape(id)}"]`);
 }
 
 function showReclassifyPopupForEdit(badge: HTMLElement): void {

@@ -241,6 +241,10 @@ async function executeAnalysis(input: ExecuteAnalysisInput): Promise<void> {
     console.error(`Analysis failed: ${message}`);
     debugLog(`Analysis ${analysisId} failed: ${message}`);
     await updateAnalysisStatus(analysisId, 'failed', message);
+  } finally {
+    // Always drop the cancellation marker — a run that throws before reaching
+    // the success-path delete would otherwise leave its id lingering in the Set.
+    canceledAnalyses.delete(analysisId);
   }
 }
 
@@ -358,8 +362,11 @@ interface BatchedAnalysisConfig<T> {
   /** Optional in-place adjustment per result before mapping (e.g. risk's max-of-dimensions). */
   postProcessResult?: (result: T) => void;
   mapResult: (r: T, indexInBatch: number) => ScoreInsert;
-  /** Optional aggregation across all results (e.g. risk sort, narrative merge). */
-  finalize?: (allResults: T[], batchCount: number) => Promise<void>;
+  /** Optional aggregation across all results (e.g. risk sort, narrative merge).
+   *  `batchedResults` is the real per-batch grouping (one inner array per
+   *  completed batch, in batch order) — use it rather than re-deriving batch
+   *  boundaries from the flat `allResults`. */
+  finalize?: (allResults: T[], batchedResults: T[][]) => Promise<void>;
 }
 
 async function runBatchedAnalysis<T>(
@@ -371,11 +378,15 @@ async function runBatchedAnalysis<T>(
   cfg: BatchedAnalysisConfig<T>,
   shouldCancel?: () => boolean,
 ): Promise<void> {
+  // Capture the real per-batch result groups (keyed by batch index, so a failed
+  // batch simply leaves a hole) for finalizers that need true batch boundaries.
+  const batchedResults: (T[] | undefined)[] = [];
   const allResults = await runBatches<T>(
     batches,
     totalFiles,
     async (batch) => cfg.runBatch(batch.files),
-    async (_batchIndex, results) => {
+    async (batchIndex, results) => {
+      batchedResults[batchIndex] = results;
       if (cfg.postProcessResult) {
         for (const r of results) cfg.postProcessResult(r);
       }
@@ -390,7 +401,8 @@ async function runBatchedAnalysis<T>(
     cfg.analysisType,
   );
 
-  if (cfg.finalize) await cfg.finalize(allResults, batches.length);
+  // `.filter()` over the sparse array drops holes left by failed batches.
+  if (cfg.finalize) await cfg.finalize(allResults, batchedResults.filter((b): b is T[] => b !== undefined));
 }
 
 async function updateSortOrders(analysisId: string, entries: Iterable<[string, number]>): Promise<void> {
@@ -462,9 +474,9 @@ function narrativeAnalysisConfig(
       dimensionScores: null,
       notes: r.notes ?? null,
     }),
-    finalize: async (allResults, batchCount) => {
+    finalize: async (allResults, batchedResults) => {
       if (allResults.length === 0) return;
-      const merged = mergeNarrativeOrders(allResults, batchCount);
+      const merged = mergeNarrativeOrders(batchedResults);
       await updateSortOrders(analysisId, merged);
     },
   };
@@ -554,7 +566,7 @@ aiAnalysisRoutes.get('/analysis/:type/status', async (c) => {
   // Auto-timeout stale running analyses (e.g. server restarted mid-analysis)
   if (analysis.status === 'running') {
     const ageMs = Date.now() - parseAnalysisTimestamp(analysis.updated_at).getTime();
-    if (ageMs > 15 * 60 * 1000) {
+    if (ageMs > ANALYSIS_REUSE_TIMEOUT_MS) {
       debugLog(`GET /analysis/${analysisType}/status: timing out stale analysis (age=${String(Math.round(ageMs / 1000))}s)`);
       await updateAnalysisStatus(analysis.id, 'failed', 'Analysis timed out');
       return c.json({ status: 'failed', error: 'Analysis timed out' });

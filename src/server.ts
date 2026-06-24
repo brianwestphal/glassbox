@@ -15,6 +15,10 @@ import { themeApiRoutes } from './routes/theme-api.js';
 import type { AppEnv } from './types.js';
 import { openOS } from './utils/openOS.js';
 
+/** How many consecutive ports to try (starting at the requested one) before
+ *  giving up, when not in `--strict-port` mode. */
+const MAX_PORT_ATTEMPTS = 20;
+
 function tryServe(appFetch: Hono<AppEnv>['fetch'], port: number): Promise<{ port: number; server: ServerType }> {
   return new Promise((resolve, reject) => {
     const server = serve({ fetch: appFetch, port, hostname: '127.0.0.1' });
@@ -82,12 +86,12 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   if (options?.strictPort === true) {
     ({ port: actualPort, server } = await tryServe(app.fetch, port));
   } else {
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (let attempt = 0; attempt < MAX_PORT_ATTEMPTS; attempt++) {
       try {
         ({ port: actualPort, server } = await tryServe(app.fetch, port + attempt));
         break;
       } catch (err: unknown) {
-        if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'EADDRINUSE' && attempt < 19) {
+        if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'EADDRINUSE' && attempt < MAX_PORT_ATTEMPTS - 1) {
           continue;
         }
         throw err;

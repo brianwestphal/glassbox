@@ -8,10 +8,14 @@ notes alongside the diff so a reviewer reads the author's reasoning at the exact
 line it applies to, rather than reconstructing it from prose in a ticket or
 commit message.
 
-> **Status: Partially built.** **P1 is shipped** — the `.pr-notes/` SARIF format
-> and a producer-side writer (the `glassbox note` CLI). The reader/render side
-> (P2+) is not built yet. Implementation is tracked as separate phased tickets;
-> the phasing and per-phase status are in §20.11.
+> **Status: Substantially shipped (P1–P5).** The `.pr-notes/` SARIF format and
+> the producer-side `glassbox note` CLI (P1), the diff-anchored reader/render
+> with threading and markdown bodies (P2), load-time re-anchoring of stale notes
+> (P3), artifact attachment with inline text/image rendering (P4), and folding
+> notes into AI analysis + export (P5) are all built. The one remaining
+> follow-up is **live *diagram* rendering** of diagram-source artifacts
+> (Mermaid/Graphviz/PlantUML) into actual images (§20.11 P4). Per-phase status is
+> in §20.11.
 
 ## Motivation
 
@@ -62,24 +66,32 @@ another AI) an optimized way to consume it.
   because it already models region-anchored results with fingerprints,
   attachments, provenance, and code flows, and has broad tooling support
   (GitHub code scanning, the VS Code SARIF Viewer, Azure DevOps, many scanners).
-- **One note = one SARIF `result`.** The mapping from a note to SARIF fields:
-  - **Anchor** → `result.locations[].physicalLocation.region`
-    (`startLine`/`startColumn`/`endLine`/`endColumn`, plus `charOffset`/
-    `charLength` and an embedded `snippet`).
-  - **Symbol fallback** → `logicalLocations[]` (`fullyQualifiedName`, `kind`).
+- **One note = one SARIF `result`.** The mapping from a note to the SARIF
+  fields **currently emitted** by the reference writer (`buildResult` in
+  `src/review-notes/sarif.ts`):
+  - **Anchor** → `result.locations[].physicalLocation.region` — currently
+    `startLine`/`endLine` plus an embedded `snippet`.
   - **Durable re-anchoring** → `result.partialFingerprints` (see §20.3).
-  - **Stale vs current** → `result.baselineState`
-    (`new` / `unchanged` / `updated` / `absent`).
   - **Baseline commit** → `run.versionControlProvenance[]` (`repositoryUri`,
     `revisionId`, `branch`).
   - **Body** → `result.message.text` + `result.message.markdown`.
-  - **Importance / risk** → `result.rank` (0–100) and `result.level`.
+  - **Importance / risk** → `result.rank` (0–100) and `result.level` (`warning`
+    for the `risk` kind, `none` otherwise).
   - **Producer identity** → `run.tool.driver.name` / `.version` — Claude Code,
     Hot Sheet, etc.; the standard "who produced this run" slot (Glassbox is the
     *consumer*, not the producer, so it does not appear here).
   - **Linked ticket** → `result.workItemUris` (standard SARIF work-item link).
-  - **Proposed change** → `result.fixes[]`.
-  - **Narrative / sequence** → `codeFlows` / `threadFlows`.
+  - **Attachments** → `result.attachments[]` (artifact URIs, each with an
+    `ext-sha256` property for verification).
+- **Future / intended SARIF fields (not currently emitted).** The following are
+  reserved by this design for later phases — the reader tolerates them but
+  `buildResult` does **not** write them today: column/offset region precision
+  (`startColumn`/`endColumn`/`charOffset`/`charLength`); a symbol fallback in
+  `logicalLocations[]` (`fullyQualifiedName`, `kind`); the persisted stale flag
+  `result.baselineState` (`new`/`unchanged`/`updated`/`absent`) — staleness is
+  presently recomputed at load time per §20.3 rather than stored; a proposed
+  change in `result.fixes[]`; and narrative/sequence linking via
+  `codeFlows`/`threadFlows`.
 - **Note kind** — Each note carries a kind from a controlled vocabulary:
   `rationale`, `proof`, `assumption`, `alternative-considered`, `risk`,
   `test-evidence`, recorded in the standard `result.properties.tags` array.

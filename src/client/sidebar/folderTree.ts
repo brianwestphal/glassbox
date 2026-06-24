@@ -1,5 +1,19 @@
 import type { ReviewFile } from '../state.js';
 
+/** The final path segment of a forward-slash path (`src/a/b.ts` → `b.ts`).
+ *  Returns the whole path when it has no slash. */
+export function baseName(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i === -1 ? path : path.slice(i + 1);
+}
+
+/** The directory portion of a forward-slash path (`src/a/b.ts` → `src/a`),
+ *  or '' when the path has no directory. */
+export function dirName(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i === -1 ? '' : path.slice(0, i);
+}
+
 export interface TreeNode {
   name: string;
   children: TreeNode[];

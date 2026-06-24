@@ -2,20 +2,8 @@ import { z } from 'zod';
 
 import type { ReviewFile } from '../db/queries.js';
 import type { AIConfig, GuidedReviewConfig } from './config.js';
+import { TOPIC_DISPLAY } from './guided-review.js';
 import { runAnalysisBatch } from './shared.js';
-
-const TOPIC_DISPLAY: Record<string, string> = {
-  programming: 'programming in general',
-  codebase: 'this codebase',
-  javascript: 'JavaScript', python: 'Python', typescript: 'TypeScript',
-  java: 'Java', csharp: 'C#', cpp: 'C++', go: 'Go', rust: 'Rust',
-  php: 'PHP', swift: 'Swift', ruby: 'Ruby', kotlin: 'Kotlin',
-  scala: 'Scala', c: 'C', objectivec: 'Objective-C', r: 'R',
-  lua: 'Lua', perl: 'Perl', bash: 'Shell scripting', dart: 'Dart',
-  elixir: 'Elixir', erlang: 'Erlang', haskell: 'Haskell',
-  clojure: 'Clojure', ocaml: 'OCaml', zig: 'Zig', nim: 'Nim',
-  groovy: 'Groovy',
-};
 
 function buildSystemPrompt(config: GuidedReviewConfig): string {
   const topicNames = config.topics.map(t => TOPIC_DISPLAY[t] ?? t);

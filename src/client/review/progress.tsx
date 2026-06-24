@@ -23,11 +23,18 @@ export function initProgress(): void {
   const fill = bar.querySelector<HTMLElement>('.progress-bar-fill');
 
   effect(() => {
-    const files = reviewStore.state.value.files;
+    const state = reviewStore.state.value;
+    const files = state.files;
     const total = files.length;
     const reviewed = files.filter(f => f.status === 'reviewed').length;
+    // Doc 8.4: the summary reads "X of Y files reviewed, Z annotations". Total
+    // annotations sum the per-file counts the store already tracks (reading
+    // annotationCounts here also makes the effect re-run as comments change).
+    const annotations = Object.values(state.annotationCounts).reduce((a, n) => a + n, 0);
     const summary = document.getElementById('progress-summary');
-    if (summary !== null) summary.textContent = `${String(reviewed)} of ${String(total)} files reviewed`;
+    if (summary !== null) {
+      summary.textContent = `${String(reviewed)} of ${String(total)} files reviewed, ${String(annotations)} annotation${annotations === 1 ? '' : 's'}`;
+    }
     if (fill !== null) fill.style.width = String(total !== 0 ? (reviewed / total * 100) : 0) + '%';
   });
 }

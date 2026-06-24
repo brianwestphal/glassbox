@@ -538,6 +538,12 @@ describe('saveAPIKey', () => {
   });
 
   describe('storage = keychain', () => {
+    // A keychain write now asserts the spawn succeeded, so default the mock to a
+    // zero-exit result for the success-path tests below.
+    beforeEach(() => {
+      setSpawnResult('', 0);
+    });
+
     it('saves to macOS keychain (darwin)', () => {
       const originalPlatform = process.platform;
       Object.defineProperty(process, 'platform', { value: 'darwin' });
@@ -554,6 +560,7 @@ describe('saveAPIKey', () => {
       expect(spawnSyncMock).toHaveBeenCalledWith(
         'security',
         ['add-generic-password', '-s', 'glassbox', '-a', 'anthropic-api-key', '-w', 'sk-keychain-key'],
+        expect.objectContaining({ encoding: 'utf-8' }),
       );
 
       Object.defineProperty(process, 'platform', { value: originalPlatform });
@@ -612,6 +619,27 @@ describe('saveAPIKey', () => {
       saveAPIKey('anthropic', 'sk-key', 'keychain');
 
       expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('throws when the keychain write exits non-zero (no silent failure)', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      // delete + add both return non-zero; only the add is asserted.
+      setSpawnResult('boom', 1);
+
+      expect(() => saveAPIKey('anthropic', 'sk-key', 'keychain')).toThrow(/Keychain write failed/);
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('throws when the keychain process fails to launch', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      spawnSyncMock.mockReturnValue({ error: new Error('ENOENT'), status: null, stdout: '', stderr: '' } as Partial<SpawnSyncReturns<string>>);
+
+      expect(() => saveAPIKey('openai', 'sk-key', 'keychain')).toThrow(/System keyring write failed: ENOENT/);
 
       Object.defineProperty(process, 'platform', { value: originalPlatform });
     });

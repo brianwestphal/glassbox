@@ -19,8 +19,14 @@ import {
   unscoredFiles,
 } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
-import { buildFolderTree, sortFilesByScore, type TreeNode } from './folderTree.js';
+import { baseName, buildFolderTree, dirName, sortFilesByScore, type TreeNode } from './folderTree.js';
 import { buildGroundTruthSourceList, type GroundTruthSetItem } from './groundTruthGroups.js';
+import { riskClass, riskColor } from './riskScore.js';
+
+/** Folder-tree indentation: base left padding, plus one step per nesting depth. */
+const PADDING_BASE = 16;
+const PADDING_STEP = 12;
+const indentStyle = (depth: number): string => `padding-left: ${String(PADDING_BASE + depth * PADDING_STEP)}px`;
 
 export function fileListJsx(): SafeHtml {
   const ai = aiStore.state.value;
@@ -85,20 +91,6 @@ function analysisErrorJsx(error: string | null, mode: 'risk' | 'narrative'): Saf
 
 // --- Risk view ---
 
-function riskColor(score: number): string {
-  if (score >= 0.7) return 'var(--red)';
-  if (score >= 0.5) return 'var(--orange)';
-  if (score >= 0.3) return 'var(--yellow)';
-  return 'var(--green)';
-}
-
-function riskClass(score: number): string {
-  if (score >= 0.7) return 'risk-critical';
-  if (score >= 0.5) return 'risk-high';
-  if (score >= 0.3) return 'risk-medium';
-  return 'risk-low';
-}
-
 function getScoreForDimension(score: RiskFileScore, dimension: string): number {
   if (dimension === 'aggregate') return score.aggregateScore;
   return score.dimensionScores[dimension] ?? 0;
@@ -134,10 +126,10 @@ function riskRowJsx(
   review: typeof reviewStore.state.value,
 ): SafeHtml {
   const displayScore = getScoreForDimension(score, ai.riskSortDimension);
-  const fileName = score.filePath.split('/').pop() ?? '';
+  const fileName = baseName(score.filePath);
   const count = review.annotationCounts[score.reviewFileId] ?? 0;
   const staleCount = review.staleCounts[score.reviewFileId] ?? 0;
-  const dir = score.filePath.includes('/') ? score.filePath.slice(0, score.filePath.lastIndexOf('/')) : '';
+  const dir = dirName(score.filePath);
   return (
     <div data-key={score.reviewFileId}
       className={`file-item${score.reviewFileId === review.currentFileId ? ' active' : ''}`}
@@ -177,10 +169,10 @@ function narrativeListJsx(): SafeHtml {
 }
 
 function narrativeRowJsx(item: NarrativeFileOrder, review: typeof reviewStore.state.value): SafeHtml {
-  const fileName = item.filePath.split('/').pop() ?? '';
+  const fileName = baseName(item.filePath);
   const count = review.annotationCounts[item.reviewFileId] ?? 0;
   const staleCount = review.staleCounts[item.reviewFileId] ?? 0;
-  const dir = item.filePath.includes('/') ? item.filePath.slice(0, item.filePath.lastIndexOf('/')) : '';
+  const dir = dirName(item.filePath);
   return (
     <div data-key={item.reviewFileId}
       className={`file-item${item.reviewFileId === review.currentFileId ? ' active' : ''}`}
@@ -195,10 +187,10 @@ function narrativeRowJsx(item: NarrativeFileOrder, review: typeof reviewStore.st
 }
 
 function flatRowJsx(file: typeof reviewStore.state.value['files'][number], review: typeof reviewStore.state.value): SafeHtml {
-  const fileName = file.file_path.split('/').pop() ?? '';
+  const fileName = baseName(file.file_path);
   const count = review.annotationCounts[file.id] ?? 0;
   const staleCount = review.staleCounts[file.id] ?? 0;
-  const dir = file.file_path.includes('/') ? file.file_path.slice(0, file.file_path.lastIndexOf('/')) : '';
+  const dir = dirName(file.file_path);
   return (
     <div data-key={file.id}
       className={`file-item${file.id === review.currentFileId ? ' active' : ''}`}
@@ -272,7 +264,7 @@ function groundTruthRowJsx(
   padLeft: number,
 ): SafeHtml {
   const meta = groundTruthMeta(f.id);
-  const basename = f.file_path.split('/').pop() ?? f.file_path;
+  const basename = baseName(f.file_path);
   const name = meta?.label ?? basename;
   const kind = meta?.expectedKind;
   const count = review.annotationCounts[f.id] ?? 0;
@@ -314,7 +306,7 @@ function treeNodeJsx(node: TreeNode, depth: number, pathPrefix: string): SafeHtm
   const sortedChildren = node.children.slice().sort((a, b) => a.name.localeCompare(b.name));
   const review = reviewStore.state.value;
   const collapsed = diffViewStore.state.value.collapsedFolders;
-  const pad = (d: number) => `padding-left: ${String(16 + d * 12)}px`;
+  const pad = indentStyle;
 
   return (
     <>
@@ -351,8 +343,8 @@ function fileRowJsx(f: typeof reviewStore.state.value['files'][number], depth: n
   const diff = parseDiffData(f.diff_data);
   const count = review.annotationCounts[f.id] ?? 0;
   const staleCount = review.staleCounts[f.id] ?? 0;
-  const fileName = f.file_path.split('/').pop() ?? '';
-  const pad = `padding-left: ${String(16 + depth * 12)}px`;
+  const fileName = baseName(f.file_path);
+  const pad = indentStyle(depth);
   const score = f.difference_score;
   return (
     <div data-key={f.id}

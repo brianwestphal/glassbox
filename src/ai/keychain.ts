@@ -77,19 +77,31 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
   return null;
 }
 
+/** Throw a descriptive error if a `spawnSync` keychain-write didn't succeed.
+ *  `spawnSync` doesn't throw on a non-zero exit, so without this an OS keychain
+ *  failure would store nothing while the caller reports success. */
+function assertSpawnOk(label: string, r: ReturnType<typeof spawnSync>): void {
+  if (r.error) throw new Error(`${label} failed: ${r.error.message}`);
+  if (r.status !== 0) {
+    const detail = (String(r.stderr) || String(r.stdout)).trim();
+    throw new Error(`${label} failed (exit ${String(r.status)})${detail ? `: ${detail}` : ''}`);
+  }
+}
+
 export function saveKeyToKeychain(platform: AIPlatform, key: string): void {
   const os = process.platform;
   const account = `${platform}-api-key`;
 
   if (os === 'darwin') {
+    // delete may legitimately fail (no existing entry) — only the add must succeed.
     spawnSync('security', ['delete-generic-password', '-s', 'glassbox', '-a', account], { stdio: 'pipe' });
-    spawnSync('security', ['add-generic-password', '-s', 'glassbox', '-a', account, '-w', key]);
+    assertSpawnOk('Keychain write', spawnSync('security', ['add-generic-password', '-s', 'glassbox', '-a', account, '-w', key], { encoding: 'utf-8' }));
     return;
   }
 
   if (os === 'linux') {
     // secret-tool reads the password from stdin
-    spawnSync('secret-tool', ['store', '--label=Glassbox API Key', 'service', 'glassbox', 'account', account], { input: key, encoding: 'utf-8' });
+    assertSpawnOk('System keyring write', spawnSync('secret-tool', ['store', '--label=Glassbox API Key', 'service', 'glassbox', 'account', account], { input: key, encoding: 'utf-8' }));
     return;
   }
 
@@ -98,7 +110,7 @@ export function saveKeyToKeychain(platform: AIPlatform, key: string): void {
     // Escape single quotes for PowerShell single-quoted string
     const escapedKey = key.replace(/'/g, "''");
     const script = `cmdkey /generic:'${target}' /user:'glassbox' /pass:'${escapedKey}'`;
-    spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' });
+    assertSpawnOk('Credential Manager write', spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' }));
   }
 }
 

@@ -89,12 +89,22 @@ export function deleteReviewExport(reviewId: string, repoRoot: string): void {
  * read `**Line N**`; image-level annotations (doc 23, `line_number === 0`) read
  * `**Image region (x%, y%, w%×h%)**` when anchored to a rectangle, or
  * `**Image comment**` for a general comment. A region scoped to one side
- * (doc 23 §23.6) adds an `on the A/B image` qualifier.
+ * (doc 23 §23.6) adds a `, A image only` / `, B image only` qualifier.
+ *
+ * `region_data` is decoded defensively: a corrupt value must not abort the whole
+ * export, so a parse/shape failure falls through to `**Image comment**` (the
+ * sibling decoders in `build-data.ts` and `artifactRegions.ts` guard the same way).
  */
 function annotationAnchorLabel(a: { line_number: number; region_data: string | null }): string {
   if (a.line_number !== 0) return `**Line ${a.line_number}**`;
   if (a.region_data !== null) {
-    const parsed = ImageRegionSchema.safeParse(JSON.parse(a.region_data) as unknown);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(a.region_data);
+    } catch {
+      return '**Image comment**';
+    }
+    const parsed = ImageRegionSchema.safeParse(raw);
     if (parsed.success) {
       const { x, y, w, h, side } = parsed.data;
       const pct = (n: number) => `${Math.round(n * 100)}%`;

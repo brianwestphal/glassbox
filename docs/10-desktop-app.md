@@ -66,4 +66,5 @@ The desktop app shall support three launch flows:
 
 ### 10.9 CLI Symlink
 
-- The CLI symlink shall point into the installed app bundle, so app updates automatically update the CLI without re-installation.
+- On **macOS and Linux**, the CLI install creates a **symlink** pointing into the installed app bundle, so app updates automatically update the CLI without re-installation.
+- On **Windows**, symlinks require elevated privileges, so the CLI is installed as a **copy** (`glassbox.cmd`) rather than a symlink (see `src-tauri/src/lib.rs`). A copy does not auto-track app updates the way a symlink does; reinstalling the CLI from a newer app refreshes it.

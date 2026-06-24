@@ -65,43 +65,31 @@ export function runNarrativeAnalysisBatch(
 }
 
 /**
- * Merge batch-level narrative orderings into a single global reading order.
+ * Merge per-batch narrative orderings into a single global reading order.
  * Uses a deterministic round-robin interleave: takes position-1 files from
  * each batch first, then position-2, etc. This preserves each batch's
  * internal ordering while interleaving across batches.
  * Returns a map of filePath → global position (1-based).
+ *
+ * Takes the real per-batch result groups (one inner array per analyzed batch,
+ * as delivered by the batch runner's per-batch completion callback). Earlier
+ * this inferred batch boundaries from a flat array by watching for a downward
+ * `position` reset, which mis-split whenever a model returned non-monotonic
+ * positions within a batch; passing the true groupings removes that guesswork.
  */
 export function mergeNarrativeOrders(
-  batchResults: NarrativeFileResult[],
-  batchCount: number,
+  batchedResults: NarrativeFileResult[][],
 ): Map<string, number> {
-  if (batchCount <= 1) {
-    return new Map(batchResults.map(r => [r.filePath, r.position]));
-  }
+  // Drop empty groups (e.g. a batch that failed) and sort each batch internally
+  // by its model-assigned position.
+  const batches = batchedResults
+    .filter(b => b.length > 0)
+    .map(b => b.slice().sort((a, z) => a.position - z.position));
 
-  // Group results by which batch they came from (using their position ranges)
-  // Since batches are processed sequentially via runBatches with concurrency=1,
-  // results arrive in batch order. We reconstruct batches by finding position resets.
-  const batches: NarrativeFileResult[][] = [];
-  let currentBatch: NarrativeFileResult[] = [];
-  let lastPos = 0;
-
-  // Sort by original insertion order — results from runBatches are concatenated in batch order
-  // Within each batch, sort by position
-  const sorted = batchResults.slice();
-
-  // Split into batches: detect when position resets (goes down)
-  for (const r of sorted) {
-    if (r.position <= lastPos && currentBatch.length > 0) {
-      // Position went down — new batch
-      batches.push(currentBatch.slice().sort((a, b) => a.position - b.position));
-      currentBatch = [];
-    }
-    currentBatch.push(r);
-    lastPos = r.position;
-  }
-  if (currentBatch.length > 0) {
-    batches.push(currentBatch.slice().sort((a, b) => a.position - b.position));
+  if (batches.length === 0) return new Map();
+  if (batches.length === 1) {
+    // Single batch — honor the model's positions as-is.
+    return new Map(batches[0].map(r => [r.filePath, r.position]));
   }
 
   // Round-robin interleave: take position-1 from each batch, then position-2, etc.

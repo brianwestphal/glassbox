@@ -102,7 +102,22 @@ export function parseArgs(
   let difftoolForce = false;
   let difftoolServe = false;
 
-  for (let i = 0; i < args.length; i++) {
+  // Consume and return the value following a value-taking flag, failing with a
+  // clean message (instead of an undefined-deref stack trace) when it's missing.
+  // By default a value that looks like another flag (`-`-prefixed) is rejected
+  // as a likely "forgot the value" slip; pass `allowDash` for flags whose value
+  // can legitimately start with `-` (e.g. an `--on-complete` command).
+  let i = 0;
+  const requireValue = (flag: string, allowDash = false): string => {
+    i++;
+    if (i >= args.length || (!allowDash && args[i].startsWith("-"))) {
+      console.error(`${flag} requires a value`);
+      process.exit(1);
+    }
+    return args[i];
+  };
+
+  for (; i < args.length; i++) {
     const arg = args[i];
     switch (arg) {
       case "--help":
@@ -120,18 +135,18 @@ export function parseArgs(
         mode = { type: "unstaged" };
         break;
       case "--commit":
-        mode = { type: "commit", sha: args[++i] };
+        mode = { type: "commit", sha: requireValue("--commit") };
         break;
       case "--range": {
-        const parts = args[++i].split("..");
+        const parts = requireValue("--range").split("..");
         mode = { type: "range", from: parts[0], to: parts[1] || "HEAD" };
         break;
       }
       case "--branch":
-        mode = { type: "branch", name: args[++i] };
+        mode = { type: "branch", name: requireValue("--branch") };
         break;
       case "--files":
-        mode = { type: "files", patterns: args[++i].split(",") };
+        mode = { type: "files", patterns: requireValue("--files").split(",") };
         break;
       case "--all":
         mode = { type: "all" };
@@ -160,11 +175,18 @@ export function parseArgs(
         mode = { type: "ground-truth", manifestPath: resolve(args[++i]), comparisons: [] };
         break;
       }
-      case "--port":
-        port = parseInt(args[++i], 10);
+      case "--port": {
+        const raw = requireValue("--port");
+        const parsedPort = parseInt(raw, 10);
+        if (isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+          console.error(`--port must be an integer between 1 and 65535 (got "${raw}")`);
+          process.exit(1);
+        }
+        port = parsedPort;
         break;
+      }
       case "--data-dir":
-        dataDir = resolve(args[++i]);
+        dataDir = resolve(requireValue("--data-dir"));
         break;
       case "--resume":
         resume = true;
@@ -185,12 +207,13 @@ export function parseArgs(
         strictPort = true;
         break;
       case "--project-dir":
-        projectDir = args[++i];
+        projectDir = requireValue("--project-dir");
         break;
       case "--on-complete":
         // A command run when a review is explicitly completed (doc 2 / GB-974).
-        // Local, user-supplied; never taken from network input.
-        onComplete = args[++i];
+        // Local, user-supplied; never taken from network input. The command may
+        // legitimately start with `-`, so dash-prefixed values are allowed.
+        onComplete = requireValue("--on-complete", true);
         break;
       case "--register-difftool":
         difftoolAction = "register";
@@ -331,6 +354,10 @@ async function main() {
 
   // Change working directory if --project-dir was passed (used by Tauri desktop app)
   if (projectDir !== null) {
+    if (!existsSync(projectDir) || !statSync(projectDir).isDirectory()) {
+      console.error(`--project-dir is not a directory: ${projectDir}`);
+      process.exit(1);
+    }
     process.chdir(projectDir);
   }
 

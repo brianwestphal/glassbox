@@ -110,7 +110,7 @@ export const SCHEMA_AI_SQL = `
     show_risk_scores BOOLEAN NOT NULL DEFAULT FALSE,
     ignore_whitespace BOOLEAN NOT NULL DEFAULT FALSE,
     svg_view_mode TEXT NOT NULL DEFAULT 'code',
-    last_image_mode TEXT NOT NULL DEFAULT 'metadata',
+    last_image_mode TEXT NOT NULL DEFAULT 'side-by-side',
     image_sxs_orientation TEXT NOT NULL DEFAULT 'left-right'
   );
 `;

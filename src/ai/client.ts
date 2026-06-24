@@ -5,6 +5,7 @@ import { runAppleFoundationInfer } from './apple-foundation.js';
 import type { AIConfig } from './config.js';
 import { DEFAULT_LOCAL_ENDPOINT } from './config.js';
 import { KEYLESS_PLATFORMS } from './models.js';
+import { CHARS_PER_TOKEN } from './token-budget.js';
 
 export interface AIMessage {
   role: 'user' | 'assistant';
@@ -15,6 +16,17 @@ export interface AIResponse {
   content: string;
   inputTokens: number;
   outputTokens: number;
+}
+
+/** Max completion tokens requested from every HTTP provider. */
+const MAX_OUTPUT_TOKENS = 8192;
+
+/** Throw a uniform, label-prefixed error when a provider response isn't OK. */
+async function throwIfNotOk(response: Response, label: string): Promise<void> {
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`${label} (${String(response.status)}): ${errorText}`);
+  }
 }
 
 // --- Response schemas for the three upstream APIs ---
@@ -76,7 +88,7 @@ export async function sendAIRequest(
   }
 
   const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0) + systemPrompt.length;
-  debugLog(`AI request → ${config.platform}/${config.model} | ${String(messages.length)} message(s) | ~${String(Math.ceil(totalChars / 3))} estimated tokens`);
+  debugLog(`AI request → ${config.platform}/${config.model} | ${String(messages.length)} message(s) | ~${String(Math.ceil(totalChars / CHARS_PER_TOKEN))} estimated tokens`);
   const start = Date.now();
 
   let response: AIResponse;
@@ -118,7 +130,7 @@ async function sendAnthropicRequest(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8192,
+      max_tokens: MAX_OUTPUT_TOKENS,
       system: systemPrompt,
       messages: messages.map(m => ({
         role: m.role,
@@ -127,10 +139,7 @@ async function sendAnthropicRequest(
     }),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Anthropic API error (${String(response.status)}): ${errorText}`);
-  }
+  await throwIfNotOk(response, 'Anthropic API error');
 
   const raw: unknown = await response.json();
   const data = AnthropicResponseSchema.parse(raw);
@@ -167,14 +176,11 @@ async function sendOpenAIRequest(
     body: JSON.stringify({
       model,
       messages: oaiMessages,
-      max_tokens: 8192,
+      max_tokens: MAX_OUTPUT_TOKENS,
     }),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error (${String(response.status)}): ${errorText}`);
-  }
+  await throwIfNotOk(response, 'OpenAI API error');
 
   const raw: unknown = await response.json();
   const data = OpenAIResponseSchema.parse(raw);
@@ -209,13 +215,10 @@ async function sendLocalRequest(
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ model, messages: oaiMessages, max_tokens: 8192, stream: false }),
+    body: JSON.stringify({ model, messages: oaiMessages, max_tokens: MAX_OUTPUT_TOKENS, stream: false }),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Local model error (${String(response.status)}): ${errorText}`);
-  }
+  await throwIfNotOk(response, 'Local model error');
 
   const raw: unknown = await response.json();
   const data = LocalResponseSchema.parse(raw);
@@ -262,17 +265,14 @@ async function sendGoogleRequest(
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: {
-          maxOutputTokens: 8192,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
           responseMimeType: 'application/json',
         },
       }),
     },
   );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google AI API error (${String(response.status)}): ${errorText}`);
-  }
+  await throwIfNotOk(response, 'Google AI API error');
 
   const raw: unknown = await response.json();
   const data = GoogleResponseSchema.parse(raw);

@@ -85,6 +85,21 @@ function channelHintHtml(channelState: ChannelState): SafeHtml {
   return <p className="settings-hint settings-hint-ok" id="channel-hint">{'Claude Code v' + (channelState.claudeVersion ?? '') + ' detected.'}</p>;
 }
 
+/** Live connected/disconnected indicator for the Claude Channel (doc 17.3).
+ *  The settings dialog re-polls `/api/channel/status` while open, so this
+ *  reflects whether a Claude Code session is currently listening. */
+function channelStatusHtml(channelState: ChannelState): SafeHtml {
+  const connected = channelState.connected;
+  return (
+    <p className={`settings-channel-status${connected ? ' is-connected' : ' is-disconnected'}`} id="channel-status">
+      <span className="settings-status-dot" aria-hidden="true"></span>
+      {connected
+        ? 'Connected — a Claude Code session is listening.'
+        : 'Not connected — launch Claude Code with the command below.'}
+    </p>
+  );
+}
+
 function renderExperimentalTab(ctx: TabContext): SafeHtml {
   const { modelsData, currentPlatform, currentModel, localEndpoint, keyStatus, guidedEnabled, channelState, fallbackPlatform, fallbackModel } = ctx;
   const platforms = modelsData.platforms;
@@ -113,12 +128,14 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
         <label className="settings-label">Platform</label>
         <div className="segmented-control settings-platform-control">
           {Object.entries(platforms)
-            // Apple appears only when `appleAvailable` is set by the server.
-            // It is currently force-disabled there (the on-device model's
-            // 4096-token window can't fit the analysis prompt + output), so the
-            // Apple button never shows; every other platform always does. The
-            // records carry all platform keys, so the gate is this flag, not
-            // key omission.
+            // Apple appears only when the server reports `appleAvailable`
+            // (the on-device helper probes successfully and the
+            // `APPLE_FM_ANALYSIS_ENABLED` kill-switch is on — doc 22 §22.10);
+            // every other platform always shows. The records carry all platform
+            // keys, so the gate is this flag, not key omission. Because the
+            // on-device model's 4096-token window can't fit larger analysis
+            // prompts, selecting Apple also surfaces a secondary fallback-model
+            // picker below.
             .filter(([key]) => key !== 'apple' || modelsData.appleAvailable)
             .map(([key, name]) => (
               <button className={`segment${key === currentPlatform ? ' active' : ''}`}
@@ -214,6 +231,7 @@ function renderExperimentalTab(ctx: TabContext): SafeHtml {
       <div className="settings-section">
         <label className="settings-checkbox"><input type="checkbox" id="settings-channel-enabled" checked={channelState.enabled} /><span>Enable Claude Channel</span></label>
         {channelHintHtml(channelState)}
+        {channelState.enabled && channelStatusHtml(channelState)}
       </div>
 
       {channelState.enabled && (

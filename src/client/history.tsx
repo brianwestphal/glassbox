@@ -1,6 +1,7 @@
 /** Client script for the review history page. Built separately from app.ts. */
 import { delegate } from 'kerfjs';
 
+import { deleteAllReviews, deleteCompletedReviews, deleteReview } from '../api/reviews.js';
 import { asEl, toElement } from './dom.js';
 
 function updateBulkVisibility(): void {
@@ -41,27 +42,27 @@ void delegate(document.body, 'click', '.delete-review-btn', (e, btn) => {
   e.stopPropagation();
   const id = asEl(btn).dataset.deleteId ?? '';
   showConfirm('Delete this review? This cannot be undone.', () => {
-    void fetch('/api/review/' + encodeURIComponent(id), { method: 'DELETE' })
-      .then(r => r.json())
+    deleteReview({ id })
       .then(() => {
         asEl(btn).closest('.history-item-link')?.parentElement?.remove();
         updateBulkVisibility();
-      });
+      })
+      .catch((err: unknown) => { alert(`Failed to delete review: ${String(err)}`); });
   });
 });
 
 void delegate(document.body, 'click', '#delete-completed-btn', () => {
   showConfirm('Delete all completed reviews (except current)? This cannot be undone.', () => {
-    void fetch('/api/reviews/delete-completed', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-      .then(r => r.json())
-      .then(() => { location.reload(); });
+    deleteCompletedReviews()
+      .then(() => { location.reload(); })
+      .catch((err: unknown) => { alert(`Failed to delete reviews: ${String(err)}`); });
   });
 });
 
 void delegate(document.body, 'click', '#delete-all-btn', () => {
   showConfirm('Delete ALL reviews except the current one? This cannot be undone.', () => {
-    void fetch('/api/reviews/delete-all', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-      .then(r => r.json())
-      .then(() => { location.reload(); });
+    deleteAllReviews()
+      .then(() => { location.reload(); })
+      .catch((err: unknown) => { alert(`Failed to delete reviews: ${String(err)}`); });
   });
 });
