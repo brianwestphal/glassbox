@@ -14,9 +14,12 @@
  *   4. Captures both a **PNG** (`page.screenshot`) and a **stand-alone SVG**
  *      (via `domotion-svg`'s `captureElementTree` + `elementTreeToSvg`)
  *
- * Outputs land under `assets/`, named to match the references already in the
- * README (`demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
- * `demo-annotations`, `demo-settings`, `demo-direct-comparison`).
+ * Outputs land under `assets/`, named to match the README references
+ * (`demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
+ * `demo-annotations`, `demo-settings`, `demo-direct-comparison`,
+ * `demo-review-notes`, `demo-image-comparison`, `demo-ground-truth`). Scenes
+ * marked `pngOnly` (the image / ground-truth ones, whose live canvas/`<img>`
+ * content doesn't serialize cleanly) skip the stand-alone SVG.
  *
  * Note: the *animated* hero (`assets/demo.svg`) is produced by the separate
  * `npm run demo:capture` (see `capture-demo.ts`) and is unrelated to this
@@ -28,7 +31,7 @@
  */
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -61,17 +64,23 @@ mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 const VIEWPORT = { width: 1280, height: 800 };
 
 interface Scenario {
-  /** `--demo:N` scenario id (see `src/demo.ts` DEMO_SCENARIOS). */
-  id: number;
+  /** Mode-defining CLI args for the Glassbox launch — usually `['--demo:N']`
+   *  (see `src/demo.ts` DEMO_SCENARIOS), but also e.g. `['--ground-truth', …]`.
+   *  The harness adds `--no-open --strict-port --ai-service-test --port`. */
+  launchArgs: string[];
   /** Output filename base — produces `assets/demo-<slug>.png` and `…/demo-<slug>.svg`. */
   slug: string;
   /** Human-readable label for log output. */
   label: string;
   /** Drive the page into the state worth screenshotting after the home page loads. */
   setup: (page: Page, base: string) => Promise<void>;
+  /** Skip the stand-alone SVG capture (PNG only). Set for image/canvas-heavy
+   *  scenes whose live `<img>`/canvas content doesn't serialize cleanly to SVG. */
+  pngOnly?: boolean;
 }
 
 const TARGET_FILE = 'src/auth/session.ts';
+const DEMO_IMAGE = 'src-tauri/icons/128x128.png';
 
 async function openFile(page: Page, path: string): Promise<void> {
   await page.click(`.file-name[title="${path}"]`);
@@ -80,7 +89,7 @@ async function openFile(page: Page, path: string): Promise<void> {
 
 const SCENARIOS: Scenario[] = [
   {
-    id: 1,
+    launchArgs: ["--demo:1"],
     slug: 'guided-review',
     label: 'Main UI with guided review notes',
     async setup(page) {
@@ -92,7 +101,7 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 2,
+    launchArgs: ["--demo:2"],
     slug: 'risk-mode',
     label: 'Risk mode with inline risk notes',
     async setup(page, base) {
@@ -111,7 +120,7 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 3,
+    launchArgs: ["--demo:3"],
     slug: 'narrative-mode',
     label: 'Narrative mode with walkthrough notes',
     async setup(page) {
@@ -123,7 +132,7 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 4,
+    launchArgs: ["--demo:4"],
     slug: 'annotations',
     label: 'Annotations with different categories',
     async setup(page) {
@@ -134,7 +143,7 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 5,
+    launchArgs: ["--demo:5"],
     slug: 'settings',
     label: 'Settings dialog with guided review',
     async setup(page) {
@@ -147,7 +156,7 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 6,
+    launchArgs: ["--demo:6"],
     slug: 'direct-comparison',
     label: 'Direct comparison (--diff) of two folders',
     async setup(page) {
@@ -157,7 +166,7 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 7,
+    launchArgs: ["--demo:7"],
     slug: 'review-notes',
     label: 'AI review notes inline with the diff',
     async setup(page) {
@@ -165,6 +174,34 @@ const SCENARIOS: Scenario[] = [
       // risk / outdated) plus the threaded human reply; wait for them to render.
       await openFile(page, TARGET_FILE);
       await page.waitForSelector('.ai-note-review', { timeout: 10000 });
+    },
+  },
+  {
+    launchArgs: ["--demo:4"],
+    slug: 'image-comparison',
+    label: 'Image diff — difference overlay',
+    pngOnly: true,
+    async setup(page) {
+      // demo:4 seeds a binary image diff (icons/128x128.png, renamed from
+      // 64x64). Open it and switch to the difference overlay — the standout
+      // image-review feature that's only described in text in the README.
+      await page.click(`.file-name[title="${DEMO_IMAGE}"]`);
+      await page.waitForSelector('.image-diff', { timeout: 15000 });
+      await page.click('[data-image-mode="difference"]');
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    launchArgs: ["--ground-truth", "tests/fixtures/ground-truth/manifest.json"],
+    slug: 'ground-truth',
+    label: 'Ground-truth image comparison',
+    pngOnly: true,
+    async setup(page) {
+      // Ground-truth mode (doc 26): the named source list with difference-score
+      // badges + the Expected/Actual comparison of the first entry. Tolerate a
+      // raced selector wait — the page auto-loads, so settle and snap regardless.
+      await page.waitForSelector('.image-diff, .file-item', { timeout: 15000 }).catch(() => undefined);
+      await page.waitForTimeout(2000);
     },
   },
 ];
@@ -182,21 +219,24 @@ function waitForServer(base: string): Promise<void> {
   })();
 }
 
-function spawnDemoServer(scenarioId: number, port: number): ChildProcessByStdio<null, Readable, Readable> {
+function spawnStillServer(scenario: Scenario, port: number, dataDir: string): ChildProcessByStdio<null, Readable, Readable> {
   const tsxBin = resolve(ROOT, 'node_modules/.bin/tsx');
   const server = spawn(
     tsxBin,
     [
       'src/cli.ts',
-      `--demo:${String(scenarioId)}`,
+      ...scenario.launchArgs,
       '--no-open',
       '--strict-port',
       '--ai-service-test',
       '--port', String(port),
+      // Honored by non-demo modes (e.g. --ground-truth); demo mode overrides it
+      // with its own tmp dir, so this is harmless there.
+      '--data-dir', dataDir,
     ],
     { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GLASSBOX_CONFIG_DIR: DEMO_CONFIG_DIR } },
   );
-  const tag = `[demo:${String(scenarioId)}]`;
+  const tag = `[${scenario.slug}]`;
   server.stdout.on('data', (d) => process.stdout.write(`${tag} ${String(d)}`));
   server.stderr.on('data', (d) => process.stderr.write(`${tag} ${String(d)}`));
   return server;
@@ -216,7 +256,8 @@ async function captureOne(scenario: Scenario, port: number): Promise<void> {
   const base = `http://localhost:${String(port)}`;
   console.log(`\n▸ ${scenario.label}  →  assets/demo-${scenario.slug}.{png,svg}`);
 
-  const server = spawnDemoServer(scenario.id, port);
+  const dataDir = mkdtempSync(resolve(tmpdir(), `glassbox-stills-${scenario.slug}-`));
+  const server = spawnStillServer(scenario, port, dataDir);
   let browser: Browser | null = null;
 
   try {
@@ -241,38 +282,56 @@ async function captureOne(scenario: Scenario, port: number): Promise<void> {
     const pngPath = resolve(OUT_DIR, `demo-${scenario.slug}.png`);
     await page.screenshot({ path: pngPath, fullPage: false });
 
-    // Embedded-font glyph state must be cleared between scenarios; otherwise a
-    // later capture inherits an earlier scenario's glyph defs.
-    clearEmbeddedFonts();
-    setRenderTextMode('paths');
+    if (scenario.pngOnly !== true) {
+      // Embedded-font glyph state must be cleared between scenarios; otherwise a
+      // later capture inherits an earlier scenario's glyph defs.
+      clearEmbeddedFonts();
+      setRenderTextMode('paths');
 
-    const tree = await captureElementTree(page, 'body', {
-      x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height,
-    });
-    // domotion-svg 0.6.0: `elementTreeToSvg` now returns a complete SVG
-    // document (the old inner-markup behavior is `elementTreeToSvgInner`).
-    const svg = elementTreeToSvg(tree, VIEWPORT.width, VIEWPORT.height);
-    const svgPath = resolve(OUT_DIR, `demo-${scenario.slug}.svg`);
-    writeFileSync(svgPath, optimizeSvg(svg));
+      const tree = await captureElementTree(page, 'body', {
+        x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height,
+      });
+      // domotion-svg 0.6.0: `elementTreeToSvg` now returns a complete SVG
+      // document (the old inner-markup behavior is `elementTreeToSvgInner`).
+      const svg = elementTreeToSvg(tree, VIEWPORT.width, VIEWPORT.height);
+      const svgPath = resolve(OUT_DIR, `demo-${scenario.slug}.svg`);
+      writeFileSync(svgPath, optimizeSvg(svg));
+    }
 
     await ctx.close();
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     await killServer(server);
+    rmSync(dataDir, { recursive: true, force: true });
   }
 }
 
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
 
+  // Optional `--only slug1,slug2` filter for iterating on a single still.
+  const onlyArg = process.argv.slice(2).find(a => a.startsWith('--only='))?.slice('--only='.length)
+    ?? (process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : undefined);
+  const only = onlyArg ? new Set(onlyArg.split(',').map(s => s.trim())) : null;
+  const scenarios = only ? SCENARIOS.filter(s => only.has(s.slug)) : SCENARIOS;
+
   // One demo at a time on a known free port — keeps server lifecycle simple
   // and avoids glyph-cache cross-talk between scenarios. Starting just above
-  // the default 4183 keeps it out of the way of any open dev/e2e servers.
+  // the default 4183 keeps it out of the way of any open dev/e2e servers. A
+  // scene failure is collected, not fatal, so one flaky capture doesn't drop
+  // the rest of the set.
   let port = 4191;
-  for (const scenario of SCENARIOS) {
-    await captureOne(scenario, port++);
+  const failed: string[] = [];
+  for (const scenario of scenarios) {
+    try {
+      await captureOne(scenario, port++);
+    } catch (err) {
+      console.error(`\n✗ ${scenario.slug} FAILED: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
+      failed.push(scenario.slug);
+    }
   }
-  console.log(`\n✓ Captured ${String(SCENARIOS.length)} scenarios. PNG + SVG outputs in ${OUT_DIR}`);
+  console.log(`\n✓ Captured ${String(scenarios.length - failed.length)}/${String(scenarios.length)} scenarios. Outputs in ${OUT_DIR}`);
+  if (failed.length > 0) { console.log(`✗ Failed: ${failed.join(', ')}`); process.exit(1); }
 }
 
 main().catch((err: unknown) => {

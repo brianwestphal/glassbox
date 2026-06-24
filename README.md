@@ -87,7 +87,10 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 
 - **Split and unified diffs** with syntax-colored add/remove/context lines
 - **Line-level annotations** — click any line to add feedback with a category
-- **Image and SVG diffs** — binary images and SVGs render side-by-side with a **difference overlay**, a **swipeable slice tool**, and pixel-precision zoom/pan. SVGs offer a *Code* / *Rendered* toggle so you can review either the source or the rasterized output.
+- **Image and SVG diffs** — binary images and SVGs render in a **side-by-side** layout (with a left/right or over/under toggle), a **difference overlay**, a **swipeable slice tool**, and pixel-precision synced zoom/pan. SVGs offer a *Code* / *Rendered* toggle so you can review either the source or the rasterized output.
+- **Comment on images** — leave a general comment on any image, or **draw a rectangle region** to anchor feedback to a specific spot (per A/B side), just like a line annotation.
+- **Ground-truth image comparison** — `glassbox --ground-truth <manifest>` compares an **actual** render against an **expected** one (a design spec, a reference, or a previous baseline — even outside the repo), scores the perceptual difference, sorts most-changed-first, and lets you **promote** a new actual to the baseline. Great for catching visual regressions.
+- **Attach files to any comment** — drag, paste, or browse to attach screenshots, logs, or any file to a line comment, image comment, or note reply. Image attachments show a thumbnail and open in a lightbox; the export lists each file's path so your AI tool can read it.
 - **Compare any two paths** — `glassbox --diff <A> <B>` reviews two arbitrary files or two arbitrary folders by path — no git repository required.
 - **Drag and drop** annotations to different lines
 - **Double-click** to edit, click the category badge to reclassify
@@ -96,7 +99,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Resizable sidebar** and word wrap toggle
 - **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
 - **Go-to-definition and a nav stack** — click any symbol to jump to its definition, with back/forward through your trail
-- **Themes** — built-in Dark, Light, High Contrast, Dracula, and Tokyo Night, plus a custom theme editor with live preview
+- **Themes** — ten built-in themes (Dark, Light, High Contrast Dark/Light, Dracula, Tokyo Night, One Dark Pro, Solarized Dark/Light, Monokai), plus a custom theme editor with live preview
 - **Session persistence** — reviews survive restarts, pick up where you left off
 - **Smart review reuse** — re-running `glassbox` on the same commit updates diffs in place and migrates annotations to their new line positions
 - **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
@@ -107,6 +110,18 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
 - **AI review notes** _(optional)_ — render the generating AI's line-anchored rationale and proof, committed alongside the code in `.pr-notes/`, right in the diff — and reply to any note inline
 - **AI-powered analysis** _(optional)_ — risk scoring, narrative reading order, and guided review, powered by cloud, local (Ollama / LM Studio), or on-device (Apple) models
+
+---
+
+## Review more than code
+
+Diffs aren't only text. Glassbox reviews **images** as a first-class diff: a side-by-side layout, a pixel **difference overlay**, and a swipeable slice tool — with synced zoom/pan. Leave a comment on the whole image or draw a region to anchor it to a spot.
+
+<img src="assets/demo-image-comparison.png" alt="Image diff with a pixel difference overlay" width="720">
+
+And when "correct" means "matches the design," **ground-truth comparison** (`glassbox --ground-truth <manifest>`) puts each **actual** render next to its **expected** one — a design spec, a reference render, or a previous baseline, even outside the repo. Glassbox scores the perceptual difference, hides identical pairs, sorts the rest most-changed-first, and lets you **promote** a new actual to the baseline once a change is intentional. Multi-step flows render as ordered, named sets.
+
+<img src="assets/demo-ground-truth.png" alt="Ground-truth comparison: expected vs actual with a perceptual difference score" width="720">
 
 ---
 
@@ -255,6 +270,9 @@ glassbox --all
 # Compare two arbitrary files or folders by path (no git repo required)
 glassbox --diff ./dist-old ./dist-new
 
+# Compare actual images against expected/ground-truth images (no git repo required)
+glassbox --ground-truth ./screenshots/manifest.json
+
 # Resume a previous review
 glassbox --resume
 ```
@@ -273,6 +291,7 @@ glassbox --resume
 | `--files <patterns>`   | Specific files (comma-separated globs)             |
 | `--all`                | Entire codebase (all tracked files)                |
 | `--diff <a> <b>`       | Compare two arbitrary files or folders by path — no git repo required |
+| `--ground-truth <m>`   | Compare actual vs expected images from a manifest — no git repo required |
 | `--port <number>`      | Port to run on (default: 4183)                     |
 | `--resume`             | Resume the latest in-progress review for this mode |
 | `--browser`            | Open in browser instead of desktop window          |
