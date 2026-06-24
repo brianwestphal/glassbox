@@ -5,8 +5,10 @@
  *
  *   npm run demo:capture
  *
- * Storyboard (one infinitely-looping SVG, framed in faux browser/terminal
- * window chrome with a caption band):
+ * Storyboard (one infinitely-looping SVG; each beat is a rounded browser/
+ * terminal window on a transparent canvas with a lower-third caption):
+ *   0. CLI launch — `npx glassbox` in a shell, then Glassbox "appears" (a
+ *      crossfade from the launch output into the live app)
  *   1. AI risk triage — sidebar in risk mode, colored risk badges
  *   2. browse a file, then open the `src/auth/session.ts` split diff (with
  *      guided "Learn" notes and a pre-seeded `remember` annotation)
@@ -24,7 +26,7 @@
  * and silently falls back to CSS `<text>` (tofu); rendering once everything else
  * is gone makes path mode reliable, and we assert it at the end.
  *
- * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.13.3; this script
+ * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.15.0; this script
  * renders in embedded-font mode — see `setRenderTextMode('embedded-font')`
  * below). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
  */
@@ -60,7 +62,14 @@ import {
   OX,
   OY,
 } from './chrome.js';
-import { endCardSvg, markdownPeekHtml, PROMPT_ANCHOR_ID, terminalSceneHtml } from './scenes.js';
+import {
+  endCardSvg,
+  LAUNCH_ANCHOR_ID,
+  launchTerminalHtml,
+  markdownPeekHtml,
+  PROMPT_ANCHOR_ID,
+  terminalSceneHtml,
+} from './scenes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
@@ -90,6 +99,7 @@ const TYPING_SPEED = 42;
 // Browser-window title used for all Glassbox frames.
 const APP_TITLE = 'Glassbox  ·  localhost:4183';
 const TERM_TITLE = 'claude — demo-project — zsh';
+const LAUNCH_TITLE = 'demo-project — zsh';
 
 type CapturedTree = Awaited<ReturnType<typeof captureElementTree>>;
 
@@ -222,6 +232,47 @@ async function main(): Promise<void> {
         body: JSON.stringify({ reviewFileId: rf.id, lineNumber: a.line, side: 'new', category: 'remember', content: a.content }),
       });
     }, { file: TARGET_FILE, line: REMEMBER_LINE, content: REMEMBER });
+
+    // === 0. CLI launch ====================================================
+    // Open on a shell launching Glassbox; the launch output crossfades into the
+    // live app below (the "Glassbox appears" beat). Captured on a throwaway page
+    // so the real review page keeps its own scroll/UI state. Pushed FIRST so
+    // these are frames 0–1 and every app frame's index shifts after them.
+    const launchPage = await ctx.newPage();
+    await launchPage.setViewportSize({ width: CONTENT_W, height: CONTENT_H });
+    await launchPage.setContent(launchTerminalHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'prompt' }));
+    await launchPage.waitForTimeout(150);
+    const launchAnchor = await launchPage.evaluate((id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, fontSize: parseFloat(getComputedStyle(document.body).fontSize) };
+    }, LAUNCH_ANCHOR_ID);
+    if (launchAnchor === null) throw new Error('launch prompt anchor not found');
+    await debugShot(launchPage, 'launch-prompt');
+    jobs.push({
+      tree: await grabTree(launchPage), prefix: nextPrefix(),
+      chrome: { title: LAUNCH_TITLE, kind: 'terminal', caption: 'Launch a review from the CLI' },
+      meta: {
+        duration: 1600, transition: { type: 'crossfade', duration: 300 },
+        overlays: [{
+          kind: 'typing', text: 'npx glassbox',
+          x: launchAnchor.x + OX, y: launchAnchor.y + OY + launchAnchor.fontSize * 0.9,
+          fontSize: launchAnchor.fontSize, color: '#c9d1d9', speed: 60, delay: 300, caret: true,
+        }],
+      },
+    });
+    await launchPage.setContent(launchTerminalHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'launched' }));
+    await launchPage.waitForTimeout(150);
+    await debugShot(launchPage, 'launch-done');
+    jobs.push({
+      tree: await grabTree(launchPage), prefix: nextPrefix(),
+      chrome: { title: LAUNCH_TITLE, kind: 'terminal', caption: 'It builds the review and opens your browser' },
+      meta: { duration: 1700, transition: { type: 'crossfade', duration: 280 } },
+    });
+    await launchPage.close();
+    // First live-app frame (risk triage) lands right after the launch beats.
+    const firstAppFrameIdx = jobs.length;
 
     // === 1. Risk triage ===================================================
     await page.click('button[data-sort-mode="risk"]');
@@ -436,9 +487,9 @@ async function main(): Promise<void> {
         }),
       };
     });
-    // End card: full-canvas hand-built SVG, no chrome, no glyph capture.
+    // End card: hand-built SVG floating in the same window rect, no glyph capture.
     frames.push({
-      svgContent: endCardSvg(CANVAS_W, CANVAS_H),
+      svgContent: endCardSvg(),
       duration: 2400, transition: { type: 'crossfade', duration: 380 },
     });
     const fontFaceCss = getEmbeddedFontFaceCss(); // base64 font subset, hoisted once
@@ -448,7 +499,11 @@ async function main(): Promise<void> {
     { let acc = 0; for (const f of frames) { frameStart.push(acc); acc += f.duration + transitionMs(f); } }
     const MOVE_MS = 420;
     const DWELL = 160;
-    const cursorEvents: CursorEvent[] = [{ type: 'show', t: 0, x: OX + CONTENT_W * 0.18, y: OY + CONTENT_H * 0.3 }];
+    // Hidden through the CLI-launch beats; appears when the live app does.
+    const cursorEvents: CursorEvent[] = [
+      { type: 'hide', t: 0 },
+      { type: 'show', t: frameStart[firstAppFrameIdx], x: OX + CONTENT_W * 0.18, y: OY + CONTENT_H * 0.3 },
+    ];
     for (const c of clickSpecs) {
       const clickT = frameStart[c.frame] + c.offset;
       const hit = shift(c.hit);
