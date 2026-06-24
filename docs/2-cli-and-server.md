@@ -152,8 +152,6 @@ The server shall expose three route groups:
 | GET | `/api/symbol-definition` | Resolve a symbol to its definition location (go-to-definition, doc 13) |
 | GET | `/api/project-settings` | Read project-specific settings |
 | PATCH | `/api/project-settings` | Save project-specific settings |
-| POST | `/api/gitignore/add` | Add `.glassbox/` to `.gitignore` |
-| POST | `/api/gitignore/dismiss` | Dismiss gitignore prompt (30-day cooldown) |
 | POST | `/api/open-external` | Open an http(s) URL in the OS default browser (used by external links in the desktop app) |
 
 ### 2.11 API Endpoints — AI

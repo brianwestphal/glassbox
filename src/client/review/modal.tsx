@@ -2,10 +2,8 @@ import type { SafeHtml } from 'kerfjs';
 import { attr, delegate, mount, signal } from 'kerfjs';
 
 import {
-  addGitignoreEntry,
   completeReview as apiCompleteReview,
   deleteStaleAnnotations,
-  dismissGitignorePrompt,
   getChannelStatus,
   keepAllStaleAnnotations,
   reopenReview,
@@ -20,8 +18,6 @@ const ACTIONS = {
   modalDone: attr('data-action', 'modal-done'),
   discardStale: attr('data-action', 'discard-stale'),
   keepStale: attr('data-action', 'keep-stale'),
-  gitignoreAdd: attr('data-action', 'gitignore-add'),
-  gitignoreDismiss: attr('data-action', 'gitignore-dismiss'),
   sendToClaude: attr('data-action', 'send-to-claude'),
 } as const;
 
@@ -29,7 +25,6 @@ interface CompleteResult {
   isCurrent: boolean;
   reviewId: string;
   exportPath: string;
-  gitignorePrompt: boolean;
   /** Outcome of the --on-complete hook (doc 2 §2.3a / GB-974), if one was set. */
   hook?: { ran: boolean; ok: boolean; exitCode: number | null; error?: string };
 }
@@ -42,7 +37,6 @@ type ModalStage =
       result: CompleteResult;
       aiCommand: string;
       channelConnected: boolean;
-      gitignoreApplied: 'pending' | 'added' | 'dismissed';
     };
 
 export function bindCompleteButton(): void {
@@ -118,23 +112,6 @@ function showCompleteModal(): void {
     setTimeout(() => { asEl(el).classList.remove('copied'); }, TOAST_DURATION_MS);
   });
 
-  void delegate(overlay, 'click', ACTIONS.gitignoreAdd.selector, () => {
-    void (async () => {
-      await addGitignoreEntry();
-      if (stage.value.kind === 'done') {
-        stage.value = { ...stage.value, gitignoreApplied: 'added' };
-      }
-    })();
-  });
-  void delegate(overlay, 'click', ACTIONS.gitignoreDismiss.selector, () => {
-    void (async () => {
-      await dismissGitignorePrompt();
-      if (stage.value.kind === 'done') {
-        stage.value = { ...stage.value, gitignoreApplied: 'dismissed' };
-      }
-    })();
-  });
-
   void delegate(overlay, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
     if (stage.value.kind !== 'done') return;
     const aiCommand = stage.value.aiCommand;
@@ -163,7 +140,7 @@ async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Pro
     : 'Read .glassbox/review-' + result.reviewId + '.md and apply the feedback.';
 
   // Default to disconnected; we'll update once we know.
-  stage.value = { kind: 'done', result, aiCommand, channelConnected: false, gitignoreApplied: 'pending' };
+  stage.value = { kind: 'done', result, aiCommand, channelConnected: false };
 
   // Swap the toolbar's Complete button for a Reopen button — this lives
   // outside the modal and persists after close. The delegate in
@@ -195,7 +172,7 @@ async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Pro
 function renderStage(s: ModalStage): SafeHtml {
   if (s.kind === 'stale-prompt') return renderStalePrompt(s.totalStale);
   if (s.kind === 'completing') return <h3>Completing...</h3>;
-  return renderDone(s.result, s.aiCommand, s.channelConnected, s.gitignoreApplied);
+  return renderDone(s.result, s.aiCommand, s.channelConnected);
 }
 
 function renderStalePrompt(totalStale: number): SafeHtml {
@@ -220,7 +197,6 @@ function renderDone(
   result: CompleteResult,
   aiCommand: string,
   channelConnected: boolean,
-  gitignoreApplied: 'pending' | 'added' | 'dismissed',
 ): SafeHtml {
   return (
     <>
@@ -229,20 +205,6 @@ function renderDone(
       <div className="modal-copyable" data-copy={result.exportPath} title="Click to copy">{result.exportPath}</div>
       <p className="modal-label">Tell your AI tool:</p>
       <div className="modal-copyable" data-copy={aiCommand} title="Click to copy">{aiCommand}</div>
-      {result.gitignorePrompt && gitignoreApplied === 'pending' && (
-        <div className="modal-gitignore">
-          <p className="modal-label">.glassbox/ is not in your .gitignore</p>
-          <div className="modal-actions" style="justify-content:flex-start;margin-top:4px">
-            <button className="btn btn-sm btn-primary" {...ACTIONS.gitignoreAdd.attrs}>Add to .gitignore</button>
-            <button className="btn btn-sm" {...ACTIONS.gitignoreDismiss.attrs}>{"Don't ask for 30 days"}</button>
-          </div>
-        </div>
-      )}
-      {gitignoreApplied === 'added' && (
-        <div className="modal-gitignore">
-          <p className="modal-label" style="color:var(--green)">Added .glassbox/ to .gitignore</p>
-        </div>
-      )}
       {result.hook?.ran === true && (
         result.hook.ok
           ? <p className="modal-label" style="color:var(--green)">Ran the on-complete hook</p>

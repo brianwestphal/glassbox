@@ -1,80 +1,15 @@
-import { spawnSync } from 'child_process';
-import { appendFileSync,existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { z } from 'zod';
 
 import { getAttachmentsForReview } from '../db/attachment-queries.js';
 import { getAnnotationsForReview,getReview, getReviewFiles } from '../db/queries.js';
 import { ImageRegionSchema } from '../db/schemas.js';
 import { parseModeString } from '../git/diff.js';
 import { extractMetadata } from '../git/image-metadata.js';
-import { isGitRepo } from '../git/repo.js';
 import { reviewNotesExportSection } from '../review-notes/format.js';
 import { formatReviewMode } from '../utils/formatReviewMode.js';
 import type { ImageDims } from './build-data.js';
 import { buildReviewExportData } from './build-data.js';
-
-const DISMISS_FILE = join(homedir(), '.glassbox', 'gitignore-dismissed.json');
-const DISMISS_DAYS = 30;
-
-// repoRoot → dismissal timestamp (ms). Validated at read time rather than cast.
-const DismissalsSchema = z.record(z.string(), z.number());
-
-function loadDismissals(): Record<string, number> {
-  try {
-    const parsed = DismissalsSchema.safeParse(JSON.parse(readFileSync(DISMISS_FILE, 'utf-8')));
-    return parsed.success ? parsed.data : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveDismissals(data: Record<string, number>): void {
-  const dir = join(homedir(), '.glassbox');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(DISMISS_FILE, JSON.stringify(data), 'utf-8');
-}
-
-export function isGlassboxGitignored(repoRoot: string): boolean {
-  // Use git check-ignore to see if .glassbox is ignored
-  const result = spawnSync('git', ['check-ignore', '-q', '.glassbox'], { cwd: repoRoot, stdio: 'pipe' });
-  return result.status === 0;
-}
-
-export function shouldPromptGitignore(repoRoot: string): boolean {
-  // Direct comparison (doc 18, FR-18.8) can run outside a repo — there's no
-  // .gitignore to manage, so never prompt.
-  if (!isGitRepo(repoRoot)) return false;
-  if (isGlassboxGitignored(repoRoot)) return false;
-  const dismissals = loadDismissals();
-  const dismissed = dismissals[repoRoot];
-  if (dismissed) {
-    const daysSince = (Date.now() - dismissed) / (1000 * 60 * 60 * 24);
-    if (daysSince < DISMISS_DAYS) return false;
-  }
-  return true;
-}
-
-export function addGlassboxToGitignore(repoRoot: string): void {
-  const gitignorePath = join(repoRoot, '.gitignore');
-  if (existsSync(gitignorePath)) {
-    const content = readFileSync(gitignorePath, 'utf-8');
-    if (!content.endsWith('\n')) {
-      appendFileSync(gitignorePath, '\n.glassbox/\n', 'utf-8');
-    } else {
-      appendFileSync(gitignorePath, '.glassbox/\n', 'utf-8');
-    }
-  } else {
-    writeFileSync(gitignorePath, '.glassbox/\n', 'utf-8');
-  }
-}
-
-export function dismissGitignorePrompt(repoRoot: string): void {
-  const dismissals = loadDismissals();
-  dismissals[repoRoot] = Date.now();
-  saveDismissals(dismissals);
-}
 
 export function deleteReviewExport(reviewId: string, repoRoot: string): void {
   const exportDir = join(repoRoot, '.glassbox');

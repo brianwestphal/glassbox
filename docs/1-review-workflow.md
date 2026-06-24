@@ -32,8 +32,7 @@ Requirements for the core review lifecycle — creating, conducting, resuming, a
 - **Complete button** — The user shall be able to mark a review as completed via the "Complete Review" button. No confirmation dialog is shown — completion is immediate.
 - **Continuous export** — The system shall automatically export `latest-review.md` as annotations change, debounced with a 2-second delay. Users do not need to formally complete a review to share feedback with AI tools.
 - **Completion export** — On explicit completion, the system shall immediately generate the structured markdown export (see doc 6) and display the copy-command hint.
-- **Gitignore prompt** — On completion, the system shall prompt the user to add `.glassbox/` to `.gitignore` if it is not already ignored.
-- **Prompt cooldown** — The gitignore prompt shall be dismissable, with a 30-day cooldown before re-prompting.
+- **Gitignore management** — `.glassbox/` is kept out of version control automatically at launch (keeping `.glassbox/settings.json` tracked); see [doc 27](27-gitignore.md). (This replaced the earlier completion-time prompt + 30-day-dismiss cooldown.)
 - **Reopenable** — A completed review shall be reopenable.
 
 ### 1.4 Review History

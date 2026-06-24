@@ -35,9 +35,6 @@ vi.mock('../../../src/db/connection.js', () => ({
 // Mock the export module to avoid filesystem/git side effects
 vi.mock('../../../src/export/generate.js', () => ({
   generateReviewExport: vi.fn(async () => `${tmpdir()}/glassbox-test-repo/.glassbox/latest-review.md`),
-  shouldPromptGitignore: vi.fn(() => false),
-  addGlassboxToGitignore: vi.fn(),
-  dismissGitignorePrompt: vi.fn(),
   deleteReviewExport: vi.fn(),
 }));
 
@@ -209,7 +206,6 @@ describe('POST /api/review/complete', () => {
     expect(body.exportPath).toBeDefined();
     expect(body.isCurrent).toBe(true);
     expect(body.reviewId).toBe(TEST_REVIEW_ID);
-    expect(typeof body.gitignorePrompt).toBe('boolean');
   });
 });
 
@@ -876,28 +872,6 @@ describe('GET /api/outline/:fileId', () => {
   it('returns 404 for a non-existent file', async () => {
     const res = await app.request('/api/outline/nonexistent');
     expect(res.status).toBe(404);
-  });
-});
-
-// ===== Gitignore =====
-
-describe('POST /api/gitignore/add', () => {
-  it('returns ok', async () => {
-    const res = await app.request('/api/gitignore/add', { method: 'POST' });
-    expect(res.status).toBe(200);
-
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-  });
-});
-
-describe('POST /api/gitignore/dismiss', () => {
-  it('returns ok', async () => {
-    const res = await app.request('/api/gitignore/dismiss', { method: 'POST' });
-    expect(res.status).toBe(200);
-
-    const body = await res.json();
-    expect(body.ok).toBe(true);
   });
 });
 

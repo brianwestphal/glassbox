@@ -45,10 +45,12 @@ describe('FR-14.3: Shell command safety', () => {
     expect(content).not.toMatch(/execSync\(/);
   });
 
-  it('export/generate.ts uses spawnSync for git check-ignore', () => {
-    const content = readFileSync(join(SRC_ROOT, 'export', 'generate.ts'), 'utf-8');
-    expect(content).toContain('spawnSync');
+  it('git/gitignore.ts manages .gitignore via fs only (no shell command execution)', () => {
+    // `.gitignore` updates are pure file I/O — git-repo gating goes through the
+    // shared safe `spawnSync` helper in repo.ts/spawn.ts, never a shell here.
+    const content = readFileSync(join(SRC_ROOT, 'git', 'gitignore.ts'), 'utf-8');
     expect(content).not.toMatch(/execSync\(/);
+    expect(content).not.toMatch(/\bexec\(/);
   });
 
   it('getDiffArgs returns arrays (not interpolated strings)', () => {

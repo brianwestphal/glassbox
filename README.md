@@ -105,7 +105,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
 - **Review history** — browse, reopen, or delete past reviews
 - **Structured export** — markdown output with file paths, line numbers, categories, and instructions for AI consumption
-- **Automatic .gitignore prompt** — reminds you to exclude `.glassbox/` from version control
+- **Automatic .gitignore** — keeps `.glassbox/` out of version control for you at launch, while leaving the per-project `.glassbox/settings.json` tracked
 - **Auto port selection** — if the default port is busy, it finds an open one
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
 - **AI review notes** _(optional)_ — render the generating AI's line-anchored rationale and proof, committed alongside the code in `.pr-notes/`, right in the diff — and reply to any note inline

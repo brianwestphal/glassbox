@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { generateReviewExport, isGlassboxGitignored, shouldPromptGitignore, addGlassboxToGitignore, dismissGitignorePrompt, deleteReviewExport } from '../../../src/export/generate.js';
+import { generateReviewExport, deleteReviewExport } from '../../../src/export/generate.js';
 
 // Mock the database queries
 vi.mock('../../../src/db/queries.js', () => ({
@@ -282,35 +282,3 @@ describe('deleteReviewExport', () => {
   });
 });
 
-describe('addGlassboxToGitignore', () => {
-  let tempDir: string;
-
-  beforeEach(() => {
-    tempDir = join(tmpdir(), `glassbox-test-gitignore-${Date.now()}`);
-    mkdirSync(tempDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
-  });
-
-  it('creates .gitignore with .glassbox/ if not exists', () => {
-    addGlassboxToGitignore(tempDir);
-    const content = readFileSync(join(tempDir, '.gitignore'), 'utf-8');
-    expect(content).toBe('.glassbox/\n');
-  });
-
-  it('appends to existing .gitignore ending with newline', () => {
-    writeFileSync(join(tempDir, '.gitignore'), 'node_modules/\n');
-    addGlassboxToGitignore(tempDir);
-    const content = readFileSync(join(tempDir, '.gitignore'), 'utf-8');
-    expect(content).toBe('node_modules/\n.glassbox/\n');
-  });
-
-  it('appends newline before .glassbox/ if .gitignore does not end with newline', () => {
-    writeFileSync(join(tempDir, '.gitignore'), 'node_modules/');
-    addGlassboxToGitignore(tempDir);
-    const content = readFileSync(join(tempDir, '.gitignore'), 'utf-8');
-    expect(content).toBe('node_modules/\n.glassbox/\n');
-  });
-});

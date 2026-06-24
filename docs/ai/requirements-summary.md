@@ -868,6 +868,17 @@ guidance + a portable per-project skill; P3d = an optional `glassbox ground-trut
 promote <manifest>` baseline-rotation subcommand. P1–P3 are fully shipped. See §5
 for the full description.
 
+## 18j. Automatic .gitignore management (`27-gitignore.md`) — **Shipped**
+
+At launch, inside a git repo, Glassbox keeps the project `.gitignore` carrying
+`/.glassbox/*` + `!/.glassbox/settings.json` — ignoring the directory's
+**contents** (not the bare directory) so the negation can keep the per-project
+`settings.json` (doc 9) tracked. Idempotent; replaces stale `.glassbox`-style
+lines; opt-out by leaving a **commented** copy of the rule. Pure
+`computeGitignore` + gated `ensureGlassboxGitignored` in `src/git/gitignore.ts`,
+called from `cli.ts`. This **replaced** the earlier completion-time prompt +
+30-day-dismiss cooldown and its `/api/gitignore/add`+`/dismiss` routes (removed).
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,

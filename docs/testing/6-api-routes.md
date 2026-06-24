@@ -100,11 +100,8 @@ API tests should use Hono's built-in test client (or `app.request()`) with a rea
 - ✅ **Save app name** — Write `appName` to settings. Verify persistence.
 - ✅ **Clear app name** — Set empty string. Verify it is removed or set to empty.
 
-### `POST /api/gitignore/add`
-- **Add to gitignore** — Appends `.glassbox/` to `.gitignore`. Verify file contents.
-
-### `POST /api/gitignore/dismiss`
-- **Dismiss prompt** — Records dismissal timestamp. Verify 30-day cooldown takes effect.
+> Note: the `/api/gitignore/*` routes were removed — `.gitignore` is now managed
+> automatically at launch (doc 27), unit-tested via `computeGitignore`.
 
 ## AI Configuration Endpoints
 

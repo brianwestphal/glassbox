@@ -118,7 +118,8 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
 
     // The completion button must be wired up even when there's no git repo
-    // backing the review (no gitignore prompt should fire — doc 18 FR-18.8).
+    // backing the review (doc 18 FR-18.8 — `--diff` runs outside a repo, so the
+    // launch-time auto-.gitignore step is skipped; the modal still appears).
     await page.locator('#complete-review').click();
     await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
   });

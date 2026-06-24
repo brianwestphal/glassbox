@@ -27,7 +27,6 @@ export const CompleteReviewRespSchema = z.object({
   exportPath: z.string(),
   isCurrent: z.boolean(),
   reviewId: z.string(),
-  gitignorePrompt: z.boolean(),
   hook: OnCompleteHookResultSchema,
 });
 export type CompleteReviewResp = z.infer<typeof CompleteReviewRespSchema>;
@@ -53,12 +52,6 @@ export type DeleteCompletedReviewsResp = z.infer<typeof DeleteCompletedReviewsRe
 
 export const DeleteAllReviewsRespSchema = z.object({ deleted: z.number() });
 export type DeleteAllReviewsResp = z.infer<typeof DeleteAllReviewsRespSchema>;
-
-export const AddGitignoreEntryRespSchema = OkResponseSchema;
-export type AddGitignoreEntryResp = z.infer<typeof AddGitignoreEntryRespSchema>;
-
-export const DismissGitignorePromptRespSchema = OkResponseSchema;
-export type DismissGitignorePromptResp = z.infer<typeof DismissGitignorePromptRespSchema>;
 
 export async function listReviews(): Promise<ListReviewsResp> {
   return apiCall(ListReviewsRespSchema, '/reviews');
@@ -90,12 +83,4 @@ export async function deleteCompletedReviews(): Promise<DeleteCompletedReviewsRe
 
 export async function deleteAllReviews(): Promise<DeleteAllReviewsResp> {
   return apiCall(DeleteAllReviewsRespSchema, '/reviews/delete-all', { method: 'POST' });
-}
-
-export async function addGitignoreEntry(): Promise<AddGitignoreEntryResp> {
-  return apiCall(AddGitignoreEntryRespSchema, '/gitignore/add', { method: 'POST' });
-}
-
-export async function dismissGitignorePrompt(): Promise<DismissGitignorePromptResp> {
-  return apiCall(DismissGitignorePromptRespSchema, '/gitignore/dismiss', { method: 'POST' });
 }

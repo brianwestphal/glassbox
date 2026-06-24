@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 import { deleteReview, getReview, listReviews, updateReviewStatus } from '../../db/queries.js';
-import { addGlassboxToGitignore, deleteReviewExport, dismissGitignorePrompt, generateReviewExport, shouldPromptGitignore } from '../../export/generate.js';
+import { deleteReviewExport, generateReviewExport } from '../../export/generate.js';
 import { runOnCompleteHook } from '../../export/on-complete-hook.js';
 import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js';
 import { updateReviewDiffs } from '../../review-update.js';
@@ -30,7 +30,6 @@ reviewsRoutes.post('/review/complete', async (c) => {
   await updateReviewStatus(reviewId, 'completed');
   const isCurrent = reviewId === currentReviewId;
   const exportPath = await generateReviewExport(reviewId, repoRoot, isCurrent);
-  const gitignorePrompt = shouldPromptGitignore(repoRoot);
 
   // Fire the --on-complete hook (doc 2 / GB-974) AFTER the review is completed +
   // exported, so a failing/absent hook never affects the review state. The JSON
@@ -42,19 +41,7 @@ reviewsRoutes.post('/review/complete', async (c) => {
     markdownPath: exportPath,
   });
 
-  return c.json({ status: 'completed' as const, exportPath, isCurrent, reviewId, gitignorePrompt, hook });
-});
-
-reviewsRoutes.post('/gitignore/add', (c) => {
-  const repoRoot = c.get('repoRoot');
-  addGlassboxToGitignore(repoRoot);
-  return c.json({ ok: true } as const);
-});
-
-reviewsRoutes.post('/gitignore/dismiss', (c) => {
-  const repoRoot = c.get('repoRoot');
-  dismissGitignorePrompt(repoRoot);
-  return c.json({ ok: true } as const);
+  return c.json({ status: 'completed' as const, exportPath, isCurrent, reviewId, hook });
 });
 
 reviewsRoutes.post('/review/reopen', async (c) => {
