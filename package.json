@@ -48,6 +48,8 @@
     "test:smoke:ground-truth": "bash tests/smoke/ground-truth.sh",
     "demo:capture": "npm run build:client && tsx scripts/demo/capture-demo.ts",
     "demo:capture-stills": "npm run build:client && tsx scripts/demo/capture-stills.ts",
+    "gt:capture": "npm run build:client && tsx scripts/ground-truth/capture-screenshots.ts",
+    "gt:review": "npm run gt:capture && tsx src/cli.ts --ground-truth ground-truth-screenshots/manifest.json",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",

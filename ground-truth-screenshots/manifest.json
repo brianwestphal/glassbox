@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "comparisons": [
+    {
+      "actual": "actuals/diff-code-split.png",
+      "expected": "baseline/diff-code-split.png",
+      "label": "Code diff — split view — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-code-unified.png",
+      "expected": "baseline/diff-code-unified.png",
+      "label": "Code diff — unified view — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-scss.png",
+      "expected": "baseline/diff-scss.png",
+      "label": "SCSS diff (different highlighting) — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-context-expand.png",
+      "expected": "baseline/diff-context-expand.png",
+      "label": "Context expansion — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-noncode.png",
+      "expected": "baseline/diff-noncode.png",
+      "label": "Non-code diff (Markdown/JSON/YAML) — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-rename.png",
+      "expected": "baseline/diff-rename.png",
+      "label": "File rename — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-added-only.png",
+      "expected": "baseline/diff-added-only.png",
+      "label": "New file (additions only) — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-deleted-only.png",
+      "expected": "baseline/diff-deleted-only.png",
+      "label": "Deleted file — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-long-line.png",
+      "expected": "baseline/diff-long-line.png",
+      "label": "Minified long-line file (truncation) — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/diff-binary.png",
+      "expected": "baseline/diff-binary.png",
+      "label": "Binary (non-image) file — Diff viewing",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-side-by-side.png",
+      "expected": "baseline/image-side-by-side.png",
+      "label": "Image — side by side — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-over-under.png",
+      "expected": "baseline/image-over-under.png",
+      "label": "Image — side by side (over/under) — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-metadata.png",
+      "expected": "baseline/image-metadata.png",
+      "label": "Image — metadata mode — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-difference.png",
+      "expected": "baseline/image-difference.png",
+      "label": "Image — difference mode — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-slice.png",
+      "expected": "baseline/image-slice.png",
+      "label": "Image — slice mode — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-svg-rendered.png",
+      "expected": "baseline/image-svg-rendered.png",
+      "label": "SVG rendered view — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/image-png-swap.png",
+      "expected": "baseline/image-png-swap.png",
+      "label": "Git-tracked PNG diff (old → new) — Image diff",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/sidebar-risk.png",
+      "expected": "baseline/sidebar-risk.png",
+      "label": "Risk sort with score badges — Sidebar / sort",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/sidebar-narrative.png",
+      "expected": "baseline/sidebar-narrative.png",
+      "label": "Narrative sort with position chips — Sidebar / sort",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/sidebar-filter.png",
+      "expected": "baseline/sidebar-filter.png",
+      "label": "File filter — Sidebar / sort",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/notes-guided.png",
+      "expected": "baseline/notes-guided.png",
+      "label": "Guided review notes — AI notes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/notes-risk.png",
+      "expected": "baseline/notes-risk.png",
+      "label": "Inline risk notes — AI notes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/notes-narrative.png",
+      "expected": "baseline/notes-narrative.png",
+      "label": "Narrative walkthrough notes — AI notes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/notes-review.png",
+      "expected": "baseline/notes-review.png",
+      "label": "AI review notes (with outdated badge) — AI notes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/annotations-categories.png",
+      "expected": "baseline/annotations-categories.png",
+      "label": "Line annotations with categories — Annotations",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/settings-general.png",
+      "expected": "baseline/settings-general.png",
+      "label": "Settings — General tab — Settings",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/settings-experimental.png",
+      "expected": "baseline/settings-experimental.png",
+      "label": "Settings — Experimental (AI platforms) — Settings",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/settings-profile.png",
+      "expected": "baseline/settings-profile.png",
+      "label": "Settings — Profile tab — Settings",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-dracula.png",
+      "expected": "baseline/theme-dracula.png",
+      "label": "Main UI — Dracula theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-light.png",
+      "expected": "baseline/theme-light.png",
+      "label": "Main UI — Light theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-tokyo-night.png",
+      "expected": "baseline/theme-tokyo-night.png",
+      "label": "Main UI — Tokyo Night theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/gt-source-list.png",
+      "expected": "baseline/gt-source-list.png",
+      "label": "Ground-truth source list — Ground-truth mode",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/gt-diff-header.png",
+      "expected": "baseline/gt-diff-header.png",
+      "label": "Ground-truth Expected/Actual header + step nav — Ground-truth mode",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/gt-difference.png",
+      "expected": "baseline/gt-difference.png",
+      "label": "Ground-truth perceptual difference — Ground-truth mode",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/workflow-completion-modal.png",
+      "expected": "baseline/workflow-completion-modal.png",
+      "label": "Review completion modal — Workflow",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/direct-comparison.png",
+      "expected": "baseline/direct-comparison.png",
+      "label": "Direct comparison (--diff) — Direct comparison",
+      "expectedKind": "previous-actual"
+    }
+  ]
+}
