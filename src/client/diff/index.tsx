@@ -166,21 +166,54 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
   // A failed fetch: just show the inline error message; no toolbar, highlight,
   // outline, or annotation binding (there's no diff to operate on).
   if (kind === 'error') {
-    const welcome = document.querySelector<HTMLElement>('.welcome-message');
-    if (welcome !== null) welcome.style.display = 'none';
-    container.style.display = 'block';
-    container.style.flexDirection = '';
-    const toolbar = document.getElementById('diff-toolbar');
-    if (toolbar !== null) toolbar.style.display = 'none';
+    showErrorChrome(container);
     return;
   }
-  // Header/toolbar visibility. Image diffs lay the container out as a flex
-  // column so the canvas fills the space down to the toolbar (the slice
-  // handles are pinned to the canvas edges, so an overshooting canvas would
-  // hide the bottom handle under the toolbar — GB-823). Text/raw diffs stay
-  // block so they scroll normally. The CSS chain under `:has(.image-diff)`
-  // takes over from here; setting display here (vs CSS) is required because
-  // this inline style would otherwise override it.
+
+  const file = fileId !== null ? reviewStore.state.value.files.find(f => f.id === fileId) : undefined;
+  const effectiveFilePath = file?.file_path ?? filePath ?? '';
+  // SVG toggle only applies to in-review files (raw views don't have a paired SVG diff).
+  const isSvg = kind !== 'raw' && effectiveFilePath.toLowerCase().endsWith('.svg');
+
+  const imageToolbar = applyDiffChrome(container, kind, isSvg);
+
+  if (kind === 'image') {
+    adaptImageToolbar(container, imageToolbar);
+    bindImageDiff();
+  } else {
+    runTextPostRender(container, kind, fileId, effectiveFilePath);
+  }
+
+  // Inline AI notes (risk / narrative / guided) are rendered reactively by
+  // `setupAINotesEffect`, not here — they depend on the sort mode and guided
+  // toggle, which change without re-fetching the diff. See GB-913.
+}
+
+/** Failed-fetch chrome: hide the welcome message, lay the container out as a
+ *  block, and hide the toolbar — there's no diff to operate on. */
+function showErrorChrome(container: HTMLElement): void {
+  const welcome = document.querySelector<HTMLElement>('.welcome-message');
+  if (welcome !== null) welcome.style.display = 'none';
+  container.style.display = 'block';
+  container.style.flexDirection = '';
+  const toolbar = document.getElementById('diff-toolbar');
+  if (toolbar !== null) toolbar.style.display = 'none';
+}
+
+/**
+ * Show/hide the diff chrome for a successful render of the given `kind`: the
+ * welcome message, the container's flex/block layout, the nav bar, the toolbar,
+ * and the toolbar's text / image / SVG sub-toolbars. Returns the image
+ * sub-toolbar element (needed by the image branch's `adaptImageToolbar`).
+ *
+ * Image diffs lay the container out as a flex column so the canvas fills the
+ * space down to the toolbar (the slice handles are pinned to the canvas edges,
+ * so an overshooting canvas would hide the bottom handle under the toolbar —
+ * GB-823). Text/raw diffs stay block so they scroll normally. Setting display
+ * here (vs CSS) is required because this inline style would otherwise override
+ * the `:has(.image-diff)` CSS chain.
+ */
+function applyDiffChrome(container: HTMLElement, kind: DiffContent['kind'], isSvg: boolean): HTMLElement | null | undefined {
   const welcome = document.querySelector<HTMLElement>('.welcome-message');
   if (welcome !== null) welcome.style.display = 'none';
   if (kind === 'image') {
@@ -199,10 +232,6 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
   const imageToolbar = toolbar?.querySelector<HTMLElement>('.diff-toolbar-image');
   const svgToggle = toolbar?.querySelector<HTMLElement>('.diff-toolbar-svg-toggle');
 
-  const file = fileId !== null ? reviewStore.state.value.files.find(f => f.id === fileId) : undefined;
-  const effectiveFilePath = file?.file_path ?? filePath ?? '';
-  // SVG toggle only applies to in-review files (raw views don't have a paired SVG diff).
-  const isSvg = kind !== 'raw' && effectiveFilePath.toLowerCase().endsWith('.svg');
   if (svgToggle) {
     svgToggle.style.display = isSvg ? '' : 'none';
     const svgMode = diffViewStore.state.value.svgViewMode;
@@ -215,33 +244,29 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
   if (textToolbar) textToolbar.style.display = kind === 'image' ? 'none' : '';
   if (imageToolbar) imageToolbar.style.display = kind === 'image' ? '' : 'none';
 
-  if (kind === 'image') {
-    adaptImageToolbar(container, imageToolbar);
-    bindImageDiff();
-  } else {
-    const diffView = container.querySelector<HTMLElement>('.diff-view');
-    const dvPath = diffView?.dataset.filePath ?? effectiveFilePath;
-    const detectedLang = detectLanguage(dvPath);
-    diffViewStore.actions.update({
-      detectedLang,
-      ...(diffViewStore.state.value.highlightAuto ? { highlightLang: detectedLang } : {}),
-    });
-    applyHighlighting();
-    updateToolbarLanguage();
-    syncSplitColumnHeights();
-    // Outline keys off a real review file; skip for raw views.
-    if (kind === 'text' && fileId !== null) void loadOutline(fileId);
-    // Annotation events are registered once via `bindAnnotationEvents()` —
-    // they fire for server-rendered annotation rows by `data-action` match.
-    // Fill each annotation row's attachment chips (doc 25). The rows are
-    // server-rendered with empty `[data-att-list]` containers; one bulk fetch
-    // populates them all.
-    void hydrateAttachments(container);
-  }
+  return imageToolbar;
+}
 
-  // Inline AI notes (risk / narrative / guided) are rendered reactively by
-  // `setupAINotesEffect`, not here — they depend on the sort mode and guided
-  // toggle, which change without re-fetching the diff. See GB-913.
+/** Post-render work for a text/raw diff: language detection + highlight, toolbar
+ *  language label, split-column height sync, outline load, attachment hydration. */
+function runTextPostRender(container: HTMLElement, kind: DiffContent['kind'], fileId: string | null, effectiveFilePath: string): void {
+  const diffView = container.querySelector<HTMLElement>('.diff-view');
+  const dvPath = diffView?.dataset.filePath ?? effectiveFilePath;
+  const detectedLang = detectLanguage(dvPath);
+  diffViewStore.actions.update({
+    detectedLang,
+    ...(diffViewStore.state.value.highlightAuto ? { highlightLang: detectedLang } : {}),
+  });
+  applyHighlighting();
+  updateToolbarLanguage();
+  syncSplitColumnHeights();
+  // Outline keys off a real review file; skip for raw views.
+  if (kind === 'text' && fileId !== null) void loadOutline(fileId);
+  // Annotation events are registered once via `bindAnnotationEvents()` — they
+  // fire for server-rendered annotation rows by `data-action` match. Fill each
+  // annotation row's attachment chips (doc 25): the rows are server-rendered
+  // with empty `[data-att-list]` containers; one bulk fetch populates them all.
+  void hydrateAttachments(container);
 }
 
 // --- Reactive inline AI notes (risk / narrative / guided) ---

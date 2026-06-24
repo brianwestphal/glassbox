@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, realpathSync, statSync } from "fs";
 import { tmpdir } from "os";
 import { basename, join, resolve } from "path";
 
+import { handleDifftoolRegistration, handleGroundTruthPromote, handleNoteSubcommand } from "./cli-subcommands.js";
 import { setDataDir } from "./db/connection.js";
 import { addReviewFile, createReview, getLatestInProgressReview } from "./db/queries.js";
 import { setAIServiceTest, setDebug, setDemoMode } from "./debug.js";
@@ -255,48 +256,14 @@ export function parseArgs(
 }
 
 async function main() {
-  // `glassbox note ...` — the producer-side review-note writer (docs/20). A
-  // standalone subcommand: write the note and exit, without booting the server
-  // or touching the review DB.
+  // Standalone subcommands (doc 20 / doc 26 / doc 19) handle their work and exit
+  // without booting the server or touching the review DB — see cli-subcommands.ts.
   const rawArgs = process.argv.slice(2);
   if (rawArgs[0] === 'note') {
-    const { runNoteCli } = await import('./review-notes/cli.js');
-    try {
-      await runNoteCli(rawArgs.slice(1));
-      process.exit(0);
-    } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
+    await handleNoteSubcommand(rawArgs.slice(1));
   }
-
-  // `glassbox ground-truth promote <manifest>` (doc 26 §26.6 P3d) — an optional,
-  // explicit baseline rotation: copy the current actuals over the previous-actual
-  // baselines so the next run regresses against this one. Standalone subcommand;
-  // no server, no review DB. Glassbox still stores no baseline state itself.
   if (rawArgs[0] === 'ground-truth' && rawArgs[1] === 'promote') {
-    const manifestArg = rawArgs[2] as string | undefined;
-    if (manifestArg === undefined || manifestArg === '') {
-      console.error('Usage: glassbox ground-truth promote <manifest.json>');
-      process.exit(1);
-    }
-    const { promoteGroundTruthBaselines } = await import('./ground-truth/promote.js');
-    try {
-      const res = promoteGroundTruthBaselines(resolve(manifestArg));
-      for (const p of res.promoted) console.log(`Promoted ${p.key}\n  ${p.from}\n  -> ${p.to}`);
-      if (res.promoted.length === 0) {
-        console.log('Nothing to promote: no comparison has expectedKind "previous-actual".');
-        console.log('Mark a comparison\'s expectedKind as "previous-actual" to rotate its baseline.');
-      } else {
-        console.log(`Promoted ${String(res.promoted.length)} baseline(s).`);
-      }
-      const realSkips = res.skipped.filter(s => !s.reason.startsWith('expectedKind'));
-      for (const s of realSkips) console.warn(`Skipped ${s.key}: ${s.reason}`);
-      process.exit(0);
-    } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
+    await handleGroundTruthPromote(rawArgs[2]);
   }
 
   const parsed = parseArgs(process.argv);
@@ -310,37 +277,10 @@ async function main() {
   // arg parsing) so the resolved comparisons ride in the mode.
   let { mode, dataDir } = parsed;
 
-  // GB-850 — `--register-difftool` / `--unregister-difftool` are standalone
-  // CLI actions: run the git config write and exit, without booting the
-  // server or touching the review DB.
+  // GB-850 — `--register-difftool` / `--unregister-difftool` are standalone CLI
+  // actions: run the git config write and exit (see cli-subcommands.ts).
   if (difftoolAction !== null) {
-    const { registerDifftool, unregisterDifftool, getDifftoolStatus } = await import("./git/difftool.js");
-    const scope = difftoolLocal ? 'local' as const : 'global' as const;
-    if (difftoolAction === 'register') {
-      const res = registerDifftool({ scope, force: difftoolForce });
-      if (res.ok) {
-        const replaced = res.replacedTool !== null ? ` (replaced previous tool: ${res.replacedTool})` : '';
-        console.log(`Glassbox registered as git difftool at --${scope} scope.${replaced}`);
-        console.log(`Try it with: git difftool --dir-diff HEAD~1 HEAD`);
-        process.exit(0);
-      }
-      if (res.reason === 'conflict') {
-        console.error(`Error: you currently have '${res.currentTool}' set as your git difftool.`);
-        console.error(`Pass --force to overwrite it with glassbox, or use --local to register only in this repo.`);
-        process.exit(1);
-      }
-      console.error(`Error: ${res.message}`);
-      process.exit(1);
-    }
-    // unregister
-    const status = getDifftoolStatus(scope);
-    const res = unregisterDifftool({ scope });
-    if (res.removed) {
-      console.log(`Glassbox unregistered as git difftool at --${scope} scope.`);
-    } else {
-      console.log(`Nothing to unregister at --${scope} scope (current tool: ${status.tool ?? 'none'}).`);
-    }
-    process.exit(0);
+    await handleDifftoolRegistration(difftoolAction, difftoolLocal, difftoolForce);
   }
 
   setDebug(debug);

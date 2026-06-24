@@ -46,7 +46,8 @@ glassbox/
 
 | File | Purpose |
 |------|---------|
-| `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. Also handles the repo-less `--diff` (doc 18) and `--ground-truth <manifest>` (doc 26) launches, the `--on-complete <command>` completion hook (doc 2 §2.3a, threaded into `startServer`), and dispatches standalone subcommands before arg parsing: `glassbox note …` (doc 20 producer) and `glassbox ground-truth promote <manifest>` (doc 26 P3d baseline rotation). |
+| `cli.ts` | Entry point. Parses args, picks review mode, calls git, creates/resumes review, starts server. Also handles the repo-less `--diff` (doc 18) and `--ground-truth <manifest>` (doc 26) launches, the `--on-complete <command>` completion hook (doc 2 §2.3a, threaded into `startServer`), and dispatches standalone subcommands before arg parsing: `glassbox note …` (doc 20 producer), `glassbox ground-truth promote <manifest>` (doc 26 P3d), and `--register/--unregister-difftool` (doc 19) — the handle-and-exit bodies for those live in `cli-subcommands.ts`. |
+| `cli-subcommands.ts` | The standalone `glassbox` subcommands that handle their work and exit without booting the server or touching the review DB: `handleNoteSubcommand`, `handleGroundTruthPromote`, `handleDifftoolRegistration` (split out of `cli.ts`'s `main()`). |
 | `cli-difftool.ts` | Standalone `glassbox-difftool` bin entry — bridges `git difftool` into a Glassbox review. Built to `dist/cli-difftool.js` and shipped via `package.json`'s `"bin"` map. **`--dir-diff` (any target):** the **blocking** path — dereferences git's symlinked snapshot dirs into a temp tree (git uses symlinks on the right side of `--dir-diff`) and launches `glassbox --diff` (desktop launcher shim with `GLASSBOX_DIFFTOOL_BLOCK=1`, or sibling `cli.js`); blocking keeps the temp tree alive for the whole session. **Per-file (doc 19, accumulating):** a **thin client** — reads `$LOCAL`/`$REMOTE` content into memory (before git deletes the temp files), discovers-or-starts a single accumulating session (`src/git/difftool-client.ts`), appends the file (labeled by git's repo-relative `$MERGED` path when the registered cmd passes it, else the working-tree basename — GB-864), and returns immediately, except on the last file (`GIT_DIFF_PATH_COUNTER == GIT_DIFF_PATH_TOTAL`) where it holds so `git difftool` stays attached until "Done"/tab-or-window-close. The session start differs by target: **browser** spawns `cli.js --difftool-serve` (opens a tab); **desktop** launches the launcher shim in `--difftool-serve` mode so the review opens in one Tauri window and later invocations append to it (GB-861 — closing the window kills the sidecar, ending the session). Pure decisions live in `src/git/difftool-launch.ts`. |
 | `server.ts` | Hono app bootstrap. Middleware for `reviewId`/`currentReviewId`/`repoRoot`. Static asset routes. Registers route groups. |
 | `types.ts` | `AppEnv` (Hono `Env` with typed Variables). |
@@ -110,7 +111,7 @@ How the layer is used:
 | `api/system.ts` | `POST /open-external` — opens a validated http(s) URL via `openOS` (same OS-open path as file reveal). |
 | `api/review-notes.ts` | AI review-note reader endpoints (doc 20): `GET /api/review-notes/artifact` (path-contained image-artifact bytes) + `DELETE /api/review-notes/:guid` (stale-note discard → `removeNote`). |
 | `ai-api.ts` | Router that mounts ai-config + ai-analysis handlers under `/api/ai/*`. |
-| `ai-analysis.ts` | `POST /analyze` dispatch (risk/narrative/guided), progress polling, cancellation. |
+| `ai-analysis.ts` | `POST /analyze` dispatch (risk/narrative/guided), progress polling, cancellation, preferences. HTTP routing only — the background pipeline lives in `ai/analysis-pipeline.ts`. |
 | `ai-config.ts` | `/config`, `/models`, `/key-status`, `/key`, `/preferences`. |
 | `theme-api.ts` | CRUD + active theme for `/api/themes/*`. |
 | `channel-api.ts` | `/status`, `/enable`, `/disable`, `/trigger`, `/claude-check`. |
@@ -176,6 +177,8 @@ See §6 for the schema itself.
 | `client.ts` | Unified client. `sendAIRequest(config, system, messages)` dispatches to Anthropic / OpenAI / Google / **Local** (OpenAI-compatible — `sendLocalRequest` posts to `{config.baseUrl}/chat/completions`, optional Bearer) / **Apple** (on-device — `sendAppleRequest` calls the `apple-foundation.ts` bridge, no HTTP, token counts 0); keyless platforms (`local`, `apple`) skip the no-key gate via `KEYLESS_PLATFORMS`. Returns content + token counts. |
 | `apple-foundation.ts` | **Apple Foundation Models bridge** (doc 22 P2). A thin wrapper over the [`apple-fm`](https://github.com/brianwestphal/apple-fm) package (Glassbox no longer ships its own Swift helper): `isAppleFoundationAvailable()` gates on `apple-fm`'s `isPlatformSupported()` then `probe()` (cached per session); `runAppleFoundationInfer(system, messages)` calls `apple-fm`'s `generate({system, messages})` and returns the raw text the analysis layer's `extractJSON` parses. `apple-fm` ships its own signed + notarized helper, resolved via `APPLE_FM_BIN` → bundled `bin/apple-fm-helper` → `PATH`. Unit-tested against a mocked `apple-fm`; the on-device path needs real macOS-26 hardware. |
 | `context-builder.ts` | Build per-file context payloads respecting a char budget. Handles summarization when a file's diff is too large. |
+| `analysis-pipeline.ts` | The background analysis pipeline (`executeAnalysis` + `markAnalysisCanceled`), split out of `routes/ai-analysis.ts`: cache carry-forward, binary-file scoring, batch dispatch per type, finalize (risk sort / narrative merge), and the process-global `canceledAnalyses` cancellation Set. |
+| `token-budget.ts` | Shared approximate token/char budgeting constants (`CHARS_PER_TOKEN`, `CONTEXT_RESERVE_FRACTION`) used by context building + batch planning. |
 | `batch-planner.ts` | Split files into token-budgeted batches for a given model. |
 | `batch-runner.ts` | Execute batches sequentially, update progress, honor cancellation. |
 | `analyze-risk.ts` | Risk orchestrator. Dimensions: security, correctness, error-handling, maintainability, architecture, performance. Aggregate = max. |
@@ -493,7 +496,7 @@ user triggers /api/ai/analyze
   → final status: completed | failed (error_message) | canceled
 ```
 
-Cancellation is cooperative via `cancelledAnalyses` in `ai-analysis.ts`;
+Cancellation is cooperative via `canceledAnalyses` in `ai/analysis-pipeline.ts`;
 switching between risk and narrative cancels the other. Caching: if a file
 is unchanged across runs, prior scores carry forward (see §7.6 of
 requirements).

@@ -366,13 +366,16 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await openModifiedFile(page);
     const rows = page.locator('.ai-note-row.ai-note-review');
     await expect(rows.first()).toBeVisible({ timeout: 5000 });
-    await expect(rows).toHaveCount(4);
+    // The notes render after the diff loads + the re-anchor pass; under parallel
+    // CPU contention (local default-parallel runs share one demo server) the
+    // 4th row can lag the first, so give the count assertion extra headroom.
+    await expect(rows).toHaveCount(4, { timeout: 10000 });
     // Per-kind badges + producer attribution.
     await expect(page.locator('.ai-note-label-rationale')).toBeVisible();
     await expect(page.locator('.ai-note-label-risk')).toBeVisible();
     await expect(page.locator('.ai-note-producer').first()).toHaveText('Claude Code');
     // The re-anchored note whose code changed is flagged outdated (P3).
-    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1);
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1, { timeout: 10000 });
     await expect(page.locator('.ai-note-stale-tag')).toHaveText('outdated');
   });
 
@@ -381,8 +384,8 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await page.locator('[data-diff-mode="unified"]').click();
     await expect(page.locator('.diff-table-unified')).toBeVisible();
     await expect(page.locator('.ai-note-row.ai-note-review').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4);
-    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1);
+    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4, { timeout: 10000 });
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1, { timeout: 10000 });
   });
 
   test('Keep dismisses the outdated flag on a stale review note (GB-907)', async ({ page }) => {

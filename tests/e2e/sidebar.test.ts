@@ -226,21 +226,28 @@ test.describe('File context menu (GB-884)', () => {
   });
 
   test('Mark reviewed/pending toggles the file status (GB-891)', async ({ page }) => {
-    let patched: { status?: string } | null = null;
-    await page.route('**/files/*/status*', async (route) => {
-      patched = route.request().postDataJSON() as { status?: string };
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
-    });
-
     await page.goto('/');
     await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
 
     // Use a non-active row so we're not racing the auto-select-first-file mark.
     const row = page.locator('.file-item').nth(2);
+    const fileId = await row.getAttribute('data-file-id');
+
+    // Scope the intercept to THIS file's id. The shared demo server is hit by
+    // every spec (and, locally, by parallel workers), so a wildcard
+    // `**/files/*/status*` route also captured the load-time auto-select PATCH
+    // (which marks the FIRST file reviewed) and any other file's PATCH — those
+    // overwrote `patched` and made the assertion order-dependent. Scoping to the
+    // target file id keeps it deterministic.
+    let patched: { status?: string } | null = null;
+    await page.route(`**/files/${fileId}/status*`, async (route) => {
+      patched = route.request().postDataJSON() as { status?: string };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    });
+
     const dot = row.locator('.status-dot');
     const wasReviewed = await dot.evaluate((el) => el.classList.contains('reviewed'));
 
-    patched = null; // ignore any PATCH from the load-time auto-select
     await row.click({ button: 'right' });
     await page.locator('.context-menu [data-action="toggle-status"]').click();
 

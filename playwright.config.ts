@@ -43,18 +43,22 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30000,
   retries: 1,
-  // Run serially under CI. The whole suite shares ONE demo server — a single
-  // PGLite review plus a single GLASSBOX_CONFIG_DIR — across every worker, so
-  // parallel workers race on shared state: timing-sensitive image-feedback drag
-  // tests get starved of mouse-event frames under CPU contention (region move
-  // produces 0 / partial movement), and theme tests race each other on the
-  // shared config dir (one test deleting a custom theme while another reads the
-  // theme list → a mid-read 404 that the failOnPageError fixture turns into a
-  // failure). Those flakes showed up only on the slower CI runners (consistently
-  // on Windows, intermittently on Linux, never locally). Locally we keep
-  // Playwright's default parallelism for speed; `CI` is set by GitHub Actions
-  // (and by `test-e2e-docker.sh` for a faithful local repro).
-  workers: process.env.CI ? 1 : undefined,
+  // Run serially everywhere (GB-994). The whole suite shares ONE demo server —
+  // a single PGLite review plus a single GLASSBOX_CONFIG_DIR — across every
+  // worker, so parallel workers race on shared state: timing-sensitive
+  // image-feedback drag tests get starved of mouse-event frames under CPU
+  // contention (region move produces 0 / partial movement); theme tests race
+  // each other on the shared config dir (one test deleting a custom theme while
+  // another reads the theme list → a mid-read 404 that the failOnPageError
+  // fixture turns into a failure); and any spec asserting absolute pre-existing
+  // demo state (file review status, persisted sort_mode, the seeded annotations
+  // / review notes) can be raced by a sibling spec mutating that same review.
+  // CI was already serial (consistently flaky on Windows, intermittently on
+  // Linux); we now match it locally too, trading ~30-60s of wall-clock for a
+  // deterministic run — the suite is ~1 min and determinism beats the margin.
+  // The isolated `--diff` / `--ground-truth` projects (their own pid-scoped
+  // servers) don't share state, but `workers` is global, so they ride along.
+  workers: 1,
   // `list` keeps the human-readable console output; `html` writes a
   // self-contained report to `playwright-report/` (with embedded traces) that
   // the E2E CI jobs upload on failure. `open: 'never'` stops the HTML reporter
