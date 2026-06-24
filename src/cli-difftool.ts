@@ -62,7 +62,13 @@ import {
   launchDetachedDesktopSession,
   spawnDetachedBrowserServer,
 } from './git/difftool-client.js';
-import { DIFFTOOL_BLOCK_ENV, planSnapshot, resolveLaunchTarget, shouldHoldForSession } from './git/difftool-launch.js';
+import {
+  DIFFTOOL_BLOCK_ENV,
+  isDirDiffInvocation,
+  planSnapshot,
+  resolveLaunchTarget,
+  shouldHoldForSession,
+} from './git/difftool-launch.js';
 
 const args = process.argv.slice(2);
 if (args.length < 2 || args[0].startsWith('-') || args[1].startsWith('-')) {
@@ -85,9 +91,13 @@ if (args.length < 2 || args[0].startsWith('-') || args[1].startsWith('-')) {
 // it is forwarded to `glassbox --diff` (the historical "extra args" escape hatch).
 const [local, remote, merged, ...extra] = args;
 
-// `--dir-diff` hands us directories; per-file mode hands us single files.
-let localIsFile = false;
-try { localIsFile = statSync(local).isFile(); } catch { /* treat as dir */ }
+// `--dir-diff` hands us two directory snapshots; per-file mode hands us single
+// files — including `/dev/null` for the absent side of an add/delete, which is
+// NOT a regular file, so we discriminate on "is it a directory" rather than "is
+// it a file" (else an added file's `/dev/null` `$LOCAL` would be misrouted to
+// the blocking dir-diff launch — GB-1000).
+const isDirDiff = isDirDiffInvocation(local, statSync);
+const isPerFile = !isDirDiff;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const target = resolveLaunchTarget(
@@ -130,16 +140,17 @@ async function runThinClient(start: () => void, timeoutMs?: number): Promise<voi
 }
 
 /**
- * Blocking launch for `--dir-diff` (any target) and per-file desktop: build the
- * dereferenced temp tree and hand the two roots to `glassbox --diff`. The launch
- * blocks for the whole session, keeping the temp tree alive and sequencing
- * per-file desktop one file at a time.
+ * Blocking launch for `--dir-diff` (any target): build the dereferenced temp
+ * tree from the two directory snapshots and hand the two roots to
+ * `glassbox --diff`. The launch blocks for the whole session, keeping the temp
+ * tree alive. Per-file invocations never reach here — they accumulate via the
+ * thin client (browser and desktop alike).
  */
 function runBlockingLaunch(): never {
-  // `planSnapshot` preserves the filename in the per-file case so the review
-  // isn't labeled "left ↔ right".
+  // Reached only for `--dir-diff`, so `isPerFile` is false here and
+  // `planSnapshot` uses the bare left/right roots.
   const work = mkdtempSync(join(tmpdir(), 'glassbox-difftool-'));
-  const plan = planSnapshot(local, remote, work, localIsFile, basename);
+  const plan = planSnapshot(local, remote, work, isPerFile, basename);
 
   const cleanup = (): void => {
     try { rmSync(work, { recursive: true, force: true }); } catch { /* best-effort */ }
@@ -192,13 +203,13 @@ const onThinClientError = (err: unknown): never => {
 // Per-file mode (single files) accumulates into one session for both targets;
 // only the "start the session" step differs. `--dir-diff` (directories) keeps
 // the original blocking launch so its dereferenced temp tree survives.
-if (localIsFile && target.kind === 'browser') {
+if (isPerFile && target.kind === 'browser') {
   const cliPath = target.cli;
   void runThinClient(() => { spawnDetachedBrowserServer(cliPath, process.cwd()); }).then(
     onThinClientDone,
     onThinClientError,
   );
-} else if (localIsFile && target.kind === 'desktop') {
+} else if (isPerFile && target.kind === 'desktop') {
   const launcher = target.launcher;
   void runThinClient(
     () => { launchDetachedDesktopSession(launcher, process.cwd()); },

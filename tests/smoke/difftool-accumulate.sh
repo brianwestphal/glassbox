@@ -60,21 +60,29 @@ for _ in $(seq 1 80); do
 done
 if $ready; then pass "accumulating server ready"; else fail "server not ready"; cat "$WORK/srv.log"; exit 1; fi
 
-# Two per-file invocations of the REAL wrapper, exactly as git drives it: two
-# single temp files plus the repo-relative path as $MERGED, neither marked last.
+# Per-file invocations of the REAL wrapper, exactly as git drives it: two single
+# temp files plus the repo-relative path as $MERGED, none marked last. The third
+# is an ADDED file, where git passes `/dev/null` as $LOCAL — the GB-1000 case
+# (`git difftool --cached` over a staged new file). `/dev/null` is not a regular
+# file, so the wrapper must still treat it as a per-file append (accumulate),
+# NOT misroute it to the blocking dir-diff launch ("one file at a time").
 printf 'alpha-old\n' >"$WORK/old1"; printf 'alpha-new\n' >"$WORK/new1"
 printf 'beta-old\n'  >"$WORK/old2"; printf 'beta-new\n'  >"$WORK/new2"
+printf 'gamma-new\n' >"$WORK/new3"
 
-GIT_DIFF_PATH_COUNTER=1 GIT_DIFF_PATH_TOTAL=3 node "$WRAPPER" "$WORK/old1" "$WORK/new1" "src/alpha.ts"
-GIT_DIFF_PATH_COUNTER=2 GIT_DIFF_PATH_TOTAL=3 node "$WRAPPER" "$WORK/old2" "$WORK/new2" "src/beta.ts"
+GIT_DIFF_PATH_COUNTER=1 GIT_DIFF_PATH_TOTAL=4 node "$WRAPPER" "$WORK/old1" "$WORK/new1" "src/alpha.ts"
+GIT_DIFF_PATH_COUNTER=2 GIT_DIFF_PATH_TOTAL=4 node "$WRAPPER" "$WORK/old2" "$WORK/new2" "src/beta.ts"
+# Added file: $LOCAL is /dev/null. A blocking launch here would hang this script.
+GIT_DIFF_PATH_COUNTER=3 GIT_DIFF_PATH_TOTAL=4 node "$WRAPPER" "/dev/null" "$WORK/new3" "src/gamma.ts"
 
-# Both files must have accumulated into the one active review, labeled by path.
+# All three files must have accumulated into the one active review, labeled by path.
 POLL="$(curl -s "http://127.0.0.1:$PORT/api/difftool/poll")"
 echo "$POLL" | grep -q '"active":true'    && pass "session active after appends"            || fail "session not active"
 echo "$POLL" | grep -q '"src/alpha.ts"'   && pass "alpha labeled by repo-relative path"     || fail "alpha missing/mislabeled"
 echo "$POLL" | grep -q '"src/beta.ts"'    && pass "beta labeled by repo-relative path"      || fail "beta missing/mislabeled"
+echo "$POLL" | grep -q '"src/gamma.ts"'   && pass "added file (/dev/null \$LOCAL) accumulated — GB-1000" || fail "added file missing (GB-1000 regression)"
 COUNT=$(echo "$POLL" | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('files',[])))" 2>/dev/null || echo "?")
-[[ "$COUNT" == "2" ]] && pass "exactly 2 files in one review" || fail "expected 2 files, got $COUNT"
+[[ "$COUNT" == "3" ]] && pass "exactly 3 files in one review" || fail "expected 3 files, got $COUNT"
 
 # The "Done"/Ctrl-C end path: POST /end releases holds and tears the server down.
 curl -s -X POST "http://127.0.0.1:$PORT/api/difftool/end" >/dev/null

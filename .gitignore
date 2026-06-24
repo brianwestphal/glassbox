@@ -3,7 +3,6 @@ dist
 .glassbox/
 .release-state.json
 .DS_Store
-.hotsheet/
 .cursor/
 coverage/
 .coverage-tmp/
@@ -31,3 +30,5 @@ ground-truth-screenshots/*.har
 
 # External fixture repos used by the ground-truth screenshot suite (cloned, not vendored)
 external/
+/.hotsheet/*
+!/.hotsheet/settings.json

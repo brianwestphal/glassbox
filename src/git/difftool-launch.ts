@@ -71,6 +71,40 @@ export function planSnapshot(
   };
 }
 
+/**
+ * Whether this is git's `--dir-diff` mode (one invocation, two directory
+ * snapshots) as opposed to per-file mode (one invocation per changed file, with
+ * two single files). `--dir-diff` is the *only* mode that hands us directories;
+ * per-file always hands us files — including the `/dev/null` placeholder git
+ * uses for the absent side of an **added** file (`$LOCAL`) or a **deleted** file
+ * (`$REMOTE`). So the robust discriminator is simply "is the left input a
+ * directory".
+ *
+ * The naive alternative — `statSync(local).isFile()` — misclassifies an added
+ * file, whose `$LOCAL` is `/dev/null` (a character device, not a regular file,
+ * so `isFile()` is `false`). That sent added files down the blocking
+ * single-file launch instead of the accumulating thin client, so
+ * `git difftool --cached` over staged *new* files opened one blocking review per
+ * file ("only shows one file at a time"). Unstaged `git difftool` never lists
+ * untracked/added files, which is why it appeared to work. Treating anything
+ * that isn't a directory (a regular file, `/dev/null`, or a path that doesn't
+ * stat) as per-file fixes it.
+ *
+ * `stat` is injected so the decision is unit-testable without a filesystem.
+ */
+export function isDirDiffInvocation(
+  local: string,
+  stat: (p: string) => { isDirectory: () => boolean },
+): boolean {
+  try {
+    return stat(local).isDirectory();
+  } catch {
+    // `/dev/null`, a missing path, or an unreadable one is never a `--dir-diff`
+    // directory snapshot — treat it as a per-file invocation.
+    return false;
+  }
+}
+
 export type LaunchTarget =
   | { kind: 'desktop'; launcher: string }
   | { kind: 'browser'; cli: string };

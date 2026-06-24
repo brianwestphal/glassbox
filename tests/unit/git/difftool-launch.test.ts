@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DIFFTOOL_BLOCK_ENV,
+  isDirDiffInvocation,
   parseGitDiffCounter,
   planSnapshot,
   resolveLaunchTarget,
@@ -71,6 +72,35 @@ describe('planSnapshot', () => {
     const plan = planSnapshot('/', '/', '/work', true, basename);
     expect(norm(plan.leftArg)).toBe('/work/left/file');
     expect(norm(plan.rightArg)).toBe('/work/right/file');
+  });
+});
+
+// GB-1000 — the per-file vs `--dir-diff` discriminator. The bug: an added file
+// in `git difftool --cached` has `$LOCAL` = `/dev/null` (a char device, not a
+// regular file), so the old `isFile()` test wrongly classified it as `--dir-diff`
+// and sent it down the blocking single-file launch, breaking accumulation ("one
+// file at a time"). The fix keys on "is the left input a directory" instead.
+describe('isDirDiffInvocation', () => {
+  const dir = () => ({ isDirectory: () => true });
+  const file = () => ({ isDirectory: () => false });
+
+  it('is true for --dir-diff (left input is a directory)', () => {
+    expect(isDirDiffInvocation('/work/left', dir)).toBe(true);
+  });
+
+  it('is false for a per-file invocation (left input is a regular file)', () => {
+    expect(isDirDiffInvocation('/tmp/git-blob-aaa/f1.txt', file)).toBe(false);
+  });
+
+  it('is false for an added file whose $LOCAL is /dev/null (GB-1000)', () => {
+    // statSync('/dev/null').isDirectory() is false — the key case the old
+    // isFile() check got wrong (isFile() is ALSO false for /dev/null).
+    expect(isDirDiffInvocation('/dev/null', file)).toBe(false);
+  });
+
+  it('is false (per-file) when the path cannot be stat-ed', () => {
+    const throwing = (): { isDirectory: () => boolean } => { throw new Error('ENOENT'); };
+    expect(isDirDiffInvocation('/missing', throwing)).toBe(false);
   });
 });
 
