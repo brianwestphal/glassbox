@@ -216,6 +216,72 @@
       "expected": "baseline/direct-comparison.png",
       "label": "Direct comparison (--diff) — Direct comparison",
       "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/sidebar-folder.png",
+      "expected": "baseline/sidebar-folder.png",
+      "label": "Folder grouping (sidebar) — Sidebar / sort",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/sidebar-risk-popover.png",
+      "expected": "baseline/sidebar-risk-popover.png",
+      "label": "Per-file risk dimension popover — Sidebar / sort",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/notes-reply.png",
+      "expected": "baseline/notes-reply.png",
+      "label": "Threaded reply under an AI note — AI notes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/annotations-form.png",
+      "expected": "baseline/annotations-form.png",
+      "label": "Annotation create form — Annotations",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-manager.png",
+      "expected": "baseline/theme-manager.png",
+      "label": "Theme manager — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-dark.png",
+      "expected": "baseline/theme-dark.png",
+      "label": "Main UI — Dark theme (default) — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-high-contrast.png",
+      "expected": "baseline/theme-high-contrast.png",
+      "label": "Main UI — High Contrast Dark theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-solarized-dark.png",
+      "expected": "baseline/theme-solarized-dark.png",
+      "label": "Main UI — Solarized Dark theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-monokai.png",
+      "expected": "baseline/theme-monokai.png",
+      "label": "Main UI — Monokai theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/theme-one-dark-pro.png",
+      "expected": "baseline/theme-one-dark-pro.png",
+      "label": "Main UI — One Dark Pro theme — Themes",
+      "expectedKind": "previous-actual"
+    },
+    {
+      "actual": "actuals/gt-identical-toggle.png",
+      "expected": "baseline/gt-identical-toggle.png",
+      "label": "Ground-truth — show identical toggle — Ground-truth mode",
+      "expectedKind": "previous-actual"
     }
   ]
 }

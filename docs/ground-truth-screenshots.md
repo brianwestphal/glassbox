@@ -12,10 +12,11 @@ committed images are the "expected", and `glassbox ground-truth promote` rotates
 the baseline.
 
 > **Status:** the harness, manifest, LFS wiring, npm scripts, the
-> `glassbox-testing` fixture commits, and **36 scenes across every major feature
+> `glassbox-testing` fixture commits, and **47 scenes across every major feature
 > area** are implemented in `scripts/ground-truth/scenes.ts` with committed
-> baselines. A handful of finer-grained scenes remain as follow-ups (listed at
-> the end). **This doc is the spec; keep it in lockstep with `scenes.ts`.**
+> baselines. A few genuinely-hard scenes (timing/drag/time-gated) remain as
+> follow-ups (listed at the end). **This doc is the spec; keep it in lockstep
+> with `scenes.ts`.**
 
 ---
 
@@ -141,15 +142,17 @@ fixture SHAs come from `build-testing-fixtures.sh` (deterministic, see below).
 | `image-svg-rendered` | demo:4 | Open an SVG file (rendered view). |
 | `image-png-swap` | testing (imageswap) | A real git-tracked PNG old→new diff (`assets/logo.png`). |
 
-### Sidebar & AI sort modes (docs 7, 8) — 3 scenes
+### Sidebar & AI sort modes (docs 7, 8) — 5 scenes
 
 | Slug | Source | Steps |
 | --- | --- | --- |
+| `sidebar-folder` | demo:4 | Default folder grouping in the sidebar. |
 | `sidebar-risk` | demo:2 | Risk sort with score badges on. |
+| `sidebar-risk-popover` | demo:2 | Click a risk badge → the per-file risk-dimension popover. |
 | `sidebar-narrative` | demo:3 | Narrative sort with position chips. |
 | `sidebar-filter` | demo:4 | Type in the file filter. |
 
-### AI notes (docs 7, 20) — 4 scenes
+### AI notes (docs 7, 20) — 5 scenes
 
 | Slug | Source | Steps |
 | --- | --- | --- |
@@ -157,31 +160,40 @@ fixture SHAs come from `build-testing-fixtures.sh` (deterministic, see below).
 | `notes-risk` | demo:2 | Inline risk notes. |
 | `notes-narrative` | demo:3 | Narrative walkthrough notes. |
 | `notes-review` | demo:7 | AI review notes (rationale/proof/risk + "outdated" badge). |
+| `notes-reply` | demo:7 | A threaded human reply nested under a note. |
 
-### Annotations (doc 5) — 1 scene
+### Annotations (doc 5) — 2 scenes
 
 | Slug | Source | Steps |
 | --- | --- | --- |
 | `annotations-categories` | demo:4 | Open `session.ts`; bug/fix/pattern annotation rows. |
+| `annotations-form` | demo:4 | Click a diff line → the inline create form + category picker. |
 
-### Settings & themes (docs 8, 15, 17, 22) — 6 scenes
+### Settings & themes (docs 8, 15, 17, 22) — 12 scenes
 
 | Slug | Source | Steps |
 | --- | --- | --- |
 | `settings-general` | demo:4 | Settings → General tab. |
 | `settings-experimental` | demo:4 | Experimental tab — 5-platform AI picker, Claude Channel. |
 | `settings-profile` | demo:4 | Profile tab. |
-| `theme-dracula` | demo:4 | Main UI under the Dracula theme. |
+| `theme-manager` | demo:4 | Settings → Manage Themes → the theme manager dialog. |
+| `theme-dark` | demo:4 | Main UI under the Dark (default) theme. |
 | `theme-light` | demo:4 | Main UI under the Light theme. |
+| `theme-dracula` | demo:4 | Main UI under the Dracula theme. |
 | `theme-tokyo-night` | demo:4 | Main UI under the Tokyo Night theme. |
+| `theme-high-contrast` | demo:4 | Main UI under High Contrast Dark. |
+| `theme-solarized-dark` | demo:4 | Main UI under Solarized Dark. |
+| `theme-monokai` | demo:4 | Main UI under Monokai. |
+| `theme-one-dark-pro` | demo:4 | Main UI under One Dark Pro. |
 
-### Ground-truth mode (doc 26) — dogfooding the feature itself — 3 scenes
+### Ground-truth mode (doc 26) — dogfooding the feature itself — 4 scenes
 
 | Slug | Source | Steps |
 | --- | --- | --- |
 | `gt-source-list` | `tests/fixtures/ground-truth` | Named source-list groups with difference-score + kind badges. |
 | `gt-diff-header` | fixture | Open a comparison — Expected/Actual + step navigator. |
 | `gt-difference` | fixture | Switch the comparison to difference mode. |
+| `gt-identical-toggle` | fixture | Toggle "show identical" to reveal hidden 0-difference pairs. |
 
 ### Workflow & direct comparison (docs 1, 18) — 2 scenes
 
@@ -192,12 +204,17 @@ fixture SHAs come from `build-testing-fixtures.sh` (deterministic, see below).
 
 ### Deferred (follow-ups)
 
-Reliable-to-capture additions for a later pass, not in the initial baseline set:
-`sidebar-folder`, `sidebar-risk-popover`, `notes-reply`, `annotations-form` /
-`-stale` / `-attachment`, `theme-manager` / `theme-editor` + the remaining
-built-in themes, `gt-sets-steps` / `gt-identical-toggle`, `nav-go-to-definition`,
-`workflow-share-prompt` (time-gated), and `image-feedback-region` (a drawn
-region — a timing-sensitive drag better suited to a dedicated capture).
+These need something more than a deterministic UI drive, so they're left for a
+dedicated pass:
+
+- `nav-go-to-definition` — a Cmd/Ctrl-click on a symbol with a resolvable definition.
+- `workflow-share-prompt` — time-gated (5-min total / 1-min session thresholds);
+  needs a way to force the prompt.
+- `image-feedback-region` — drawing a region is a timing-sensitive mouse drag.
+- `annotations-attachment` — needs a seeded attachment in the demo data.
+- `theme-editor` — needs a custom (non-built-in) theme to edit.
+- `gt-sets-steps` — the collapsible set group is already visible in
+  `gt-source-list`; a dedicated collapsed-state capture adds little.
 
 > **glassbox-testing fixtures.** The diff-shape scenes pin commits from the
 > `glassbox-testing` repo, cloned to the gitignored `external/glassbox-testing/`

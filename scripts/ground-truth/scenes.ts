@@ -406,4 +406,90 @@ export const SCENES: Scene[] = [
       await page.waitForTimeout(1200);
     },
   },
+
+  // ============== GB-996 follow-up: finer-grained scenes ==================
+  {
+    slug: 'sidebar-folder', label: 'Folder grouping (sidebar)', featureArea: 'Sidebar / sort',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page) { await page.waitForTimeout(1200); },
+  },
+  {
+    slug: 'sidebar-risk-popover', label: 'Per-file risk dimension popover', featureArea: 'Sidebar / sort',
+    repo: 'self', args: ['--demo:2'],
+    async setup(page, base) {
+      await fetch(`${base}/api/ai/preferences`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_risk_scores: true, risk_sort_dimension: 'aggregate' }),
+      });
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForSelector('.risk-badge', { timeout: 12000 });
+      await page.locator('.risk-badge').first().click();
+      await page.waitForSelector('.risk-popover', { timeout: 5000 });
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    slug: 'notes-reply', label: 'Threaded reply under an AI note', featureArea: 'AI notes',
+    repo: 'self', args: ['--demo:7'],
+    async setup(page) {
+      await openFile(page, DEMO_FILE);
+      await page.waitForSelector('.annotation-reply-tag', { timeout: 10000 });
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    slug: 'annotations-form', label: 'Annotation create form', featureArea: 'Annotations',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page) {
+      await openFile(page, DEMO_FILE);
+      await page.locator('.diff-line').first().click();
+      await page.waitForSelector('.annotation-form-container', { timeout: 6000 });
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    slug: 'theme-manager', label: 'Theme manager', featureArea: 'Themes',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page) {
+      await page.click('.settings-gear');
+      await page.waitForSelector('.settings-dialog', { timeout: 5000 });
+      await page.click('#manage-themes-btn');
+      await page.waitForSelector('.theme-manager-dialog', { timeout: 5000 });
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    slug: 'theme-dark', label: 'Main UI — Dark theme (default)', featureArea: 'Themes',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page, base) { await setTheme(page, base, 'dark'); await openFile(page, DEMO_FILE); },
+  },
+  {
+    slug: 'theme-high-contrast', label: 'Main UI — High Contrast Dark theme', featureArea: 'Themes',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page, base) { await setTheme(page, base, 'high-contrast-dark'); await openFile(page, DEMO_FILE); },
+  },
+  {
+    slug: 'theme-solarized-dark', label: 'Main UI — Solarized Dark theme', featureArea: 'Themes',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page, base) { await setTheme(page, base, 'solarized-dark'); await openFile(page, DEMO_FILE); },
+  },
+  {
+    slug: 'theme-monokai', label: 'Main UI — Monokai theme', featureArea: 'Themes',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page, base) { await setTheme(page, base, 'monokai'); await openFile(page, DEMO_FILE); },
+  },
+  {
+    slug: 'theme-one-dark-pro', label: 'Main UI — One Dark Pro theme', featureArea: 'Themes',
+    repo: 'self', args: ['--demo:4'],
+    async setup(page, base) { await setTheme(page, base, 'one-dark-pro'); await openFile(page, DEMO_FILE); },
+  },
+  {
+    slug: 'gt-identical-toggle', label: 'Ground-truth — show identical toggle', featureArea: 'Ground-truth mode',
+    repo: 'self', args: ['--ground-truth', GT_MANIFEST],
+    async setup(page) {
+      await page.waitForSelector('.identical-toggle', { timeout: 10000 });
+      await page.locator('.identical-toggle').first().click();
+      await page.waitForTimeout(600);
+    },
+  },
 ];
