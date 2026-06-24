@@ -1,0 +1,157 @@
+{
+  "appName": "Glassbox",
+  "appIcon": "variant-5",
+  "backupDir": "/Users/westphal/Library/CloudStorage/GoogleDrive-brian.westphal@bleugris.com/My Drive/hotsheet-backups/glassbox",
+  "ticketPrefix": "GB",
+  "port": 4174,
+  "detail_width": "360",
+  "detail_height": "300",
+  "trash_cleanup_days": "3",
+  "completed_cleanup_days": "30",
+  "verified_cleanup_days": "30",
+  "detail_position": "side",
+  "channel_enabled": "true",
+  "custom_commands": [
+    {
+      "name": "Commit Changes",
+      "prompt": "make a commit message for the recently completed tickets, without wrapping long lines.  Don't include any co-authored by Anthropic type lines in the commit message.  add all unstaged changes to the git commit.  git commit with the message you generated but don't push",
+      "icon": "send",
+      "color": "#3b82f6"
+    },
+    {
+      "name": "Update Requirements",
+      "prompt": "Update the requirements docs as appropriate",
+      "icon": "file-text",
+      "color": "#6b7280"
+    },
+    {
+      "type": "group",
+      "name": "quality",
+      "children": [
+        {
+          "name": "Reqs ↔︎ Code",
+          "prompt": "/check-requirements-against-code",
+          "icon": "arrow-left-right",
+          "color": "#ec4899"
+        },
+        {
+          "name": "Analyze Code Quality",
+          "prompt": "/analyze-code-quality",
+          "icon": "circle-check-big",
+          "color": "#8b5cf6"
+        },
+        {
+          "name": "Kerf Usage Audit",
+          "prompt": "Audit this codebase for kerf usage.  See ~/.claude/skills/kerf-app/SKILL.md or node_modules/kerfjs/ai/skill.md.  For each finding, make Hot Sheet tickets with: file:line, which rule or pattern, the fix shape. Don't speculate - only flag patterns you can point to in the code. Top \"must fix\" list, then \"consider\" list.",
+          "icon": "slice",
+          "color": "#f97316"
+        },
+        {
+          "name": "Check Code Hygene",
+          "prompt": "/check-code-hygiene",
+          "icon": "soap-dispenser-droplet",
+          "color": "#f97316"
+        },
+        {
+          "name": "Everything",
+          "prompt": "do these sequentially, creating follow up tickets for all concerns encountered:\n/check-requirements-against-code\n/check-code-hygiene\n/analyze-code-quality\n",
+          "icon": "balloon",
+          "color": "#e5e7eb"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "GIT",
+      "children": [
+        {
+          "name": "git status",
+          "prompt": "git status",
+          "icon": "git-compare",
+          "color": "#e5e7eb",
+          "target": "shell",
+          "autoShowLog": true
+        },
+        {
+          "name": "git push",
+          "prompt": "git push",
+          "icon": "git-compare-arrows",
+          "target": "shell"
+        }
+      ]
+    },
+    {
+      "name": "Prep Major Release",
+      "prompt": "We've made a lot of changes.  Review and update the README.md file as necessary.  Make sure it stays compelling and advertises our most important and interesting features.\n\nReview the demo modes and revise those if you think new / different / fewer screenshots are needed.  Then re-capture all of the demos (always do all of them in case minor details changed).\n",
+      "icon": "wand",
+      "color": "#14b8a6"
+    },
+    {
+      "name": "Release Beta",
+      "prompt": "npm run release:beta:auto",
+      "target": "shell",
+      "icon": "rocket",
+      "color": "#6b7280",
+      "launchInNewTerminal": true
+    },
+    {
+      "name": "Release Prod",
+      "prompt": "npm run release",
+      "target": "shell",
+      "color": "#22c55e",
+      "icon": "rocket",
+      "launchInNewTerminal": true
+    }
+  ],
+  "layout": "columns",
+  "custom_views": [],
+  "notify_permission": "once",
+  "auto_context": [
+    {
+      "type": "category",
+      "key": "feature",
+      "text": "Read docs/ai/code-summary.md and docs/ai/requirements-summary.md if you haven't yet or if you feel you might be out-of-date.\n\nAdd a new requirements document.\n\nAsk clarifying questions as needed.\n\nBe sure to create follow up tickets as needed as well.\n"
+    },
+    {
+      "type": "category",
+      "key": "requirement_change",
+      "text": "Read docs/ai/code-summary.md and docs/ai/requirements-summary.md if you haven't yet or if you feel you might be out-of-date.\n\nUpdate requirements documents as appropriate.\n\nAsk clarifying questions as needed.\n"
+    },
+    {
+      "type": "category",
+      "key": "bug",
+      "text": "Read docs/ai/code-summary.md and docs/ai/requirements-summary.md if you haven't yet or if you feel you might be out-of-date.\n\nEvaluate current tests and add unit tests or test automation to protected against this kind of bug going forward, if applicable.\n"
+    }
+  ],
+  "drawer_open": "true",
+  "drawer_active_tab": "terminal:t-moj7fzo1-4uie",
+  "drawer_expanded": "false",
+  "terminals": [
+    {
+      "id": "t-moj7fzo1-4uie",
+      "command": "{{claudeCommand}}",
+      "lazy": false,
+      "name": "Claude"
+    }
+  ],
+  "terminal_default": {
+    "theme": "github-dark",
+    "fontSize": 17
+  },
+  "terminal_prompt_allow_rules": [
+    {
+      "id": "tp_momezcht_551e56",
+      "parser_id": "claude-numbered",
+      "question_hash": "03018162",
+      "question_preview": "WARNING: Loading development channels",
+      "choice_index": 0,
+      "choice_label": "I am using this for local development",
+      "created_at": "2026-05-01T04:30:05.825Z"
+    }
+  ],
+  "telemetry_enabled": true,
+  "announcer_enabled": "true",
+  "announcer_ai_key_id": "d68695d5-0eb2-4972-9997-000468afa2a2",
+  "announcer_last_listened_at": "2026-06-22T02:12:54.222Z",
+  "ai_instructions_nudge_dismissed": true
+}

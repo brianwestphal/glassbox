@@ -280,7 +280,7 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 
 ## Ticket References Are Local-Only
 
-> **Hot Sheet tickets are local-only.** The `.hotsheet/` directory is gitignored and lives only on the project maintainer's machine. Ticket IDs (e.g. `GB-774`) are meaningless to anyone else and there is no shared issue tracker to look them up in.
+> **Hot Sheet tickets are local-only.** Only `.hotsheet/settings.json` (shareable Hot Sheet config) is tracked in git; the rest of `.hotsheet/` — the ticket database and the worklist — is gitignored and lives only on the project maintainer's machine. Ticket IDs (e.g. `GB-774`) are meaningless to anyone else and there is no shared issue tracker to look them up in.
 >
 > This has two consequences for everything you write:
 >

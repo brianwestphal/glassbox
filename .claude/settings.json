@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl * http://localhost:417*/api/*)",
+      "Bash(curl * http://localhost:418*/api/*)",
+      "Bash(curl * http://localhost:419*/api/*)"
+    ]
+  }
+}
