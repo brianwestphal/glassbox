@@ -277,6 +277,7 @@ npm run test:all      # Unit + E2E with merged coverage report (lcov + genhtml)
 - Client CSS and JS are built separately and served as static files — never inlined in layout
 - **Always use American-English spelling and grammar** in all source files — code, comments, identifiers, log/error messages, UI strings, documentation, and commit messages. Prefer `color`/`behavior`/`canceled`/`canceling`/`finalize`/`organize`/`customize`/`optimize`/`analyze`/`initialize`/`center`/`gray` over their British variants (`colour`/`behaviour`/`cancelled`/`cancelling`/`finalise`/`organise`/`customise`/`optimise`/`analyse`/`initialise`/`centre`/`grey`). This applies equally to TypeScript, Rust, SCSS, Markdown, and shell scripts.
 - **No emoji or decorative Unicode glyphs in the UI** — they look unprofessional and render inconsistently across platforms. Use an SVG icon from `src/icons.tsx` (lucide-style, `stroke="currentColor"`) instead. This covers emoji (`📎`, `✅`, …) and dingbat/geometric glyphs pressed into service as icons (`✎`, `✕`, `▭`, `▾`, `▸`, …). If a needed icon isn't in `src/icons.tsx`, add it there. (Legitimate text content — e.g. a `✓` inside a mocked test-runner transcript — is fine; this rule is about UI chrome.)
+- **Git: commit freely, never push without permission.** Commit changes as needed without asking first (follow the project commit style: no `Co-Authored-By` trailer, no hard-wrapped body lines). Do **not** run `git push` unless the user explicitly asks for it.
 
 ## Ticket References Are Local-Only
 
