@@ -2,6 +2,30 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.18.0] - 2026-06-26
+
+
+- **Ground-truth image comparison** — a new `glassbox --ground-truth <manifest.json>` mode (no git repo required) compares actual images against expected baselines (design specs, reference renders, or previous-actual baselines), with a perceptual difference score that hides identical pairs and sorts the list most-different-first. Supports ordered sets/flows of steps, Expected/Actual pane labels, a named source list, and a `glassbox ground-truth promote` command to rotate baselines.
+- **Side-by-side image comparison** — review image changes with old (A) and new (B) shown in two panes, toggling between left/right and over/under layouts; this is now the default for two-sided image and rendered-SVG changes, with synced zoom/pan.
+- **Single-side image focus modes (A / B)** — view only the old or only the new image, with per-side region feedback, placed between Metadata and Side by Side in the mode control.
+- **Reviewer file attachments** — attach any file (screenshots, logs, specs, recordings, up to 50 MB) to a line comment, image comment, drawn region, or note reply via button, drag-and-drop, or paste. Image chips show inline thumbnails and open a full-screen preview; other types open in the OS default app, and attachment paths ride into the exported review for AI tools.
+- **Sidebar hide/show toggle** — a nav-bar button collapses the sidebar so the diff fills the width, and restores it on a second click.
+- **Review-note image artifacts** — click an AI review note's image to open a full-screen lightbox; drag a rectangle to mark a region (one or more) that rides into your reply as a "see this spot" thumbnail.
+- **Structured review export + completion hook** — Glassbox now also writes `.glassbox/latest-review.json` alongside the markdown, and a new `--on-complete "<cmd>"` hook runs a command when a review completes (with review JSON/markdown/ID/repo paths in the environment), enabling automated review loops.
+- **Automatic `.gitignore` management** — at launch inside a git repo, Glassbox keeps `.gitignore` set up to ignore `.glassbox/` contents while keeping the shared per-project `settings.json` tracked.
+
+- Fixed `git difftool` per-file mode misrouting added files into a blocking review instead of accumulating them into one session.
+- Fixed a ground-truth review showing a gigantic, useless serialized "source" label in the sidebar.
+- Fixed a production-only crash when launching a ground-truth review from the packaged app.
+- Side-by-side "Actual size" (1:1) now sizes each pane to its own image instead of only the first pane.
+- Fixed unresponsive edit/delete icon-button clicks on image-feedback comments.
+
+- Replaced decorative Unicode glyphs and the artifact emoji throughout the UI with consistent lucide SVG icons.
+- Image-file diffs now use the shared lightbox with zoom/pan.
+
+- Added an AI-integration hub (`AGENTS.md` + `docs/ai-integration.md`) documenting how external AI tools launch reviews, write review notes, export proof, and consume feedback.
+- Refreshed the README to showcase image diffs, ground-truth comparison, attachments, and the side-by-side image layouts, with re-captured screenshots.
+
 ## [0.17.0] - 2026-06-22
 
 
