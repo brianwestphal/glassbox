@@ -75,7 +75,17 @@ fi
 echo ""
 echo -e "${DIM}Cloning test repo...${RESET}"
 TEST_REPO_DIR=$(mktemp -d "${TMPDIR:-/tmp}/glassbox-smoke.XXXXXX")
-git clone --depth 50 --quiet "$TEST_REPO_URL" "$TEST_REPO_DIR" 2>/dev/null
+# Skip Git LFS smudge on clone. The smoke test only needs a real git repo to
+# point Glassbox at — not the LFS-tracked screenshot baselines under
+# `ground-truth-screenshots/baseline/`. Without this, a missing or throttled LFS
+# object aborts the checkout (`smudge filter lfs failed`) and `git clone` exits
+# 128, which under `set -e` kills the whole smoke run. GIT_LFS_SKIP_SMUDGE leaves
+# pointer files in place, which is fine here. Drop `2>/dev/null` so a genuine
+# clone failure is visible in the log instead of silently exiting 128.
+if ! GIT_LFS_SKIP_SMUDGE=1 git clone --depth 50 --quiet "$TEST_REPO_URL" "$TEST_REPO_DIR"; then
+  fail "Could not clone test repo from $TEST_REPO_URL"
+  exit 1
+fi
 
 # Pick a commit that has changes (not the initial commit)
 cd "$TEST_REPO_DIR"
