@@ -609,12 +609,16 @@ Scripts (`package.json`):
   annotate → complete → `/glassbox` loop with Playwright, captures each beat via
   `domotion-svg`, and composites one looping SVG: each beat is a rounded
   browser/terminal window floating on a **transparent** canvas with a
-  broadcast-style lower-third caption + an animated cursor. Lives in
-  `scripts/demo/` (`capture-demo.ts` orchestrator, `scenes.ts`
-  launch/terminal/markdown/end-card scenes, `chrome.ts` window + lower-third
-  compositing); see `scripts/demo/README.md`. `domotion-svg` is pinned to 0.15.0
-  and forced to embedded-font text mode (`setRenderTextMode`). Must run outside
-  the command sandbox (Chromium).
+  broadcast-style lower-third caption + an animated cursor. The two **terminal
+  beats** (the CLI launch and the Claude Code `/glassbox` session) are real
+  `domotion term` cast renders (`castToTermFrames`) so they read as a genuine
+  terminal session — not HTML mocks crossfaded together; their `.cast` scripts
+  live in `scripts/demo/casts.ts`. Lives in `scripts/demo/` (`capture-demo.ts`
+  orchestrator, `casts.ts` terminal cast scripts, `scenes.ts` markdown-peek +
+  end-card scenes, `chrome.ts` window + lower-third compositing); see
+  `scripts/demo/README.md`. `domotion-svg` is pinned to 0.16.0 and forced to
+  embedded-font text mode (`setRenderTextMode`). Must run outside the command
+  sandbox (Chromium).
 - `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
 - `release:beta:auto` — **non-interactive** equivalent of `release:beta` (`scripts/release-beta-auto.sh`) for automation/unattended cuts: no prompts, no `$EDITOR`. Smart-defaults the target version (package.json version if not yet stable-tagged, else next minor; override with `X.Y.Z` / `--version`), drafts notes via gitgist (AI → `--no-ai` → log pointer; override with `--notes`/`--notes-stdin`), runs build + tests (retry once, `--skip-tests`) + lint + tsc, then auto-increments + pushes the `v{ver}-beta.{N}` tag. `--dry-run` stops before tagging. Skips the `npm whoami` preflight (CI publishes via token). Distinct exit codes (1/2/3).

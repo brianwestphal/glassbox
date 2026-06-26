@@ -6,15 +6,17 @@ rounded browser/terminal window floating on a **transparent** canvas (so it sits
 on any README background, light or dark) with a broadcast-style **lower-third**
 caption (accent bar + `GLASSBOX` eyebrow). It walks the whole Glassbox loop:
 
-1. **CLI launch** — a shell runs `npx glassbox` over some uncommitted changes;
-   the launch output crossfades into the live app (Glassbox "appears")
+1. **CLI launch** — a real terminal recording (`domotion term`): `git status -s`
+   shows the uncommitted changes, then `npx glassbox` runs; the last frame
+   crossfades into the live app (Glassbox "appears")
 2. **AI risk triage** — sidebar in risk mode with colored risk badges
 3. Browse a file, then open the `src/auth/session.ts` split diff (with guided
    "Learn" notes and a pre-seeded `remember` annotation)
 4. Click line 23, type a bug annotation, save it
 5. Complete the review
 6. Peek at the exported `.glassbox/latest-review.md`
-7. A Claude Code terminal runs `/glassbox`, applies the fix, tests pass
+7. A Claude Code terminal recording (`domotion term`) runs `/glassbox`, applies
+   the fix, tests pass
 8. The loop closes on the fixed diff
 9. A branded end card (floating in the same window rect)
 
@@ -67,7 +69,7 @@ DevTools / VS Code can both open them directly.
   bootstrap ports; a sandbox blocks that with a `mach_port_rendezvous … Permission
   denied` crash.
 - **`domotion-svg`** — pinned to an exact version in `devDependencies`
-  (currently `0.15.0`). The script calls `setRenderTextMode('embedded-font')` so
+  (currently `0.16.0`). The script calls `setRenderTextMode('embedded-font')` so
   the demo is always built in **embedded-font** mode: text is `<text>` rendered
   with an `@font-face` subset embedded in the SVG, so it looks identical on any
   viewer regardless of installed fonts, and it's lighter than the older
@@ -82,12 +84,18 @@ DevTools / VS Code can both open them directly.
   composition). The storyboard lives near the top (target file/line, feedback
   text, captions, durations, transitions, overlays) and in the frame jobs +
   cursor track.
-- `scenes.ts` — the hand-built scenes that aren't captured from the live app:
-  the CLI-launch shell (`launchTerminalHtml`), the Claude Code terminal mock
-  (`terminalSceneHtml`), the exported-markdown peek (`markdownPeekHtml`), and the
-  branded end card (`endCardSvg`, floated in the shared `chrome.ts` `CARD` rect).
-  The fix the terminal shows (URL-encoding the Redis session key) must match the
-  annotation typed in `capture-demo.ts` and the loop-close frame.
+- `casts.ts` — asciinema-v2 `.cast` generators for the two **terminal beats**
+  (`launchCast`, `claudeCast`), rendered through `domotion term`
+  (`castToTermFrames`) so they read as a genuine terminal session (incremental
+  line reveal, a real caret, hard cuts between settle points) rather than HTML
+  mocks crossfaded together. The `git status -s` files match the demo review
+  (`DEMO_FILES`); the fix the Claude session shows (URL-encoding the Redis
+  session key) must match the annotation typed in `capture-demo.ts` and the
+  loop-close frame.
+- `scenes.ts` — the remaining hand-built scenes that aren't captured from the
+  live app: the exported-markdown peek (`markdownPeekHtml`) and the branded end
+  card (`endCardSvg` — the app icon over a single-color wordmark, floated in the
+  shared `chrome.ts` `CARD` rect).
 - `chrome.ts` — SVG compositing: wraps each captured frame in a rounded
   browser/terminal window on a transparent canvas (hairline border, no drop
   shadow — it would clip at the tight canvas margins) plus a left-anchored
@@ -96,9 +104,9 @@ DevTools / VS Code can both open them directly.
 
 ## Notes / gotchas
 
-- The end card is **hand-built SVG**, not captured HTML — purely for precise
-  branding/layout control (it's the one frame that isn't a screenshot of the app
-  or a captured HTML scene).
+- The end card is **hand-built SVG** (the only hand-built frame) — purely for
+  precise branding/layout control; the app beats are live screenshots and the
+  terminal beats are `domotion term` cast renders.
 - The risk badges use mocked (random) scores, so their exact values/order vary
   per run — that's cosmetic; the point is the colored risk triage.
 - The typed feedback wraps natively (domotion's typing-overlay `bgWidth`) and

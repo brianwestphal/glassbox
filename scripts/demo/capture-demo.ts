@@ -7,15 +7,16 @@
  *
  * Storyboard (one infinitely-looping SVG; each beat is a rounded browser/
  * terminal window on a transparent canvas with a lower-third caption):
- *   0. CLI launch — `npx glassbox` in a shell, then Glassbox "appears" (a
- *      crossfade from the launch output into the live app)
+ *   0. CLI launch — a real terminal recording (`domotion term`): `git status -s`
+ *      then `npx glassbox`, whose last frame crossfades into the live app
  *   1. AI risk triage — sidebar in risk mode, colored risk badges
  *   2. browse a file, then open the `src/auth/session.ts` split diff (with
  *      guided "Learn" notes and a pre-seeded `remember` annotation)
  *   3. click line 23, type a bug annotation, save it
  *   4. complete the review
  *   5. peek at the exported `.glassbox/latest-review.md`
- *   6. a mocked Claude Code terminal runs `/glassbox`, applies the fix, tests pass
+ *   6. a Claude Code terminal recording (`domotion term`) runs `/glassbox`,
+ *      applies the fix, tests pass
  *   7. the loop closes on the fixed diff
  *   8. a branded end card
  * An on-screen cursor glides between targets (with click pulses) through the
@@ -26,9 +27,10 @@
  * and silently falls back to CSS `<text>` (tofu); rendering once everything else
  * is gone makes path mode reliable, and we assert it at the end.
  *
- * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.15.0; this script
+ * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.16.0; this script
  * renders in embedded-font mode — see `setRenderTextMode('embedded-font')`
- * below). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
+ * below). The terminal beats are real `domotion term` cast renders (see
+ * `casts.ts`). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
  */
 
 import { spawn } from 'node:child_process';
@@ -39,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   captureElementTree,
+  castToTermFrames,
   clearEmbeddedFonts,
   cullElementsOutsideViewBox,
   elementTreeToSvgInner,
@@ -52,6 +55,7 @@ import {
 import type { AnimationFrame, CursorEvent, TypingOverlay } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
 
+import { claudeCast, launchCast } from './casts.js';
 import {
   CANVAS_H,
   CANVAS_W,
@@ -64,12 +68,18 @@ import {
 } from './chrome.js';
 import {
   endCardSvg,
-  LAUNCH_ANCHOR_ID,
-  launchTerminalHtml,
   markdownPeekHtml,
-  PROMPT_ANCHOR_ID,
-  terminalSceneHtml,
 } from './scenes.js';
+
+// Terminal beats are real `domotion term` cast renders (DM-1225), so they read
+// as a continuous terminal session (incremental line reveal, a real caret, hard
+// cuts between settle points) rather than separate HTML screenshots crossfaded
+// together (which looked composited / faded). Grid sized so the widest line —
+// the inline-edit diff's `encodeURIComponent` row — fits without wrapping.
+const TERM_THEME = { extends: 'dark', bg: '#0d1117', fg: '#c9d1d9' } as const;
+const TERM_COLS = 112;
+const TERM_FONT_SIZE = 15;
+const TERM_PADDING = 30;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
@@ -107,7 +117,8 @@ type CapturedTree = Awaited<ReturnType<typeof captureElementTree>>;
 interface FrameJob {
   /** Captured tree rendered at CONTENT size + wrapped in chrome … */
   tree: CapturedTree | null;
-  /** … OR a pre-built full-canvas SVG (the end card, which is chrome-less). */
+  /** … OR a pre-built full-canvas SVG (the end card; the terminal cast frames,
+   *  already rendered to SVG during the session by `castToTermFrames`). */
   fullSvg?: string;
   prefix: string;
   chrome?: { title: string; kind: ChromeKind; caption?: string };
@@ -115,7 +126,10 @@ interface FrameJob {
 }
 
 interface Hit { cx: number; cy: number }
-interface ClickSpec { frame: number; offset: number; hit: Hit }
+/** A click pulse: the app job it lands on (resolved to a frame index at compose
+ *  time, so it survives a varying number of terminal cast frames before it) plus
+ *  the ms offset into that frame and the content-space target. */
+interface ClickSpec { job: FrameJob; offset: number; hit: Hit }
 
 function center(b: { x: number; y: number; width: number; height: number }): Hit {
   return { cx: b.x + b.width / 2, cy: b.y + b.height / 2 };
@@ -180,20 +194,51 @@ async function main(): Promise<void> {
     await page.screenshot({ path: resolve(DEBUG_DIR, `${String(shot++).padStart(2, '0')}-${name}.png`) });
   };
 
-  const jobs: FrameJob[] = [];
   const clickSpecs: ClickSpec[] = [];
   let prefix = 0;
   const nextPrefix = (): string => `f${String(prefix++)}-`;
 
-  // Push a Glassbox/terminal/markdown frame (chrome-wrapped at compose time).
-  const pushChrome = (tree: CapturedTree, chrome: FrameJob['chrome'], meta: FrameJob['meta']): number => {
-    jobs.push({ tree, prefix: nextPrefix(), chrome, meta });
-    return jobs.length - 1;
+  // Build a Glassbox/markdown frame job (the captured tree is chrome-wrapped at
+  // compose time, after teardown). Returns the job so callers can hold a
+  // reference — frame INDICES aren't known until the final order is assembled
+  // (terminal cast beats contribute a variable number of frames).
+  const mkJob = (tree: CapturedTree, chrome: FrameJob['chrome'], meta: FrameJob['meta']): FrameJob =>
+    ({ tree, prefix: nextPrefix(), chrome, meta });
+
+  // Render one terminal beat from an asciinema cast through `castToTermFrames`
+  // (the `domotion term` pipeline) into pre-wrapped frame jobs: each settle-point
+  // frame is centered on a terminal-bg content area and wrapped in window chrome.
+  // The cast frames already cut between settle points (terminals don't crossfade);
+  // only the FIRST frame takes the beat's entry transition from the prior scene.
+  const renderTermCast = async (
+    castText: string, rows: number,
+    o: { title: string; caption: string; entry: AnimationFrame['transition'] },
+  ): Promise<FrameJob[]> => {
+    if (browser === null) throw new Error('browser not ready for cast render');
+    const { frames, width, height } = await castToTermFrames(castText, browser, {
+      theme: TERM_THEME, cols: TERM_COLS, rows, fontSize: TERM_FONT_SIZE,
+      padding: TERM_PADDING, cursor: 'block', mode: 'incremental', manageFonts: false,
+    });
+    // Center horizontally; top-align vertically (a real terminal fills from the
+    // top — centering left the shorter launch terminal floating mid-card). A
+    // small inset gives breathing room under the title bar.
+    const dx = Math.round((CONTENT_W - width) / 2);
+    const dy = 16;
+    return frames.map((f, i): FrameJob => {
+      const id = nextPrefix();
+      const content =
+        `<rect x="0" y="0" width="${String(CONTENT_W)}" height="${String(CONTENT_H)}" fill="${TERM_THEME.bg}"/>` +
+        `<g transform="translate(${String(dx)}, ${String(dy)})">${f.svgContent}</g>`;
+      return {
+        tree: null, prefix: id,
+        fullSvg: chromeWrap(content, { title: o.title, kind: 'terminal', id, caption: o.caption }),
+        meta: { duration: f.duration, transition: i === 0 ? o.entry : f.transition },
+      };
+    });
   };
 
   let typeEnd = 0;
   let markdown = '';
-  let promptAnchor = { x: 0, y: 0, fontSize: 14 };
 
   try {
     await waitForServer();
@@ -205,6 +250,16 @@ async function main(): Promise<void> {
       body: JSON.stringify({ show_risk_scores: true, risk_sort_dimension: 'aggregate' }),
     });
     browser = await launchChromium();
+    // Pin the text mode ONCE, up front — before any frame (terminal cast or app)
+    // is rendered to SVG — so a future domotion default change can't silently
+    // break the demo (v0.4.0's switch to embedded-font once rendered as tofu).
+    // Terminal cast frames render during the session (they need the browser); app
+    // frames render after teardown. Both share this one embedded-font builder
+    // (cleared once here, collected once at the end), so the base64 font subset
+    // appears a single time in the output — hence no `clearEmbeddedFonts()` in
+    // the post-teardown render loop, which would drop the terminal glyphs.
+    setRenderTextMode('embedded-font');
+    clearEmbeddedFonts();
     // Record a HAR alongside the animated SVG output. Gitignored (see
     // `.gitignore`) — useful for debugging the network activity that drove
     // the storyboard, not as a committed artifact.
@@ -234,45 +289,16 @@ async function main(): Promise<void> {
     }, { file: TARGET_FILE, line: REMEMBER_LINE, content: REMEMBER });
 
     // === 0. CLI launch ====================================================
-    // Open on a shell launching Glassbox; the launch output crossfades into the
-    // live app below (the "Glassbox appears" beat). Captured on a throwaway page
-    // so the real review page keeps its own scroll/UI state. Pushed FIRST so
-    // these are frames 0–1 and every app frame's index shifts after them.
-    const launchPage = await ctx.newPage();
-    await launchPage.setViewportSize({ width: CONTENT_W, height: CONTENT_H });
-    await launchPage.setContent(launchTerminalHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'prompt' }));
-    await launchPage.waitForTimeout(150);
-    const launchAnchor = await launchPage.evaluate((id) => {
-      const el = document.getElementById(id);
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, fontSize: parseFloat(getComputedStyle(document.body).fontSize) };
-    }, LAUNCH_ANCHOR_ID);
-    if (launchAnchor === null) throw new Error('launch prompt anchor not found');
-    await debugShot(launchPage, 'launch-prompt');
-    jobs.push({
-      tree: await grabTree(launchPage), prefix: nextPrefix(),
-      chrome: { title: LAUNCH_TITLE, kind: 'terminal', caption: 'Launch a review from the CLI' },
-      meta: {
-        duration: 1600, transition: { type: 'crossfade', duration: 300 },
-        overlays: [{
-          kind: 'typing', text: 'npx glassbox',
-          x: launchAnchor.x + OX, y: launchAnchor.y + OY + launchAnchor.fontSize * 0.9,
-          fontSize: launchAnchor.fontSize, color: '#c9d1d9', speed: 60, delay: 300, caret: true,
-        }],
-      },
+    // The opening shell beat is a real terminal recording (domotion term): the
+    // user runs `git status -s` then `npx glassbox`, and the CLI reports the
+    // review + URL. Its last frame crossfades into the live app below (the
+    // "Glassbox appears" beat). Rendered now (needs the browser); spliced FIRST
+    // in the final order. The `git status` files match the demo review, so the
+    // launch lines up with the diff shown next (no continuity gap).
+    const launchJobs = await renderTermCast(launchCast(TERM_COLS, 22), 22, {
+      title: LAUNCH_TITLE, caption: 'Launch a review from the CLI',
+      entry: { type: 'cut', duration: 0 },
     });
-    await launchPage.setContent(launchTerminalHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'launched' }));
-    await launchPage.waitForTimeout(150);
-    await debugShot(launchPage, 'launch-done');
-    jobs.push({
-      tree: await grabTree(launchPage), prefix: nextPrefix(),
-      chrome: { title: LAUNCH_TITLE, kind: 'terminal', caption: 'It builds the review and opens your browser' },
-      meta: { duration: 1700, transition: { type: 'crossfade', duration: 280 } },
-    });
-    await launchPage.close();
-    // First live-app frame (risk triage) lands right after the launch beats.
-    const firstAppFrameIdx = jobs.length;
 
     // === 1. Risk triage ===================================================
     await page.click('button[data-sort-mode="risk"]');
@@ -280,22 +306,18 @@ async function main(): Promise<void> {
     await page.waitForTimeout(700);
     const browseHit = await sidebarHit(page, BROWSE_FILE);
     await debugShot(page, 'risk');
-    clickSpecs.push({
-      frame: pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'AI scores every file’s risk' },
-        { duration: 2000, transition: { type: 'crossfade', duration: 260 } }),
-      offset: 1400, hit: browseHit,
-    });
+    const riskJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'AI scores every file’s risk' },
+      { duration: 2000, transition: { type: 'crossfade', duration: 300 } });
+    clickSpecs.push({ job: riskJob, offset: 1400, hit: browseHit });
 
     // === 2. Browse a file, then open the target diff ======================
     await openFile(page, BROWSE_FILE);
     await page.waitForTimeout(500);
     const targetHit = await sidebarHit(page, TARGET_FILE);
     await debugShot(page, 'browse');
-    clickSpecs.push({
-      frame: pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Browse the changes' },
-        { duration: 1500, transition: { type: 'crossfade', duration: 260 } }),
-      offset: 1000, hit: targetHit,
-    });
+    const browseJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Browse the changes' },
+      { duration: 1500, transition: { type: 'crossfade', duration: 260 } });
+    clickSpecs.push({ job: browseJob, offset: 1000, hit: targetHit });
 
     await openFile(page, TARGET_FILE);
     await page.waitForSelector('.ai-note-guided', { timeout: 10000 });
@@ -306,11 +328,9 @@ async function main(): Promise<void> {
     const lineBox = await page.locator(lineSel).boundingBox();
     if (lineBox === null) throw new Error('target line not visible');
     await debugShot(page, 'diff');
-    clickSpecs.push({
-      frame: pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Review with AI “Learn” notes' },
-        { duration: 2600, transition: { type: 'crossfade', duration: 260 } }),
-      offset: 1800, hit: center(lineBox),
-    });
+    const diffJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Review with AI “Learn” notes' },
+      { duration: 2600, transition: { type: 'crossfade', duration: 260 } });
+    clickSpecs.push({ job: diffJob, offset: 1800, hit: center(lineBox) });
 
     // === 3. Annotate line 23 (type wrapped feedback) ======================
     await page.click(lineSel, { position: { x: 60, y: lineBox.height / 2 } });
@@ -345,11 +365,9 @@ async function main(): Promise<void> {
     };
 
     await debugShot(page, 'form');
-    clickSpecs.push({
-      frame: pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Leave a note for your AI' },
-        { duration: typeEnd + 1100, transition: { type: 'crossfade', duration: 260 }, overlays: [typingOverlay] }),
-      offset: typeEnd + 550, hit: center(saveBox),
-    });
+    const formJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Leave a note for your AI' },
+      { duration: typeEnd + 1100, transition: { type: 'crossfade', duration: 260 }, overlays: [typingOverlay] });
+    clickSpecs.push({ job: formJob, offset: typeEnd + 550, hit: center(saveBox) });
 
     // === 4. Save + complete ===============================================
     await page.fill('.annotation-form-container textarea', FEEDBACK);
@@ -359,11 +377,9 @@ async function main(): Promise<void> {
     const completeBox = await page.locator('#complete-review').boundingBox();
     if (completeBox === null) throw new Error('complete-review button not found');
     await debugShot(page, 'saved');
-    clickSpecs.push({
-      frame: pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'A bug to fix — and a rule to remember' },
-        { duration: 1700, transition: { type: 'crossfade', duration: 260 } }),
-      offset: 1150, hit: center(completeBox),
-    });
+    const savedJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'A bug to fix — and a rule to remember' },
+      { duration: 1700, transition: { type: 'crossfade', duration: 260 } });
+    clickSpecs.push({ job: savedJob, offset: 1150, hit: center(completeBox) });
 
     await page.click('#complete-review');
     await page.waitForSelector('.modal-copyable', { timeout: 8000 });
@@ -373,7 +389,7 @@ async function main(): Promise<void> {
       if (first) first.textContent = '.glassbox/latest-review.md';
     });
     await debugShot(page, 'modal');
-    pushChrome(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Finish — feedback is exported' },
+    const modalJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Finish — feedback is exported' },
       { duration: 2300, transition: { type: 'push-left', duration: 320 } });
 
     // Read the freshly-exported markdown for the peek frame.
@@ -412,52 +428,28 @@ async function main(): Promise<void> {
       meta: { duration: 2600, transition: { type: 'push-left', duration: 320 } },
     };
 
-    // === 6. Terminal scenes ==============================================
-    await aux.setContent(terminalSceneHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'prompt' }));
-    await aux.waitForTimeout(150);
-    const anchor = await aux.evaluate((id) => {
-      const el = document.getElementById(id);
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, fontSize: parseFloat(getComputedStyle(document.body).fontSize) };
-    }, PROMPT_ANCHOR_ID);
-    if (anchor === null) throw new Error('terminal prompt anchor not found');
-    promptAnchor = anchor;
-    await debugShot(aux, 'term-prompt');
-    const termPromptJob: FrameJob = {
-      tree: await grabTree(aux), prefix: nextPrefix(),
-      chrome: { title: TERM_TITLE, kind: 'terminal', caption: 'Hand the review to Claude Code' },
-      meta: {
-        duration: 1700, transition: { type: 'crossfade', duration: 240 },
-        overlays: [{
-          kind: 'typing', text: '/glassbox',
-          x: promptAnchor.x + OX, y: promptAnchor.y + OY + promptAnchor.fontSize * 0.9,
-          fontSize: promptAnchor.fontSize, color: '#79c0ff', speed: 55, delay: 300, caret: true,
-        }],
-      },
-    };
+    // === 6. Terminal scenes (domotion term) ==============================
+    // The Claude Code `/glassbox` session as a real terminal recording: the user
+    // runs `/glassbox`, Claude reads the review, applies the URL-encoding fix (the
+    // same change the loop-closing frame shows), and tests pass. Rendered now
+    // (needs the browser); the markdown peek pushes in via push-left, the
+    // terminal cuts internally, then push-left out to the loop frame.
+    const claudeJobs = await renderTermCast(claudeCast(TERM_COLS, 30), 30, {
+      title: TERM_TITLE, caption: 'Hand the review to Claude Code — it applies the fix',
+      entry: { type: 'push-left', duration: 320 },
+    });
 
-    await aux.setContent(terminalSceneHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'working' }));
-    await aux.waitForTimeout(150);
-    await debugShot(aux, 'term-working');
-    const termWorkingJob: FrameJob = {
-      tree: await grabTree(aux), prefix: nextPrefix(),
-      chrome: { title: TERM_TITLE, kind: 'terminal', caption: 'It reads the review…' },
-      meta: { duration: 1800, transition: { type: 'crossfade', duration: 240 } },
-    };
-
-    await aux.setContent(terminalSceneHtml({ width: CONTENT_W, height: CONTENT_H, stage: 'done' }));
-    await aux.waitForTimeout(150);
-    await debugShot(aux, 'term-done');
-    const termDoneJob: FrameJob = {
-      tree: await grabTree(aux), prefix: nextPrefix(),
-      chrome: { title: TERM_TITLE, kind: 'terminal', caption: '…applies the fix, and tests pass' },
-      meta: { duration: 3000, transition: { type: 'push-left', duration: 320 } },
-    };
-
-    // Assemble final order.
-    jobs.push(markdownJob, termPromptJob, termWorkingJob, termDoneJob, loopJob);
-    const endJobIndex = jobs.length; // appended after render
+    // Assemble the final frame order: launch terminal → app review beats →
+    // markdown peek → Claude terminal → loop-close. Index bookkeeping is by job
+    // reference (below), so the variable terminal frame counts don't matter.
+    const jobs: FrameJob[] = [
+      ...launchJobs,
+      riskJob, browseJob, diffJob, formJob, savedJob, modalJob,
+      markdownJob,
+      ...claudeJobs,
+      loopJob,
+    ];
+    const endJobIndex = jobs.length; // end card appended after the mapped frames
 
     // === Teardown, then render ============================================
     // Close the context first so the recorded HAR is flushed to disk
@@ -467,11 +459,12 @@ async function main(): Promise<void> {
     browser = null;
     server.kill('SIGTERM');
 
-    // Pin the text mode so a future domotion default change can't silently
-    // break the demo (v0.4.0's switch to embedded-font once rendered as tofu).
-    setRenderTextMode('embedded-font');
-    clearEmbeddedFonts();
+    // Render the app frames (the terminal cast frames were already rendered to
+    // SVG during the session — they carry `fullSvg`). The text mode + embedded
+    // font builder were set up once after the browser launched and are NOT
+    // cleared here, so app glyphs accumulate alongside the terminal glyphs.
     const frames: AnimationFrame[] = jobs.map(j => {
+      if (j.fullSvg !== undefined) return { ...j.meta, svgContent: j.fullSvg };
       const tree = j.tree as CapturedTree;
       // Drop elements outside the content viewport (diff lines below the fold,
       // scrolled-off sidebar rows) — the window chrome clips them anyway, but
@@ -497,24 +490,23 @@ async function main(): Promise<void> {
     // === Cursor track =====================================================
     const frameStart: number[] = [];
     { let acc = 0; for (const f of frames) { frameStart.push(acc); acc += f.duration + transitionMs(f); } }
+    const idxOf = (job: FrameJob): number => jobs.indexOf(job);
     const MOVE_MS = 420;
     const DWELL = 160;
-    // Hidden through the CLI-launch beats; appears when the live app does.
+    // Hidden through the CLI-launch terminal beat; appears when the live app does.
     const cursorEvents: CursorEvent[] = [
       { type: 'hide', t: 0 },
-      { type: 'show', t: frameStart[firstAppFrameIdx], x: OX + CONTENT_W * 0.18, y: OY + CONTENT_H * 0.3 },
+      { type: 'show', t: frameStart[idxOf(riskJob)], x: OX + CONTENT_W * 0.18, y: OY + CONTENT_H * 0.3 },
     ];
     for (const c of clickSpecs) {
-      const clickT = frameStart[c.frame] + c.offset;
+      const clickT = frameStart[idxOf(c.job)] + c.offset;
       const hit = shift(c.hit);
       cursorEvents.push({ type: 'move', t: Math.max(0, clickT - DWELL - MOVE_MS), duration: MOVE_MS, to: { x: hit.cx, y: hit.cy } });
       cursorEvents.push({ type: 'click', t: clickT });
     }
     // Hide for the markdown/terminal/end-card scenes; reappear on the loop frame.
-    const markdownIdx = jobs.length - 5; // markdownJob's position in `jobs`
-    const loopIdx = jobs.length - 1; // loopJob is last in `jobs`
-    cursorEvents.push({ type: 'hide', t: frameStart[markdownIdx] });
-    cursorEvents.push({ type: 'show', t: frameStart[loopIdx], x: OX + CONTENT_W * 0.5, y: OY + CONTENT_H * 0.5 });
+    cursorEvents.push({ type: 'hide', t: frameStart[idxOf(markdownJob)] });
+    cursorEvents.push({ type: 'show', t: frameStart[idxOf(loopJob)], x: OX + CONTENT_W * 0.5, y: OY + CONTENT_H * 0.5 });
     cursorEvents.push({ type: 'hide', t: frameStart[endJobIndex] });
 
     let svg = generateAnimatedSvg({
