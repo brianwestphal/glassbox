@@ -82,6 +82,33 @@ export function ImageDiff({ file, diff, fontWarning, baseWidth, baseHeight, side
         </div>
       )}
 
+      {/* Single-side focus: A shows only the old image, B only the new (doc 28).
+          Each is its own zoom/pan canvas, structurally a single-image viewer; the
+          region overlay carries the side so doc-23 feedback shows the matching
+          A-only / B-only (and unscoped) regions, consistent with the sxs panes. */}
+      {hasComparison && (
+        <div className="image-diff-panel image-diff-visual" data-panel="a">
+          <div className="image-visual-canvas" data-zoomable="true">
+            <ExpandButton src={`/api/image/${fileId}/old`} alt={oldLabel} />
+            <div className="image-zoom-wrap">
+              <img className="image-layer image-layer-old" src={`/api/image/${fileId}/old`} alt="Old version" />
+              <div className="region-overlay" data-region-overlay data-region-side="old"></div>
+            </div>
+          </div>
+        </div>
+      )}
+      {hasComparison && (
+        <div className="image-diff-panel image-diff-visual" data-panel="b">
+          <div className="image-visual-canvas" data-zoomable="true">
+            <ExpandButton src={`/api/image/${fileId}/new`} alt={newLabel} />
+            <div className="image-zoom-wrap">
+              <img className="image-layer image-layer-new" src={`/api/image/${fileId}/new`} alt="New version" />
+              <div className="region-overlay" data-region-overlay data-region-side="new"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Difference mode (blend) */}
       {hasComparison && (
         <div className="image-diff-panel image-diff-visual" data-panel="difference">

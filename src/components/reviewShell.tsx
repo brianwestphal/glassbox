@@ -89,6 +89,8 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
               <div className="diff-toolbar-left">
                 <div className="segmented-control">
                   <button className="segment" data-image-mode="metadata">Metadata</button>
+                  <button className="segment" data-image-mode="a" title="Show only the A (old) image">A</button>
+                  <button className="segment" data-image-mode="b" title="Show only the B (new) image">B</button>
                   <button className="segment active" data-image-mode="side-by-side">Side by Side</button>
                   <button className="segment" data-image-mode="difference">Difference</button>
                   <button className="segment" data-image-mode="slice">Slice</button>

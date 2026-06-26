@@ -754,3 +754,61 @@ test.describe('Side-by-side image comparison (doc 24)', () => {
     expect(sizes.newWrap).toBe(sizes.newNat);
   });
 });
+
+// Doc 28 — single-side focus: "A" and "B" modes that show only one side at a time.
+test.describe('Single-side image focus (doc 28)', () => {
+  const IMG = '128x128.png';
+
+  async function openImg(page: import('@playwright/test').Page) {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    await page.locator('.file-item .file-name', { hasText: IMG }).click();
+    await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
+  }
+
+  test('A and B segments appear between Metadata and Side by Side for a two-sided image', async ({ page }) => {
+    await openImg(page);
+    await expect(page.locator('[data-image-mode="a"]')).toBeVisible();
+    await expect(page.locator('[data-image-mode="b"]')).toBeVisible();
+    // Order within the segmented control: Metadata, A, B, Side by Side, ...
+    const order = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('.diff-toolbar-image [data-image-mode]'));
+      return btns.map((b) => (b as HTMLElement).dataset.imageMode);
+    });
+    expect(order.indexOf('metadata')).toBeLessThan(order.indexOf('a'));
+    expect(order.indexOf('a')).toBeLessThan(order.indexOf('b'));
+    expect(order.indexOf('b')).toBeLessThan(order.indexOf('side-by-side'));
+  });
+
+  test('selecting A shows only the old image; B shows only the new', async ({ page }) => {
+    await openImg(page);
+
+    await page.locator('[data-image-mode="a"]').click();
+    await expect(page.locator('[data-panel="a"]')).toHaveClass(/active/, { timeout: 5000 });
+    // Only the A panel is visible; side-by-side / B / difference are not.
+    await expect(page.locator('[data-panel="a"] .image-layer-old')).toBeVisible();
+    await expect(page.locator('[data-panel="b"]')).toBeHidden();
+    await expect(page.locator('[data-panel="side-by-side"]')).toBeHidden();
+    // The side-by-side orientation sub-control is hidden outside side-by-side mode.
+    await expect(page.locator('[data-sxs-orient-control]')).toBeHidden();
+
+    await page.locator('[data-image-mode="b"]').click();
+    await expect(page.locator('[data-panel="b"]')).toHaveClass(/active/, { timeout: 5000 });
+    await expect(page.locator('[data-panel="b"] .image-layer-new')).toBeVisible();
+    await expect(page.locator('[data-panel="a"]')).toBeHidden();
+    await expect(page.locator('[data-panel="side-by-side"]')).toBeHidden();
+  });
+
+  test('the selected focus mode persists across reload', async ({ page }) => {
+    await openImg(page);
+    await page.locator('[data-image-mode="a"]').click();
+    await expect(page.locator('[data-panel="a"]')).toHaveClass(/active/, { timeout: 5000 });
+
+    await openImg(page);
+    await expect(page.locator('[data-panel="a"]')).toHaveClass(/active/, { timeout: 5000 });
+
+    // Reset so later specs start from a known mode.
+    await page.locator('[data-image-mode="side-by-side"]').click();
+    await expect(page.locator('[data-panel="side-by-side"]')).toHaveClass(/active/, { timeout: 5000 });
+  });
+});

@@ -192,7 +192,9 @@ export type RiskDimension = z.infer<typeof RiskDimensionSchema>;
 export const SvgViewModeSchema = z.enum(['code', 'rendered']);
 export type SvgViewMode = z.infer<typeof SvgViewModeSchema>;
 
-export const ImageModeSchema = z.enum(['metadata', 'side-by-side', 'difference', 'slice']);
+// `a` / `b` focus a single side at a time (show only the A/old or B/new image),
+// sitting between metadata and side-by-side in the segmented control (doc 28).
+export const ImageModeSchema = z.enum(['metadata', 'a', 'b', 'side-by-side', 'difference', 'slice']);
 export type ImageMode = z.infer<typeof ImageModeSchema>;
 
 // Layout of the side-by-side image comparison: panes left/right (default) or

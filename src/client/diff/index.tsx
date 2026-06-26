@@ -335,13 +335,14 @@ export function setRawDiffContent(filePath: string, html: string): void {
 }
 
 /** Resolve the stored image mode to one that exists for THIS file. A single-side
- *  image (added/deleted) has no comparison panels, so difference/slice/side-by-side
- *  fall back to the single "image" viewer; a two-sided file maps the single
- *  "image" mode to the side-by-side default. */
+ *  image (added/deleted) has no comparison panels, so the comparison-only modes
+ *  (difference/slice/side-by-side and the A/B single-side focus modes) fall back
+ *  to the single "image" viewer; a two-sided file maps the single "image" mode to
+ *  the side-by-side default. */
 function effectiveImageMode(imageDiffEl: HTMLElement, storeMode: string): string {
   const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
   let mode = storeMode;
-  if (!hasComparison && (mode === 'difference' || mode === 'slice' || mode === 'side-by-side')) mode = 'image';
+  if (!hasComparison && (mode === 'difference' || mode === 'slice' || mode === 'side-by-side' || mode === 'a' || mode === 'b')) mode = 'image';
   if (hasComparison && mode === 'image') mode = 'side-by-side';
   return mode;
 }
@@ -371,11 +372,15 @@ function adaptImageToolbar(container: HTMLElement, imageToolbar: HTMLElement | n
   const imageDiffEl = container.querySelector<HTMLElement>('.image-diff');
   if (imageDiffEl === null) return;
   const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
+  const aBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="a"]');
+  const bBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="b"]');
   const sxsBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="side-by-side"]');
   const diffBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="difference"]');
   const sliceBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="slice"]');
   const imageBtn = imageToolbar.querySelector<HTMLElement>('[data-image-mode="image"]');
-  for (const btn of [sxsBtn, diffBtn, sliceBtn]) {
+  // The A/B focus modes, like difference/slice/side-by-side, only make sense when
+  // both sides exist; a single-sided file shows just the "image" viewer (doc 28).
+  for (const btn of [aBtn, bBtn, sxsBtn, diffBtn, sliceBtn]) {
     if (btn) btn.style.display = hasComparison ? '' : 'none';
   }
   if (imageBtn) imageBtn.style.display = hasComparison ? 'none' : '';

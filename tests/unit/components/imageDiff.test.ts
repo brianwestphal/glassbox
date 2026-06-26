@@ -37,6 +37,15 @@ describe('ImageDiff', () => {
     expect(html).toContain('data-panel="metadata"');
   });
 
+  it('renders single-side A and B focus panels for modified files (doc 28)', () => {
+    const html = ImageDiff({ file: makeFile(), diff: makeDiff() }).toString();
+    expect(html).toContain('data-panel="a"');
+    expect(html).toContain('data-panel="b"');
+    // A focuses the old image, B the new — each scoped overlay matches its side.
+    expect(html).toContain('data-region-side="old"');
+    expect(html).toContain('data-region-side="new"');
+  });
+
   it('renders only image panel for added files', () => {
     const html = ImageDiff({ file: makeFile(), diff: makeDiff({ status: 'added' }) }).toString();
     expect(html).toContain('data-has-old="false"');
@@ -44,6 +53,9 @@ describe('ImageDiff', () => {
     expect(html).toContain('data-panel="image"');
     expect(html).not.toContain('data-panel="difference"');
     expect(html).not.toContain('data-panel="slice"');
+    // The A/B focus panels are comparison-only, like difference/slice.
+    expect(html).not.toContain('data-panel="a"');
+    expect(html).not.toContain('data-panel="b"');
   });
 
   it('renders only image panel for deleted files', () => {
@@ -51,6 +63,8 @@ describe('ImageDiff', () => {
     expect(html).toContain('data-has-old="true"');
     expect(html).toContain('data-has-new="false"');
     expect(html).toContain('data-panel="image"');
+    expect(html).not.toContain('data-panel="a"');
+    expect(html).not.toContain('data-panel="b"');
   });
 
   it('renders image sources with correct API paths', () => {

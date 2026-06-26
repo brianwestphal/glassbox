@@ -138,6 +138,17 @@ hover "view full screen" button that opens that side in the shared lightbox
 (`src/client/lightbox.tsx`, zoom/pan up to 8×) — supplementary to the in-place
 zoom/comparison modes; the blend difference/slice canvases get no button.
 
+**Single-side focus (A / B)** (doc 28, Shipped): two modes — **A** and **B** —
+that show only one side at a time (A = old image only, B = new image only),
+sitting **between Metadata and Side by Side** in the segmented control. Each is
+the existing single-image **Image** viewer, gated on a two-sided change (`a`/`b`
+added to `ImageModeSchema`, persisted via the existing `last_image_mode`
+preference; falls back to **Image** on single-side files, where the A/B segments
+are hidden like difference/slice). Per-side region overlays (`data-region-side`)
+make doc-23 feedback work like the Side-by-Side panes. View-only — no new server
+route, no new CSS; panels in `src/components/imageDiff.tsx`, mode resolution in
+`src/client/diff/index.tsx`.
+
 **Feedback attachments** (doc 25, P1 shipped): a reviewer can attach any file
 type to a feedback item via an **attach button** or **drag-and-drop**; the files
 render as **chips** beneath the comment and persist with the review (hydrated
@@ -879,6 +890,19 @@ lines; opt-out by leaving a **commented** copy of the rule. Pure
 called from `cli.ts`. This **replaced** the earlier completion-time prompt +
 30-day-dismiss cooldown and its `/api/gitignore/add`+`/dismiss` routes (removed).
 
+## 18k. Single-side image focus (`28-image-side-focus.md`) — **Shipped**
+
+Two image-comparison modes, **A** and **B**, that show only one side at a time —
+**A** displays just the old image, **B** just the new — for focusing on,
+zooming into, and annotating a single image. The segments sit **between Metadata
+and Side by Side** (`Metadata · A · B · Side by Side · Difference · Slice`).
+Structurally the existing single-image **Image** viewer, gated on a two-sided
+change; `a`/`b` added to `ImageModeSchema` and persisted via the existing
+`last_image_mode` preference (falls back to **Image** on single-side files, where
+the A/B segments are hidden like difference/slice). Per-side region overlays
+(`data-region-side`) make doc-23 feedback work like the Side-by-Side panes.
+View-only: no new server route, no new CSS. See §5 for the full description.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -944,6 +968,8 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/24-image-comparison-layouts.md` → §18g (and §5)
 - `docs/25-attachments.md` → §18h (and §5)
 - `docs/26-ground-truth-comparison.md` → §18i (and §5)
+- `docs/27-gitignore.md` → §18j
+- `docs/28-image-side-focus.md` → §18k (and §5)
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets
