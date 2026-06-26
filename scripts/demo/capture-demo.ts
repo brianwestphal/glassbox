@@ -123,6 +123,24 @@ interface FrameJob {
   prefix: string;
   chrome?: { title: string; kind: ChromeKind; caption?: string };
   meta: Omit<AnimationFrame, 'svgContent'>;
+  /** When set, the whole frame is wrapped in `<g class="anim-<popInId>">` so the
+   *  matching intra-frame `scale` animation in `meta.animations` makes the window
+   *  "pop in" over the previous (terminal) frame — see `withPopIn`. */
+  popInId?: string;
+}
+
+/** Make an app frame **pop in** over the previous (terminal) beat: a center-origin
+ *  scale from 0.92 → 1 during the crossfade, so the Glassbox window grows in over
+ *  the terminal instead of switching abruptly (GB-1006). The class is applied to
+ *  the rendered frame in the compose loop; the animation keys off it. */
+function withPopIn(job: FrameJob, id: string): FrameJob {
+  job.popInId = id;
+  job.meta.animations = [
+    ...(job.meta.animations ?? []),
+    { animId: id, property: 'scale', from: '0.92', to: '1', duration: 460,
+      transformOrigin: 'center', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+  ];
+  return job;
 }
 
 interface Hit { cx: number; cy: number }
@@ -306,8 +324,9 @@ async function main(): Promise<void> {
     await page.waitForTimeout(700);
     const browseHit = await sidebarHit(page, BROWSE_FILE);
     await debugShot(page, 'risk');
-    const riskJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'AI scores every file’s risk' },
-      { duration: 2000, transition: { type: 'crossfade', duration: 300 } });
+    // First live-app window: pops in over the launch terminal (GB-1006).
+    const riskJob = withPopIn(mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'AI scores every file’s risk' },
+      { duration: 2000, transition: { type: 'crossfade', duration: 300 } }), 'popInRisk');
     clickSpecs.push({ job: riskJob, offset: 1400, hit: browseHit });
 
     // === 2. Browse a file, then open the target diff ======================
@@ -377,8 +396,11 @@ async function main(): Promise<void> {
     const completeBox = await page.locator('#complete-review').boundingBox();
     if (completeBox === null) throw new Error('complete-review button not found');
     await debugShot(page, 'saved');
+    // Cut (not crossfade) from the annotation form: a crossfade faded the typed
+    // feedback overlay out, which read as the text vanishing on save. A cut makes
+    // the typed note resolve straight into the saved annotation (GB-1006).
     const savedJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'A bug to fix — and a rule to remember' },
-      { duration: 1700, transition: { type: 'crossfade', duration: 260 } });
+      { duration: 1700, transition: { type: 'cut', duration: 0 } });
     clickSpecs.push({ job: savedJob, offset: 1150, hit: center(completeBox) });
 
     await page.click('#complete-review');
@@ -391,14 +413,19 @@ async function main(): Promise<void> {
     await debugShot(page, 'modal');
     const modalJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Finish — feedback is exported' },
       { duration: 2300, transition: { type: 'push-left', duration: 320 } });
+    // Click the modal's "Done" button (cursor pulse) before this frame
+    // transitions away — it reads as the reviewer dismissing the dialog rather
+    // than an unmotivated cut to the next scene (GB-1006).
+    const doneBtn = page.locator('[data-action="modal-done"]');
+    const doneBox = (await doneBtn.count() > 0) ? await doneBtn.first().boundingBox() : null;
+    if (doneBox !== null) clickSpecs.push({ job: modalJob, offset: 1700, hit: center(doneBox) });
 
     // Read the freshly-exported markdown for the peek frame.
     try { markdown = readFileSync(EXPORT_MD, 'utf-8'); }
     catch { markdown = '# Code Review\n\n## File Annotations\n\n### src/auth/session.ts\n\n- **Line 23** [bug]: ' + FEEDBACK; }
 
     // === loop-close frame (fix applied + annotation resolved) =============
-    const doneBtn = page.locator('[data-action="modal-done"]');
-    if (await doneBtn.count() > 0) await doneBtn.first().click();
+    if (doneBox !== null) await doneBtn.first().click();
     await page.waitForTimeout(200);
     await page.evaluate((line) => {
       document.querySelectorAll('.annotation-row, .annotation-form-container, .annotation-count').forEach(el => { el.remove(); });
@@ -410,11 +437,10 @@ async function main(): Promise<void> {
     await page.locator(lineSel).scrollIntoViewIfNeeded();
     await page.waitForTimeout(300);
     await debugShot(page, 'loop');
-    const loopJob: FrameJob = {
-      tree: await grabTree(page), prefix: nextPrefix(),
-      chrome: { title: APP_TITLE, kind: 'browser', caption: 'The loop closes — issue resolved' },
-      meta: { duration: 2200, transition: { type: 'crossfade', duration: 360 } },
-    };
+    // The fixed-diff window pops in over the Claude terminal (GB-1006).
+    const loopJob = withPopIn(mkJob(await grabTree(page),
+      { title: APP_TITLE, kind: 'browser', caption: 'The loop closes — issue resolved' },
+      { duration: 2200, transition: { type: 'crossfade', duration: 360 } }), 'popInLoop');
 
     // === 5. Markdown peek (separate page) =================================
     const aux = await ctx.newPage();
@@ -434,9 +460,12 @@ async function main(): Promise<void> {
     // same change the loop-closing frame shows), and tests pass. Rendered now
     // (needs the browser); the markdown peek pushes in via push-left, the
     // terminal cuts internally, then push-left out to the loop frame.
+    // Crossfade in from the markdown peek (not push-left): both are dark windows,
+    // so a slide read as the *same* terminal sliding sideways. A dissolve makes
+    // them read as distinct scenes (GB-1006).
     const claudeJobs = await renderTermCast(claudeCast(TERM_COLS, 30), 30, {
       title: TERM_TITLE, caption: 'Hand the review to Claude Code — it applies the fix',
-      entry: { type: 'push-left', duration: 320 },
+      entry: { type: 'crossfade', duration: 320 },
     });
 
     // Assemble the final frame order: launch terminal → app review beats →
@@ -473,12 +502,13 @@ async function main(): Promise<void> {
       cullElementsOutsideViewBox(tree, CONTENT_W, CONTENT_H, undefined, 0, 1);
       // includeGlyphDefs=false → per-frame font CSS is also suppressed; the
       // embedded-font @font-face is collected once below for the whole SVG.
-      return {
-        ...j.meta,
-        svgContent: chromeWrap(elementTreeToSvgInner(tree, CONTENT_W, CONTENT_H, j.prefix, false), {
-          title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
-        }),
-      };
+      let svgContent = chromeWrap(elementTreeToSvgInner(tree, CONTENT_W, CONTENT_H, j.prefix, false), {
+        title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
+      });
+      // Pop-in: wrap the whole window in the anim group its scale keyframes key
+      // off (GB-1006). `transform-box`/`transform-origin` come from the animation.
+      if (j.popInId !== undefined) svgContent = `<g class="anim-${j.popInId}">${svgContent}</g>`;
+      return { ...j.meta, svgContent };
     });
     // End card: hand-built SVG floating in the same window rect, no glyph capture.
     frames.push({
