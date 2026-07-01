@@ -85,7 +85,7 @@
     "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.9",
     "c8": "^11.0.0",
-    "domotion-svg": "0.17.0",
+    "domotion-svg": "0.18.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "eslint-plugin-import-x": "^4.16.2",
