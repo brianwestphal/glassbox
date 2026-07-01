@@ -1,7 +1,7 @@
 ---
 name: kerf-app
 description: Build UIs in the kerf reactive framework (https://github.com/brianwestphal/kerf). Use this skill whenever the user is writing or modifying code that imports `kerfjs`, asks to add a feature to a kerf app, or asks "how do I do X in kerf?". Use it proactively the moment you spot a kerf import in the file you're editing.
-kerf-skill-version: 1.2.0
+kerf-skill-version: 1.2.1
 ---
 
 # Building apps with kerf
@@ -147,6 +147,7 @@ morph(liveCard, '<article class="card">…</article>');
 | `<my-tag>` fails to typecheck | declaration merging targeted global JSX | Use `declare module 'kerfjs/jsx-runtime' { namespace JSX { … } }` instead |
 | `each(): row render at index N produced K top-level elements` | row returned multiple sibling elements or zero | Wrap them in one parent so the row renders exactly one element |
 | Drag/drop / state change has no visible effect; only elements *outside* `each()` update | Used `each(STATIC_ARRAY, …)` whose row render reads signals. Items never change identity → cache hits forever → row render never re-invoked → signal reads stop tracking | Replace outer with `STATIC_ARRAY.map(...)`; keep inner `each()` for the dynamic sub-list. See Hard Rule 14 |
+| Row-enter CSS animation no longer replays when only a row's *content* changed (kerf ≥ 0.15.0) | 0.15.0+ morphs a same-identity, same-position row *in place* instead of recreating its node, so a mount-keyed `@keyframes` never re-triggers on a content-only update (≤ 0.14.x recreated the node, so it fired). Intentional flip side: focus, scroll, IME, and in-progress transitions now survive | Key the animation on a state-class toggle, not element creation. To force a remount, churn the row's identity (new object ref / `data-key`) so the reconciler replaces the node |
 
 ## Workflow guidance
 

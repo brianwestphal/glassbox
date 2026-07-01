@@ -1,4 +1,4 @@
-<!-- kerf-skill-version: 1.2.0 -->
+<!-- kerf-skill-version: 1.2.1 -->
 # kerf.cursorrules — rules for building apps with kerf
 #
 # Drop this file into your project as `.cursorrules` (Cursor will pick it
@@ -135,6 +135,7 @@ morph(liveCard, '<article class="card">…</article>');
 - Library widget destroyed on every render → wrap host in `data-morph-skip`; mount the library imperatively after first render.
 - `each(): row render at index N produced K top-level elements` → wrap multiple roots in one parent.
 - Drag/drop / state change has no visible effect, only stuff *outside* `each()` updates → you used `each(STATIC_ARRAY, …)` whose row render reads signals. Replace the outer with `STATIC_ARRAY.map(...)`; keep inner `each()` for the dynamic sub-list. See Hard Rule 14.
+- Row-enter CSS animation no longer replays when only a row's *content* changed (kerf ≥ 0.15.0) → 0.15.0+ morphs a same-identity, same-position row *in place* instead of recreating its node, so a mount-keyed `@keyframes` never re-triggers on a content-only update (≤ 0.14.x recreated the node, so it fired; the intentional flip side is that focus, scroll, IME, and in-progress transitions now survive). Key the animation on a state-class toggle, not element creation; to force a remount, churn the row's identity (new object ref / `data-key`).
 
 ## Server / SSR
 
