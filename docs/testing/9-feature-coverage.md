@@ -38,6 +38,14 @@ found becomes a new test.
   `transitions` its tests exercise — a stateful unit with tests but no
   transitions is reported as a gap, because that is exactly the blind spot line
   coverage hides.
+
+  A unit may instead carry a `"waived": "<justification>"` — reserved for
+  genuine non-functional requirements that cannot be meaningfully asserted in a
+  test (a performance target like "completes within seconds", an
+  absence-of-telemetry property, "works with any standard git repo"). A waived
+  unit is **not** a gap, but the report counts waivers separately so they stay
+  visible and reviewable. Do **not** waive a testable behavior — write the test
+  instead.
 - **The report** — `npm run check:features` prints every unit with no map entry,
   no asserting test, or (for stateful units) no listed transitions. Advisory by
   default; `npm run check:features -- --strict` exits non-zero on any gap, for a

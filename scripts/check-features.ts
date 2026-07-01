@@ -50,6 +50,15 @@ export interface CoverageEntry {
    * transitions listed is a gap even when `tests` is non-empty.
    */
   transitions?: string[];
+  /**
+   * A justification for why this unit is intentionally NOT covered by an
+   * automated test — reserved for genuine non-functional requirements that
+   * cannot be meaningfully asserted in a test (e.g. a performance target, an
+   * absence-of-telemetry property, "works with any standard git repo"). A
+   * waived unit is not a gap, but is reported separately so waivers stay
+   * visible and reviewable. Do NOT use this to paper over a testable behavior.
+   */
+  waived?: string;
   /** Free-form note. */
   note?: string;
 }
@@ -65,6 +74,13 @@ export interface CoverageGap {
   title: string;
   doc: number;
   reason: 'unmapped' | 'no-test' | 'stateful-no-transitions';
+}
+
+/** Result of evaluating the map against the extracted units. */
+export interface CoverageResult {
+  gaps: CoverageGap[];
+  /** Count of units explicitly waived (not gaps, tracked for visibility). */
+  waived: number;
 }
 
 const FR_ID_RE = /\*\*(FR|NFR)-(\d+(?:\.\d+)*[a-z]?)/g;
@@ -115,11 +131,22 @@ export function extractRequirementUnits(markdown: string, doc: number): Requirem
 
 /** Compute the coverage gaps for a set of requirement units against a map. */
 export function findCoverageGaps(units: RequirementUnit[], map: CoverageMap): CoverageGap[] {
+  return evaluateCoverage(units, map).gaps;
+}
+
+/** Evaluate the map against the units, returning gaps + the waived count. */
+export function evaluateCoverage(units: RequirementUnit[], map: CoverageMap): CoverageResult {
   const gaps: CoverageGap[] = [];
+  let waived = 0;
   for (const unit of units) {
     const entry = map.units[unit.id];
     if (!entry) {
       gaps.push({ ...unit, reason: 'unmapped' });
+      continue;
+    }
+    // An explicit, justified waiver takes a genuine NFR out of the gap set.
+    if (entry.waived && entry.waived.trim().length > 0) {
+      waived++;
       continue;
     }
     if (!entry.tests || entry.tests.length === 0) {
@@ -130,7 +157,7 @@ export function findCoverageGaps(units: RequirementUnit[], map: CoverageMap): Co
       gaps.push({ ...unit, reason: 'stateful-no-transitions' });
     }
   }
-  return gaps;
+  return { gaps, waived };
 }
 
 /** Read every `docs/N-*.md` requirements doc and extract its units. */
@@ -161,7 +188,7 @@ function main(): void {
     map = { version: 1, units: {} };
   }
 
-  const gaps = findCoverageGaps(units, map);
+  const { gaps, waived } = evaluateCoverage(units, map);
   const mapped = units.length - gaps.filter((g) => g.reason === 'unmapped').length;
 
   const REASON_LABEL: Record<CoverageGap['reason'], string> = {
@@ -174,6 +201,7 @@ function main(): void {
   console.log('=====================================');
   console.log(`Requirement units found:   ${units.length}`);
   console.log(`Units with a map entry:    ${mapped}`);
+  console.log(`Units waived (justified NFRs): ${waived}`);
   console.log(`Gaps (behavior with no asserting test): ${gaps.length}`);
   console.log('');
 

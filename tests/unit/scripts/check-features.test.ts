@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type CoverageMap,
+  evaluateCoverage,
   extractRequirementUnits,
   findCoverageGaps,
 } from '../../../scripts/check-features.js';
@@ -97,5 +98,25 @@ describe('findCoverageGaps', () => {
       units: { 'FR-1.1': { tests: ['a.test.ts'] } },
     };
     expect(findCoverageGaps([units[0]], full)).toEqual([]);
+  });
+
+  it('treats a justified waiver as a non-gap and counts it separately', () => {
+    const withWaiver: CoverageMap = {
+      version: 1,
+      units: { 'FR-1.4': { waived: 'performance target; not automatable' } },
+    };
+    const { gaps, waived } = evaluateCoverage([units[3]], withWaiver);
+    expect(gaps).toEqual([]);
+    expect(waived).toBe(1);
+  });
+
+  it('does not treat an empty/whitespace waiver as a waiver', () => {
+    const emptyWaiver: CoverageMap = {
+      version: 1,
+      units: { 'FR-1.4': { waived: '   ' } },
+    };
+    const { gaps, waived } = evaluateCoverage([units[3]], emptyWaiver);
+    expect(waived).toBe(0);
+    expect(gaps.map((g) => g.reason)).toEqual(['no-test']);
   });
 });
