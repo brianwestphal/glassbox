@@ -1,7 +1,124 @@
 {
   "version": 1,
-  "_comment": "Coverage map for check-features (docs/testing/feature-coverage.md). Maps each documented requirement unit (FR-N.M / NFR-N.M, or a N.M subsection number for older docs) to the test(s) that would fail if the behavior regressed. Stateful units set stateful:true and list the transitions the tests exercise. This map is intentionally partial; `npm run check:features` reports every unmapped or under-tested unit as a gap. Filling it out is an ongoing exercise (see the doc).",
+  "_comment": "Coverage map for check-features (docs/testing/feature-coverage.md). Maps each documented requirement unit (FR-N.M / NFR-N.M, or a N.M subsection number for older docs) to the test(s) that would fail if the behavior regressed. Stateful units set stateful:true and list the transitions the tests exercise. This map is intentionally partial; `npm run check:features` reports every unmapped or under-tested unit as a gap. Filling it out is an ongoing exercise (GB-1012); every mapping below is verified against the cited test, and genuine gaps are left unmapped rather than papered over.",
   "units": {
+    "3.1": {
+      "tests": ["tests/unit/git/repo-helpers.test.ts"],
+      "note": "isGitRepo (repo check), getRepoRoot (root path), getRepoName (name), getHeadCommit (HEAD SHA) — all four sub-behaviors asserted."
+    },
+    "3.2": {
+      "tests": ["tests/unit/git/diff.test.ts"],
+      "note": "getDiffArgs covers every review mode's git command mapping; parseDiff asserts structured parsing (path/oldPath/status/hunks) + line metadata (type/old/new/content)."
+    },
+    "3.4": {
+      "tests": ["tests/unit/git/diff.test.ts", "tests/unit/git/diff-raw.test.ts"],
+      "note": "Binary detection from git's diff header is asserted (parseDiff 'parses a binary file'; diffRawContent binary). GAP: the untracked-file first-8KB null-byte scan in createNewFileDiff is not separately tested (tied to the 3.3 gap)."
+    },
+    "6.1": {
+      "stateful": true,
+      "tests": ["tests/unit/export/generate.test.ts", "tests/unit/export/auto-export.test.ts"],
+      "transitions": [
+        "multiple schedule calls within the window -> coalesced into one export (debounce)",
+        "debounce window elapses uninterrupted -> export fires once",
+        "flush -> pending export fires immediately and the timer is canceled (no double fire)",
+        "isCurrent true -> writes latest-review.md + archive; isCurrent false -> archive only"
+      ]
+    },
+    "6.2": {
+      "tests": ["tests/unit/export/generate.test.ts"],
+      "note": "Header, Annotation Summary (per-category counts), Items to Remember, per-file annotations, and AI-tool instructions sections are each asserted."
+    },
+    "6.2a": {
+      "tests": ["tests/unit/export/build-data.test.ts", "tests/unit/export/on-complete-hook.test.ts"],
+      "note": "buildReviewExportData shape: clean mode label, group-by-comparison, omit no-annotation files, ground-truth context, region denormalization by scope, schemaVersion rejection. Consumed by the --on-complete hook (export paths in env)."
+    },
+    "6.3": {
+      "tests": ["tests/unit/export/generate.test.ts"],
+      "note": "Deletion cleanup asserted (deleteReviewExport removes archive; no-op when absent). GAP: reopen-preserves-export is not directly asserted."
+    },
+    "6.4": {
+      "tests": ["tests/unit/export/generate.test.ts"],
+      "note": "Export renders plain markdown grouped by (relative) file path; the AI-instructions section is asserted."
+    },
+    "9.1": {
+      "stateful": true,
+      "tests": ["tests/unit/db/connection.test.ts"],
+      "transitions": [
+        "getDb before setDataDir -> throws",
+        "first getDb -> creates PGlite pinned to template1 + runs schema SQL",
+        "subsequent getDb -> returns the same instance (singleton)",
+        "migration: adds a missing column when absent (idempotent when present)",
+        "startup -> running analyses reset to failed"
+      ]
+    },
+    "9.2": {
+      "tests": [
+        "tests/unit/db/queries.test.ts",
+        "tests/unit/db/ai-queries.test.ts",
+        "tests/unit/attachments/store.test.ts"
+      ],
+      "note": "reviews / review_files / annotations CRUD (queries), ai_analyses / ai_file_scores (ai-queries), attachments (store). user_preferences exercised via ai-queries/preferences."
+    },
+    "9.3": {
+      "tests": ["tests/unit/ai/config-full.test.ts", "tests/unit/global-config.test.ts"],
+      "note": "config.json chmod 0600, base64-encoded keys, and GLASSBOX_CONFIG_DIR override all asserted."
+    },
+    "9.6": {
+      "tests": ["tests/unit/db/queries.test.ts", "tests/unit/lock/lock.test.ts"],
+      "note": "Isolation by repo_path (listReviews repoPath filter); instance lock prevents concurrent access (lock.test.ts)."
+    },
+    "FR-26.1": {
+      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "note": "Ground-truth is a distinct mode: groundTruthSideLabels reads it and returns undefined for non-GT modes."
+    },
+    "FR-26.2": {
+      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "note": "Expected (A) / Actual (B) side labels."
+    },
+    "FR-26.3": {
+      "tests": ["tests/unit/ground-truth/promote.test.ts"],
+      "note": "Previous-actual baseline entries are promotable."
+    },
+    "FR-26.4": {
+      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "note": "loadGroundTruthManifest resolves actual<->expected pairs relative to the manifest dir (and keeps absolutes)."
+    },
+    "FR-26.5": {
+      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "note": "Single still-image pairs (v1 comparisons[]); images-only enforcement."
+    },
+    "FR-26.6": {
+      "tests": ["tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/utils/diffScore.test.ts"],
+      "note": "comparePerceptual difference score; identical=0, differing dims=1, unsupported/corrupt=undecodable."
+    },
+    "FR-26.7": {
+      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "note": "Expected/Actual side labels shipped (groundTruthSideLabels)."
+    },
+    "FR-26.8": {
+      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "note": "Source list reads as named comparisons (groundTruthMetaByFileId maps file id -> label/expectedKind)."
+    },
+    "FR-26.9": {
+      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "note": "A set is an ordered flow: v2 sets resolve to one ordered entry per step with derived keys, in order."
+    },
+    "FR-26.10": {
+      "tests": ["tests/unit/client/groundTruthGroups.test.ts"],
+      "note": "buildGroundTruthSourceList groups set steps as named groups in declared/stepIndex order."
+    },
+    "FR-26.11": {
+      "tests": ["tests/unit/client/groundTruthGroups.test.ts"],
+      "note": "Per-step scores + a max aggregate per set; singles and sets sorted most-different-first."
+    },
+    "FR-26.12": {
+      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "note": "groundTruthStepNav reports step k of N with bounded prev/next within the set."
+    },
+    "FR-26.15": {
+      "tests": ["tests/unit/ground-truth/promote.test.ts"],
+      "note": "Baseline rotation stays external: promote copies actual over previous-actual, never overwrites spec/reference, skips missing, handles v2 sets."
+    },
     "FR-27.1": {
       "tests": ["tests/unit/git/gitignore.test.ts", "tests/unit/cli"],
       "note": "ensureGlassboxGitignored runs at launch inside a git repo."
@@ -51,14 +168,6 @@
     "NFR-27.2": {
       "tests": ["tests/unit/git/gitignore.test.ts"],
       "note": "Unrelated entries containing the word glassbox are left untouched."
-    },
-    "FR-26.4": {
-      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
-      "note": "loadGroundTruthManifest resolves actual<->expected pairs relative to the manifest dir."
-    },
-    "FR-26.5": {
-      "tests": ["tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/utils/diffScore.test.ts"],
-      "note": "comparePerceptual difference score; PNG/JPEG decode, SVG/corrupt -> undecodable."
     }
   }
 }

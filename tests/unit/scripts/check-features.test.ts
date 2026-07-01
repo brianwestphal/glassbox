@@ -35,9 +35,10 @@ describe('extractRequirementUnits', () => {
       'prose',
       '### 1.2 Review Resumption',
       '#### 1.2.1 Nested',
+      '### 1.2a Suffixed subsection',
     ].join('\n');
     const units = extractRequirementUnits(md, 1);
-    expect(units.map((u) => u.id)).toEqual(['1.1', '1.2', '1.2.1']);
+    expect(units.map((u) => u.id)).toEqual(['1.1', '1.2', '1.2.1', '1.2a']);
     expect(units[0].title).toBe('Review Creation');
   });
 

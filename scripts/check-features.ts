@@ -68,7 +68,7 @@ export interface CoverageGap {
 }
 
 const FR_ID_RE = /\*\*(FR|NFR)-(\d+(?:\.\d+)*[a-z]?)/g;
-const SUBSECTION_RE = /^#{3,4}\s+(\d+(?:\.\d+)+)\s+(.+?)\s*$/;
+const SUBSECTION_RE = /^#{3,4}\s+(\d+(?:\.\d+)+[a-z]?)\s+(.+?)\s*$/;
 
 /**
  * Extract the requirement units from one requirements doc's markdown.
