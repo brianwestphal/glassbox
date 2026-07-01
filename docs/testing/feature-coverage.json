@@ -3,20 +3,30 @@
   "_comment": "Coverage map for check-features (docs/testing/feature-coverage.md). Maps each documented requirement unit (FR-N.M / NFR-N.M, or a N.M subsection number for older docs) to the test(s) that would fail if the behavior regressed. Stateful units set stateful:true and list the transitions the tests exercise. This map is intentionally partial; `npm run check:features` reports every unmapped or under-tested unit as a gap. Filling it out is an ongoing exercise (GB-1012); every mapping below is verified against the cited test, and genuine gaps are left unmapped rather than papered over.",
   "units": {
     "3.1": {
-      "tests": ["tests/unit/git/repo-helpers.test.ts"],
+      "tests": [
+        "tests/unit/git/repo-helpers.test.ts"
+      ],
       "note": "isGitRepo (repo check), getRepoRoot (root path), getRepoName (name), getHeadCommit (HEAD SHA) — all four sub-behaviors asserted."
     },
     "3.2": {
-      "tests": ["tests/unit/git/diff.test.ts"],
+      "tests": [
+        "tests/unit/git/diff.test.ts"
+      ],
       "note": "getDiffArgs covers every review mode's git command mapping; parseDiff asserts structured parsing (path/oldPath/status/hunks) + line metadata (type/old/new/content)."
     },
     "3.4": {
-      "tests": ["tests/unit/git/diff.test.ts", "tests/unit/git/diff-raw.test.ts"],
+      "tests": [
+        "tests/unit/git/diff.test.ts",
+        "tests/unit/git/diff-raw.test.ts"
+      ],
       "note": "Binary detection from git's diff header is asserted (parseDiff 'parses a binary file'; diffRawContent binary). GAP: the untracked-file first-8KB null-byte scan in createNewFileDiff is not separately tested (tied to the 3.3 gap)."
     },
     "6.1": {
       "stateful": true,
-      "tests": ["tests/unit/export/generate.test.ts", "tests/unit/export/auto-export.test.ts"],
+      "tests": [
+        "tests/unit/export/generate.test.ts",
+        "tests/unit/export/auto-export.test.ts"
+      ],
       "transitions": [
         "multiple schedule calls within the window -> coalesced into one export (debounce)",
         "debounce window elapses uninterrupted -> export fires once",
@@ -25,24 +35,35 @@
       ]
     },
     "6.2": {
-      "tests": ["tests/unit/export/generate.test.ts"],
+      "tests": [
+        "tests/unit/export/generate.test.ts"
+      ],
       "note": "Header, Annotation Summary (per-category counts), Items to Remember, per-file annotations, and AI-tool instructions sections are each asserted."
     },
     "6.2a": {
-      "tests": ["tests/unit/export/build-data.test.ts", "tests/unit/export/on-complete-hook.test.ts"],
+      "tests": [
+        "tests/unit/export/build-data.test.ts",
+        "tests/unit/export/on-complete-hook.test.ts"
+      ],
       "note": "buildReviewExportData shape: clean mode label, group-by-comparison, omit no-annotation files, ground-truth context, region denormalization by scope, schemaVersion rejection. Consumed by the --on-complete hook (export paths in env)."
     },
     "6.3": {
-      "tests": ["tests/unit/export/generate.test.ts"],
+      "tests": [
+        "tests/unit/export/generate.test.ts"
+      ],
       "note": "Deletion cleanup asserted (deleteReviewExport removes archive; no-op when absent). GAP: reopen-preserves-export is not directly asserted."
     },
     "6.4": {
-      "tests": ["tests/unit/export/generate.test.ts"],
+      "tests": [
+        "tests/unit/export/generate.test.ts"
+      ],
       "note": "Export renders plain markdown grouped by (relative) file path; the AI-instructions section is asserted."
     },
     "9.1": {
       "stateful": true,
-      "tests": ["tests/unit/db/connection.test.ts"],
+      "tests": [
+        "tests/unit/db/connection.test.ts"
+      ],
       "transitions": [
         "getDb before setDataDir -> throws",
         "first getDb -> creates PGlite pinned to template1 + runs schema SQL",
@@ -60,80 +81,122 @@
       "note": "reviews / review_files / annotations CRUD (queries), ai_analyses / ai_file_scores (ai-queries), attachments (store). user_preferences exercised via ai-queries/preferences."
     },
     "9.3": {
-      "tests": ["tests/unit/ai/config-full.test.ts", "tests/unit/global-config.test.ts"],
+      "tests": [
+        "tests/unit/ai/config-full.test.ts",
+        "tests/unit/global-config.test.ts"
+      ],
       "note": "config.json chmod 0600, base64-encoded keys, and GLASSBOX_CONFIG_DIR override all asserted."
     },
     "9.6": {
-      "tests": ["tests/unit/db/queries.test.ts", "tests/unit/lock/lock.test.ts"],
+      "tests": [
+        "tests/unit/db/queries.test.ts",
+        "tests/unit/lock/lock.test.ts"
+      ],
       "note": "Isolation by repo_path (listReviews repoPath filter); instance lock prevents concurrent access (lock.test.ts)."
     },
     "FR-26.1": {
-      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/presentation.test.ts"
+      ],
       "note": "Ground-truth is a distinct mode: groundTruthSideLabels reads it and returns undefined for non-GT modes."
     },
     "FR-26.2": {
-      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/presentation.test.ts"
+      ],
       "note": "Expected (A) / Actual (B) side labels."
     },
     "FR-26.3": {
-      "tests": ["tests/unit/ground-truth/promote.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/promote.test.ts"
+      ],
       "note": "Previous-actual baseline entries are promotable."
     },
     "FR-26.4": {
-      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/manifest.test.ts"
+      ],
       "note": "loadGroundTruthManifest resolves actual<->expected pairs relative to the manifest dir (and keeps absolutes)."
     },
     "FR-26.5": {
-      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/manifest.test.ts"
+      ],
       "note": "Single still-image pairs (v1 comparisons[]); images-only enforcement."
     },
     "FR-26.6": {
-      "tests": ["tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/utils/diffScore.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/perceptual-diff.test.ts",
+        "tests/unit/utils/diffScore.test.ts"
+      ],
       "note": "comparePerceptual difference score; identical=0, differing dims=1, unsupported/corrupt=undecodable."
     },
     "FR-26.7": {
-      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/presentation.test.ts"
+      ],
       "note": "Expected/Actual side labels shipped (groundTruthSideLabels)."
     },
     "FR-26.8": {
-      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/presentation.test.ts"
+      ],
       "note": "Source list reads as named comparisons (groundTruthMetaByFileId maps file id -> label/expectedKind)."
     },
     "FR-26.9": {
-      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/manifest.test.ts"
+      ],
       "note": "A set is an ordered flow: v2 sets resolve to one ordered entry per step with derived keys, in order."
     },
     "FR-26.10": {
-      "tests": ["tests/unit/client/groundTruthGroups.test.ts"],
+      "tests": [
+        "tests/unit/client/groundTruthGroups.test.ts"
+      ],
       "note": "buildGroundTruthSourceList groups set steps as named groups in declared/stepIndex order."
     },
     "FR-26.11": {
-      "tests": ["tests/unit/client/groundTruthGroups.test.ts"],
+      "tests": [
+        "tests/unit/client/groundTruthGroups.test.ts"
+      ],
       "note": "Per-step scores + a max aggregate per set; singles and sets sorted most-different-first."
     },
     "FR-26.12": {
-      "tests": ["tests/unit/ground-truth/presentation.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/presentation.test.ts"
+      ],
       "note": "groundTruthStepNav reports step k of N with bounded prev/next within the set."
     },
     "FR-26.15": {
-      "tests": ["tests/unit/ground-truth/promote.test.ts"],
+      "tests": [
+        "tests/unit/ground-truth/promote.test.ts"
+      ],
       "note": "Baseline rotation stays external: promote copies actual over previous-actual, never overwrites spec/reference, skips missing, handles v2 sets."
     },
     "5.1": {
-      "tests": ["tests/unit/db/queries.test.ts"],
+      "tests": [
+        "tests/unit/db/queries.test.ts"
+      ],
       "note": "addAnnotation creates with defaults (category, side, timestamps); reply_to_note_id when threading a note reply."
     },
     "5.3": {
-      "tests": ["tests/unit/db/queries.test.ts"],
+      "tests": [
+        "tests/unit/db/queries.test.ts"
+      ],
       "note": "updateAnnotation changes content and category."
     },
     "5.4": {
-      "tests": ["tests/unit/db/queries.test.ts"],
+      "tests": [
+        "tests/unit/db/queries.test.ts"
+      ],
       "note": "moveAnnotation changes line + side and clears stale (the persistence of drag-and-drop). The DnD UI gesture itself is covered by e2e, not here."
     },
     "5.5": {
       "stateful": true,
-      "tests": ["tests/unit/db/queries.test.ts", "tests/unit/review/review-update.test.ts"],
+      "tests": [
+        "tests/unit/db/queries.test.ts",
+        "tests/unit/review/review-update.test.ts"
+      ],
       "transitions": [
         "markAnnotationStale -> markAnnotationCurrent cycle",
         "deleteStaleAnnotations removes only stale rows, leaves current",
@@ -141,44 +204,66 @@
       ]
     },
     "5.7": {
-      "tests": ["tests/unit/db/queries.test.ts"],
+      "tests": [
+        "tests/unit/db/queries.test.ts"
+      ],
       "note": "Annotations persist across the full CRUD surface (create/read/update/delete/move round-trip through PGLite)."
     },
     "15.1": {
-      "tests": ["tests/unit/themes/config.test.ts", "tests/unit/themes/theme-api.test.ts"],
+      "tests": [
+        "tests/unit/themes/config.test.ts",
+        "tests/unit/themes/theme-api.test.ts"
+      ],
       "note": "Active theme is read/written (getActiveThemeId/setActiveThemeId), default fallback on missing/corrupt config."
     },
     "15.2": {
-      "tests": ["tests/unit/themes/built-in.test.ts"],
+      "tests": [
+        "tests/unit/themes/built-in.test.ts"
+      ],
       "note": "Built-in theme set: count, order, unique ids/names, dark/light background sanity."
     },
     "15.3": {
-      "tests": ["tests/unit/themes/config.test.ts"],
+      "tests": [
+        "tests/unit/themes/config.test.ts"
+      ],
       "note": "Custom themes: loadCustomThemes (skips non-json/corrupt/missing-field), saveCustomTheme, deleteCustomTheme, getCustomTheme."
     },
     "15.4": {
-      "tests": ["tests/unit/themes/built-in.test.ts"],
+      "tests": [
+        "tests/unit/themes/built-in.test.ts"
+      ],
       "note": "THEME_VARIABLES set (background/text/diff/gutter); every theme defines all required color variables."
     },
     "15.8": {
-      "tests": ["tests/unit/themes/stored-theme-schema.test.ts", "tests/unit/themes/config.test.ts"],
+      "tests": [
+        "tests/unit/themes/stored-theme-schema.test.ts",
+        "tests/unit/themes/config.test.ts"
+      ],
       "note": "StoredCustomThemeSchema validates the on-disk file format (well-formed / partial colors / rejects empty id-name / non-string colors)."
     },
     "15.9": {
-      "tests": ["tests/unit/themes/theme-api.test.ts"],
+      "tests": [
+        "tests/unit/themes/theme-api.test.ts"
+      ],
       "note": "Theme REST API: list / get-set active / create-update-delete custom."
     },
     "20.1": {
-      "tests": ["tests/unit/review-notes/store.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/store.test.ts"
+      ],
       "note": "Notes are written to path-mirrored .NNNNNN.sarif shards under .pr-notes/, with shard roll-over at the cap."
     },
     "20.2": {
-      "tests": ["tests/unit/review-notes/sarif.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/sarif.test.ts"
+      ],
       "note": "SARIF 2.1.0: emptyLog is a valid log with producer as tool.driver.name; buildResult maps anchor/body/snippet/kind/confidence/ticket to standard + namespaced fields."
     },
     "20.3": {
       "stateful": true,
-      "tests": ["tests/unit/review-notes/reanchor.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/reanchor.test.ts"
+      ],
       "transitions": [
         "snippet still matches its line -> untouched",
         "authored text moved -> re-anchored to the new line",
@@ -188,56 +273,160 @@
       ]
     },
     "20.4": {
-      "tests": ["tests/unit/review-notes/cli.test.ts", "tests/unit/review-notes/store.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/cli.test.ts",
+        "tests/unit/review-notes/store.test.ts"
+      ],
       "note": "glassbox note add/update/remove/coalesce; writeReviewNote appends into the shard, updateNote patches in place, removeNote by guid, coalesce drops redundant."
     },
     "20.5": {
-      "tests": ["tests/unit/review-notes/load.test.ts", "tests/unit/review-notes/sarif.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/load.test.ts",
+        "tests/unit/review-notes/sarif.test.ts"
+      ],
       "note": "Artifacts: text artifact read inline, image artifacts marked as <img>, missing/binary surfaced as reference, path-escape refused; SARIF result.attachments mapping. GAP: live diagram rendering (P4 remainder) not yet built/tested."
     },
     "20.6": {
-      "tests": ["tests/unit/review-notes/load.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/load.test.ts"
+      ],
       "note": "loadReviewNotesForFile flattens notes to diff-anchored view items on the new side; scoped to the requested file; skips corrupt shards."
     },
     "20.7": {
-      "tests": ["tests/unit/review-notes/format.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/format.test.ts"
+      ],
       "note": "reviewNotesExportSection emits a markdown section with per-file notes + producer attribution — what Hot Sheet / other orchestrators consume."
     },
     "20.8": {
-      "tests": ["tests/unit/review-notes/format.test.ts", "tests/unit/review-notes/store.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/format.test.ts",
+        "tests/unit/review-notes/store.test.ts"
+      ],
       "note": "reviewNotesPromptSection folds notes into the analysis prompt; store round-trips notes losslessly."
     },
     "20.9": {
-      "tests": ["tests/unit/review-notes/store.test.ts"],
+      "tests": [
+        "tests/unit/review-notes/store.test.ts"
+      ],
       "note": "Interoperability: preserves unknown fields written by another tool on round-trip; refuses to overwrite a non-SARIF shard; groups results into per-producer runs."
     },
     "FR-25.1": {
-      "tests": ["tests/unit/attachments/store.test.ts"],
+      "tests": [
+        "tests/unit/attachments/store.test.ts"
+      ],
       "note": "Any file type: the store round-trips arbitrary bytes and records size + sha."
     },
     "FR-25.8": {
-      "tests": ["tests/unit/export/generate.test.ts"],
+      "tests": [
+        "tests/unit/export/generate.test.ts"
+      ],
       "note": "Readable by the AI tool: the markdown export lists each attachment's path under its annotation (doc 25)."
     },
     "NFR-25.1": {
-      "tests": ["tests/unit/attachments/store.test.ts"],
+      "tests": [
+        "tests/unit/attachments/store.test.ts"
+      ],
       "note": "Local storage: bytes live on disk under <dataDir>/attachments/, named by id + sanitized original."
     },
     "NFR-25.3": {
-      "tests": ["tests/unit/attachments/store.test.ts"],
+      "tests": [
+        "tests/unit/attachments/store.test.ts"
+      ],
       "note": "Path containment: sanitizeFilename strips separators + control/reserved chars so a name cannot escape the dir; falls back when it sanitizes away."
     },
+    "3.6": {
+      "waived": "Git compatibility (works with any standard repo; commands run via child_process) is an architectural property, not a unit-assertable behavior. Exercised implicitly by every git test running against real repos + the smoke suite.",
+      "note": "NFR."
+    },
+    "3.7": {
+      "waived": "Performance target ('diff completes within seconds for hundreds of files') is not meaningfully unit-assertable; the e2e large-file-perf.test.ts covers rendering perf, not diff-gen wall-clock.",
+      "note": "NFR."
+    },
+    "9.4": {
+      "waived": "Data locality / no-telemetry / no-accounts is an absence property — there is nothing to call. Guarded by convention (no analytics deps) and the loopback-only binding (doc 14); not a positive unit assertion.",
+      "note": "NFR."
+    },
+    "9.5": {
+      "tests": [
+        "tests/unit/db/ids.test.ts",
+        "tests/unit/db/queries.test.ts"
+      ],
+      "note": "Entity ID generation format (generateId: base36 ms + 8 random) asserted in ids.test.ts; raw-SQL/no-ORM is an architectural convention; crash recovery is delegated to PGLite."
+    },
+    "FR-25.2": {
+      "tests": [
+        "tests/e2e/attachments.test.ts"
+      ],
+      "note": "Ways to attach: button ('attach a file to an annotation') and paste ('paste a file onto a focused annotation chip')."
+    },
+    "FR-25.3": {
+      "tests": [
+        "tests/e2e/attachments.test.ts"
+      ],
+      "note": "Chips render, persist, and remove ('chip renders, persists, and removes')."
+    },
+    "FR-25.4": {
+      "tests": [
+        "tests/e2e/attachments.test.ts"
+      ],
+      "note": "In-app image preview ('an image attachment shows a thumbnail and opens the preview overlay')."
+    },
+    "FR-25.5": {
+      "tests": [
+        "tests/unit/utils/openOS.test.ts",
+        "tests/unit/utils/openOS-modes.test.ts"
+      ],
+      "note": "OS opener for non-image types: macOS open / Windows cmd /c start / Linux xdg-open, never the terminal $EDITOR."
+    },
+    "FR-25.6": {
+      "tests": [
+        "tests/e2e/attachments.test.ts"
+      ],
+      "note": "Image thumbnails ('an image attachment shows a thumbnail ...')."
+    },
+    "FR-25.7": {
+      "tests": [
+        "tests/unit/client/lightboxZoom.test.ts"
+      ],
+      "note": "Zoom/pan in the lightbox."
+    },
+    "NFR-25.2": {
+      "tests": [
+        "tests/unit/db/queries.test.ts"
+      ],
+      "note": "Cascade cleanup: deleting a review (→ annotations, ON DELETE CASCADE) removes attachment rows too — asserted in the deleteReview cascade test."
+    },
+    "FR-26.13": {
+      "waived": "Consumer-only contract (Glassbox never authors ground-truth manifests) is an architectural boundary, not a runtime behavior with an asserting test.",
+      "note": "NFR/architectural."
+    },
+    "FR-26.14": {
+      "waived": "Proof-export guidance is documentation + a portable skill (docs/proof-export-guidance.md, docs/skills/export-review-proof/); nothing executable to assert.",
+      "note": "Doc-only."
+    },
+    "NFR-26.1": {
+      "waived": "'Reuse, don't fork' is an architectural constraint (ground-truth rides the existing image route/modes); no positive unit assertion. The reuse is evidenced by the ground-truth tests passing through unchanged image plumbing.",
+      "note": "NFR/architectural."
+    },
     "FR-27.1": {
-      "tests": ["tests/unit/git/gitignore.test.ts", "tests/unit/cli"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts",
+        "tests/unit/cli"
+      ],
       "note": "ensureGlassboxGitignored runs at launch inside a git repo."
     },
     "FR-27.2": {
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "note": "computeGitignore emits /.glassbox/* + !/.glassbox/settings.json (contents-glob + negation)."
     },
     "FR-27.3": {
       "stateful": true,
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "transitions": [
         "already-present -> no-op (idempotent re-run)",
         "no trailing newline -> block appended cleanly"
@@ -246,7 +435,9 @@
     },
     "FR-27.4": {
       "stateful": true,
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "transitions": [
         "stale bare '.glassbox/' -> replaced with canonical block",
         "stale variants (.glassbox, /.glassbox, /.glassbox/*) -> replaced",
@@ -255,7 +446,9 @@
     },
     "FR-27.5": {
       "stateful": true,
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "transitions": [
         "no file -> created fresh",
         "empty/whitespace file -> block created"
@@ -263,19 +456,1314 @@
     },
     "FR-27.6": {
       "stateful": true,
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "transitions": [
         "commented opt-out present -> file left untouched",
         "any commented .glassbox variant -> treated as opt-out"
       ]
     },
     "NFR-27.1": {
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "note": "computeGitignore is a pure function; the whole suite exercises it without touching disk."
     },
     "NFR-27.2": {
-      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
       "note": "Unrelated entries containing the word glassbox are left untouched."
+    },
+    "1.1": {
+      "tests": [
+        "tests/unit/cli/parseArgs.test.ts",
+        "tests/unit/git/diff.test.ts",
+        "tests/unit/db/queries.test.ts"
+      ],
+      "note": "Modes parsed; empty-diff detection; HEAD SHA + repo name/path capture via createReview/getReview."
+    },
+    "1.2": {
+      "tests": [
+        "tests/unit/db/queries.test.ts",
+        "tests/unit/review/review-update.test.ts",
+        "tests/integration/api/routes.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "same-HEAD reuse -> updateReviewDiffs updates files in place",
+        "no-in-progress fallback -> getLatestInProgressReview returns undefined",
+        "completed reviews ignored on resume",
+        "annotation migration: shift, stale-then-recovery, empty-then-refill, beyond-radius->stale"
+      ],
+      "note": "getLatestInProgressReview matches/filters/ignores-completed; review-update migration cases."
+    },
+    "1.3": {
+      "tests": [
+        "tests/integration/api/routes.test.ts",
+        "tests/unit/export/auto-export.test.ts",
+        "tests/unit/git/gitignore.test.ts",
+        "tests/e2e/review-completion.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "in_progress -> completed (POST /api/review/complete)",
+        "completed -> in_progress (POST /api/review/reopen)",
+        "reopen-then-complete and complete-then-reopen cycles"
+      ],
+      "note": "complete/reopen lifecycle + export path; debounced auto-export; gitignore-at-launch; Complete button flow."
+    },
+    "1.4": {
+      "tests": [
+        "tests/unit/components/reviewHistory.test.ts",
+        "tests/integration/api/routes.test.ts",
+        "tests/e2e/review-completion.test.ts"
+      ],
+      "note": "history render + delete/bulk controls; DELETE endpoints; reopen; history listing."
+    },
+    "1.5": {
+      "tests": [
+        "tests/unit/lock/lock.test.ts"
+      ],
+      "note": "single-instance + stale-lock cleanup; live-process lock held. (demo-bypass is a sub-gap, see 12.2)."
+    },
+    "1.6": {
+      "waived": "Startup performance target ('ready within a few seconds'); server.test confirms startServer resolves but the wall-clock bound is not unit-assertable.",
+      "note": "NFR."
+    },
+    "2.1": {
+      "tests": [
+        "tests/unit/cli/parseArgs.test.ts"
+      ],
+      "note": "default uncommitted; --help/-h exit 0; unknown option exit 1."
+    },
+    "2.2": {
+      "tests": [
+        "tests/unit/cli/parseArgs.test.ts",
+        "tests/unit/git/difftool.test.ts"
+      ],
+      "note": "every mode/option flag parsed; difftool register/unregister/force."
+    },
+    "2.3": {
+      "tests": [
+        "tests/unit/cli/parseArgs.test.ts",
+        "tests/unit/lock/lock.test.ts",
+        "tests/unit/update-check.test.ts"
+      ],
+      "note": "arg-parse-first resolved config; instance locking; once/day update check."
+    },
+    "2.4": {
+      "tests": [
+        "tests/unit/server.test.ts"
+      ],
+      "note": "127.0.0.1 bind + default port; next-port fallback; strict-port throws."
+    },
+    "2.5": {
+      "tests": [
+        "tests/unit/server.test.ts",
+        "tests/integration/api/routes.test.ts",
+        "tests/unit/utils/resolveReviewId.test.ts"
+      ],
+      "note": "middleware injects reviewId/repoRoot; query override vs middleware."
+    },
+    "2.6": {
+      "tests": [
+        "tests/unit/server.test.ts"
+      ],
+      "note": "styles.css/app.js/history.js routes + no-cache + dist fallback."
+    },
+    "2.7": {
+      "tests": [
+        "tests/unit/server.test.ts"
+      ],
+      "note": "/api/*, /api/ai/*, and page route mounted."
+    },
+    "2.8": {
+      "tests": [
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "reviews list/get/complete/reopen/refresh/delete/delete-completed/delete-all."
+    },
+    "2.9": {
+      "tests": [
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "files list/get/status/reveal; annotation create/patch/delete/move/keep; stale ops; annotations/all."
+    },
+    "2.10": {
+      "tests": [
+        "tests/integration/api/routes.test.ts",
+        "tests/integration/api/system-routes.test.ts"
+      ],
+      "note": "context/outline/symbol-definition/project-settings; open-external scheme validation."
+    },
+    "2.11": {
+      "tests": [
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "ai config/models/key-status/key/analyze/preferences."
+    },
+    "2.12": {
+      "tests": [
+        "tests/integration/api/attachment-routes.test.ts",
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "attachments upload/list/raw/quicklook/delete; review-notes delete/artifact."
+    },
+    "2.13": {
+      "tests": [
+        "tests/unit/routes/pages.test.ts"
+      ],
+      "note": "GET / , /file/:id split+unified, /review/:id (+redirect), /history."
+    },
+    "2.14": {
+      "tests": [
+        "tests/unit/server.test.ts",
+        "tests/unit/utils/openOS-modes.test.ts"
+      ],
+      "note": "auto-open + --no-open; platform open commands for url."
+    },
+    "2.15": {
+      "tests": [
+        "tests/integration/api/routes.test.ts",
+        "tests/unit/routes/pages.test.ts"
+      ],
+      "note": "API JSON; pages server-rendered HTML."
+    },
+    "2.16": {
+      "tests": [
+        "tests/integration/api/routes.test.ts",
+        "tests/unit/routes/pages.test.ts",
+        "tests/unit/cli/parseArgs.test.ts"
+      ],
+      "note": "404/400 statuses; CLI non-zero exit on bad input."
+    },
+    "8.1": {
+      "tests": [
+        "tests/e2e/review-workflow.test.ts",
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/routes/pages.test.ts"
+      ],
+      "note": "sidebar+main; hide/show toggle (aria-pressed); sidebar contents rendered."
+    },
+    "8.2": {
+      "tests": [
+        "tests/e2e/review-workflow.test.ts",
+        "tests/e2e/sidebar.test.ts",
+        "tests/e2e/annotations.test.ts",
+        "tests/unit/components/fileList.test.ts"
+      ],
+      "note": "folder tree; filter; j/k nav; click loads diff; count badges + stale dots."
+    },
+    "8.3": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/client/sortControl.test.ts",
+        "tests/unit/demo.test.ts"
+      ],
+      "note": "three-mode segmented control; active-segment mapping; risk/narrative setup."
+    },
+    "8.4": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/e2e/review-workflow.test.ts"
+      ],
+      "note": "progress bar + summary text; reviewed-status feeds the bar."
+    },
+    "8.5": {
+      "tests": [
+        "tests/e2e/settings.test.ts"
+      ],
+      "note": "gear opens tabbed dialog; close via button/Escape/outside-click; auto-save; tab contents."
+    },
+    "8.6": {
+      "tests": [
+        "tests/e2e/annotations.test.ts",
+        "tests/e2e/review-workflow.test.ts",
+        "tests/e2e/find.test.ts"
+      ],
+      "note": "Escape closes forms/modals; j/k; Cmd/Ctrl+F find bar."
+    },
+    "8.7": {
+      "tests": [
+        "tests/e2e/review-completion.test.ts"
+      ],
+      "note": "completion shows a modal overlay (stale/result). NOTE: confirmation-modal + gitignore-offer bullets are outdated vs doc 1.3."
+    },
+    "8.8": {
+      "tests": [
+        "tests/unit/components/layout.test.ts",
+        "tests/unit/conventions.test.ts"
+      ],
+      "note": "XSS auto-escape + raw(); kerfjs-only (no react)."
+    },
+    "8.9": {
+      "tests": [
+        "tests/e2e/themes.test.ts"
+      ],
+      "note": "light/dark scheme via theme system. (800x500 min-window is CSS-only sub-gap)."
+    },
+    "4.1": {
+      "tests": [
+        "tests/e2e/diff-viewing.test.ts",
+        "tests/unit/components/diffView.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "split (default) -> unified",
+        "unified -> split"
+      ],
+      "note": "split-default/unified/toggle; added/deleted always unified; line numbers; add/remove/context classes."
+    },
+    "4.2": {
+      "tests": [
+        "tests/unit/components/diffView.test.ts",
+        "tests/e2e/diff-viewing.test.ts",
+        "tests/e2e/sidebar.test.ts",
+        "tests/integration/api/routes.test.ts",
+        "tests/integration/git/diff.test.ts"
+      ],
+      "note": "status badge; reviewed toggle; binary indicator (non-image)."
+    },
+    "4.3": {
+      "tests": [
+        "tests/unit/git/image.test.ts",
+        "tests/unit/git/image-metadata-parsing.test.ts",
+        "tests/unit/components/imageDiff.test.ts",
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "side-by-side -> difference",
+        "A/B single-side focus",
+        "-> slice",
+        "fit -> zoomed (pinch) -> panned (swipe)"
+      ],
+      "note": "metadata parsing; A/B focus; side-by-side default+layout; difference+slice; zoom/pan gestures."
+    },
+    "4.3.1": {
+      "tests": [
+        "tests/unit/git/svg-meta.test.ts",
+        "tests/unit/components/diffView.test.ts",
+        "tests/unit/components/imageDiff.test.ts",
+        "tests/e2e/diff-mode.test.ts",
+        "tests/e2e/image-diff.test.ts",
+        "tests/integration/api/routes.test.ts",
+        "tests/unit/client/zoom.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "Code (text) -> Rendered SVG",
+        "rendered fit -> zoomed re-raster -> panned"
+      ],
+      "note": "svg base-size/font detection; data-is-svg; font banner; raw image/svg+xml serve; vector zoom."
+    },
+    "4.4": {
+      "tests": [
+        "tests/unit/utils/lineTruncate.test.ts",
+        "tests/unit/client/highlight-line-length.test.ts",
+        "tests/unit/components/diffView.test.ts",
+        "tests/e2e/large-file-perf.test.ts",
+        "tests/e2e/diff-viewing.test.ts"
+      ],
+      "note": "large-line truncation; syntax highlighting applied; wrap+language buttons exist (toggle behavior is a sub-gap)."
+    },
+    "4.5": {
+      "tests": [
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "GET /api/context/:fileId range read from disk + 404. (client expander UI is a sub-gap)."
+    },
+    "4.6": {
+      "tests": [
+        "tests/unit/outline/parser.test.ts",
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "symbol parsing (JS/TS/Py/Go); GET /api/outline/:fileId. (click-to-nav is a sub-gap)."
+    },
+    "4.7": {
+      "tests": [
+        "tests/unit/client/find.test.ts",
+        "tests/e2e/find.test.ts"
+      ],
+      "note": "find bar on Cmd/Ctrl+F; match highlighting + offset math; Tauri path. (nav up/down + Escape are sub-gaps)."
+    },
+    "4.8": {
+      "tests": [
+        "tests/e2e/large-file-perf.test.ts"
+      ],
+      "note": "large-file no-freeze bounded render. (split horizontal scroll sync is a sub-gap)."
+    },
+    "4.9": {
+      "tests": [
+        "tests/unit/git/diff.test.ts",
+        "tests/integration/git/diff.test.ts"
+      ],
+      "note": "tracked binary from git header; untracked null-byte scan; text untracked not flagged."
+    },
+    "13.1": {
+      "tests": [
+        "tests/integration/api/routes.test.ts",
+        "tests/unit/client/diff-container-mount.test.ts"
+      ],
+      "note": "symbol-definition endpoint; cross-file raw-file open via setRawDiffContent. (Cmd+Click gesture, toast, keyword filter are sub-gaps)."
+    },
+    "13.2": {
+      "tests": [
+        "tests/e2e/navigation.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "push new entry on file switch",
+        "back restores previous",
+        "forward after back",
+        "back disabled at stack start"
+      ],
+      "note": "history tracking + back/forward buttons + disabled state. (keyboard shortcuts + scroll restoration are sub-gaps)."
+    },
+    "16.1": {
+      "tests": [
+        "tests/integration/api/share-prompt-routes.test.ts"
+      ],
+      "note": "cumulative open-time tick accumulation + negative-ignore + state read. (two-condition gating is a sub-gap)."
+    },
+    "16.2": {
+      "tests": [
+        "tests/e2e/sponsor-link.test.ts"
+      ],
+      "note": "sponsor link: Tauri open-external routing + plain-browser href fallback."
+    },
+    "16.5": {
+      "tests": [
+        "tests/integration/api/share-prompt-routes.test.ts",
+        "tests/unit/global-config.test.ts"
+      ],
+      "note": "dismiss timestamp + cumulative time persisted under sharePrompt; malformed-blob coercion; race-free read-modify-write."
+    },
+    "16.6": {
+      "waived": "'non-intrusive / visually subtle / not a modal' is a subjective visual NFR; the demo-suppression slice is only indirectly shown (forceSharePrompt).",
+      "note": "NFR."
+    },
+    "21.1": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts"
+      ],
+      "note": "right-click opens custom menu + suppresses native; Escape/outside-click dismiss."
+    },
+    "21.2": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/client/context-menu.test.ts",
+        "tests/unit/utils/openOS-modes.test.ts"
+      ],
+      "note": "delegated data-action dispatch; best-effort failure swallow at OS layer."
+    },
+    "21.2.1": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/client/context-menu.test.ts",
+        "tests/unit/utils/openOS-modes.test.ts",
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "reveal wiring (POST reveal); platform label; open -R / explorer /select / xdg-open; endpoint 404."
+    },
+    "21.2.2": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/client/context-menu.test.ts"
+      ],
+      "note": "modifier-aware copy path (abs default, rel with Alt); live label logic. (live label update while open is a sub-gap)."
+    },
+    "21.2.3": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/client/context-menu.test.ts",
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "toggle status + dot update; state-driven label; PATCH status endpoint."
+    },
+    "21.2.4": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts",
+        "tests/unit/utils/openOS.test.ts"
+      ],
+      "note": "open action (POST open); $EDITOR/$VISUAL avoidance on all 3 platforms."
+    },
+    "21.3": {
+      "tests": [
+        "tests/e2e/sidebar.test.ts"
+      ],
+      "note": "close on Escape + outside-click without triggering action. (scroll/blur dismiss + viewport clamp are sub-gaps)."
+    },
+    "21.4": {
+      "tests": [
+        "tests/unit/client/context-menu.test.ts"
+      ],
+      "note": "DOM-free label logic module is unit-tested in isolation (extensibility claim). (theme-var styling is a sub-gap)."
+    },
+    "7.1": {
+      "tests": [
+        "tests/unit/ai/models.test.ts",
+        "tests/unit/ai/list-models.test.ts",
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "five-platform set; live model discovery + static fallback; resolveModelId; save platform/model."
+    },
+    "7.2": {
+      "tests": [
+        "tests/unit/ai/analyze-risk.test.ts",
+        "tests/unit/ai/mock.test.ts",
+        "tests/e2e/risk-dimension-dropdown.spec.ts",
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "6 dimensions 0-1; aggregate=max; rationale+line notes; sort-by-dimension + persisted pref."
+    },
+    "7.3": {
+      "tests": [
+        "tests/unit/ai/analyze-narrative.test.ts",
+        "tests/unit/ai/mock.test.ts"
+      ],
+      "note": "reading-order positions; per-file rationale; cross-batch position merge. (ordering priority in prompt only)."
+    },
+    "7.4": {
+      "tests": [
+        "tests/unit/ai/analyze-guided.test.ts",
+        "tests/unit/ai/guided-review.test.ts",
+        "tests/unit/ai/analyze-risk.test.ts",
+        "tests/e2e/settings.test.ts"
+      ],
+      "note": "educational annotations; topic + language selection; independence; risk/narrative adjust when guided on."
+    },
+    "7.5": {
+      "tests": [
+        "tests/unit/ai/batch-planner.test.ts",
+        "tests/unit/ai/context-builder.test.ts",
+        "tests/unit/ai/analyze-risk.test.ts",
+        "tests/unit/ai/batch-runner.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "large file set -> >=2 token-capped batches",
+        "binary -> excluded from batches",
+        "needContext -> follow-up round -> converges",
+        "3 rounds no convergence -> throws",
+        "batch completes -> onProgress fires",
+        "shouldCancel -> no further batches"
+      ],
+      "note": "token batching; ~3 char/token; binary exclusion; multi-turn context loop; progress+cancel."
+    },
+    "7.7": {
+      "tests": [
+        "tests/unit/ai/config-full.test.ts",
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "priority env>keychain>config; three OS keychains; base64 config; add/remove; env-source detection."
+    },
+    "7.8": {
+      "tests": [
+        "tests/unit/ai/client.test.ts",
+        "tests/unit/ai/context-builder.test.ts"
+      ],
+      "note": "egress only to configured provider endpoint; diff budget-limited/summarized."
+    },
+    "7.9": {
+      "tests": [
+        "tests/unit/ai/batch-runner.test.ts",
+        "tests/unit/ai/analyze-risk.test.ts",
+        "tests/unit/ai/shared.test.ts",
+        "tests/integration/api/ai-routes.test.ts",
+        "tests/unit/client/analysis-trigger-error.test.ts"
+      ],
+      "note": "per-batch failure isolation; malformed-JSON/schema handling; failure surfaced with error status; trigger-error union guard."
+    },
+    "17.1": {
+      "tests": [
+        "tests/unit/channel-config.test.ts",
+        "tests/integration/api/channel-routes.test.ts"
+      ],
+      "note": "getChannelPort read; /trigger surface. (MCP subprocess lifecycle/health/port-file is a sub-gap)."
+    },
+    "17.2": {
+      "tests": [
+        "tests/unit/channel-config.test.ts",
+        "tests/e2e/settings.test.ts",
+        "tests/unit/global-config.test.ts"
+      ],
+      "note": "register/unregister .mcp.json entry; corrupt-file resilience; Experimental toggle; channelEnabled persistence. (launch-cmd string + min-version are sub-gaps)."
+    },
+    "17.3": {
+      "tests": [
+        "tests/e2e/settings.test.ts"
+      ],
+      "note": "live connected/disconnected status indicator on enable; re-poll status."
+    },
+    "17.5": {
+      "tests": [
+        "tests/integration/api/channel-routes.test.ts"
+      ],
+      "note": "POST /api/channel/trigger validation + happy path. (status/enable/disable/claude-check endpoints are sub-gaps)."
+    },
+    "17.6": {
+      "waived": "Loopback bind + 'not started unless enabled' + payload restriction are whole-subprocess negative security properties of src/channel.ts with no isolating test (partly evidenced by isChannelAlive gating on channelEnabled).",
+      "note": "NFR/security."
+    },
+    "17.7": {
+      "tests": [
+        "tests/integration/api/channel-routes.test.ts",
+        "tests/e2e/settings.test.ts"
+      ],
+      "note": "graceful degradation: API works with channel mocked disconnected; every other suite runs with no channel."
+    },
+    "22.1": {
+      "tests": [
+        "tests/unit/ai/models.test.ts",
+        "tests/unit/ai/client.test.ts",
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "local+apple in platform set + switch; keyless availability; GB-925 keyless analyze."
+    },
+    "22.2": {
+      "tests": [
+        "tests/unit/ai/client.test.ts",
+        "tests/unit/ai/config-full.test.ts",
+        "tests/unit/ai/list-models.test.ts"
+      ],
+      "note": "OpenAI-shaped POST + optional Bearer; default Ollama base + trailing-slash trim; /models discovery."
+    },
+    "22.3": {
+      "tests": [
+        "tests/unit/ai/apple-foundation.test.ts",
+        "tests/unit/ai/client.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "unsupported platform -> unavailable without probe",
+        "supported + probe available -> available",
+        "supported + probe unavailable/throws -> unavailable",
+        "first call probes; subsequent served from cache"
+      ],
+      "note": "apple-fm delegation; two-stage availability gate + session cache; JSON structured output."
+    },
+    "22.4": {
+      "tests": [
+        "tests/e2e/settings.test.ts",
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "Local picker reveals base-URL+optional key+model; Apple shows fallback section; Apple gated on availability."
+    },
+    "22.5": {
+      "tests": [
+        "tests/unit/ai/client.test.ts",
+        "tests/unit/ai/apple-foundation.test.ts",
+        "tests/unit/ai/list-models.test.ts"
+      ],
+      "note": "no off-machine network: local only loopback baseUrl; apple no fetch; unavailability normal (no crash)."
+    },
+    "22.6": {
+      "tests": [
+        "tests/unit/ai/list-models.test.ts",
+        "tests/unit/ai/client.test.ts",
+        "tests/unit/ai/apple-foundation.test.ts"
+      ],
+      "note": "hermetic tests: stubbed global fetch (local) + mocked apple-fm module; real helper out-of-scope for CI."
+    },
+    "10.1": {
+      "waived": "Tauri native-window wrap + window title + macOS Dock .app identity — desktop shell behavior in src-tauri; verified by manual/CI build.",
+      "note": "desktop."
+    },
+    "10.2": {
+      "waived": "Sidecar PID tracking + exit cleanup lives in src-tauri/src/lib.rs but has no #[test]; Tauri runtime teardown not unit-testable.",
+      "note": "desktop."
+    },
+    "10.3": {
+      "waived": "Three production launch flows are Tauri shell orchestration; only the dev-mode launch path is unit-tested (build_dev_server_args).",
+      "note": "desktop."
+    },
+    "10.4": {
+      "tests": [
+        "src-tauri/src/lib.rs"
+      ],
+      "note": "Rust unit tests assert the manual-install command shape per platform (ln -sf on macOS/Linux, copy on Windows)."
+    },
+    "10.5": {
+      "waived": "Tauri updater plugin (check-on-launch, no auto-install, banner, signature verify, GitHub Releases) — desktop-shell/updater behavior, not unit-testable.",
+      "note": "desktop."
+    },
+    "10.6": {
+      "tests": [
+        "tests/integration/api/system-routes.test.ts",
+        "tests/unit/client/tauri-open-external.test.ts",
+        "tests/e2e/sponsor-link.test.ts"
+      ],
+      "note": "open-external http/https validation + 400; Tauri-vs-browser routing; sponsor click e2e."
+    },
+    "10.7": {
+      "waived": "macOS entitlements are static packaging metadata in the .entitlements plist, not runtime-testable.",
+      "note": "desktop."
+    },
+    "10.8": {
+      "waived": "Platform distribution matrix + code-sign/notarize + CI artifacts — CI/packaging NFR, verified by GitHub Actions + manual.",
+      "note": "CI."
+    },
+    "10.9": {
+      "tests": [
+        "src-tauri/src/lib.rs"
+      ],
+      "note": "macOS/Linux shapes assert ln -sf (symlink); Windows asserts copy — the platform behavior this NFR specifies."
+    },
+    "11.1": {
+      "waived": "npm installability + single-file dist/cli.js shebang + Node20/git prerequisites — packaging concerns verified by npm pack in CI.",
+      "note": "packaging."
+    },
+    "11.2": {
+      "waived": "Desktop build pipeline + artifact set + Node sidecar download — build steps; build-sidecar.test asserts the dep-copy contract, not the artifact matrix.",
+      "note": "build."
+    },
+    "11.3": {
+      "waived": "Version synchronization across package.json/tauri.conf.json/Cargo.toml — release-script behavior, not unit-tested.",
+      "note": "release."
+    },
+    "11.3.1": {
+      "waived": "Release-notes generation via gitgist — interactive release.sh state machine, not unit-tested.",
+      "note": "release."
+    },
+    "11.3.2": {
+      "tests": [
+        "tests/unit/scripts/release-assets.test.ts"
+      ],
+      "note": "dmg rename to friendly names (AS/Intel), idempotent, only-after-rename publish, download links per platform."
+    },
+    "11.4": {
+      "tests": [
+        "tests/unit/update-check.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "already-checked-today + force=false -> skip",
+        "already-checked-today + force=true -> check",
+        "not-checked -> check then persist date"
+      ],
+      "note": "once/day gating + package-manager detection (npm/yarn/pnpm/bun)."
+    },
+    "11.8": {
+      "waived": "Beta-release machinery (--beta, release:beta:auto, shared CI workflow, NSIS-only, no auto-promotion) — release scripts + Actions, not unit-tested.",
+      "note": "release."
+    },
+    "11.5": {
+      "waived": "Build pipeline config (tsup externals, esbuild IIFE, sass, kerfjs jsxImportSource) — build-tooling NFR.",
+      "note": "build."
+    },
+    "11.6": {
+      "tests": [
+        "tests/unit/scripts/build-sidecar.test.ts"
+      ],
+      "note": "apple-fm supply-contract slice (bundled signed helper, no Swift helper, no macOS-26 job). Sign/notarize/audit gates are CI-only (waived aspect)."
+    },
+    "11.9": {
+      "waived": "Dependency-security auditing (npm audit gate, Dependabot) — CI/GitHub-config NFR, not unit-testable.",
+      "note": "CI."
+    },
+    "11.7": {
+      "tests": [
+        "src-tauri/src/lib.rs"
+      ],
+      "note": "tauri:dev server-launch argv (node --import tsx src/cli.ts, flag forwarding) unit-tested."
+    },
+    "12.1": {
+      "tests": [
+        "tests/unit/demo.test.ts",
+        "tests/unit/cli/parseArgs.test.ts",
+        "tests/e2e/diff-mode.test.ts"
+      ],
+      "note": "7 unique scenarios; per-scenario seeding (1-5,7); --demo:N parse + invalid-ID reject; representative diff kinds incl SVG/image."
+    },
+    "12.3": {
+      "waived": "Purpose statement (showcase without a real repo) — non-behavioral NFR realized via 12.1/12.2.",
+      "note": "NFR."
+    },
+    "14.1": {
+      "tests": [
+        "tests/unit/security/security.test.ts",
+        "tests/unit/server.test.ts"
+      ],
+      "note": "loopback 127.0.0.1 bind (source grep + serve() hostname)."
+    },
+    "14.2": {
+      "tests": [
+        "tests/unit/security/security.test.ts",
+        "tests/unit/utils/requirePathParam.test.ts",
+        "tests/unit/utils/validate.test.ts"
+      ],
+      "note": "path-param non-empty 400; body/enum validation helpers."
+    },
+    "14.3": {
+      "tests": [
+        "tests/unit/security/security.test.ts",
+        "tests/unit/utils/openOS.test.ts",
+        "tests/unit/export/on-complete-hook.test.ts"
+      ],
+      "note": "no-shell-interpolation (spawnSync + argv arrays); openOS path as separate argv; hook via env vars."
+    },
+    "14.4": {
+      "tests": [
+        "tests/unit/ai/config-full.test.ts",
+        "tests/unit/security/security.test.ts"
+      ],
+      "note": "keychain-preferred per platform; base64 config + 0600; keys absent from error messages."
+    },
+    "14.5": {
+      "waived": "Plaintext-HTTP-on-loopback is a design-justification NFR; its precondition (loopback bind) is covered under 14.1.",
+      "note": "NFR."
+    },
+    "14.6": {
+      "waived": "No-auth-on-loopback is a design-justification NFR resting on the localhost bind (14.1); no auth code to test.",
+      "note": "NFR."
+    },
+    "14.8": {
+      "waived": "Dependency-security gate (npm audit in release-candidate.yml) + Dependabot — CI/GitHub-config NFR, not unit-testable.",
+      "note": "CI."
+    },
+    "18.1": {
+      "tests": [
+        "tests/unit/cli/parseArgs.test.ts",
+        "tests/unit/git/diff.test.ts"
+      ],
+      "note": "--diff CLI option + path-resolution-to-absolute + arg-arity error; empty-diff identical-files. (existence/type-agreement validation is a sub-gap)."
+    },
+    "18.2": {
+      "tests": [
+        "tests/unit/git/diff.test.ts"
+      ],
+      "note": "file-vs-file: single modified, differing-basenames rename shape, identical-empty."
+    },
+    "18.3": {
+      "tests": [
+        "tests/unit/git/diff.test.ts",
+        "tests/e2e/diff-mode.test.ts"
+      ],
+      "note": "folder-vs-folder recursive walk, pairing-by-relative-path (add/delete/modify), root prefixes not leaking."
+    },
+    "18.4": {
+      "tests": [
+        "tests/unit/git/diff.test.ts",
+        "tests/unit/git/image.test.ts",
+        "tests/e2e/diff-mode.test.ts"
+      ],
+      "note": "git diff --no-index argv; image bytes read from disk paths (rootA/rootB); SVG live-render from disk."
+    },
+    "18.6": {
+      "tests": [
+        "tests/unit/git/diff.test.ts"
+      ],
+      "note": "getModeArgs returns the 'A ↔ B' repo_name label. (data-dir/head-sentinel/history details are sub-gaps)."
+    },
+    "18.7": {
+      "tests": [
+        "tests/unit/git/diff.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "getModeString -> parseModeString round-trip preserves both absolute paths (JSON-encoded)",
+        "malformed diff: string -> falls back to uncommitted"
+      ],
+      "note": "mode persistence round-trip with safe fallback."
+    },
+    "18.8": {
+      "tests": [
+        "tests/e2e/diff-mode.test.ts"
+      ],
+      "note": "--diff review finalizes outside a git repo (auto-gitignore launch step skipped). (go-to-def/channel degradation are sub-gaps)."
+    },
+    "18.9": {
+      "tests": [
+        "tests/unit/git/diff.test.ts"
+      ],
+      "note": "getDiffArgs returns argv array ['diff','--no-index',pathA,pathB] — paths never a shell string."
+    },
+    "18.10": {
+      "waived": "Folder-comparison performance NFR (within seconds for hundreds of files) is timing/machine-dependent; delegated to git diff --no-index. No deterministic assertion practical.",
+      "note": "NFR."
+    },
+    "18.11": {
+      "waived": "Asserts the ABSENCE of an in-app file/folder picker (CLI-only, explicitly deferred); nothing behavioral to assert. CLI entry covered by parseArgs --diff.",
+      "note": "deferred/absence."
+    },
+    "19.1": {
+      "tests": [
+        "tests/unit/git/difftool.test.ts"
+      ],
+      "note": "register/unregister/status: three config keys, non-glassbox refuse-without-force, force-overwrite, non-destructive. (--global default + Settings UI are sub-gaps)."
+    },
+    "19.2": {
+      "tests": [
+        "tests/unit/git/difftool-launch.test.ts"
+      ],
+      "note": "--dir-diff plan (copies both roots to temp = symlink-deref staging) + isDirDiffInvocation discriminator."
+    },
+    "19.3": {
+      "tests": [
+        "tests/e2e/difftool.test.ts",
+        "tests/unit/git/difftool-launch.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "append file 1..4 -> single live review, sidebar count 0->4",
+        "per-file plan preserves basename label (not 'left ↔ right')",
+        "empty old side -> added entry (content captured)"
+      ],
+      "note": "per-file accumulating: 4 files into ONE review labeled by relative path; filename preservation via planSnapshot."
+    },
+    "19.4": {
+      "tests": [
+        "tests/unit/git/difftool-client.test.ts"
+      ],
+      "note": "thin-client: discover-or-start server, appendFile (base64 old/new body), detached-server spawn/unref."
+    },
+    "19.5": {
+      "tests": [
+        "tests/unit/difftool/session.test.ts",
+        "tests/unit/git/difftool-launch.test.ts",
+        "tests/unit/git/difftool-client.test.ts",
+        "tests/e2e/difftool.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "counter==total -> hold true; earlier -> false",
+        "hold -> resolves on endSession, shutdown after flush",
+        "second end -> idempotent",
+        "hold after end -> fires immediately",
+        "idle backstop tears down; noteActivity resets",
+        "Done click -> release + terminal overlay"
+      ],
+      "note": "last-file hold/release, Done-ends-session (e2e), Ctrl-C/drop fallback, idle backstop."
+    },
+    "19.6": {
+      "tests": [
+        "tests/unit/git/difftool-discovery.test.ts",
+        "tests/unit/git/difftool-client.test.ts"
+      ],
+      "note": "difftool.lock discovery (write/read/clear/corrupt) + single-winner start-election (singleton grouping)."
+    },
+    "19.7": {
+      "tests": [
+        "tests/unit/git/diff-raw.test.ts",
+        "tests/unit/git/image-blobs.test.ts",
+        "tests/e2e/difftool.test.ts"
+      ],
+      "note": "diffRawContent from raw {old,new}; image-blobs persists old/new bytes + clear; e2e append yields fileId re-served by /api/image. (append zod schema itself is a sub-gap)."
+    },
+    "19.8": {
+      "tests": [
+        "tests/e2e/difftool.test.ts",
+        "tests/unit/difftool/session.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "append while page open -> sidebar list grows live 1->4, no reload",
+        "first appended file auto-selects + diff renders",
+        "tab close/lost client -> server observes drop and tears down"
+      ],
+      "note": "live-growing sidebar + first-file auto-select; tab-close via session drop teardown."
+    },
+    "19.9": {
+      "tests": [
+        "tests/unit/git/difftool-client.test.ts",
+        "tests/unit/git/difftool-launch.test.ts"
+      ],
+      "note": "desktop launch per-platform (shell on Windows, argv non-Windows, macOS bundle shim). (window-close lifecycle is a sub-gap)."
+    },
+    "19.10": {
+      "tests": [
+        "tests/unit/git/difftool-launch.test.ts"
+      ],
+      "note": "path counter unavailable -> parseGitDiffCounter null + shouldHoldForSession false (graceful fallback to Done/tab-close)."
+    },
+    "19.11": {
+      "tests": [
+        "tests/unit/git/difftool-client.test.ts"
+      ],
+      "note": "append/hold/ping target 127.0.0.1 (loopback); base64 HTTP body; server spawned via argv array (no shell interpolation)."
+    },
+    "19.12": {
+      "tests": [
+        "tests/unit/git/difftool-client.test.ts",
+        "tests/unit/git/difftool-discovery.test.ts",
+        "tests/unit/git/repo.test.ts",
+        "tests/unit/git/image.test.ts",
+        "tests/unit/git/repo-helpers.test.ts"
+      ],
+      "note": "startup-race probe-with-retry/timeout + start-election; difftool-env scrub (scrubbedGitEnv strips GIT_EXTERNAL_DIFF applied by git show/rev-parse)."
+    },
+    "19.13": {
+      "tests": [
+        "tests/unit/git/difftool.test.ts",
+        "tests/unit/git/difftool-launch.test.ts"
+      ],
+      "note": "legacy two-arg registration recognized + upgraded (keys unchanged); --dir-diff plan unchanged."
+    },
+    "23.1": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "general image comment composer + list + reload-persistence + edit/delete controls (GB-956)."
+    },
+    "23.2": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/client/regionGeometry.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "enter draw mode -> drag rect -> pending input",
+        "save -> region box on overlay + numbered list row",
+        "below MIN_REGION_SIZE (stray click) -> discarded",
+        "reload -> persists on overlay + list"
+      ],
+      "note": "draw->anchor->render->persist; stray-click discard via isDrawnRegion."
+    },
+    "23.3": {
+      "tests": [
+        "tests/unit/client/regionGeometry.test.ts"
+      ],
+      "note": "normalized {x,y,w,h} in [0,1] (clientToFraction/rectFromPoints/regionStyle) + min-size discard + out-of-range reject."
+    },
+    "23.4": {
+      "tests": [
+        "tests/unit/client/regionGeometry.test.ts",
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "region_data JSON incl optional per-side 'side' (parseRegion); line_number=0 image-level identity + annotations-table reuse (integration)."
+    },
+    "23.5": {
+      "tests": [
+        "tests/integration/api/routes.test.ts",
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "POST /annotations lineNumber 0 + region ([0,1] validation); PATCH /:id/region via e2e move/side-toggle persistence."
+    },
+    "23.6": {
+      "tests": [
+        "tests/unit/export/generate.test.ts"
+      ],
+      "note": "markdown export renders image-comment + image-region distinctly with corrupt-region_data fallback. (side qualifier is a sub-gap)."
+    },
+    "23.7": {
+      "tests": [
+        "tests/unit/components/imageDiff.test.ts",
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "feedback panel + region overlay inside zoom wrapper exercised by the e2e draw flow."
+    },
+    "23.8": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "draw-mode drag capture (not pan) exercised while zoomed/panned; empty overlay still pans."
+    },
+    "23.9": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/client/regionGeometry.test.ts"
+      ],
+      "note": "GB-940: rendered box matches dragged screen rect within a few px at zoom>1 + pan (no drift); clientToFraction against transformed rect."
+    },
+    "23.10": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/client/regionGeometry.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "composer category -> saved item carries [cat], persists",
+        "side badge cycle A+B -> A -> B, persists",
+        "drag interior -> new position persists",
+        "resize edge/corner -> opposite fixed, held to MIN",
+        "hover row -> box active; leave clears"
+      ],
+      "note": "category/side/hover/move/resize: e2e persistence + regionGeometry (moveRegion/resizeRegion/hitTestRegion/cursorForHandle)."
+    },
+    "FR-24.1": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "side-by-side renders two panes (data-sxs-pane old/new) for a two-sided image."
+    },
+    "FR-24.3": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/client/zoom.test.ts"
+      ],
+      "note": "each pane sizes to its own natural dimensions; pickActualSize per-pane (GB-951)."
+    },
+    "FR-24.4": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "single orientation sub-control left-right (default) / over-under; flip changes data-sxs-orientation + stacks vertically."
+    },
+    "FR-24.5": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "orientation sub-control shown in SxS, hidden in difference + A/B focus."
+    },
+    "FR-24.6": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "chosen orientation (image_sxs_orientation) persists across reload."
+    },
+    "FR-24.8": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "region drawn on B pane renders + persists; per-side overlay tagging (data-region-side) asserted in component."
+    },
+    "FR-24.9": {
+      "tests": [
+        "tests/unit/client/lightboxZoom.test.ts"
+      ],
+      "note": "shared lightbox zoom/pan geometry (up to 8x, cursor-anchored, pan clamp). (the 'view full screen' button open is a sub-gap)."
+    },
+    "NFR-24.1": {
+      "tests": [
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "both panes reuse GET /api/image/:fileId/:side — no new transport route."
+    },
+    "NFR-24.2": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "orientation is a pure CSS layout flip (data-sxs-orientation row<->column); no server image processing."
+    },
+    "FR-28.1": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts",
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "A shows only old (data-panel a), B only new (data-panel b) for two-sided images."
+    },
+    "FR-28.2": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "segment order metadata < a < b < side-by-side."
+    },
+    "FR-28.3": {
+      "tests": [
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "A/B focus panels comparison-only: absent for added/deleted single-side files."
+    },
+    "FR-28.4": {
+      "tests": [
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "selected A/B focus mode persists across reload (last_image_mode accepts a/b). (single/two-sided fallback is a sub-gap, see FR-24.2)."
+    },
+    "FR-28.6": {
+      "tests": [
+        "tests/unit/client/lightboxZoom.test.ts"
+      ],
+      "note": "same shared lightbox geometry as FR-24.9. (focus-canvas full-screen button open is a sub-gap)."
+    },
+    "FR-28.7": {
+      "tests": [
+        "tests/unit/components/imageDiff.test.ts",
+        "tests/e2e/image-diff.test.ts"
+      ],
+      "note": "A overlay tagged data-region-side=old, B=new (component); scoped per-side rendering shared with SxS B pane."
+    },
+    "NFR-28.1": {
+      "tests": [
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "A/B focus read existing GET /api/image/:fileId/:side — no new route."
+    },
+    "NFR-28.2": {
+      "tests": [
+        "tests/unit/components/imageDiff.test.ts"
+      ],
+      "note": "two server-rendered single-image panels reusing existing canvas markup/CSS (data-panel a/b); no new processing."
+    },
+    "2.3a": {
+      "tests": [
+        "tests/unit/export/on-complete-hook.test.ts",
+        "tests/unit/cli/parseArgs.test.ts"
+      ],
+      "note": "hook only on completion; env vars; non-zero/failed-spawn swallowed; output log; flag parse."
+    },
+    "3.3": {
+      "tests": [
+        "tests/integration/git/diff.test.ts"
+      ],
+      "note": "Untracked files included as added diffs in uncommitted mode ('includes untracked files as added diffs', 'creates correct diff for a plain text untracked file')."
+    },
+    "3.5": {
+      "tests": [
+        "tests/integration/git/diff.test.ts"
+      ],
+      "note": "Working-directory file reads: getFileContent 'returns working-copy content when ref is working' + at HEAD / specific ref / missing."
+    },
+    "5.6": {
+      "tests": [
+        "tests/e2e/annotations.test.ts"
+      ],
+      "note": "Annotation display: content text rendered, correct categories, count badge in sidebar."
+    },
+    "15.5": {
+      "tests": [
+        "tests/e2e/themes.test.ts",
+        "tests/e2e/settings.test.ts"
+      ],
+      "note": "Theme selection in settings: dropdown shows built-ins, switching changes CSS variables, persists across reload."
+    },
+    "15.6": {
+      "tests": [
+        "tests/e2e/themes.test.ts"
+      ],
+      "note": "Theme Manager dialog: opens with items+swatches, click switches active, selected style, Escape closes."
+    },
+    "15.7": {
+      "tests": [
+        "tests/e2e/themes.test.ts",
+        "tests/unit/themes/config.test.ts"
+      ],
+      "note": "Theme editor path: duplicate creates a new custom entry, delete removes it; saveCustomTheme writes JSON. (live color-preview editing is a manual sub-check)."
+    },
+    "FR-27.8": {
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
+      "note": "Notify on change: computeGitignore returns a `changed` flag (true when it writes, false when already canonical) that gates the launch-time notice."
+    },
+    "7.6": {
+      "tests": [
+        "tests/integration/api/ai-routes.test.ts"
+      ],
+      "note": "In-session analysis caching: running analyses of the same type are deduplicated ('deduplicates running analyses of the same type'). (cache invalidate/carry-forward across runs is a sub-gap)."
+    },
+    "15.10": {
+      "waived": "Theme performance (instant switch, no flash) is a timing/visual NFR; theme switching correctness is covered by themes.test.ts but the perf target is not deterministically assertable.",
+      "note": "NFR."
+    },
+    "15.11": {
+      "waived": "Theme accessibility (adequate contrast) is a visual/subjective property; built-in themes are hand-tuned. No automated contrast harness; verified by eye.",
+      "note": "NFR."
+    },
+    "15.12": {
+      "waived": "Theme compatibility (renders across the app's surfaces) is a broad visual NFR realized by the CSS-variable system (15.4) rather than a single assertable behavior.",
+      "note": "NFR."
+    },
+    "20.10": {
+      "waived": "Repository hygiene (.pr-notes/ committed, Git LFS wiring for artifacts) is a git/repo-config NFR, not runtime-testable.",
+      "note": "NFR."
+    },
+    "20.11": {
+      "waived": "Phasing is a roadmap/status section (P1-P5 markers); its behaviors are tested under 20.1-20.9.",
+      "note": "NFR."
+    },
+    "12.2": {
+      "waived": "Demo isolation (skip instance lock, no git repo required, disposable tmp data dir) lives in cli.main() orchestration. It is exercised end-to-end by the entire hermetic e2e suite, which runs `--demo:4` with no real repo and no lock conflict; there is no isolating unit assertion of the bypass itself.",
+      "note": "NFR."
+    },
+    "16.4": {
+      "waived": "Settings 'Share Glassbox' link wiring — manual (docs/manual-test-plan.md). The share action itself (triggerShare) is unit-tested.",
+      "note": "Manual — see docs/manual-test-plan.md."
+    },
+    "17.4": {
+      "waived": "Completion-modal Send-to-Claude button — manual against a live Claude session (docs/manual-test-plan.md). The channel trigger endpoint + status gating are integration-tested.",
+      "note": "Manual — see docs/manual-test-plan.md."
+    },
+    "FR-24.7": {
+      "waived": "Synced zoom/pan across the two side-by-side panes — manual, needs real pointer/wheel gestures (docs/manual-test-plan.md). Zoom/pan geometry is unit-tested (client/zoom.test.ts, client/lightboxZoom.test.ts).",
+      "note": "Manual — see docs/manual-test-plan.md."
+    },
+    "FR-28.5": {
+      "waived": "Zoom/pan within the A/B focus views — manual (docs/manual-test-plan.md). Uses the same unit-tested shared zoom code.",
+      "note": "Manual — see docs/manual-test-plan.md."
+    },
+    "2.17": {
+      "tests": [
+        "tests/unit/server.test.ts"
+      ],
+      "note": "Startup output: 'Glassbox running at <url>' ready line logged; port-in-use fallback message logged when the first port is taken."
+    },
+    "5.2": {
+      "tests": [
+        "tests/unit/client/categories.test.ts"
+      ],
+      "note": "The seven documented annotation categories (bug/fix/style/pattern-follow/pattern-avoid/note/remember) with non-empty labels, no duplicates."
+    },
+    "14.7": {
+      "tests": [
+        "tests/integration/api/routes.test.ts"
+      ],
+      "note": "Error responses omit internals: flat {error} shape, no stack/paths/exception dump; malformed JSON, schema failure, empty path-param all return user-safe messages."
+    },
+    "16.3": {
+      "tests": [
+        "tests/unit/client/share.test.ts"
+      ],
+      "note": "triggerShare uses the Web Share API with the npm URL when available, else falls back to clipboard copy + a .share-toast."
+    },
+    "18.5": {
+      "tests": [
+        "tests/integration/git/diff.test.ts"
+      ],
+      "note": "Context expansion in --diff mode: getModeFileContent reads the new side from path B and old side from path A on disk (no git ref), '' when absent."
+    },
+    "FR-24.2": {
+      "tests": [
+        "tests/unit/client/effectiveImageMode.test.ts"
+      ],
+      "note": "Side by Side is the default for a two-sided image ('image'->'side-by-side'); comparison/focus modes fall back to 'image' on single-side files."
+    },
+    "FR-27.7": {
+      "tests": [
+        "tests/unit/git/gitignore.test.ts"
+      ],
+      "note": "Git-repo + default-directory scope: ensureGlassboxGitignored acts only when basename is '.glassbox' AND dirname is a git repo; skips custom data-dir names and non-repo dirs."
+    },
+    "22.7": {
+      "tests": [
+        "tests/unit/ai/apple-foundation.test.ts",
+        "tests/unit/ai/list-models.test.ts"
+      ],
+      "note": "Cross-platform support: Apple macOS/Apple-Silicon-only no-ops elsewhere (off-platform -> unavailable, probe not attempted); local is pure HTTP on any OS."
+    },
+    "22.8": {
+      "waived": "Phasing is a roadmap/status section (P1/P2/P2a markers); its behaviors are tested under 22.1-22.4/22.9-22.10.",
+      "note": "Roadmap."
+    },
+    "22.9": {
+      "tests": [
+        "tests/unit/scripts/build-sidecar.test.ts"
+      ],
+      "note": "Production signing & notarization: apple-fm bundled into the sidecar (signed helper rides along), identity-gated re-sign, old Swift-helper job removed. On-device notarization is CI-unverifiable."
+    },
+    "22.10": {
+      "tests": [
+        "tests/unit/ai/analyze-risk.test.ts",
+        "tests/unit/ai/config-full.test.ts",
+        "tests/unit/ai/models.test.ts",
+        "tests/integration/api/ai-routes.test.ts",
+        "tests/e2e/settings.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "apple batch throws + fallback configured -> retry on fallback -> success",
+        "apple batch fails + no fallback -> re-throw",
+        "apple batch succeeds -> fallback never invoked",
+        "loadAIConfig apple+fallback -> one-level AIConfig.fallback",
+        "fallbackPlatform==apple or primary!=apple -> no fallback",
+        "empty fallbackPlatform -> cleared"
+      ],
+      "note": "Apple FM secondary fallback model: per-failed-batch spill to secondary, one-level fallback resolution, persist/clear, 4096 conservative window, settings fallback picker."
     }
   }
 }

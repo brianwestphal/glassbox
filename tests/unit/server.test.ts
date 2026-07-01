@@ -193,6 +193,43 @@ describe('startServer', () => {
     expect(serve).toHaveBeenCalled();
   });
 
+  it('logs the ready line with the actual URL after a normal start', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+
+    await startServer(4183, 'review-123', '/tmp/repo', { noOpen: true });
+
+    expect(logSpy).toHaveBeenCalledWith('\n  Glassbox running at http://localhost:4183\n');
+    logSpy.mockRestore();
+  });
+
+  it('logs the port-fallback message when the first port is in use', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+
+    let callCount = 0;
+    vi.mocked(serve).mockImplementation(() => {
+      callCount++;
+      const server = {
+        on: vi.fn((event: string, cb: (...args: any[]) => void) => {
+          if (callCount === 1 && event === 'error') {
+            const err = new Error('EADDRINUSE') as NodeJS.ErrnoException;
+            err.code = 'EADDRINUSE';
+            setTimeout(() => cb(err), 0);
+          } else if (callCount > 1 && event === 'listening') {
+            setTimeout(() => cb(), 0);
+          }
+        }),
+      };
+      return server as any;
+    });
+
+    await startServer(4183, 'review-123', '/tmp/repo', { noOpen: true });
+
+    // First port (4183) in use -> falls back to 4184 and logs the notice.
+    expect(logSpy).toHaveBeenCalledWith('  Port 4183 in use, using 4184 instead.');
+    expect(logSpy).toHaveBeenCalledWith('\n  Glassbox running at http://localhost:4184\n');
+    logSpy.mockRestore();
+  });
+
   it('tries next port when strictPort is false and port is in use', async () => {
     let callCount = 0;
     mockServer.on.mockImplementation((event: string, cb: (...args: any[]) => void) => {

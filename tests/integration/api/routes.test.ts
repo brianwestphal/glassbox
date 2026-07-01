@@ -1549,6 +1549,81 @@ describe('DELETE /api/review-notes/:guid (GB-907)', () => {
   });
 });
 
+// ===== Error responses omit internal details (doc 14, FR-14.7) =====
+//
+// FR-14.7: error responses must not leak internal file paths, stack traces, or
+// system details. The structured-error path in src/utils/parseBody.ts returns a
+// flat `{ error: <user-safe message> }` with a 4xx status — never an exception
+// dump. These tests trigger real error paths (malformed JSON, schema validation
+// failure, empty path param) and assert the returned body carries only a safe
+// message and none of the tell-tale leak markers.
+describe('Error responses omit internal details (FR-14.7)', () => {
+  // Markers that would indicate an internal detail leaked into the response.
+  function assertNoInternalLeak(body: unknown): void {
+    expect(typeof body).toBe('object');
+    expect(body).not.toBeNull();
+    const obj = body as Record<string, unknown>;
+    // Only the safe `error` key is present — no `stack`, `trace`, `cause`, etc.
+    expect(Object.keys(obj)).toEqual(['error']);
+    expect(typeof obj.error).toBe('string');
+    const msg = obj.error as string;
+    // No absolute filesystem paths (POSIX or Windows), no node_modules, no repo
+    // root, no stack frames, no raw exception dumps.
+    expect(msg).not.toContain(TEST_REPO_ROOT);
+    expect(msg).not.toContain('node_modules');
+    expect(msg).not.toMatch(/\/(Users|home|var|private|tmp)\//);
+    expect(msg).not.toMatch(/[A-Za-z]:\\/); // Windows drive path
+    expect(msg).not.toMatch(/\bat\s+\S+\s+\(/); // "at fn (file:line)" stack frame
+    expect(msg).not.toMatch(/\.(ts|js):\d+/); // source-location reference
+    expect(msg).not.toContain('Error:');
+    expect(msg).not.toMatch(/\bstack\b/i);
+  }
+
+  it('returns a user-safe message (not an exception dump) for a malformed JSON body', async () => {
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{ this is not valid json',
+    });
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    // The exact user-safe message the code returns for unparseable bodies.
+    expect(body.error).toBe('Body must be valid JSON');
+    assertNoInternalLeak(body);
+  });
+
+  it('returns a field-scoped validation message without leaking internals for a schema failure', async () => {
+    // Well-formed JSON that fails the annotation schema (missing required
+    // fields). parseBody summarizes the zod issues by field path + message.
+    const res = await app.request('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineNumber: 'not-a-number' }),
+    });
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    // The message describes what the client got wrong (field paths / messages),
+    // which is the "necessary for the user to resolve" carve-out in FR-14.7 —
+    // but it must not carry paths, stacks, or exception dumps.
+    expect(typeof body.error).toBe('string');
+    expect(body.error.length).toBeGreaterThan(0);
+    assertNoInternalLeak(body);
+  });
+
+  it('returns a safe message for an empty path parameter (requirePathParam)', async () => {
+    // A whitespace guid hits the requirePathParam guard on the review-notes
+    // delete route, which returns a structured 400.
+    const res = await app.request('/api/review-notes/%20?file=src/app.ts', { method: 'DELETE' });
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toContain('path parameter');
+    assertNoInternalLeak(body);
+  });
+});
+
 describe('GET /api/review-notes/artifact (GB-911)', () => {
   it('serves an image artifact with the right content-type', async () => {
     mkdirSync(`${TEST_REPO_ROOT}/.pr-notes/artifacts`, { recursive: true });

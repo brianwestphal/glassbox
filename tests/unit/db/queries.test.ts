@@ -34,6 +34,10 @@ import {
   keepAllStaleAnnotations,
   getStaleCountsForReview,
 } from '../../../src/db/queries.js';
+import {
+  createAttachment,
+  getAttachmentsForAnnotation,
+} from '../../../src/db/attachment-queries.js';
 
 describe('queries', () => {
   beforeAll(async () => {
@@ -133,18 +137,29 @@ describe('queries', () => {
       const review = await createReview('/repo/delete', 'delete-repo', 'uncommitted');
       const file = await addReviewFile(review.id, 'test.ts', '{}');
       const annotation = await addAnnotation(file.id, 10, 'new', 'bug', 'found a bug');
+      // An attachment on the annotation must cascade away too (doc 25 NFR-25.2).
+      await createAttachment({
+        annotationId: annotation.id,
+        originalFilename: 'proof.png',
+        storedPath: '/data/attachments/proof.png',
+        mimeType: 'image/png',
+        size: 123,
+        sha256: null,
+      });
 
       // Verify they exist
       expect(await getReview(review.id)).toBeDefined();
       expect(await getReviewFile(file.id)).toBeDefined();
       expect((await getAnnotationsForFile(file.id)).length).toBe(1);
+      expect((await getAttachmentsForAnnotation(annotation.id)).length).toBe(1);
 
       await deleteReview(review.id);
 
-      // All should be gone
+      // All should be gone, including the attachment (annotation FK cascade)
       expect(await getReview(review.id)).toBeUndefined();
       expect(await getReviewFile(file.id)).toBeUndefined();
       expect((await getAnnotationsForFile(file.id)).length).toBe(0);
+      expect((await getAttachmentsForAnnotation(annotation.id)).length).toBe(0);
     });
 
     it('getLatestInProgressReview matches by repo+mode', async () => {

@@ -78,6 +78,11 @@ jobs:
       # erases `import type` without checking — so type-level drift in a
       # script-only dependency would otherwise reach a release undetected.
       - run: npm run typecheck:scripts
+      # Feature-coverage gate: every documented requirement must map to an
+      # asserting test (or a justified waiver) in docs/testing/feature-coverage.json.
+      # Orthogonal to line coverage — catches a new documented behavior shipped
+      # with no test. See docs/testing/9-feature-coverage.md.
+      - run: npm run check:features -- --strict
 
   test-unit:
     name: Unit Tests

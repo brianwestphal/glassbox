@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   getFileDiffs,
   getFileContent,
+  getModeFileContent,
   getHeadCommit,
   parseDiff,
 } from '../../../src/git/diff.js';
@@ -453,6 +454,67 @@ index abc1234..def5678 100644
     const appDiff = result.find(f => f.filePath === 'src/app.ts');
     expect(appDiff).toBeDefined();
     expect(appDiff!.hunks).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getModeFileContent — context expansion in --diff mode reads the disk paths
+//
+// Doc 18, FR-18.5: in direct-comparison (`--diff`) mode there are no git refs,
+// so expanding hunk context must read the extra lines straight off disk — the
+// new side from path B's directory, the old side from path A's. This is the
+// seam the /api/context route uses to serve context lines for a diff-mode
+// review. Two files with the SAME basename in two separate directories make the
+// per-side root selection unambiguous.
+// ---------------------------------------------------------------------------
+
+describe('getModeFileContent — --diff mode reads from disk paths (FR-18.5)', () => {
+  let dir: string | undefined;
+
+  afterAll(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads the new side from path B and the old side from path A on disk', () => {
+    dir = mkdtempSync(join(tmpdir(), 'glassbox-diff-context-'));
+    const dirA = join(dir, 'a');
+    const dirB = join(dir, 'b');
+    execSync(`mkdir -p "${dirA}" "${dirB}"`, { stdio: 'pipe' });
+
+    const oldContent = 'old-1\nold-2\nold-3\nold-4\nold-5\n';
+    const newContent = 'new-1\nnew-2\nnew-3\nnew-4\nnew-5\n';
+    const pathA = join(dirA, 'data.txt');
+    const pathB = join(dirB, 'data.txt');
+    writeFileSync(pathA, oldContent);
+    writeFileSync(pathB, newContent);
+
+    const mode = { type: 'diff' as const, pathA, pathB };
+    // The display/relative path within each root is the shared basename.
+    const filePath = 'data.txt';
+
+    // New side reads from disk path B; old side reads from disk path A. `cwd`
+    // is irrelevant in diff mode — no git ref is consulted.
+    const newSide = getModeFileContent(mode, filePath, 'new', dir);
+    const oldSide = getModeFileContent(mode, filePath, 'old', dir);
+
+    expect(newSide).toBe(newContent);
+    expect(oldSide).toBe(oldContent);
+  });
+
+  it('returns empty string when the on-disk file is absent (no git fallback)', () => {
+    const missingDir = mkdtempSync(join(tmpdir(), 'glassbox-diff-context-missing-'));
+    try {
+      const pathA = join(missingDir, 'a', 'gone.txt');
+      const pathB = join(missingDir, 'b', 'gone.txt');
+      const mode = { type: 'diff' as const, pathA, pathB };
+
+      // Neither file exists on disk — diff mode must not fall through to a git
+      // ref; it returns '' instead.
+      expect(getModeFileContent(mode, 'gone.txt', 'new', missingDir)).toBe('');
+      expect(getModeFileContent(mode, 'gone.txt', 'old', missingDir)).toBe('');
+    } finally {
+      rmSync(missingDir, { recursive: true, force: true });
+    }
   });
 });
 

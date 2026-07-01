@@ -1,8 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { computeGitignore, GLASSBOX_GITIGNORE_LINES } from '../../../src/git/gitignore.js';
+const existsSyncMock = vi.fn();
+const readFileSyncMock = vi.fn();
+const writeFileSyncMock = vi.fn();
+vi.mock('fs', () => ({
+  existsSync: (...args: unknown[]) => existsSyncMock(...args),
+  readFileSync: (...args: unknown[]) => readFileSyncMock(...args),
+  writeFileSync: (...args: unknown[]) => writeFileSyncMock(...args),
+}));
+
+const isGitRepoMock = vi.fn();
+vi.mock('../../../src/git/repo.js', () => ({
+  isGitRepo: (cwd: string) => isGitRepoMock(cwd),
+}));
+
+const { computeGitignore, ensureGlassboxGitignored, GLASSBOX_GITIGNORE_LINES } = await import(
+  '../../../src/git/gitignore.js'
+);
 
 const BLOCK = GLASSBOX_GITIGNORE_LINES.join('\n');
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('computeGitignore', () => {
   it('creates a fresh file when none exists', () => {
@@ -72,5 +92,65 @@ describe('computeGitignore', () => {
     const { changed, content } = computeGitignore(existing);
     expect(changed).toBe(true); // appends our block, keeps theirs
     expect(content).toBe(`glassbox-notes/\nmy.glassbox\n\n${BLOCK}\n`);
+  });
+});
+
+describe('ensureGlassboxGitignored', () => {
+  it('writes the updated .gitignore inside a git repo when a change is needed', () => {
+    isGitRepoMock.mockReturnValue(true);
+    existsSyncMock.mockReturnValue(true);
+    readFileSyncMock.mockReturnValue('node_modules/\n'); // no .glassbox block yet -> change needed
+
+    const { changed } = ensureGlassboxGitignored('/repo/.glassbox');
+
+    expect(changed).toBe(true);
+    expect(isGitRepoMock).toHaveBeenCalledWith('/repo');
+    expect(readFileSyncMock).toHaveBeenCalledWith('/repo/.gitignore', 'utf-8');
+    expect(writeFileSyncMock).toHaveBeenCalledWith(
+      '/repo/.gitignore',
+      `node_modules/\n\n${BLOCK}\n`,
+      'utf-8'
+    );
+  });
+
+  it('creates a fresh .gitignore when none exists in the repo', () => {
+    isGitRepoMock.mockReturnValue(true);
+    existsSyncMock.mockReturnValue(false); // no .gitignore -> computeGitignore(null)
+
+    const { changed } = ensureGlassboxGitignored('/repo/.glassbox');
+
+    expect(changed).toBe(true);
+    expect(readFileSyncMock).not.toHaveBeenCalled();
+    expect(writeFileSyncMock).toHaveBeenCalledWith('/repo/.gitignore', `${BLOCK}\n`, 'utf-8');
+  });
+
+  it('does not write when already up to date (no change needed)', () => {
+    isGitRepoMock.mockReturnValue(true);
+    existsSyncMock.mockReturnValue(true);
+    readFileSyncMock.mockReturnValue(`node_modules/\n${BLOCK}\n`);
+
+    const { changed } = ensureGlassboxGitignored('/repo/.glassbox');
+
+    expect(changed).toBe(false);
+    expect(writeFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('does not write when the target directory is not a git repo', () => {
+    isGitRepoMock.mockReturnValue(false);
+
+    const { changed } = ensureGlassboxGitignored('/somewhere/.glassbox');
+
+    expect(changed).toBe(false);
+    expect(isGitRepoMock).toHaveBeenCalledWith('/somewhere');
+    expect(readFileSyncMock).not.toHaveBeenCalled();
+    expect(writeFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('does not write (or even check the repo) for a non-default data-dir name', () => {
+    const { changed } = ensureGlassboxGitignored('/repo/.custom-data');
+
+    expect(changed).toBe(false);
+    expect(isGitRepoMock).not.toHaveBeenCalled();
+    expect(writeFileSyncMock).not.toHaveBeenCalled();
   });
 });

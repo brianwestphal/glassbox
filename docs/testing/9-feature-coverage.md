@@ -47,9 +47,12 @@ found becomes a new test.
   visible and reviewable. Do **not** waive a testable behavior — write the test
   instead.
 - **The report** — `npm run check:features` prints every unit with no map entry,
-  no asserting test, or (for stateful units) no listed transitions. Advisory by
-  default; `npm run check:features -- --strict` exits non-zero on any gap, for a
-  pre-commit / CI gate once the map is fully populated.
+  no asserting test, or (for stateful units) no listed transitions. It also
+  reports how many units are explicitly `waived`. `npm run check:features --
+  --strict` exits non-zero on any gap and **runs as an enforcing gate in CI**
+  (the Type Check job in `.github/workflows/release-candidate.yml`): the map is
+  fully populated, so a newly documented behavior shipped without a test (or a
+  waiver) fails the build.
 - **The structural guard** — `tests/unit/conventions.test.ts` pins
   requirement-level invariants line coverage can't express (contiguous doc
   numbering, the external-dependency allow-list agreeing across `tsup.config.ts`
@@ -75,7 +78,10 @@ npm run check:features          # advisory report of every gap
 npm run check:features -- --strict   # non-zero exit if any gap remains
 ```
 
-The map ships intentionally **partial** — the tool reports every not-yet-mapped
-requirement as a gap, and closing those gaps (verifying, or writing, an
-asserting test per unit) is an ongoing exercise. When you add a requirement or a
-test, update `feature-coverage.json` in the same pass.
+The map is **complete** — every documented requirement unit maps to an asserting
+test or a justified `waived` entry, and `--strict` is enforced in CI. When you
+add a requirement (a new `### N.M` / `## N.M` heading or a `**FR-N.M**` id) or a
+test, update `feature-coverage.json` in the same pass, or the gate fails. Genuine
+non-functional requirements with no practical automated assertion, and the
+handful of manual-only UI behaviors listed in `docs/manual-test-plan.md`, carry a
+`waived` justification rather than a test.

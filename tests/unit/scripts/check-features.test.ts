@@ -43,10 +43,29 @@ describe('extractRequirementUnits', () => {
     expect(units[0].title).toBe('Review Creation');
   });
 
-  it('prefers FR-/NFR- ids over subsection headings when both are present', () => {
-    const md = ['### 24.1 Grouping heading', '- **FR-24.1 — Mode.** ...'].join('\n');
+  it('prefers numbered subsections and ignores redundant inline FR-ids (doc 2 shape)', () => {
+    // Doc 2 has `### 2.3a` subsection headings AND a redundant `**FR-2.3a**` bold
+    // statement inside them. The subsection heading is the unit; the bold id must
+    // NOT produce a second, double-counted unit.
+    const md = ['### 2.3a Completion hook', '- **FR-2.3a — Hook.** ...', '### 2.7 API'].join('\n');
+    const units = extractRequirementUnits(md, 2);
+    expect(units.map((u) => u.id)).toEqual(['2.3a', '2.7']);
+  });
+
+  it('includes level-2 numbered headings alongside ### subsections (doc 22 shape)', () => {
+    // Doc 22 mixes `### 22.1`…`### 22.6` with `## 22.7`…`## 22.10` (level 2),
+    // and has no bold FR ids — every numbered heading is a unit.
+    const md = ['### 22.1 Platforms', '## 22.7 Cross-platform', '## 22.10 Fallback'].join('\n');
+    const units = extractRequirementUnits(md, 22);
+    expect(units.map((u) => u.id)).toEqual(['22.1', '22.7', '22.10']);
+  });
+
+  it('treats a `## N.M` grouping doc with bold FR-ids as FR-primary (doc 24 shape)', () => {
+    // Docs 24/25/26/28 use `## N.M` as grouping over `**FR-N.M**` units; the
+    // grouping headings must NOT become units.
+    const md = ['## 24.1 Side by Side mode', '- **FR-24.1 — Mode.** ...', '- **FR-24.2 — Default.** ...'].join('\n');
     const units = extractRequirementUnits(md, 24);
-    expect(units.map((u) => u.id)).toEqual(['FR-24.1']);
+    expect(units.map((u) => u.id)).toEqual(['FR-24.1', 'FR-24.2']);
   });
 
   it('returns nothing for a doc with neither form', () => {

@@ -931,8 +931,10 @@ check:features` (`scripts/check-features.ts`) extracts a requirement unit per
 behavior from `docs/[0-9]*.md` and flags any with no asserting test in
 `docs/testing/feature-coverage.json` (stateful units must also list their
 transitions); `tests/unit/conventions.test.ts` pins the structural invariants
-line coverage can't express. See `docs/testing/9-feature-coverage.md`. The map
-ships intentionally partial — filling it out is an ongoing exercise.
+line coverage can't express. See `docs/testing/9-feature-coverage.md`. The map is
+**complete** (every unit tested or `waived`) and `check:features --strict` runs
+as an enforcing CI gate, so a newly documented behavior without a test fails the
+build.
 
 ## 20. Maintenance rules
 

@@ -339,7 +339,7 @@ export function setRawDiffContent(filePath: string, html: string): void {
  *  (difference/slice/side-by-side and the A/B single-side focus modes) fall back
  *  to the single "image" viewer; a two-sided file maps the single "image" mode to
  *  the side-by-side default. */
-function effectiveImageMode(imageDiffEl: HTMLElement, storeMode: string): string {
+export function effectiveImageMode(imageDiffEl: HTMLElement, storeMode: string): string {
   const hasComparison = imageDiffEl.dataset.hasOld === 'true' && imageDiffEl.dataset.hasNew === 'true';
   let mode = storeMode;
   if (!hasComparison && (mode === 'difference' || mode === 'slice' || mode === 'side-by-side' || mode === 'a' || mode === 'b')) mode = 'image';

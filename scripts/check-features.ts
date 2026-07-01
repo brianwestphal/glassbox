@@ -84,7 +84,10 @@ export interface CoverageResult {
 }
 
 const FR_ID_RE = /\*\*(FR|NFR)-(\d+(?:\.\d+)*[a-z]?)/g;
-const SUBSECTION_RE = /^#{3,4}\s+(\d+(?:\.\d+)+[a-z]?)\s+(.+?)\s*$/;
+/** Fine-grained numbered subsection headings, `### N.M` / `#### N.M.K`. */
+const SUB3_RE = /^#{3,4}\s+(\d+(?:\.\d+)+[a-z]?)\s+(.+?)\s*$/;
+/** Numbered level-2 headings, `## N.M` — units only in heading-based docs. */
+const SUB2_RE = /^##\s+(\d+(?:\.\d+)+[a-z]?)\s+(.+?)\s*$/;
 
 /**
  * Extract the requirement units from one requirements doc's markdown.
@@ -93,16 +96,52 @@ const SUBSECTION_RE = /^#{3,4}\s+(\d+(?:\.\d+)+[a-z]?)\s+(.+?)\s*$/;
  *   - Newer docs use explicit bold ids: `**FR-24.1 — Mode.** ...`
  *   - Older docs enumerate behaviors as numbered subsections: `### 1.1 Review Creation`
  *
- * When a doc uses explicit `FR-`/`NFR-` ids, those are authoritative and the
- * subsection headings are ignored (they are just section groupings there).
- * Otherwise the numbered subsections are the units. This keeps every doc
- * indexable without retrofitting ids into the older ones.
+ * Docs come in two structural flavors and the rule reconciles both:
+ *
+ * - **FR-primary** (newer docs 24/25/26/28): `## N.M` headings are just grouping;
+ *   the real units are the `**FR-N.M**` / `**NFR-N.M**` bold ids beneath them.
+ *   These have no `### N.M` subsections, so FR-ids win.
+ * - **Heading-based** (docs 1–23, 27): numbered headings are the units. Most use
+ *   `### N.M`; doc 22 additionally has `## 22.7`…`## 22.10` at level 2; doc 2 has
+ *   `### 2.x` plus a couple of redundant `**FR-2.3a**` bold statements that must
+ *   NOT double-count against their `### 2.3a` heading.
+ *
+ * So: if a doc has `**FR-**` ids AND no `### N.M` subsections, it is FR-primary →
+ * use the FR ids. Otherwise it is heading-based → use every numbered heading
+ * (levels 2–4), and ignore any bold FR ids (they are redundant emphasis there).
  */
 export function extractRequirementUnits(markdown: string, doc: number): RequirementUnit[] {
+  const lines = markdown.split('\n');
+  const sub3 = matchHeadings(lines, SUB3_RE, doc);
+  const frIds = matchFrIds(markdown, doc);
+
+  // FR-primary: bold ids present and no fine-grained subsections to anchor to.
+  if (frIds.length > 0 && sub3.length === 0) return frIds;
+
+  // Heading-based: level 3-4 subsections plus any level-2 numbered headings
+  // (doc 22). FR ids are ignored here (redundant with the headings).
   const units: RequirementUnit[] = [];
   const seen = new Set<string>();
+  for (const u of [...sub3, ...matchHeadings(lines, SUB2_RE, doc)]) {
+    if (seen.has(u.id)) continue;
+    seen.add(u.id);
+    units.push(u);
+  }
+  return units;
+}
 
-  // First pass: explicit FR-/NFR- ids.
+function matchHeadings(lines: string[], re: RegExp, doc: number): RequirementUnit[] {
+  const out: RequirementUnit[] = [];
+  for (const line of lines) {
+    const m = line.match(re);
+    if (m) out.push({ id: m[1], title: m[2].trim(), doc });
+  }
+  return out;
+}
+
+function matchFrIds(markdown: string, doc: number): RequirementUnit[] {
+  const out: RequirementUnit[] = [];
+  const seen = new Set<string>();
   for (const m of markdown.matchAll(FR_ID_RE)) {
     const id = `${m[1]}-${m[2]}`;
     if (seen.has(id)) continue;
@@ -110,23 +149,9 @@ export function extractRequirementUnits(markdown: string, doc: number): Requirem
     // Title: text after the id up to the next `.` or `—`/`-` delimiter, best-effort.
     const after = markdown.slice(m.index + m[0].length);
     const titleMatch = after.match(/^\s*(?:[—-]\s*)?([^.\n*]+)/);
-    const title = titleMatch ? titleMatch[1].trim() : id;
-    units.push({ id, title, doc });
+    out.push({ id, title: titleMatch ? titleMatch[1].trim() : id, doc });
   }
-
-  if (units.length > 0) return units;
-
-  // Fallback: numbered subsection headings (older docs).
-  for (const line of markdown.split('\n')) {
-    const m = line.match(SUBSECTION_RE);
-    if (!m) continue;
-    const id = m[1];
-    if (seen.has(id)) continue;
-    seen.add(id);
-    units.push({ id, title: m[2].trim(), doc });
-  }
-
-  return units;
+  return out;
 }
 
 /** Compute the coverage gaps for a set of requirement units against a map. */
