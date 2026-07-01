@@ -2,7 +2,7 @@
 description: Create a new req change ticket in Hot Sheet
 alwaysApply: false
 ---
-<!-- hotsheet-skill-version: 17 -->
+<!-- hotsheet-skill-version: 20 -->
 
 Create a new Hot Sheet **req change** ticket. Changes to existing requirements.
 

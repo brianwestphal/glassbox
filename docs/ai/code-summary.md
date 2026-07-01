@@ -616,7 +616,7 @@ Scripts (`package.json`):
   live in `scripts/demo/casts.ts`. Lives in `scripts/demo/` (`capture-demo.ts`
   orchestrator, `casts.ts` terminal cast scripts, `scenes.ts` markdown-peek +
   end-card scenes, `chrome.ts` window + lower-third compositing); see
-  `scripts/demo/README.md`. `domotion-svg` is pinned to 0.16.0 and forced to
+  `scripts/demo/README.md`. `domotion-svg` is pinned to 0.17.0 and forced to
   embedded-font text mode (`setRenderTextMode`). Must run outside the command
   sandbox (Chromium).
 - `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.

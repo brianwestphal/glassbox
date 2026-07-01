@@ -1,6 +1,8 @@
 {
   "appName": "Glassbox",
   "ticketPrefix": "GB",
+  "secret": "bc7629a2b43846a89ead61fe781e62df",
+  "secretPathHash": "209cc37424013c72",
   "appIcon": "variant-5",
   "trash_cleanup_days": "3",
   "completed_cleanup_days": "30",
@@ -11,13 +13,15 @@
       "name": "Commit Changes",
       "prompt": "make a commit message for the recently completed tickets, without wrapping long lines.  Don't include any co-authored by Anthropic type lines in the commit message.  add all unstaged changes to the git commit.  git commit with the message you generated but don't push",
       "icon": "send",
-      "color": "#3b82f6"
+      "color": "#3b82f6",
+      "id": "67d6781b-5d64-43a9-9127-1bb0451cb3a8"
     },
     {
       "name": "Update Requirements",
       "prompt": "Update the requirements docs as appropriate",
       "icon": "file-text",
-      "color": "#6b7280"
+      "color": "#6b7280",
+      "id": "053d5c80-c6dc-4583-9999-f15557bec2d7"
     },
     {
       "type": "group",
@@ -27,33 +31,39 @@
           "name": "Reqs ↔︎ Code",
           "prompt": "/check-requirements-against-code",
           "icon": "arrow-left-right",
-          "color": "#ec4899"
+          "color": "#ec4899",
+          "id": "4b2e824d-21b7-4c5b-96d0-f02727d4e361"
         },
         {
           "name": "Analyze Code Quality",
           "prompt": "/analyze-code-quality",
           "icon": "circle-check-big",
-          "color": "#8b5cf6"
+          "color": "#8b5cf6",
+          "id": "8bbbed31-0f25-4007-9296-b858c8cb6153"
         },
         {
           "name": "Kerf Usage Audit",
           "prompt": "Audit this codebase for kerf usage.  See ~/.claude/skills/kerf-app/SKILL.md or node_modules/kerfjs/ai/skill.md.  For each finding, make Hot Sheet tickets with: file:line, which rule or pattern, the fix shape. Don't speculate - only flag patterns you can point to in the code. Top \"must fix\" list, then \"consider\" list.",
           "icon": "slice",
-          "color": "#f97316"
+          "color": "#f97316",
+          "id": "4a45d043-402d-47bb-800d-31f06df9ac48"
         },
         {
           "name": "Check Code Hygene",
           "prompt": "/check-code-hygiene",
           "icon": "soap-dispenser-droplet",
-          "color": "#f97316"
+          "color": "#f97316",
+          "id": "7ae577d6-8448-44f5-8870-059e837029c1"
         },
         {
           "name": "Everything",
           "prompt": "do these sequentially, creating follow up tickets for all concerns encountered:\n/check-requirements-against-code\n/check-code-hygiene\n/analyze-code-quality\n",
           "icon": "balloon",
-          "color": "#e5e7eb"
+          "color": "#e5e7eb",
+          "id": "a0443765-ff79-464b-838d-7f602f0f6d4d"
         }
-      ]
+      ],
+      "id": "ff20cb3d-571f-45b9-8ddd-219d28949ccd"
     },
     {
       "type": "group",
@@ -65,21 +75,25 @@
           "icon": "git-compare",
           "color": "#e5e7eb",
           "target": "shell",
-          "autoShowLog": true
+          "autoShowLog": true,
+          "id": "24cea4bd-852f-474e-a989-72ffa6b1b935"
         },
         {
           "name": "git push",
           "prompt": "git push",
           "icon": "git-compare-arrows",
-          "target": "shell"
+          "target": "shell",
+          "id": "97f40bb7-f78b-4a49-8cf7-18a1ad4db7cf"
         }
-      ]
+      ],
+      "id": "949c0902-5345-4a5b-bf57-8092a7ca8a6e"
     },
     {
       "name": "Prep Major Release",
-      "prompt": "We've made a lot of changes.  Review and update the README.md file as necessary.  Make sure it stays compelling and advertises our most important and interesting features.\n\nReview the demo modes and revise those if you think new / different / fewer screenshots are needed.  Then re-capture all of the demos (always do all of them in case minor details changed).\n",
+      "prompt": "/prep-major-release",
       "icon": "wand",
-      "color": "#14b8a6"
+      "color": "#14b8a6",
+      "id": "6891d5aa-f210-41a6-ba72-ae9afdbc0532"
     },
     {
       "name": "Release Beta",
@@ -87,7 +101,8 @@
       "target": "shell",
       "icon": "rocket",
       "color": "#6b7280",
-      "launchInNewTerminal": true
+      "launchInNewTerminal": true,
+      "id": "61af6eaf-6434-4978-a33c-2603941e4bad"
     },
     {
       "name": "Release Prod",
@@ -95,7 +110,8 @@
       "target": "shell",
       "color": "#22c55e",
       "icon": "rocket",
-      "launchInNewTerminal": true
+      "launchInNewTerminal": true,
+      "id": "0f8099e3-cee6-4711-b739-0630167101f1"
     }
   ],
   "custom_views": [],
