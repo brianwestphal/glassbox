@@ -233,7 +233,11 @@ test.describe('Image feedback follow-ups', () => {
     await pendingInput.fill(comment);
     await page.locator('[data-action="save-pending"]').click();
 
-    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment });
+    // `.last()` = the region we just drew (regions render in creation order).
+    // Regions persist in the shared demo DB with no per-test cleanup, so a retry
+    // after a failure can leave an earlier same-comment region behind; scoping to
+    // the newest avoids a strict-mode "resolved to N elements" cascade (GB-1030).
+    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment }).last();
     await expect(row).toBeVisible({ timeout: 5000 });
     const id = await row.getAttribute('data-id');
     if (id === null || id === 'pending') throw new Error(`region row has no saved id (${id})`);
@@ -308,11 +312,19 @@ test.describe('Image feedback follow-ups', () => {
     const before = await region.box.boundingBox();
     if (!before) throw new Error('region box has no box');
 
-    // Grab the interior (center) and drag right + down.
+    // Grab the interior (center) and drag right + down. On mouse-up the app persists
+    // the new geometry as a fire-and-forget PATCH /annotations/:id/region; wait for
+    // that response before reloading, otherwise the reload can race the save and read
+    // the pre-move position (a flake that only surfaced on slow CI — GB-1030).
+    const geomSaved = page.waitForResponse(
+      // URL is `/api/annotations/<id>/region?reviewId=…` — match `/region` before the query.
+      (r) => /\/annotations\/[^/]+\/region(\?|$)/.test(r.url()) && r.request().method() === 'PATCH',
+    );
     await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
     await page.mouse.down();
     await page.mouse.move(before.x + before.width / 2 + 60, before.y + before.height / 2 + 40, { steps: 10 });
     await page.mouse.up();
+    await geomSaved;
 
     await expect.poll(async () => {
       const b = await region.box.boundingBox();
@@ -364,7 +376,11 @@ test.describe('Image feedback follow-ups', () => {
     await page.locator('[data-action="save-pending"]').click();
 
     // Scope to the region we just drew (not a leftover from an earlier test).
-    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment });
+    // `.last()` = the region we just drew (regions render in creation order).
+    // Regions persist in the shared demo DB with no per-test cleanup, so a retry
+    // after a failure can leave an earlier same-comment region behind; scoping to
+    // the newest avoids a strict-mode "resolved to N elements" cascade (GB-1030).
+    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment }).last();
     await expect(row).toBeVisible({ timeout: 5000 });
     const id = await row.getAttribute('data-id');
     const regionBox = page.locator(`[data-panel="difference"] .region-box[data-region-id="${id}"]`);
@@ -703,7 +719,11 @@ test.describe('Side-by-side image comparison (doc 24)', () => {
     await pendingInput.fill(comment);
     await page.locator('[data-action="save-pending"]').click();
 
-    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment });
+    // `.last()` = the region we just drew (regions render in creation order).
+    // Regions persist in the shared demo DB with no per-test cleanup, so a retry
+    // after a failure can leave an earlier same-comment region behind; scoping to
+    // the newest avoids a strict-mode "resolved to N elements" cascade (GB-1030).
+    const row = page.locator('[data-list="regions"] .image-feedback-item', { hasText: comment }).last();
     await expect(row).toBeVisible({ timeout: 5000 });
     const id = await row.getAttribute('data-id');
     if (id === null || id === 'pending') throw new Error(`region row has no saved id (${id})`);

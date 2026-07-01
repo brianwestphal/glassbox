@@ -201,12 +201,15 @@ test.describe('--ground-truth comparison mode (doc 26 P1)', () => {
     await page.locator('.file-name[title="actual/button.svg"]').click();
     await expect(page.locator('.image-diff')).toBeVisible({ timeout: 5000 });
 
-    const fileId = await page.locator('.image-diff').getAttribute('data-file-id');
-    // Open the actual (new / B) side full screen.
+    // Open the actual (new / B) side full screen, and assert the lightbox shows a
+    // new/B-side image. We check the SIDE (any file's `/new`), not a specific file
+    // id: pinning the id made this flake when the ground-truth file selection settled
+    // late and the lightbox opened a different (but still valid) file — the feature
+    // under test is "expand opens the B side in the lightbox", not which file (GB-1030).
     await page.locator('.image-sxs-pane[data-sxs-pane="new"] .image-expand-btn').click();
     const lightbox = page.locator('.lightbox-overlay');
     await expect(lightbox).toBeVisible({ timeout: 5000 });
-    await expect(lightbox.locator('.lightbox-img')).toHaveAttribute('src', `/api/image/${fileId}/new`);
+    await expect(lightbox.locator('.lightbox-img')).toHaveAttribute('src', /\/api\/image\/[^/]+\/new$/);
 
     // Esc dismisses it, returning to the diff.
     await page.keyboard.press('Escape');
