@@ -12,3 +12,4 @@ This directory contains the testing strategy for Glassbox, organized by focus ar
 6. [API Routes](6-api-routes.md) — HTTP endpoints, request/response validation, error handling
 7. [Client and UI](7-client-and-ui.md) — JSX runtime, DOM interactions, sidebar, diff viewer, annotations
 8. [Infrastructure](8-infrastructure.md) — CLI parsing, server startup, locking, port management, desktop app
+9. [Feature / Requirement Coverage](9-feature-coverage.md) — the coverage axis orthogonal to line coverage: `check-features`, the `feature-coverage.json` map, `conventions.test.ts`, and transition testing for stateful modules

@@ -53,6 +53,7 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
+    "check:features": "tsx scripts/check-features.ts",
     "clean": "rm -rf dist node_modules/.cache",
     "release": "bash scripts/release.sh",
     "release:beta": "bash scripts/release.sh --beta",

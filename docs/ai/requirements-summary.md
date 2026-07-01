@@ -923,6 +923,17 @@ all **Shipped**. When a new feature is spec'd before implementation, add a doc a
 mark the entry here **Design only** until the code lands, then **Partially
 built** / **Shipped** as it progresses.
 
+**Verification axis (not just "shipped").** Beyond line/branch coverage, the
+project tracks a **feature-coverage** axis that asserts every *documented
+behavior* has a test that would fail if it regressed — line coverage proves lines
+ran, not that behaviors or state *transitions* are asserted. `npm run
+check:features` (`scripts/check-features.ts`) extracts a requirement unit per
+behavior from `docs/[0-9]*.md` and flags any with no asserting test in
+`docs/testing/feature-coverage.json` (stateful units must also list their
+transitions); `tests/unit/conventions.test.ts` pins the structural invariants
+line coverage can't express. See `docs/testing/9-feature-coverage.md`. The map
+ships intentionally partial — filling it out is an ongoing exercise.
+
 ## 20. Maintenance rules
 
 Update `docs/ai/requirements-summary.md` in the same pass whenever you:

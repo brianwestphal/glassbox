@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "_comment": "Coverage map for check-features (docs/testing/feature-coverage.md). Maps each documented requirement unit (FR-N.M / NFR-N.M, or a N.M subsection number for older docs) to the test(s) that would fail if the behavior regressed. Stateful units set stateful:true and list the transitions the tests exercise. This map is intentionally partial; `npm run check:features` reports every unmapped or under-tested unit as a gap. Filling it out is an ongoing exercise (see the doc).",
+  "units": {
+    "FR-27.1": {
+      "tests": ["tests/unit/git/gitignore.test.ts", "tests/unit/cli"],
+      "note": "ensureGlassboxGitignored runs at launch inside a git repo."
+    },
+    "FR-27.2": {
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "note": "computeGitignore emits /.glassbox/* + !/.glassbox/settings.json (contents-glob + negation)."
+    },
+    "FR-27.3": {
+      "stateful": true,
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "transitions": [
+        "already-present -> no-op (idempotent re-run)",
+        "no trailing newline -> block appended cleanly"
+      ],
+      "note": "Idempotency is a transition, not a single-op check: run twice, second run must not change the file."
+    },
+    "FR-27.4": {
+      "stateful": true,
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "transitions": [
+        "stale bare '.glassbox/' -> replaced with canonical block",
+        "stale variants (.glassbox, /.glassbox, /.glassbox/*) -> replaced",
+        "multiple stale lines -> collapsed into one block at first position"
+      ]
+    },
+    "FR-27.5": {
+      "stateful": true,
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "transitions": [
+        "no file -> created fresh",
+        "empty/whitespace file -> block created"
+      ]
+    },
+    "FR-27.6": {
+      "stateful": true,
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "transitions": [
+        "commented opt-out present -> file left untouched",
+        "any commented .glassbox variant -> treated as opt-out"
+      ]
+    },
+    "NFR-27.1": {
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "note": "computeGitignore is a pure function; the whole suite exercises it without touching disk."
+    },
+    "NFR-27.2": {
+      "tests": ["tests/unit/git/gitignore.test.ts"],
+      "note": "Unrelated entries containing the word glassbox are left untouched."
+    },
+    "FR-26.4": {
+      "tests": ["tests/unit/ground-truth/manifest.test.ts"],
+      "note": "loadGroundTruthManifest resolves actual<->expected pairs relative to the manifest dir."
+    },
+    "FR-26.5": {
+      "tests": ["tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/utils/diffScore.test.ts"],
+      "note": "comparePerceptual difference score; PNG/JPEG decode, SVG/corrupt -> undecodable."
+    }
+  }
+}
