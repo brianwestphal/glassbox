@@ -47,14 +47,21 @@ review always covers every scene.
 ### The review + promote loop
 
 ```bash
-# 1. Capture this version's screenshots and open the ground-truth review:
+# 1. Capture this version's screenshots into actuals/:
+npm run gt:capture
+
+# 2. Open the ground-truth review on the last-captured actuals (no re-capture):
 npm run gt:review
-#    → captures actuals/, then launches
-#      `glassbox --ground-truth ground-truth-screenshots/manifest.json`.
+#    → launches `glassbox --ground-truth ground-truth-screenshots/manifest.json`.
 #    Each scene shows expected (baseline) vs actual with a perceptual-diff score;
 #    identical pairs are hidden by default, most-changed first.
+#
+#    gt:capture and gt:review are deliberately SEPARATE: capture is a ~2-3 min
+#    headless loop over every scene, so you (or an AI assistant) can capture +
+#    triage once, then review as many times as you like without re-capturing.
+#    Want both in one command? `npm run gt:capture-review`.
 
-# 2. If a change is a real regression → fix the code and re-run.
+# 2b. If a change is a real regression → fix the code and re-run.
 #    If a change is the new expected behavior → promote it:
 npx tsx src/cli.ts ground-truth promote ground-truth-screenshots/manifest.json
 #    → copies the current actuals/ over baseline/ (only "previous-actual" entries,

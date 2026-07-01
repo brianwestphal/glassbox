@@ -11,7 +11,8 @@
  *   npm run gt:capture                 # write actuals/ (compare against baseline)
  *   npm run gt:capture -- --baseline   # (re)generate the committed baseline/ set
  *   npm run gt:capture -- --only diff-code-split,diff-code-unified
- *   npm run gt:review                  # capture actuals, then open the GT review
+ *   npm run gt:review                  # open the GT review on the LAST-captured actuals (no re-capture)
+ *   npm run gt:capture-review          # capture actuals, then open the GT review
  *
  * Like the demo capture scripts, this MUST run OUTSIDE the command sandbox —
  * Chromium needs Mach ports / IPC the sandbox blocks.
