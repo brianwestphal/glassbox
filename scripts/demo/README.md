@@ -7,8 +7,9 @@ on any README background, light or dark) with a broadcast-style **lower-third**
 caption (accent bar + `GLASSBOX` eyebrow). It walks the whole Glassbox loop:
 
 1. **CLI launch** — a real terminal recording (`domotion term`): `git status -s`
-   shows the uncommitted changes, then `npx glassbox` runs; the last frame
-   crossfades into the live app (Glassbox "appears")
+   shows the uncommitted changes, then `npx glassbox` runs; the live app then
+   **pops in over** the terminal (a layered reveal — the app window scales in on
+   top while the terminal fades out behind it, see `popIn.ts`)
 2. **AI risk triage** — sidebar in risk mode with colored risk badges
 3. Browse a file, then open the `src/auth/session.ts` split diff (with guided
    "Learn" notes and a pre-seeded `remember` annotation)
@@ -112,3 +113,13 @@ DevTools / VS Code can both open them directly.
 - The typed feedback wraps natively (domotion's typing-overlay `bgWidth`) and
   shows a blinking insertion caret (`caret: true`); the terminal `/glassbox`
   prompt has a caret too.
+- **Transition semantics (domotion 0.16+, DM-1414): a frame's `transition` is how
+  it EXITS to the next frame; its ENTRANCE is driven by the PREVIOUS frame's
+  transition.** So to change how beat B *arrives*, set beat A's transition, not
+  B's. Getting this backwards silently shifts every transition by one beat (it put
+  the "don't fade the typed note" cut on the wrong boundary once). Consecutive app
+  beats **cut** (a crossfade between two near-identical app states just ghosts).
+- **Slide-in (`push-left`) doesn't engage in this pipeline** — the outgoing frame
+  slides out but the incoming one cuts in after it, flashing the transparent canvas
+  in the gap. So scene changes use **cuts**; the terminal→app reveals use the
+  layered pop-in (`popIn.ts`); only the loop seam (loop→end-card→launch) crossfades.

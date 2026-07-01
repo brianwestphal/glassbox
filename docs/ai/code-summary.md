@@ -616,10 +616,17 @@ Scripts (`package.json`):
   terminal session — not HTML mocks crossfaded together; their `.cast` scripts
   live in `scripts/demo/casts.ts`. Lives in `scripts/demo/` (`capture-demo.ts`
   orchestrator, `casts.ts` terminal cast scripts, `scenes.ts` markdown-peek +
-  end-card scenes, `chrome.ts` window + lower-third compositing); see
-  `scripts/demo/README.md`. `domotion-svg` is pinned to 0.18.0 and forced to
+  end-card scenes, `chrome.ts` window + lower-third compositing, `popIn.ts` the
+  pure layered terminal→app pop-in helpers); see `scripts/demo/README.md`.
+  **Transition model (domotion 0.16+, DM-1414): a frame's `transition` is its
+  EXIT; a frame's entrance comes from the PREVIOUS frame's transition.** Beats
+  cut (no crossfade between near-identical app states); the terminal→app reveals
+  use the layered pop-in (app scales in on top, terminal fades out behind);
+  `push-left` slide-in doesn't engage here (it flashes the transparent canvas), so
+  scene changes cut and only the loop seam crossfades. Port is `DEMO_PORT`-
+  overridable (default 4188). `domotion-svg` is pinned to 0.18.0 and forced to
   embedded-font text mode (`setRenderTextMode`). Must run outside the command
-  sandbox (Chromium).
+  sandbox (Chromium). Unit-tested by `tests/unit/demo-popin.test.ts`.
 - `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.
 - `release:beta` — opt-in pre-release; tag-only flow, no version-file bump or CHANGELOG edit (`scripts/release.sh --beta`). CI publishes npm `--tag beta` + GH prerelease.
 - `release:beta:auto` — **non-interactive** equivalent of `release:beta` (`scripts/release-beta-auto.sh`) for automation/unattended cuts: no prompts, no `$EDITOR`. Smart-defaults the target version (package.json version if not yet stable-tagged, else next minor; override with `X.Y.Z` / `--version`), drafts notes via gitgist (AI → `--no-ai` → log pointer; override with `--notes`/`--notes-stdin`), runs build + tests (retry once, `--skip-tests`) + lint + tsc, then auto-increments + pushes the `v{ver}-beta.{N}` tag. `--dry-run` stops before tagging. Skips the `npm whoami` preflight (CI publishes via token). Distinct exit codes (1/2/3).

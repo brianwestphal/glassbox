@@ -8,7 +8,7 @@
  * Storyboard (one infinitely-looping SVG; each beat is a rounded browser/
  * terminal window on a transparent canvas with a lower-third caption):
  *   0. CLI launch — a real terminal recording (`domotion term`): `git status -s`
- *      then `npx glassbox`, whose last frame crossfades into the live app
+ *      then `npx glassbox`, over whose last frame the live app pops in (layered)
  *   1. AI risk triage — sidebar in risk mode, colored risk badges
  *   2. browse a file, then open the `src/auth/session.ts` split diff (with
  *      guided "Learn" notes and a pre-seeded `remember` annotation)
@@ -56,6 +56,7 @@ import type { AnimationFrame, CursorEvent, TypingOverlay } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
 
 import { claudeCast, launchCast } from './casts.js';
+import { popInAnimations, popInFrameSvg, popInIds } from './popIn.js';
 import {
   CANVAS_H,
   CANVAS_W,
@@ -88,7 +89,11 @@ const OUT_SVGZ = resolve(ROOT, 'assets/demo.svgz');
 const DEBUG_DIR = resolve(__dirname, '.debug');
 const EXPORT_MD = resolve(ROOT, '.glassbox/latest-review.md');
 
-const PORT = 4188;
+// Ephemeral port for the demo server. Overridable via DEMO_PORT so a run can
+// dodge a port collision (e.g. a stray `python -m http.server 4188` squatting the
+// default), which otherwise makes the browser hit the wrong server and every
+// in-page `/api/*` fetch return 404 HTML.
+const PORT = Number(process.env.DEMO_PORT) || 4188;
 const BASE = `http://localhost:${String(PORT)}`;
 
 // Isolate the demo server's GLOBAL config under a disposable pid-scoped dir via
@@ -123,23 +128,31 @@ interface FrameJob {
   prefix: string;
   chrome?: { title: string; kind: ChromeKind; caption?: string };
   meta: Omit<AnimationFrame, 'svgContent'>;
-  /** When set, the whole frame is wrapped in `<g class="anim-<popInId>">` so the
-   *  matching intra-frame `scale` animation in `meta.animations` makes the window
-   *  "pop in" over the previous (terminal) frame — see `withPopIn`. */
+  /** When set, this frame is a LAYERED pop-in (see `withPopIn` / `popIn.ts`): the
+   *  app window (wrapped in `<g class="anim-<popInId>">`, scale-popped) sits ON TOP
+   *  of the previous terminal frame, which is layered behind it (`popInBgSvg`,
+   *  wrapped in `<g class="anim-<popInFadeId>">`) and fades out. */
   popInId?: string;
+  /** The prior terminal frame's full SVG, layered behind a pop-in app frame and
+   *  faded out while the app pops in on top (GB-1016 / GB-1024). */
+  popInBgSvg?: string;
+  popInFadeId?: string;
 }
 
-/** Make an app frame **pop in** over the previous (terminal) beat: a center-origin
- *  scale from 0.92 → 1 during the crossfade, so the Glassbox window grows in over
- *  the terminal instead of switching abruptly (GB-1006). The class is applied to
- *  the rendered frame in the compose loop; the animation keys off it. */
-function withPopIn(job: FrameJob, id: string): FrameJob {
-  job.popInId = id;
-  job.meta.animations = [
-    ...(job.meta.animations ?? []),
-    { animId: id, property: 'scale', from: '0.92', to: '1', duration: 460,
-      transformOrigin: 'center', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
-  ];
+/** Make an app frame a **layered pop-in** over the previous terminal beat: the app
+ *  window is entered via a `cut` (so it's opaque and on top from t=0), scale-pops
+ *  from 0.9 → 1, and the terminal frame is layered BEHIND it (`bgTerminalSvg`) and
+ *  fades out — the "keep A, pop B on top, fade A behind" reveal the maintainer
+ *  asked for (GB-1016 / GB-1024), not a mutual see-through crossfade. The classes
+ *  are applied in the compose loop (`popInFrameSvg`); the animations key off them.
+ *  Entry-as-cut is owned by the previous (terminal) frame's transition under the
+ *  DM-1414 exit-semantics — cast frames all exit via `cut`, so that holds. */
+function withPopIn(job: FrameJob, base: string, bgTerminalSvg: string): FrameJob {
+  const ids = popInIds(base);
+  job.popInId = ids.scaleId;
+  job.popInFadeId = ids.fadeId;
+  job.popInBgSvg = bgTerminalSvg;
+  job.meta.animations = [...(job.meta.animations ?? []), ...popInAnimations(ids)];
   return job;
 }
 
@@ -226,11 +239,16 @@ async function main(): Promise<void> {
   // Render one terminal beat from an asciinema cast through `castToTermFrames`
   // (the `domotion term` pipeline) into pre-wrapped frame jobs: each settle-point
   // frame is centered on a terminal-bg content area and wrapped in window chrome.
-  // The cast frames already cut between settle points (terminals don't crossfade);
-  // only the FIRST frame takes the beat's entry transition from the prior scene.
+  // EVERY cast frame exits via `cut` — terminals hard-cut between settle points and
+  // never crossfade internally (an internal crossfade read as a "weird fade out",
+  // GB-1023). The beat's ENTRY transition is NOT set here: under domotion's
+  // exit-semantics (DM-1414) a frame's entrance is driven by the PREVIOUS frame's
+  // transition, so a terminal beat's entry is owned by the preceding frame's exit
+  // (the markdown peek cuts to the Claude terminal — slide-in doesn't engage for
+  // cast frames, so a push-left there would leave a transparent gap).
   const renderTermCast = async (
     castText: string, rows: number,
-    o: { title: string; caption: string; entry: AnimationFrame['transition'] },
+    o: { title: string; caption: string },
   ): Promise<FrameJob[]> => {
     if (browser === null) throw new Error('browser not ready for cast render');
     const { frames, width, height } = await castToTermFrames(castText, browser, {
@@ -242,7 +260,7 @@ async function main(): Promise<void> {
     // small inset gives breathing room under the title bar.
     const dx = Math.round((CONTENT_W - width) / 2);
     const dy = 16;
-    return frames.map((f, i): FrameJob => {
+    return frames.map((f): FrameJob => {
       const id = nextPrefix();
       const content =
         `<rect x="0" y="0" width="${String(CONTENT_W)}" height="${String(CONTENT_H)}" fill="${TERM_THEME.bg}"/>` +
@@ -250,7 +268,7 @@ async function main(): Promise<void> {
       return {
         tree: null, prefix: id,
         fullSvg: chromeWrap(content, { title: o.title, kind: 'terminal', id, caption: o.caption }),
-        meta: { duration: f.duration, transition: i === 0 ? o.entry : f.transition },
+        meta: { duration: f.duration, transition: f.transition },
       };
     });
   };
@@ -315,7 +333,6 @@ async function main(): Promise<void> {
     // launch lines up with the diff shown next (no continuity gap).
     const launchJobs = await renderTermCast(launchCast(TERM_COLS, 22), 22, {
       title: LAUNCH_TITLE, caption: 'Launch a review from the CLI',
-      entry: { type: 'cut', duration: 0 },
     });
 
     // === 1. Risk triage ===================================================
@@ -324,9 +341,13 @@ async function main(): Promise<void> {
     await page.waitForTimeout(700);
     const browseHit = await sidebarHit(page, BROWSE_FILE);
     await debugShot(page, 'risk');
-    // First live-app window: pops in over the launch terminal (GB-1006).
+    // First live-app window: a LAYERED pop-in over the launch terminal — the app
+    // sits on top (cut entry) and the terminal fades out behind it (GB-1016). Its
+    // OWN transition is the exit to the browse beat: a `cut`, not a crossfade —
+    // consecutive app states shouldn't cross-dissolve (GB-1017).
     const riskJob = withPopIn(mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'AI scores every file’s risk' },
-      { duration: 2000, transition: { type: 'crossfade', duration: 300 } }), 'popInRisk');
+      { duration: 2000, transition: { type: 'cut', duration: 0 } }), 'popInRisk',
+      launchJobs[launchJobs.length - 1].fullSvg ?? '');
     clickSpecs.push({ job: riskJob, offset: 1400, hit: browseHit });
 
     // === 2. Browse a file, then open the target diff ======================
@@ -334,8 +355,9 @@ async function main(): Promise<void> {
     await page.waitForTimeout(500);
     const targetHit = await sidebarHit(page, TARGET_FILE);
     await debugShot(page, 'browse');
+    // Cut (not crossfade) to the diff — same window, next state (GB-1018).
     const browseJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Browse the changes' },
-      { duration: 1500, transition: { type: 'crossfade', duration: 260 } });
+      { duration: 1500, transition: { type: 'cut', duration: 0 } });
     clickSpecs.push({ job: browseJob, offset: 1000, hit: targetHit });
 
     await openFile(page, TARGET_FILE);
@@ -347,8 +369,9 @@ async function main(): Promise<void> {
     const lineBox = await page.locator(lineSel).boundingBox();
     if (lineBox === null) throw new Error('target line not visible');
     await debugShot(page, 'diff');
+    // Cut (not crossfade) to the annotation form — same window, next state (GB-1019).
     const diffJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Review with AI “Learn” notes' },
-      { duration: 2600, transition: { type: 'crossfade', duration: 260 } });
+      { duration: 2600, transition: { type: 'cut', duration: 0 } });
     clickSpecs.push({ job: diffJob, offset: 1800, hit: center(lineBox) });
 
     // === 3. Annotate line 23 (type wrapped feedback) ======================
@@ -384,8 +407,14 @@ async function main(): Promise<void> {
     };
 
     await debugShot(page, 'form');
+    // Cut (not crossfade) from the annotation form to the saved state. Under
+    // domotion's exit-semantics (DM-1414) it's THIS frame's transition — not the
+    // next frame's — that governs the form→saved handoff; a crossfade here faded
+    // the typed-feedback overlay out, which read as the text vanishing on save
+    // (GB-1020 "input text disappears" / GB-1021 "weird fade out"). A cut resolves
+    // the typed note straight into the saved annotation.
     const formJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Leave a note for your AI' },
-      { duration: typeEnd + 1100, transition: { type: 'crossfade', duration: 260 }, overlays: [typingOverlay] });
+      { duration: typeEnd + 1100, transition: { type: 'cut', duration: 0 }, overlays: [typingOverlay] });
     clickSpecs.push({ job: formJob, offset: typeEnd + 550, hit: center(saveBox) });
 
     // === 4. Save + complete ===============================================
@@ -396,9 +425,9 @@ async function main(): Promise<void> {
     const completeBox = await page.locator('#complete-review').boundingBox();
     if (completeBox === null) throw new Error('complete-review button not found');
     await debugShot(page, 'saved');
-    // Cut (not crossfade) from the annotation form: a crossfade faded the typed
-    // feedback overlay out, which read as the text vanishing on save. A cut makes
-    // the typed note resolve straight into the saved annotation (GB-1006).
+    // This frame's transition is its exit to the completion modal (exit-semantics,
+    // DM-1414): a cut — the modal is a distinct overlay, not a cross-dissolve of
+    // the same window.
     const savedJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'A bug to fix — and a rule to remember' },
       { duration: 1700, transition: { type: 'cut', duration: 0 } });
     clickSpecs.push({ job: savedJob, offset: 1150, hit: center(completeBox) });
@@ -411,8 +440,13 @@ async function main(): Promise<void> {
       if (first) first.textContent = '.glassbox/latest-review.md';
     });
     await debugShot(page, 'modal');
+    // Cut (not push-left) to the markdown peek. A push-left slides the modal out
+    // but domotion does NOT slide the incoming frame in with it — it cuts in after
+    // the outgoing has left, so the transparent canvas flashes through in between.
+    // (This is the same limitation the markdown→terminal transition hit; slide-in
+    // simply doesn't engage in this pipeline.) A cut is clean and gap-free.
     const modalJob = mkJob(await grabTree(page), { title: APP_TITLE, kind: 'browser', caption: 'Finish — feedback is exported' },
-      { duration: 2300, transition: { type: 'push-left', duration: 320 } });
+      { duration: 2300, transition: { type: 'cut', duration: 0 } });
     // Click the modal's "Done" button (cursor pulse) before this frame
     // transitions away — it reads as the reviewer dismissing the dialog rather
     // than an unmotivated cut to the next scene (GB-1006).
@@ -437,10 +471,13 @@ async function main(): Promise<void> {
     await page.locator(lineSel).scrollIntoViewIfNeeded();
     await page.waitForTimeout(300);
     await debugShot(page, 'loop');
-    // The fixed-diff window pops in over the Claude terminal (GB-1006).
-    const loopJob = withPopIn(mkJob(await grabTree(page),
+    // The fixed-diff window. It's a layered pop-in over the Claude terminal
+    // (GB-1024) — applied AFTER the Claude cast is rendered below, since it needs
+    // that beat's last frame as its fading background. Its own transition is the
+    // exit to the end card (the loop seam), a crossfade.
+    const loopJob = mkJob(await grabTree(page),
       { title: APP_TITLE, kind: 'browser', caption: 'The loop closes — issue resolved' },
-      { duration: 2200, transition: { type: 'crossfade', duration: 360 } }), 'popInLoop');
+      { duration: 2200, transition: { type: 'crossfade', duration: 360 } });
 
     // === 5. Markdown peek (separate page) =================================
     const aux = await ctx.newPage();
@@ -451,22 +488,32 @@ async function main(): Promise<void> {
     const markdownJob: FrameJob = {
       tree: await grabTree(aux), prefix: nextPrefix(),
       chrome: { title: '.glassbox/latest-review.md', kind: 'browser', caption: 'Exported as structured markdown your AI reads' },
-      meta: { duration: 2600, transition: { type: 'push-left', duration: 320 } },
+      // This transition is markdown's exit to the Claude terminal (exit-semantics,
+      // DM-1414). A `cut`, not a slide: a push-left here slides the markdown out but
+      // domotion does NOT slide the incoming terminal CAST frame in with it, leaving
+      // a transparent gap where the page shows through. A cut is clean and symmetric
+      // (both hard), and removes the old lopsided review-slides-but-terminal-fades
+      // asymmetry (GB-1022) without introducing the gap.
+      meta: { duration: 2600, transition: { type: 'cut', duration: 0 } },
     };
 
     // === 6. Terminal scenes (domotion term) ==============================
     // The Claude Code `/glassbox` session as a real terminal recording: the user
     // runs `/glassbox`, Claude reads the review, applies the URL-encoding fix (the
     // same change the loop-closing frame shows), and tests pass. Rendered now
-    // (needs the browser); the markdown peek pushes in via push-left, the
-    // terminal cuts internally, then push-left out to the loop frame.
-    // Crossfade in from the markdown peek (not push-left): both are dark windows,
-    // so a slide read as the *same* terminal sliding sideways. A dissolve makes
-    // them read as distinct scenes (GB-1006).
+    // (needs the browser). It's entered from the markdown peek via a clean cut
+    // (owned by `markdownJob`'s exit transition, exit-semantics DM-1414) — symmetric
+    // and fade-free, replacing the old review-slides-but-terminal-fades asymmetry
+    // (GB-1022). A true push-left of the terminal isn't feasible — domotion won't
+    // slide an incoming CAST frame in, so it left a transparent gap. The cast frames
+    // cut internally too — no "weird fade out" mid-terminal (GB-1023).
     const claudeJobs = await renderTermCast(claudeCast(TERM_COLS, 30), 30, {
       title: TERM_TITLE, caption: 'Hand the review to Claude Code — it applies the fix',
-      entry: { type: 'crossfade', duration: 320 },
     });
+    // Now that the Claude beat exists, make the loop frame a layered pop-in over
+    // its last frame — the terminal stays behind and fades out while the fixed
+    // diff pops in on top (GB-1024).
+    withPopIn(loopJob, 'popInLoop', claudeJobs[claudeJobs.length - 1].fullSvg ?? '');
 
     // Assemble the final frame order: launch terminal → app review beats →
     // markdown peek → Claude terminal → loop-close. Index bookkeeping is by job
@@ -505,9 +552,12 @@ async function main(): Promise<void> {
       let svgContent = chromeWrap(elementTreeToSvgInner(tree, CONTENT_W, CONTENT_H, j.prefix, false), {
         title: j.chrome?.title ?? '', kind: j.chrome?.kind ?? 'browser', id: j.prefix, caption: j.chrome?.caption,
       });
-      // Pop-in: wrap the whole window in the anim group its scale keyframes key
-      // off (GB-1006). `transform-box`/`transform-origin` come from the animation.
-      if (j.popInId !== undefined) svgContent = `<g class="anim-${j.popInId}">${svgContent}</g>`;
+      // Layered pop-in: the terminal background (fading) UNDER the app window
+      // (scale-popping on top) — see `popInFrameSvg` (GB-1016 / GB-1024).
+      if (j.popInId !== undefined) {
+        svgContent = popInFrameSvg(j.popInBgSvg ?? '', svgContent,
+          { scaleId: j.popInId, fadeId: j.popInFadeId ?? `${j.popInId}Fade` });
+      }
       return { ...j.meta, svgContent };
     });
     // End card: hand-built SVG floating in the same window rect, no glyph capture.
