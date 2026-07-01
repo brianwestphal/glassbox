@@ -1,4 +1,5 @@
 import { test, expect } from './coverage-fixture.js';
+import { waitForStableBox } from './stableBox.js';
 
 /**
  * GB-823 — the bottom handle of the image *slice* comparison couldn't be
@@ -597,12 +598,13 @@ test.describe('Zoom/pan gestures (GB-942)', () => {
   test('a plain two-finger swipe pans once zoomed (and does nothing at fit)', async ({ page }) => {
     await openDifference(page);
 
-    // At fit (zoom 1) a swipe must not move or zoom anything.
-    const atFit = await imgBox(page);
-    if (!atFit) throw new Error('no image box');
+    // At fit (zoom 1) a swipe must not move or zoom anything. Read the box only once
+    // it's settled — the difference image reflows to fit/center after loading, and a
+    // mid-reflow read made this see a ~39px layout shift as a phantom pan (GB-1031).
+    const oldLayer = page.locator('[data-panel="difference"] .image-layer-old');
+    const atFit = await waitForStableBox(oldLayer);
     await wheel(page, { dy: 120 });
-    const stillFit = await imgBox(page);
-    if (!stillFit) throw new Error('no image box');
+    const stillFit = await waitForStableBox(oldLayer);
     expect(Math.abs(stillFit.y - atFit.y)).toBeLessThan(2);
     expect(Math.abs(stillFit.width - atFit.width)).toBeLessThan(2);
 

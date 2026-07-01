@@ -1,4 +1,5 @@
 import { test, expect } from './coverage-fixture.js';
+import { waitForStableBox } from './stableBox.js';
 
 // Helper: navigate to the review page and click a file to load its diff
 async function openFile(page: import('@playwright/test').Page, fileText?: string) {
@@ -498,6 +499,10 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await page.getByText('demo-annotations.png').click();
     const artImg = page.locator('.ai-note-artifact-img');
     await expect.poll(() => artImg.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    // Let the artifact image's box settle before dragging on it — a mid-reflow box
+    // made the first drag land off the image, so no region drew and the reply form
+    // never opened (GB-1031).
+    await waitForStableBox(artImg);
 
     const dragOn = async (x0: number, y0: number, x1: number, y1: number) => {
       const box = await artImg.boundingBox();
