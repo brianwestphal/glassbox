@@ -82,6 +82,31 @@ Capture a subset with `--only`:
 npm run gt:capture -- --only diff-code-split,diff-code-unified
 ```
 
+### Triaging a diff: real change or noise?
+
+For each changed scene, decide whether it's a **real UI change** (fix it, or
+promote it as the new expected) or **capture noise** (ignore). Do not assume
+"small score = noise" — that mistake once mislabeled the doc-28 A/B image-focus
+segments as noise:
+
+- **Cross-reference the baseline's age against the changelog first.** Get the
+  baseline's capture date (`git log -1 -- ground-truth-screenshots/baseline/`),
+  then scan `git log --since=<that date>` / `CHANGELOG.md` for UI-affecting commits
+  (new controls, layout, themes). Those *predict* which scenes should genuinely
+  differ. (The A/B image-focus control landed two days after a baseline and showed
+  up in every two-sided `image-*` scene — foreseeable from the dates alone.)
+- **A small perceptual score is not proof of noise.** The score is a fraction of
+  changed pixels, so a real but *spatially small* change — e.g. two buttons added
+  to a toolbar — scores well under 1%. Look at **where** the diff is, not just the
+  magnitude: `magick compare -highlight-color red baseline/<s>.png actuals/<s>.png
+  /tmp/<s>-diff.png`, or crop the changed region.
+- **A determinism check must cover the scenes you're judging.** Capturing one scene
+  twice and diffing run-to-run establishes the noise floor *for that scene only* —
+  don't extrapolate a handful of scenes to the whole set.
+- **Baselines are Git LFS objects.** `git show <ref>:.../baseline/<s>.png` returns
+  the LFS *pointer* text (not a valid image); pipe it through `git lfs smudge` to
+  get the historical bytes for a before/after comparison.
+
 ---
 
 ## Determinism & environment
