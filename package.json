@@ -51,6 +51,7 @@
     "gt:capture": "npm run build:client && tsx scripts/ground-truth/capture-screenshots.ts",
     "gt:review": "tsx src/cli.ts --ground-truth ground-truth-screenshots/manifest.json",
     "gt:capture-review": "npm run gt:capture && npm run gt:review",
+    "gt:promote": "tsx src/cli.ts ground-truth promote ground-truth-screenshots/manifest.json",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",

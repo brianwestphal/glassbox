@@ -63,9 +63,10 @@ npm run gt:review
 
 # 2b. If a change is a real regression → fix the code and re-run.
 #    If a change is the new expected behavior → promote it:
-npx tsx src/cli.ts ground-truth promote ground-truth-screenshots/manifest.json
+npm run gt:promote
 #    → copies the current actuals/ over baseline/ (only "previous-actual" entries,
-#      which is every scene). Then commit the updated baseline/ PNGs.
+#      which is every scene; a "spec" entry is never overwritten). Then commit the
+#      updated baseline/ PNGs.
 ```
 
 To regenerate **all** baselines from scratch (e.g. an intentional broad UI
