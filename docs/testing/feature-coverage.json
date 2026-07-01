@@ -119,6 +119,114 @@
       "tests": ["tests/unit/ground-truth/promote.test.ts"],
       "note": "Baseline rotation stays external: promote copies actual over previous-actual, never overwrites spec/reference, skips missing, handles v2 sets."
     },
+    "5.1": {
+      "tests": ["tests/unit/db/queries.test.ts"],
+      "note": "addAnnotation creates with defaults (category, side, timestamps); reply_to_note_id when threading a note reply."
+    },
+    "5.3": {
+      "tests": ["tests/unit/db/queries.test.ts"],
+      "note": "updateAnnotation changes content and category."
+    },
+    "5.4": {
+      "tests": ["tests/unit/db/queries.test.ts"],
+      "note": "moveAnnotation changes line + side and clears stale (the persistence of drag-and-drop). The DnD UI gesture itself is covered by e2e, not here."
+    },
+    "5.5": {
+      "stateful": true,
+      "tests": ["tests/unit/db/queries.test.ts", "tests/unit/review/review-update.test.ts"],
+      "transitions": [
+        "markAnnotationStale -> markAnnotationCurrent cycle",
+        "deleteStaleAnnotations removes only stale rows, leaves current",
+        "migration: exact match stays; shifted line follows content; moved outside radius -> stale; content reappears -> unmarked current"
+      ]
+    },
+    "5.7": {
+      "tests": ["tests/unit/db/queries.test.ts"],
+      "note": "Annotations persist across the full CRUD surface (create/read/update/delete/move round-trip through PGLite)."
+    },
+    "15.1": {
+      "tests": ["tests/unit/themes/config.test.ts", "tests/unit/themes/theme-api.test.ts"],
+      "note": "Active theme is read/written (getActiveThemeId/setActiveThemeId), default fallback on missing/corrupt config."
+    },
+    "15.2": {
+      "tests": ["tests/unit/themes/built-in.test.ts"],
+      "note": "Built-in theme set: count, order, unique ids/names, dark/light background sanity."
+    },
+    "15.3": {
+      "tests": ["tests/unit/themes/config.test.ts"],
+      "note": "Custom themes: loadCustomThemes (skips non-json/corrupt/missing-field), saveCustomTheme, deleteCustomTheme, getCustomTheme."
+    },
+    "15.4": {
+      "tests": ["tests/unit/themes/built-in.test.ts"],
+      "note": "THEME_VARIABLES set (background/text/diff/gutter); every theme defines all required color variables."
+    },
+    "15.8": {
+      "tests": ["tests/unit/themes/stored-theme-schema.test.ts", "tests/unit/themes/config.test.ts"],
+      "note": "StoredCustomThemeSchema validates the on-disk file format (well-formed / partial colors / rejects empty id-name / non-string colors)."
+    },
+    "15.9": {
+      "tests": ["tests/unit/themes/theme-api.test.ts"],
+      "note": "Theme REST API: list / get-set active / create-update-delete custom."
+    },
+    "20.1": {
+      "tests": ["tests/unit/review-notes/store.test.ts"],
+      "note": "Notes are written to path-mirrored .NNNNNN.sarif shards under .pr-notes/, with shard roll-over at the cap."
+    },
+    "20.2": {
+      "tests": ["tests/unit/review-notes/sarif.test.ts"],
+      "note": "SARIF 2.1.0: emptyLog is a valid log with producer as tool.driver.name; buildResult maps anchor/body/snippet/kind/confidence/ticket to standard + namespaced fields."
+    },
+    "20.3": {
+      "stateful": true,
+      "tests": ["tests/unit/review-notes/reanchor.test.ts"],
+      "transitions": [
+        "snippet still matches its line -> untouched",
+        "authored text moved -> re-anchored to the new line",
+        "line shown but text gone -> flagged stale",
+        "line not in the diff -> untouched (cannot judge)",
+        "text appears more than once -> nearest match chosen"
+      ]
+    },
+    "20.4": {
+      "tests": ["tests/unit/review-notes/cli.test.ts", "tests/unit/review-notes/store.test.ts"],
+      "note": "glassbox note add/update/remove/coalesce; writeReviewNote appends into the shard, updateNote patches in place, removeNote by guid, coalesce drops redundant."
+    },
+    "20.5": {
+      "tests": ["tests/unit/review-notes/load.test.ts", "tests/unit/review-notes/sarif.test.ts"],
+      "note": "Artifacts: text artifact read inline, image artifacts marked as <img>, missing/binary surfaced as reference, path-escape refused; SARIF result.attachments mapping. GAP: live diagram rendering (P4 remainder) not yet built/tested."
+    },
+    "20.6": {
+      "tests": ["tests/unit/review-notes/load.test.ts"],
+      "note": "loadReviewNotesForFile flattens notes to diff-anchored view items on the new side; scoped to the requested file; skips corrupt shards."
+    },
+    "20.7": {
+      "tests": ["tests/unit/review-notes/format.test.ts"],
+      "note": "reviewNotesExportSection emits a markdown section with per-file notes + producer attribution — what Hot Sheet / other orchestrators consume."
+    },
+    "20.8": {
+      "tests": ["tests/unit/review-notes/format.test.ts", "tests/unit/review-notes/store.test.ts"],
+      "note": "reviewNotesPromptSection folds notes into the analysis prompt; store round-trips notes losslessly."
+    },
+    "20.9": {
+      "tests": ["tests/unit/review-notes/store.test.ts"],
+      "note": "Interoperability: preserves unknown fields written by another tool on round-trip; refuses to overwrite a non-SARIF shard; groups results into per-producer runs."
+    },
+    "FR-25.1": {
+      "tests": ["tests/unit/attachments/store.test.ts"],
+      "note": "Any file type: the store round-trips arbitrary bytes and records size + sha."
+    },
+    "FR-25.8": {
+      "tests": ["tests/unit/export/generate.test.ts"],
+      "note": "Readable by the AI tool: the markdown export lists each attachment's path under its annotation (doc 25)."
+    },
+    "NFR-25.1": {
+      "tests": ["tests/unit/attachments/store.test.ts"],
+      "note": "Local storage: bytes live on disk under <dataDir>/attachments/, named by id + sanitized original."
+    },
+    "NFR-25.3": {
+      "tests": ["tests/unit/attachments/store.test.ts"],
+      "note": "Path containment: sanitizeFilename strips separators + control/reserved chars so a name cannot escape the dir; falls back when it sanitizes away."
+    },
     "FR-27.1": {
       "tests": ["tests/unit/git/gitignore.test.ts", "tests/unit/cli"],
       "note": "ensureGlassboxGitignored runs at launch inside a git repo."
