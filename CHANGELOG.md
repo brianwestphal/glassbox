@@ -2,6 +2,13 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.19.0] - 2026-07-02
+
+
+- Refreshed the app icon and browser favicon with a new gradient cube mark.
+
+- Fixed sidebar and annotation list rendering glitches where a selected row could lose its selection after another row was removed, or items could fail to render correctly when a list was cleared and refilled.
+
 ## [0.18.0] - 2026-06-26
 
 
