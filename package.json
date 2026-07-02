@@ -68,7 +68,7 @@
     "!dist/*.map"
   ],
   "dependencies": {
-    "@electric-sql/pglite": "^0.4.5",
+    "@electric-sql/pglite": "^0.5.3",
     "@hono/node-server": "^2.0.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "apple-fm": "^1.0.0",
