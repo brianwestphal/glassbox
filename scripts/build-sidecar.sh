@@ -110,6 +110,7 @@ mkdir -p "$SERVER_DIR/client"
 cp dist/client/app.global.js "$SERVER_DIR/client/"
 cp dist/client/history.global.js "$SERVER_DIR/client/"
 cp dist/client/styles.css "$SERVER_DIR/client/"
+cp dist/client/favicon.svg "$SERVER_DIR/client/"
 
 # Copy only the external runtime dependencies (those kept external by tsup's
 # noExternal regex). Must stay in sync with that regex and CLAUDE.md's

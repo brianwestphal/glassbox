@@ -314,6 +314,8 @@ Graceful shutdown: Tauri's `RunEvent::Exit` kills the sidecar process group
 | `GET /static/styles.css` | `server.ts` | Built CSS |
 | `GET /static/app.js` | `server.ts` | Built client IIFE |
 | `GET /static/history.js` | `server.ts` | History page IIFE |
+| `GET /favicon.svg` | `server.ts` | Browser tab icon (copied from `assets/favicon.svg` into `dist/client/` at build) |
+| `GET /favicon.ico` | `server.ts` | 204 (no `.ico` shipped; keeps console clean) |
 
 ### `/api/*` (core — `routes/api.ts`)
 

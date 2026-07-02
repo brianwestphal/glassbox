@@ -66,9 +66,17 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
     const js = readFileSync(join(distDir, 'history.global.js'), 'utf-8');
     return c.text(js, 200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
   });
-  // Browsers auto-request /favicon.ico. We don't ship one, so answer 204 rather
-  // than let it 404 — keeps the page console clean (and stops browsers that
-  // request it, e.g. full Chrome, from tripping the e2e page-error guard).
+  // The browser tab icon. The SVG is copied into dist/client/ at build time
+  // (see tsup.config.ts / build:client / build-sidecar.sh) so it ships in both
+  // the npm package and the Tauri sidecar, alongside styles.css and app.js.
+  app.get('/favicon.svg', (c) => {
+    const svg = readFileSync(join(distDir, 'favicon.svg'), 'utf-8');
+    return c.body(svg, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
+  });
+  // Browsers that ignore the SVG <link> (and older ones) still auto-request
+  // /favicon.ico. We don't ship a .ico, so answer 204 rather than let it 404 —
+  // keeps the page console clean (and stops browsers that request it, e.g. full
+  // Chrome, from tripping the e2e page-error guard).
   app.get('/favicon.ico', (c) => c.body(null, 204));
 
   // API routes

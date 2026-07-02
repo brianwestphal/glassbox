@@ -55,6 +55,9 @@ export default defineConfig([
     onSuccess: async () => {
       // Build SCSS
       execSync('npx sass src/client/styles.scss dist/client/styles.css --style compressed --no-source-map', { stdio: 'inherit' });
+      // Copy the browser favicon alongside the other client assets so it ships
+      // in the npm package (files: ["dist"]) and is served by /favicon.svg.
+      execSync('cp assets/favicon.svg dist/client/favicon.svg', { stdio: 'inherit' });
     },
   },
 ]);
