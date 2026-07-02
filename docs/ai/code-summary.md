@@ -624,7 +624,7 @@ Scripts (`package.json`):
   use the layered pop-in (app scales in on top, terminal fades out behind);
   `push-left` slide-in doesn't engage here (it flashes the transparent canvas), so
   scene changes cut and only the loop seam crossfades. Port is `DEMO_PORT`-
-  overridable (default 4188). `domotion-svg` is pinned to 0.19.1 and forced to
+  overridable (default 4188). `domotion-svg` is pinned to 0.20.0 and forced to
   embedded-font text mode (`setRenderTextMode`). Must run outside the command
   sandbox (Chromium). Unit-tested by `tests/unit/demo-popin.test.ts`.
 - `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.
