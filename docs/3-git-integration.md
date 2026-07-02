@@ -20,7 +20,7 @@ Requirements for interacting with git repositories.
   - `commit <sha>`: `git diff <sha>~1 <sha>`
   - `range <from>..<to>`: `git diff <from> <to>` (the two refs passed space-separated, not as a single `<from>..<to>` argument)
   - `branch <name>`: `git diff <name>...HEAD`
-  - `files <patterns>`: `git diff HEAD -- <patterns>`
+  - `files <patterns>`: `git diff HEAD -- <patterns>` plus `git ls-files --others --exclude-standard -- <patterns>` for untracked files matching the patterns
   - `all`: custom walk of all tracked files
 - **Structured parsing** — Diffs shall be parsed into structured objects: file path, old path (for renames), status, hunks, and lines.
 - **Line metadata** — Each diff line shall include its type (add/remove/context), old line number, new line number, and content.
@@ -28,6 +28,7 @@ Requirements for interacting with git repositories.
 ### 3.3 Untracked Files
 
 - **Inclusion in uncommitted mode** — In `uncommitted` mode, untracked files (not in `.gitignore`) shall be included as "added" files.
+- **Inclusion in files mode** — In `files` mode, untracked files matching the requested patterns shall likewise be included as "added" files. `git diff HEAD` never reports a never-tracked file, so without this backfill reviewing a single not-yet-added new file by path would surface nothing; the backfill is scoped to the patterns (via `git ls-files --others --exclude-standard -- <patterns>`) so unrequested new files are not pulled in.
 - **Full content display** — Untracked file diffs shall show the full file content as added lines.
 
 ### 3.4 Binary Files

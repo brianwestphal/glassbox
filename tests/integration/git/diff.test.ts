@@ -149,6 +149,70 @@ describe('getFileDiffs — uncommitted mode', () => {
 });
 
 // ---------------------------------------------------------------------------
+// getFileDiffs — files mode
+// ---------------------------------------------------------------------------
+
+describe('getFileDiffs — files mode', () => {
+  it('returns a diff for a modified tracked file matching the pattern', () => {
+    const r = createTempRepo();
+    try {
+      writeFileSync(join(r.path, 'tracked.txt'), 'line one\n');
+      gitCommit(r.path, 'initial', true);
+
+      // Unstaged edit to a tracked file — `git diff HEAD` reports it.
+      writeFileSync(join(r.path, 'tracked.txt'), 'line one\nline two\n');
+
+      const diffs = getFileDiffs({ type: 'files', patterns: ['tracked.txt'] }, r.path);
+      const diff = diffs.find(d => d.filePath === 'tracked.txt');
+      expect(diff).toBeDefined();
+      expect(diff!.status).toBe('modified');
+    } finally {
+      r.cleanup();
+    }
+  });
+
+  it('backfills an untracked file matching the requested pattern as an added diff', () => {
+    const r = createTempRepo();
+    try {
+      writeFileSync(join(r.path, 'tracked.txt'), 'tracked\n');
+      gitCommit(r.path, 'initial', true);
+
+      // A brand-new, never-tracked file: `git diff HEAD -- new.txt` is empty,
+      // so without the untracked backfill this would return nothing.
+      writeFileSync(join(r.path, 'new.txt'), 'brand new\n');
+
+      const diffs = getFileDiffs({ type: 'files', patterns: ['new.txt'] }, r.path);
+      const newFileDiff = diffs.find(d => d.filePath === 'new.txt');
+      expect(newFileDiff).toBeDefined();
+      expect(newFileDiff!.status).toBe('added');
+      expect(newFileDiff!.isBinary).toBe(false);
+      expect(newFileDiff!.hunks).toHaveLength(1);
+      expect(newFileDiff!.hunks[0].lines[0].content).toBe('brand new');
+    } finally {
+      r.cleanup();
+    }
+  });
+
+  it('scopes the untracked backfill to the requested patterns (unrequested new files excluded)', () => {
+    const r = createTempRepo();
+    try {
+      writeFileSync(join(r.path, 'tracked.txt'), 'tracked\n');
+      gitCommit(r.path, 'initial', true);
+
+      writeFileSync(join(r.path, 'wanted.txt'), 'wanted\n');
+      writeFileSync(join(r.path, 'other.txt'), 'other\n');
+
+      const diffs = getFileDiffs({ type: 'files', patterns: ['wanted.txt'] }, r.path);
+      expect(diffs.find(d => d.filePath === 'wanted.txt')).toBeDefined();
+      // The other untracked file was not requested, so it must not be backfilled.
+      expect(diffs.find(d => d.filePath === 'other.txt')).toBeUndefined();
+    } finally {
+      r.cleanup();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getFileDiffs — staged mode
 // ---------------------------------------------------------------------------
 

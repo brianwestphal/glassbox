@@ -222,8 +222,15 @@ export function getFileDiffs(mode: ReviewMode, cwd: string): FileDiff[] {
 
   const diffs = parseDiff(rawDiff);
 
-  if (mode.type === 'uncommitted') {
-    const untracked = git(['ls-files', '--others', '--exclude-standard'], repoRoot).trim();
+  // Backfill untracked (brand-new) files as added-file diffs — `git diff HEAD`
+  // never reports a file git has not tracked, so without this an untracked file
+  // silently shows nothing. `uncommitted` lists every untracked file; `files`
+  // scopes the backfill to the requested pathspecs so reviewing a single
+  // not-yet-added new file by path still surfaces it.
+  if (mode.type === 'uncommitted' || mode.type === 'files') {
+    const lsArgs = ['ls-files', '--others', '--exclude-standard'];
+    if (mode.type === 'files') lsArgs.push('--', ...mode.patterns);
+    const untracked = git(lsArgs, repoRoot).trim();
     if (untracked) {
       for (const file of untracked.split('\n').filter(Boolean)) {
         if (!diffs.some(d => d.filePath === file)) {
