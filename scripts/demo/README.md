@@ -108,6 +108,21 @@ DevTools / VS Code can both open them directly.
 - The end card is **hand-built SVG** (the only hand-built frame) — purely for
   precise branding/layout control; the app beats are live screenshots and the
   terminal beats are `domotion term` cast renders.
+- **Why not domotion's creative-template pack (`cta` / `title-card` / `compare` /
+  …)?** This pipeline is a bespoke `generateAnimatedSvg()` composition: a single
+  unified embedded-font subset collected across every captured beat
+  (`getEmbeddedFontFaceCss`, asserted present or we throw), **per-frame static
+  `svgContent`** with the compositor owning the timeline + cursor track, and every
+  beat **floated in the shared window `CARD` rect** on a transparent canvas. The
+  built-in templates render as **full-bleed, standalone _animated_ SVGs** — so
+  dropping one into a frame gives a static snapshot (per domotion's llms.txt,
+  animated-inside-animated needs `composite`), its typography won't share our
+  embedded font subset, and full-bleed breaks the floating-window aesthetic every
+  other beat shares. A side-by-side render confirmed the hand-built end card reads
+  better than the `cta` template here (it keeps the `$ npx glassbox`
+  terminal-command pill; `cta` is a generic web button). Keep the beats bespoke;
+  reach for a template only if the pipeline is ever re-architected around
+  `composite`.
 - The risk badges use mocked (random) scores, so their exact values/order vary
   per run — that's cosmetic; the point is the colored risk triage.
 - The typed feedback wraps natively (domotion's typing-overlay `bgWidth`) and
