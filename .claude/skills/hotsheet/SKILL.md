@@ -3,7 +3,7 @@ name: hotsheet
 description: Read the Hot Sheet worklist and work through the current priority items
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash
 ---
-<!-- hotsheet-skill-version: 21 -->
+<!-- hotsheet-skill-version: 22 -->
 
 Read `.hotsheet/worklist.md` and work through the tickets in priority order.
 
@@ -19,6 +19,8 @@ If the worklist says "Auto-Prioritize", follow those instructions to choose and 
 If API calls fail (connection refused or 403), re-read `.hotsheet/settings.json` for the current `port` and `secret` values — you may be connecting to the wrong Hot Sheet instance.
 
 **MCP tools (`hotsheet_*`) are preferred over curl when the channel is connected** — see the worklist for per-operation guidance. The 14-tool surface covers ticket lifecycle (`hotsheet_update_ticket`, `hotsheet_create_ticket`, `hotsheet_get_ticket`, `hotsheet_delete_ticket`, `hotsheet_restore_ticket`, `hotsheet_toggle_up_next`, `hotsheet_duplicate_tickets`), bulk operations (`hotsheet_batch`), notes (`hotsheet_edit_note`, `hotsheet_delete_note`), attachments (`hotsheet_add_attachment`), channel signaling (`hotsheet_signal_done`), feedback sugar (`hotsheet_request_feedback`), and query (`hotsheet_query_tickets`). Curl stays supported as the universal fallback for non-Claude AI agents and human terminal callers.
+
+**Parallelizing work across the worker pool:** `hotsheet_get_worker_pool` / `hotsheet_set_worker_target` / `hotsheet_dispatch_tickets` / `hotsheet_drain_workers`. When the project has **"always preview agent plans"** on (the worklist says so), call **`hotsheet_propose_partition`** with your whole proposed assignment INSTEAD of `hotsheet_dispatch_tickets` — it surfaces the plan in the owner's partition editor for review, and the UI dispatches on accept (you do not claim the tickets yourself).
 
 ## Git: keep the target current + integrate worker branches
 

@@ -1,6 +1,6 @@
 ---
+name: hs-requirement-change
 description: Create a new req change ticket in Hot Sheet
-alwaysApply: false
 ---
 <!-- hotsheet-skill-version: 22 -->
 

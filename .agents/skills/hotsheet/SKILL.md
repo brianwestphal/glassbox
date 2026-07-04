@@ -1,6 +1,6 @@
 ---
+name: hotsheet
 description: Read the Hot Sheet worklist and work through the current priority items
-alwaysApply: false
 ---
 <!-- hotsheet-skill-version: 22 -->
 

@@ -3,7 +3,7 @@ name: hs-feature
 description: Create a new feature ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 21 -->
+<!-- hotsheet-skill-version: 22 -->
 
 Create a new Hot Sheet **feature** ticket. New features to be implemented.
 
