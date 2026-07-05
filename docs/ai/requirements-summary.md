@@ -903,6 +903,28 @@ the A/B segments are hidden like difference/slice). Per-side region overlays
 (`data-region-side`) make doc-23 feedback work like the Side-by-Side panes.
 View-only: no new server route, no new CSS. See §5 for the full description.
 
+## 18l. Content plugins (`29-content-plugins.md`) — **Design only**
+
+A plugin boundary so specialized content **renderers** (file/blob → safe
+HTML/SVG) and **differs** (old vs new → diff view) live *outside* core and are
+installed opt-in, keeping the local-first core and desktop bundle lean instead of
+baking in multi-MB format libraries (the trigger is diagram-source rendering,
+GB-910). Modeled on the sibling Hot Sheet plugin system: directory discovery in
+`~/.glassbox/plugins/` (symlink-aware), a zod-validated manifest as the single
+trust boundary, an `activate(context) → { renderers?, differs? }` lifecycle,
+self-contained esbuild-bundled plugins loaded by dynamic `import(file://)` (so
+they load against the frozen desktop sidecar), bundled/official plugins
+auto-installed into the user dir (version + content-hash freshness + dismiss-list)
+plus install-from-disk, in-process full trust (opt-in install = the boundary, no
+runtime sandbox — doc 14), per-project opt-in enablement, server-side rendering to
+safe HTML/SVG, and graceful fallback (code block / `<img>` / "install X" hint)
+when no plugin matches. One API serves both the file diff viewer and review-note
+artifacts (doc 20). Nothing is implemented yet — every FR/NFR is `waived`
+design-only in `feature-coverage.json`. First reference plugin: diagram-source
+(Mermaid/Graphviz/PlantUML, GB-910), spec'd here and built separately. Follow-ups:
+GB-1038 (core loader/contract), GB-1039 (desktop delivery), GB-1040 (management
+UI), GB-1041 (developer guide).
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -919,7 +941,12 @@ it in the OS file manager. Doc **22** (local & on-device AI models) is **Shipped
 — `local` (OpenAI-compatible) + Apple Foundation Models (on-device, with a
 secondary fallback model). Docs **23** (image feedback), **24** (image comparison
 layouts), **25** (attachments), and **26** (ground-truth comparison, P1–P3) are
-all **Shipped**. When a new feature is spec'd before implementation, add a doc and
+all **Shipped**. Docs **27** (automatic .gitignore) and **28** (single-side image
+focus) are **Shipped**. Doc **29** (content plugins) is **Design only** — the
+renderer/differ plugin contract + loader are specified (modeled on Hot Sheet's
+plugin system) but unimplemented; the build is decomposed into GB-1038/1039/1040/
+1041 with diagram-source rendering (GB-910) as the first reference plugin. When a
+new feature is spec'd before implementation, add a doc and
 mark the entry here **Design only** until the code lands, then **Partially
 built** / **Shipped** as it progresses.
 

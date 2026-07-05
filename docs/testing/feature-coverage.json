@@ -1764,6 +1764,69 @@
         "empty fallbackPlatform -> cleared"
       ],
       "note": "Apple FM secondary fallback model: per-failed-batch spill to secondary, one-level fallback resolution, persist/clear, 4096 conservative window, settings fallback picker."
+    },
+    "FR-29.1": {
+      "waived": "Design-only (doc 29 content-plugin system): the plugin boundary is a spec only; no code yet. Implementation tracked in GB-1038 (core loader/contract). Flip to a test when the loader ships."
+    },
+    "FR-29.2": {
+      "waived": "Design-only (doc 29): one API serving the diff viewer + review-note artifacts is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the dispatcher is wired into both paths."
+    },
+    "FR-29.3": {
+      "waived": "Design-only (doc 29): ~/.glassbox/plugins/ symlink-aware discovery is a spec only; no code yet. Tracked in GB-1038. Flip to a test when discovery lands."
+    },
+    "FR-29.4": {
+      "waived": "Design-only (doc 29): the zod-validated manifest trust boundary is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the manifest schema lands."
+    },
+    "FR-29.5": {
+      "waived": "Design-only (doc 29): self-contained esbuild-bundled plugin loading is a spec only; no code yet. Tracked in GB-1038/GB-1039. Flip to a test when the load path exists."
+    },
+    "FR-29.6": {
+      "waived": "Design-only (doc 29): fail-soft activation is a spec only; no code yet. Tracked in GB-1038. When built this becomes a stateful unit (bad-import / bad-manifest / missing-entry -> skipped, others still load) with transition tests."
+    },
+    "FR-29.7": {
+      "waived": "Design-only (doc 29): desktop delivery (bundled auto-install + freshness + dismiss-list + install-from-disk) is a spec only; no code yet. Tracked in GB-1039. Flip to tests when the delivery path lands."
+    },
+    "FR-29.8": {
+      "waived": "Design-only (doc 29): content matching by ext/MIME/sniff with priority is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the dispatcher lands."
+    },
+    "FR-29.9": {
+      "waived": "Design-only (doc 29): the ContentRenderer contract is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the contract + a reference renderer land."
+    },
+    "FR-29.10": {
+      "waived": "Design-only (doc 29): the ContentDiffer contract is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the contract lands."
+    },
+    "FR-29.11": {
+      "waived": "Design-only (doc 29): activate() -> { renderers?, differs? } registration is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the registry lands."
+    },
+    "FR-29.12": {
+      "waived": "Design-only (doc 29): PluginContext (log + keychain-backed getSetting/setSetting) is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the context lands."
+    },
+    "FR-29.13": {
+      "waived": "Design-only (doc 29): server-side rendering to safe HTML/SVG is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the first server-side renderer lands (GB-910)."
+    },
+    "FR-29.14": {
+      "waived": "Design-only (doc 29): graceful fallback (code block / <img> / install-hint, no CDN) when no plugin matches is a spec only; no code yet. Tracked in GB-1038. Flip to a test when dispatch + fallback land."
+    },
+    "FR-29.15": {
+      "waived": "Design-only (doc 29): the opt-in-install / no-sandbox trust model is a design-justification requirement resting on doc 14's threat model; there is no plugin code to test yet. Tracked in GB-1038. Revisit when loading lands."
+    },
+    "FR-29.16": {
+      "waived": "Design-only (doc 29): per-project opt-in enablement is a spec only; no code yet. Tracked in GB-1040 (management UI). Flip to a test when enablement lands."
+    },
+    "FR-29.17": {
+      "waived": "Design-only (doc 29): the diagram-source reference plugin is spec'd here but built separately in GB-910, unblocked by the GB-1038 loader. Flip to a test when the plugin ships."
+    },
+    "NFR-29.1": {
+      "waived": "Design-only (doc 29): lean-core / offline / no-CDN is a design-justification NFR; core has no format-specific renderer dep to assert against yet. The conventions test already pins the external-dep allow-list. Revisit when plugins land."
+    },
+    "NFR-29.2": {
+      "waived": "Design-only (doc 29): safe/inert plugin output is a spec only; no plugin output path to test yet. Tracked in GB-1038. Flip to a test when the first renderer's output path lands."
+    },
+    "NFR-29.3": {
+      "waived": "Design-only (doc 29): zero-plugin no-op is a design-justification NFR; with no subsystem yet there is nothing to regress. Tracked in GB-1038. Flip to a test when discovery lands (empty-dir -> no-op)."
+    },
+    "NFR-29.4": {
+      "waived": "Design-only (doc 29): the PLUGINS_ENABLED feature flag / kill-switch is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the flag lands (flag off -> subsystem skipped)."
     }
   }
 }
