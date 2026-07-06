@@ -29,6 +29,19 @@ export function matches(match: ContentMatch, input: RenderInput): boolean {
   return matchSpecificity(match, input) > 0;
 }
 
+/**
+ * A cheap path-only match (extension / MIME, ignoring `sniff`). Used by the
+ * file-diff-viewer integration to decide whether a file is worth reading +
+ * dispatching, without paying the cost of reading every file's bytes. A
+ * sniff-only plugin is intentionally not selected here (path pre-check only).
+ */
+export function pathMatches(match: ContentMatch, path: string, mime?: string): boolean {
+  const ext = extname(path).toLowerCase();
+  if (ext !== '' && match.extensions?.some((e) => e.toLowerCase() === ext) === true) return true;
+  if (mime !== undefined && match.mimeTypes?.includes(mime) === true) return true;
+  return false;
+}
+
 interface Handler { match: ContentMatch; priority?: number }
 
 /** Highest (priority, specificity) wins; ties resolve to registration order. */
@@ -59,6 +72,14 @@ export class ContentPluginRegistry {
   /** The best-matching differ for a pair; matching keys off the new side. */
   findDiffer(input: DiffInput): ContentDiffer | undefined {
     return pickBest(this.differs, input.new);
+  }
+
+  /** Cheap path pre-check: could any renderer/differ handle this path (by ext /
+   *  MIME)? Skips sniff so no bytes are read. */
+  mightHandleByPath(path: string, mime?: string): boolean {
+    for (const h of this.renderers) if (pathMatches(h.match, path, mime)) return true;
+    for (const h of this.differs) if (pathMatches(h.match, path, mime)) return true;
+    return false;
   }
 
   get rendererCount(): number { return this.renderers.length; }

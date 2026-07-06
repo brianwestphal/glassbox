@@ -47,6 +47,16 @@ export async function initContentPlugins(): Promise<void> {
 /** The per-plugin load outcomes (for the management UI, GB-1040). */
 export function getLoadedPlugins(): readonly LoadedPlugin[] { return loadedPlugins; }
 
+/**
+ * Cheap path-only pre-check: could any installed plugin handle a file at `path`
+ * (by extension / MIME)? Lets the file-diff-viewer integration skip reading a
+ * file's content unless a plugin might render it (NFR-29.3). Always `false` when
+ * disabled.
+ */
+export function mightHandleFile(path: string, mime?: string): boolean {
+  return PLUGINS_ENABLED && registry.mightHandleByPath(path, mime);
+}
+
 function usableView(view: RenderedView | undefined): RenderedView | null {
   if (view === undefined) return null;
   const svg = typeof view.svg === 'string' && view.svg !== '';

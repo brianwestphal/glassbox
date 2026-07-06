@@ -6,6 +6,8 @@ import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import type { GroundTruthStepNav } from '../ground-truth/presentation.js';
 import { IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
+import type { PluginFileView } from '../plugins/fileView.js';
+import type { RenderedView } from '../plugins/types.js';
 import type { ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
@@ -15,7 +17,7 @@ import { renderNoteMarkdown } from '../utils/noteMarkdown.js';
 import { ImageDiff } from './imageDiff.js';
 import { ReviewNoteRegionThumb } from './reviewNoteRegionThumb.js';
 
-export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imageSideLabels, stepNav }: {
+export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imageSideLabels, stepNav, pluginView }: {
   file: ReviewFile;
   diff: FileDiff;
   annotations: Annotation[];
@@ -25,6 +27,9 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imag
   imageSideLabels?: { old: string; new: string };
   /** Ground-truth set step navigator (doc 26 §26.3 FR-26.12); absent for singles. */
   stepNav?: GroundTruthStepNav;
+  /** A content plugin's render/diff of this whole file (doc 29 FR-29.2); when
+   *  present it replaces the built-in text/image diff body. */
+  pluginView?: PluginFileView;
 }) {
   // Replies (annotations linked to a review note on this file) render nested
   // beneath their note, not on their line; everything else goes by line. An
@@ -66,7 +71,9 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imag
           <span className={`file-status ${diff.status}`}>{diff.status}</span>
         </div>
       </div>
-      {diff.isBinary && isImageFile(diff.filePath) ? (
+      {pluginView !== undefined ? (
+        <PluginFileBody view={pluginView} />
+      ) : diff.isBinary && isImageFile(diff.filePath) ? (
         <ImageDiff file={file} diff={diff} sideLabels={imageSideLabels} />
       ) : diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
@@ -95,6 +102,38 @@ function StepNav({ nav }: { nav: GroundTruthStepNav }) {
         disabled={nav.nextFileId === null} title="Next step"><IconChevronRight /></button>
     </span>
   );
+}
+
+/** A content plugin's whole-file render (doc 29 FR-29.2). `single` for an
+ *  added/deleted file or a differ result; `pair` for a modified file a
+ *  renderer-only plugin renders per-side. */
+function PluginFileBody({ view }: { view: PluginFileView }) {
+  if (view.kind === 'single') {
+    return <div className="plugin-file-view">{renderPluginView(view.view)}</div>;
+  }
+  return (
+    <div className="plugin-file-view plugin-file-view-pair">
+      <div className="plugin-file-side">
+        <div className="plugin-file-side-label">Old</div>
+        {view.old !== null ? renderPluginView(view.old) : <div className="hunk-separator">Not rendered</div>}
+      </div>
+      <div className="plugin-file-side">
+        <div className="plugin-file-side-label">New</div>
+        {view.new !== null ? renderPluginView(view.new) : <div className="hunk-separator">Not rendered</div>}
+      </div>
+    </div>
+  );
+}
+
+/** SVG is delivered inertly via an `<img>` data URI; HTML is trusted (doc 29
+ *  FR-29.15) and required to be inert (NFR-29.2). */
+function renderPluginView(v: RenderedView): SafeHtml {
+  if (v.svg !== undefined && v.svg !== '') {
+    return <img className="plugin-file-img" alt="Rendered by plugin" draggable={false}
+      src={`data:image/svg+xml;utf8,${encodeURIComponent(v.svg)}`} />;
+  }
+  // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-rendered HTML is trusted (opt-in install; doc 29 FR-29.15) and required to be inert (NFR-29.2)
+  return <div className="plugin-file-html">{raw(v.html ?? '')}</div>;
 }
 
 // A single item in the flattened split diff stream

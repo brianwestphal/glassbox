@@ -5,11 +5,12 @@
 > under `~/.glassbox/plugins/`, fail-soft dynamic-`import()` activation, the
 > priority/specificity dispatcher, the feature-flag kill-switch, and the
 > review-note **artifact** integration with its code-block fallback — all in
-> `src/plugins/`, loaded at server startup. The **developer guide** has also
-> shipped (GB-1041, `docs/plugin-development-guide.md`). Still open: **desktop
-> delivery** (GB-1039), the **file-diff-viewer** integration (the second
-> integration point, GB-1042), the **management UI** (GB-1040), and the first
-> reference plugin, **diagram-source rendering** (GB-910). See
+> `src/plugins/`, loaded at server startup. The **file-diff-viewer** integration
+> has also shipped (GB-1042, `src/plugins/fileView.ts`) — so **both** FR-29.2
+> integration points are wired — as has the **developer guide** (GB-1041,
+> `docs/plugin-development-guide.md`). Still open: **desktop delivery** (GB-1039),
+> the **management UI** (GB-1040), a committed fixture-plugin **e2e** (GB-1043),
+> and the first reference plugin, **diagram-source rendering** (GB-910). See
 > [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
@@ -197,10 +198,13 @@ The build is decomposed into follow-up tickets:
   discovery, fail-soft activation, the `ContentRenderer` / `ContentDiffer` /
   `PluginContext` contract, the content-type dispatcher, the review-note artifact
   integration + fallback, and the feature flag. Lives in `src/plugins/`.
-- **File-diff-viewer integration** (GB-1042) — the second integration point:
-  consult the dispatcher for an arbitrary content-type *file* in the diff viewer
-  (render / diff a whole file via a plugin), not just review-note artifacts.
-  Completes FR-29.2.
+- **File-diff-viewer integration** (GB-1042, **shipped**) — the second
+  integration point: `src/plugins/fileView.ts` (`renderFileWithPlugins`) consults
+  the dispatcher for an arbitrary content-type *file* in the diff viewer
+  (`renderContent` for an added/deleted side, `diffContent` for a modified file,
+  else per-side render for a renderer-only plugin), gated by a cheap path
+  pre-check so nothing is read without an installed handler. Completes FR-29.2.
+  Scope: text content types; binary content types (raw bytes) are a follow-up.
 - **Desktop delivery** (GB-1039) — the esbuild plugin build path, the
   `build-sidecar.sh` copy, bundled-plugin auto-install (version + content-hash
   freshness + dismiss-list), and install-from-disk. Realizes FR-29.5 / FR-29.7.
@@ -230,13 +234,15 @@ Shipped in P1 (GB-1038):
   which `src/components/diffView.tsx` renders (SVG via an `<img>` data URI) in
   place of the code block. Called from the `/file/:fileId` route
   (`src/routes/pages.tsx`). Zero-plugin installs are a no-op (unchanged behavior).
+- **File-diff-viewer integration** — `src/plugins/fileView.ts`
+  (`renderFileWithPlugins`) renders/diffs a whole file via a plugin; `DiffView`
+  (`PluginFileBody` / `renderPluginView`) shows it (SVG via an `<img>` data URI;
+  a renderer-only modified file as a two-column pair) in place of the text diff.
+  Also called from the `/file/:fileId` route, behind the `mightHandleFile` path
+  pre-check (no content read without an installed handler).
 
 Planned by the follow-ups:
 
-- **Diff-viewer integration** (GB-1042) — the content-type branch in the file
-  view (`src/components/diffView.tsx` / `src/components/imageDiff.tsx` and the
-  `/file/:fileId` path) consults the dispatcher before falling back to the
-  built-in text/image views.
 - **Desktop** (GB-1039) — `dist/plugins/<id>/` built by an esbuild step, copied
   into the sidecar by `scripts/build-sidecar.sh`, auto-installed at startup from
   `global-config.ts`'s `~/.glassbox` dir.

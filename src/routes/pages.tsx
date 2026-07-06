@@ -19,6 +19,7 @@ import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-meta.js';
 import { groundTruthSideLabels, groundTruthStepNav } from '../ground-truth/presentation.js';
 import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
 import { renderNoteArtifacts } from '../plugins/artifacts.js';
+import { renderFileWithPlugins } from '../plugins/fileView.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
@@ -151,8 +152,12 @@ pageRoutes.get('/file/:fileId', async (c) => {
   // a match renders it (inert SVG/HTML) in place of the code block (doc 29). A
   // no-op with no plugin installed, so the code-block fallback is unchanged.
   await renderNoteArtifacts(reviewNotes);
+  // Offer the whole file to an installed content plugin (doc 29 FR-29.2); a
+  // match renders/diffs it in place of the built-in text diff. No-op (no content
+  // read) when no plugin handles this path.
+  const pluginView = await renderFileWithPlugins(reviewMode, finalDiff, c.get('repoRoot'));
 
-  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} stepNav={stepNav} />;
+  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} stepNav={stepNav} pluginView={pluginView ?? undefined} />;
   return c.html(html.toString());
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ContentPluginRegistry, matches, matchSpecificity } from '../../../src/plugins/registry.js';
+import { ContentPluginRegistry, matches, matchSpecificity, pathMatches } from '../../../src/plugins/registry.js';
 import type { ContentRenderer, RenderInput } from '../../../src/plugins/types.js';
 
 function input(over: Partial<RenderInput> = {}): RenderInput {
@@ -63,5 +63,23 @@ describe('registry dispatch (doc 29 FR-29.8/29.11)', () => {
     reg.addDiffers(undefined);
     expect(reg.rendererCount).toBe(2);
     expect(reg.differCount).toBe(0);
+  });
+});
+
+describe('path pre-check (doc 29 FR-29.2, NFR-29.3)', () => {
+  it('pathMatches by extension (case-insensitive) and MIME, ignoring sniff', () => {
+    expect(pathMatches({ extensions: ['.mmd'] }, 'x.MMD')).toBe(true);
+    expect(pathMatches({ mimeTypes: ['m'] }, 'x', 'm')).toBe(true);
+    expect(pathMatches({ sniff: () => true }, 'x.mmd')).toBe(false); // sniff-only never path-matches
+    expect(pathMatches({ extensions: ['.mmd'] }, 'x.dot')).toBe(false);
+  });
+
+  it('mightHandleByPath scans renderers and differs', () => {
+    const reg = new ContentPluginRegistry();
+    reg.addRenderers([renderer('r', { match: { extensions: ['.mmd'] } })]);
+    expect(reg.mightHandleByPath('a.mmd')).toBe(true);
+    expect(reg.mightHandleByPath('a.dot')).toBe(false);
+    reg.addDiffers([{ name: 'd', match: { extensions: ['.dot'] }, diff: () => ({ html: '' }) }]);
+    expect(reg.mightHandleByPath('a.dot')).toBe(true);
   });
 });
