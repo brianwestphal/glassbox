@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 
 import { registerChannel } from './channel-config.js';
 import { readGlobalConfig } from './global-config.js';
+import { initContentPlugins } from './plugins/index.js';
 import { aiApiRoutes } from './routes/ai-api.js';
 import { apiRoutes } from './routes/api.js';
 import { channelApiRoutes } from './routes/channel-api.js';
@@ -114,6 +115,10 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
 
   const url = `http://localhost:${actualPort}`;
   console.log(`\n  Glassbox running at ${url}\n`);
+
+  // Discover + load installed content plugins (doc 29). Fail-soft: never throws,
+  // never blocks startup on a broken plugin.
+  await initContentPlugins();
 
   // Ensure .mcp.json is registered for this project if channel is enabled
   try {

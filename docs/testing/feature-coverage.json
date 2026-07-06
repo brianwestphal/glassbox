@@ -1772,40 +1772,59 @@
       "waived": "Design-only (doc 29): one API serving the diff viewer + review-note artifacts is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the dispatcher is wired into both paths."
     },
     "FR-29.3": {
-      "waived": "Design-only (doc 29): ~/.glassbox/plugins/ symlink-aware discovery is a spec only; no code yet. Tracked in GB-1038. Flip to a test when discovery lands."
+      "tests": ["tests/unit/plugins/loader.test.ts"],
+      "note": "Discovery of ~/.glassbox/plugins/ subdirs: missing-dir -> [], skips dotfiles, sorted, symlink-to-dir followed."
     },
     "FR-29.4": {
-      "waived": "Design-only (doc 29): the zod-validated manifest trust boundary is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the manifest schema lands."
+      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts"],
+      "note": "Zod manifest validation (the trust boundary): minimal valid, loose extra keys, contentTypes, null on invalid; manifest.json + package.json#glassbox fallback."
     },
     "FR-29.5": {
       "waived": "Design-only (doc 29): self-contained esbuild-bundled plugin loading is a spec only; no code yet. Tracked in GB-1038/GB-1039. Flip to a test when the load path exists."
     },
     "FR-29.6": {
-      "waived": "Design-only (doc 29): fail-soft activation is a spec only; no code yet. Tracked in GB-1038. When built this becomes a stateful unit (bad-import / bad-manifest / missing-entry -> skipped, others still load) with transition tests."
+      "tests": ["tests/unit/plugins/loader.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "valid plugin -> loaded + registered",
+        "invalid manifest -> error, skipped",
+        "missing entry file -> error, skipped",
+        "entry throws on import -> error, skipped",
+        "activate() throws -> error, skipped",
+        "no activate export -> error, skipped",
+        "one broken + one good -> good still loads (loadAllPlugins)"
+      ],
+      "note": "Fail-soft activation: a bad plugin records an error and is skipped, never crashing startup or disabling others."
     },
     "FR-29.7": {
       "waived": "Design-only (doc 29): desktop delivery (bundled auto-install + freshness + dismiss-list + install-from-disk) is a spec only; no code yet. Tracked in GB-1039. Flip to tests when the delivery path lands."
     },
     "FR-29.8": {
-      "waived": "Design-only (doc 29): content matching by ext/MIME/sniff with priority is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the dispatcher lands."
+      "tests": ["tests/unit/plugins/registry.test.ts"],
+      "note": "Content matching by ext (case-insensitive) / MIME / sniff, specificity sniff>mime>ext, priority tie-break, throwing-sniff never matches."
     },
     "FR-29.9": {
-      "waived": "Design-only (doc 29): the ContentRenderer contract is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the contract + a reference renderer land."
+      "tests": ["tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/registry.test.ts"],
+      "note": "ContentRenderer contract via renderContent: matching plugin renders, empty view -> null, renderer throw -> null."
     },
     "FR-29.10": {
-      "waived": "Design-only (doc 29): the ContentDiffer contract is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the contract lands."
+      "tests": ["tests/unit/plugins/dispatch.test.ts"],
+      "note": "ContentDiffer contract via diffContent: matching differ diffs, keyed off the new side."
     },
     "FR-29.11": {
-      "waived": "Design-only (doc 29): activate() -> { renderers?, differs? } registration is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the registry lands."
+      "tests": ["tests/unit/plugins/registry.test.ts", "tests/unit/plugins/loader.test.ts"],
+      "note": "activate() -> { renderers?, differs? } additive registration into the registry; counts."
     },
     "FR-29.12": {
-      "waived": "Design-only (doc 29): PluginContext (log + keychain-backed getSetting/setSetting) is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the context lands."
+      "waived": "Design-only (doc 29): full PluginContext with persisted, keychain-backed getSetting/setSetting is not built — P1 ships a minimal context (log + no-op settings). Tracked in GB-1040 (management UI). Flip to a test when settings persistence lands."
     },
     "FR-29.13": {
-      "waived": "Design-only (doc 29): server-side rendering to safe HTML/SVG is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the first server-side renderer lands (GB-910)."
+      "tests": ["tests/unit/plugins/artifacts.test.ts"],
+      "note": "Server-side render pass (renderNoteArtifacts) offers a text/diagram-source artifact to the dispatcher and attaches inert rendered SVG (shown via an <img> data URI in DiffView) in place of the code block."
     },
     "FR-29.14": {
-      "waived": "Design-only (doc 29): graceful fallback (code block / <img> / install-hint, no CDN) when no plugin matches is a spec only; no code yet. Tracked in GB-1038. Flip to a test when dispatch + fallback land."
+      "tests": ["tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/artifacts.test.ts"],
+      "note": "Graceful fallback: no-match -> null from renderContent/diffContent; a non-matching artifact is left untouched (code-block fallback unchanged)."
     },
     "FR-29.15": {
       "waived": "Design-only (doc 29): the opt-in-install / no-sandbox trust model is a design-justification requirement resting on doc 14's threat model; there is no plugin code to test yet. Tracked in GB-1038. Revisit when loading lands."
@@ -1823,10 +1842,12 @@
       "waived": "Design-only (doc 29): safe/inert plugin output is a spec only; no plugin output path to test yet. Tracked in GB-1038. Flip to a test when the first renderer's output path lands."
     },
     "NFR-29.3": {
-      "waived": "Design-only (doc 29): zero-plugin no-op is a design-justification NFR; with no subsystem yet there is nothing to regress. Tracked in GB-1038. Flip to a test when discovery lands (empty-dir -> no-op)."
+      "tests": ["tests/unit/plugins/artifacts.test.ts"],
+      "note": "Zero-plugin no-op: with no plugins installed, the render pass leaves artifacts untouched (content preserved), so behavior is unchanged."
     },
     "NFR-29.4": {
-      "waived": "Design-only (doc 29): the PLUGINS_ENABLED feature flag / kill-switch is a spec only; no code yet. Tracked in GB-1038. Flip to a test when the flag lands (flag off -> subsystem skipped)."
+      "tests": ["tests/unit/plugins/dispatch.test.ts"],
+      "note": "PLUGINS_ENABLED kill-switch honors GLASSBOX_PLUGINS_DISABLED (off -> subsystem skipped; loadAllPlugins returns empty)."
     }
   }
 }

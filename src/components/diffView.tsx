@@ -432,7 +432,21 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
           {n.artifacts !== undefined && n.artifacts.length > 0 ? (
             <div className="ai-note-artifacts">
               {n.artifacts.map(a => (
-                a.content !== undefined ? (
+                a.renderedSvg !== undefined ? (
+                  <details className="ai-note-artifact" open>
+                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
+                    <div className="ai-note-artifact-imgwrap">
+                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable={false}
+                        src={`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`} />
+                    </div>
+                  </details>
+                ) : a.renderedHtml !== undefined ? (
+                  <details className="ai-note-artifact" open>
+                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
+                    {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-rendered HTML is trusted (opt-in install; doc 29 FR-29.15) and required to be inert (NFR-29.2) */}
+                    <div className="ai-note-artifact-rendered">{raw(a.renderedHtml)}</div>
+                  </details>
+                ) : a.content !== undefined ? (
                   <details className="ai-note-artifact">
                     <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
                     <pre className="ai-note-artifact-content"><code>{a.content}</code></pre>

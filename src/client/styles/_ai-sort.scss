@@ -518,6 +518,23 @@
   border-radius: 3px;
   white-space: pre;
 }
+// A content plugin's rendered HTML output for a text/diagram-source artifact
+// (doc 29). SVG output uses .ai-note-artifact-imgwrap/-img below; this is the
+// container for the `html` render path.
+.ai-note-artifact-rendered {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+
+  svg,
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
 // Inline artifact thumbnail + its region-draw overlay (doc 25 / GB-959). The
 // wrapper shrinks to the image so the overlay (inset:0) lines up exactly.
 .ai-note-artifact-imgwrap {

@@ -903,7 +903,7 @@ the A/B segments are hidden like difference/slice). Per-side region overlays
 (`data-region-side`) make doc-23 feedback work like the Side-by-Side panes.
 View-only: no new server route, no new CSS. See §5 for the full description.
 
-## 18l. Content plugins (`29-content-plugins.md`) — **Design only**
+## 18l. Content plugins (`29-content-plugins.md`) — **Partially built**
 
 A plugin boundary so specialized content **renderers** (file/blob → safe
 HTML/SVG) and **differs** (old vs new → diff view) live *outside* core and are
@@ -919,11 +919,15 @@ plus install-from-disk, in-process full trust (opt-in install = the boundary, no
 runtime sandbox — doc 14), per-project opt-in enablement, server-side rendering to
 safe HTML/SVG, and graceful fallback (code block / `<img>` / "install X" hint)
 when no plugin matches. One API serves both the file diff viewer and review-note
-artifacts (doc 20). Nothing is implemented yet — every FR/NFR is `waived`
-design-only in `feature-coverage.json`. First reference plugin: diagram-source
-(Mermaid/Graphviz/PlantUML, GB-910), spec'd here and built separately. Follow-ups:
-GB-1038 (core loader/contract), GB-1039 (desktop delivery), GB-1040 (management
-UI), GB-1041 (developer guide).
+artifacts (doc 20). The **P1 core shipped** (GB-1038): `src/plugins/` — the
+renderer/differ contract, zod manifest, symlink-aware discovery, fail-soft
+dynamic-`import()` activation, priority/specificity dispatcher, `PLUGINS_ENABLED`
+kill-switch, and the review-note **artifact** integration with code-block
+fallback, loaded at startup. Still open: the file-diff-viewer integration
+(GB-1042, the second integration point), desktop delivery (GB-1039), the
+management UI (GB-1040), the developer guide (GB-1041), and the diagram-source
+first reference plugin (GB-910). Implemented FR/NFR units carry real tests in
+`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 19. Implementation-status snapshot
 
@@ -942,10 +946,12 @@ it in the OS file manager. Doc **22** (local & on-device AI models) is **Shipped
 secondary fallback model). Docs **23** (image feedback), **24** (image comparison
 layouts), **25** (attachments), and **26** (ground-truth comparison, P1–P3) are
 all **Shipped**. Docs **27** (automatic .gitignore) and **28** (single-side image
-focus) are **Shipped**. Doc **29** (content plugins) is **Design only** — the
-renderer/differ plugin contract + loader are specified (modeled on Hot Sheet's
-plugin system) but unimplemented; the build is decomposed into GB-1038/1039/1040/
-1041 with diagram-source rendering (GB-910) as the first reference plugin. When a
+focus) are **Shipped**. Doc **29** (content plugins) is **Partially built** — the
+P1 core (renderer/differ contract, loader, dispatcher, kill-switch, review-note
+artifact integration) shipped in GB-1038 (`src/plugins/`, modeled on Hot Sheet's
+plugin system); the file-diff-viewer integration (GB-1042), desktop delivery
+(GB-1039), management UI (GB-1040), developer guide (GB-1041), and the
+diagram-source first reference plugin (GB-910) remain. When a
 new feature is spec'd before implementation, add a doc and
 mark the entry here **Design only** until the code lands, then **Partially
 built** / **Shipped** as it progresses.

@@ -1,9 +1,14 @@
 # 29. Content Plugins (Renderers & Differs)
 
-> **Status: Design only.** This document specifies the contract and loader; no
-> implementation has landed yet. The build is split across follow-up tickets —
-> the core loader/contract, desktop delivery, the management UI, and the developer
-> guide — with diagram-source rendering as the first reference plugin. See
+> **Status: Partially built.** The **P1 core** has landed (GB-1038): the
+> renderer/differ contract, the zod-validated manifest, symlink-aware discovery
+> under `~/.glassbox/plugins/`, fail-soft dynamic-`import()` activation, the
+> priority/specificity dispatcher, the feature-flag kill-switch, and the
+> review-note **artifact** integration with its code-block fallback — all in
+> `src/plugins/`, loaded at server startup. Still open: **desktop delivery**
+> (GB-1039), the **file-diff-viewer** integration (the second integration point,
+> GB-1042), the **management UI** (GB-1040), the **developer guide** (GB-1041),
+> and the first reference plugin, **diagram-source rendering** (GB-910). See
 > [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
@@ -180,44 +185,57 @@ content `renderer` / `differ`. Everything else transfers.
 
 ## 29.8 Status and follow-ups
 
-This is a design/architecture document. Nothing is implemented yet; every FR/NFR
-above is **Design only** and is recorded as a justified `waived` entry in
-`docs/testing/feature-coverage.json` until the corresponding code lands, at which
-point the waiver is replaced by a real asserting test.
+The **P1 core has shipped** (GB-1038); its FR/NFR units carry real tests in
+`docs/testing/feature-coverage.json`. The units not yet realized remain justified
+`waived` entries there until their follow-up lands, at which point the waiver is
+replaced by an asserting test.
 
 The build is decomposed into follow-up tickets:
 
-- **Content-plugin core** (GB-1038) — manifest schema + validation, discovery,
-  fail-soft activation, the `ContentRenderer` / `ContentDiffer` / `PluginContext`
-  contract, the content-type dispatcher, wiring into the diff viewer **and** the
-  review-note artifact path, the fallback, and the feature flag.
+- **Content-plugin core** (GB-1038, **shipped**) — manifest schema + validation,
+  discovery, fail-soft activation, the `ContentRenderer` / `ContentDiffer` /
+  `PluginContext` contract, the content-type dispatcher, the review-note artifact
+  integration + fallback, and the feature flag. Lives in `src/plugins/`.
+- **File-diff-viewer integration** (GB-1042) — the second integration point:
+  consult the dispatcher for an arbitrary content-type *file* in the diff viewer
+  (render / diff a whole file via a plugin), not just review-note artifacts.
+  Completes FR-29.2.
 - **Desktop delivery** (GB-1039) — the esbuild plugin build path, the
   `build-sidecar.sh` copy, bundled-plugin auto-install (version + content-hash
   freshness + dismiss-list), and install-from-disk. Realizes FR-29.5 / FR-29.7.
 - **Management UI** (GB-1040) — a Settings **Plugins** tab: list installed
   plugins with status, per-project enable/disable (FR-29.16), install-from-disk /
-  uninstall, and manifest-declared preferences.
+  uninstall, and manifest-declared preferences (completing FR-29.12).
 - **Developer guide** (GB-1041) — `docs/plugin-development-guide.md` plus a
   standalone, copy-paste `types.ts` so third parties can build plugins without
   depending on the Glassbox package.
 - **First reference plugin** ([GB-910](20-ai-review-notes.md)) — diagram-source
   rendering, unblocked by the core loader.
 
-## Implementation pointers (planned)
+## Implementation pointers
 
-These are the seams the follow-up tickets will use; they do not exist yet.
+Shipped in P1 (GB-1038):
 
-- **Loader + registry + dispatcher** — a new `src/plugins/` folder (loader,
-  manifest zod schema, in-memory registry, content-type dispatch), mirroring
-  `~/Documents/hotsheet/src/plugins/` (`loader.ts`, `types.ts`).
-- **Diff-viewer integration** — the content-type branch in the file view
-  (`src/components/diffView.tsx` / `src/components/imageDiff.tsx` and the
+- **Loader + registry + dispatcher** — `src/plugins/` (`types.ts` contract,
+  `manifest.ts` zod schema, `loader.ts` discovery + fail-soft activation,
+  `registry.ts` matching + priority dispatch, `index.ts` the process-global
+  registry + `renderContent` / `diffContent` + startup `initContentPlugins`),
+  mirroring `~/Documents/hotsheet/src/plugins/`. The kill-switch is
+  `src/feature-flags.ts` (`PLUGINS_ENABLED`). Loaded at startup from
+  `src/server.ts`.
+- **Artifact integration** — `src/plugins/artifacts.ts` (`renderNoteArtifacts`)
+  offers each text/diagram-source review-note artifact to the dispatcher; a match
+  attaches inert `renderedSvg` / `renderedHtml` to the `ReviewNoteArtifact` view,
+  which `src/components/diffView.tsx` renders (SVG via an `<img>` data URI) in
+  place of the code block. Called from the `/file/:fileId` route
+  (`src/routes/pages.tsx`). Zero-plugin installs are a no-op (unchanged behavior).
+
+Planned by the follow-ups:
+
+- **Diff-viewer integration** (GB-1042) — the content-type branch in the file
+  view (`src/components/diffView.tsx` / `src/components/imageDiff.tsx` and the
   `/file/:fileId` path) consults the dispatcher before falling back to the
   built-in text/image views.
-- **Artifact integration** — the review-note artifact render path
-  (`src/review-notes/store.ts` `loadReviewNotesForFile` + `src/components/diffView.tsx`
-  `ReviewNoteRows`) consults the same dispatcher, replacing the diagram-source
-  code-block special-case with a plugin lookup + code-block fallback.
-- **Desktop** — `dist/plugins/<id>/` built by an esbuild step, copied into the
-  sidecar by `scripts/build-sidecar.sh`, auto-installed at startup from
+- **Desktop** (GB-1039) — `dist/plugins/<id>/` built by an esbuild step, copied
+  into the sidecar by `scripts/build-sidecar.sh`, auto-installed at startup from
   `global-config.ts`'s `~/.glassbox` dir.

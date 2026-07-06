@@ -46,6 +46,11 @@ export interface ReviewNoteArtifact {
   /** True for image artifacts (`.png`/`.webp`/`.avif`/`.gif`/`.jpg`/`.svg`) —
    *  rendered via `<img>` served from `GET /api/review-notes/artifact`. */
   isImage?: boolean;
+  /** Inert SVG produced by a content plugin for this artifact (doc 29): shown
+   *  via an `<img>` data URI in place of the code block. */
+  renderedSvg?: string;
+  /** Inert HTML produced by a content plugin for this artifact (doc 29). */
+  renderedHtml?: string;
 }
 
 /** Image artifact extensions rendered inline as `<img>` (docs/20 §20.5 P4c). */

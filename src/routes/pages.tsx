@@ -18,6 +18,7 @@ import { emptyFileDiff } from '../git/parseDiffData.js';
 import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-meta.js';
 import { groundTruthSideLabels, groundTruthStepNav } from '../ground-truth/presentation.js';
 import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
+import { renderNoteArtifacts } from '../plugins/artifacts.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
@@ -146,6 +147,10 @@ pageRoutes.get('/file/:fileId', async (c) => {
     ? demoReviewNotes(file.file_path)
     : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
   const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff);
+  // Offer each note's text/diagram-source artifact to installed content plugins;
+  // a match renders it (inert SVG/HTML) in place of the code block (doc 29). A
+  // no-op with no plugin installed, so the code-block fallback is unchanged.
+  await renderNoteArtifacts(reviewNotes);
 
   const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} stepNav={stepNav} />;
   return c.html(html.toString());
