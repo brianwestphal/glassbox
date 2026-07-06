@@ -923,11 +923,12 @@ artifacts (doc 20). The **P1 core shipped** (GB-1038): `src/plugins/` — the
 renderer/differ contract, zod manifest, symlink-aware discovery, fail-soft
 dynamic-`import()` activation, priority/specificity dispatcher, `PLUGINS_ENABLED`
 kill-switch, and the review-note **artifact** integration with code-block
-fallback, loaded at startup. Still open: the file-diff-viewer integration
+fallback, loaded at startup. The developer guide also shipped (GB-1041,
+`docs/plugin-development-guide.md`). Still open: the file-diff-viewer integration
 (GB-1042, the second integration point), desktop delivery (GB-1039), the
-management UI (GB-1040), the developer guide (GB-1041), and the diagram-source
-first reference plugin (GB-910). Implemented FR/NFR units carry real tests in
-`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
+management UI (GB-1040), and the diagram-source first reference plugin (GB-910).
+Implemented FR/NFR units carry real tests in `feature-coverage.json`; the rest
+stay `waived` until their follow-up lands.
 
 ## 19. Implementation-status snapshot
 

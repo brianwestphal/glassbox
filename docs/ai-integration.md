@@ -217,6 +217,16 @@ exported review file named in the event — `latest-review.md`, or an archive pa
 for a non-current review — and apply the feedback), then signal completion per the
 event. Setup, endpoints, and the health/registration model: [doc 17](17-claude-channel.md).
 
+## 6. Extend Glassbox with a content plugin
+
+Need Glassbox to *render* or *diff* a content type it doesn't handle natively — a
+diagram source, a notebook, a proprietary format? Ship a **content plugin**: an
+opt-in, installable renderer/differ that lives outside core. The contract (a
+manifest + an `activate(context) → { renderers?, differs? }` entry, returning inert
+SVG/HTML) and a copy-paste standalone `types.ts` are in the
+[plugin development guide](plugin-development-guide.md); the design and trust model
+are in [doc 29](29-content-plugins.md).
+
 ---
 
 ## A note on the two AI-doc audiences

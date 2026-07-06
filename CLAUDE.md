@@ -78,6 +78,7 @@ Both summaries are actively maintained. Update them in the same pass whenever yo
 - `AGENTS.md` (repo root) — one-screen router: contributors → `CLAUDE.md` + `docs/ai/`; integrators → `docs/ai-integration.md`. Keep its quick-reference table in sync with the integration surfaces.
 - `docs/ai-integration.md` — the integration hub: launch a review, write `glassbox note` review notes (`.pr-notes/`), export ground-truth proof, consume `.glassbox/latest-review.md`, MCP/Claude channel. Cross-links the deep docs (2/3/6/17/18/20/26). Update it when a launch mode, a `glassbox note` flag, the export path/format, or the channel contract changes.
 - `docs/proof-export-guidance.md` + `docs/skills/export-review-proof/SKILL.md` — proof-export convention + portable per-project agent skill (doc 26 P3c).
+- `docs/plugin-development-guide.md` — how a third party builds a Glassbox **content plugin** (renderer/differ) for doc 29: directory + manifest, the `activate(context) → { renderers?, differs? }` entry, the `ContentRenderer`/`ContentDiffer`/`PluginContext` shapes + a copy-paste standalone `types.ts`, the safe-output (inert SVG/HTML) contract, a diagram-plugin skeleton, and install/trust. Cross-linked from `docs/ai-integration.md` §6. Update it when the doc-29 contract changes.
 
 **When making changes, keep docs in sync:**
 

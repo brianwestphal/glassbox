@@ -5,10 +5,11 @@
 > under `~/.glassbox/plugins/`, fail-soft dynamic-`import()` activation, the
 > priority/specificity dispatcher, the feature-flag kill-switch, and the
 > review-note **artifact** integration with its code-block fallback — all in
-> `src/plugins/`, loaded at server startup. Still open: **desktop delivery**
-> (GB-1039), the **file-diff-viewer** integration (the second integration point,
-> GB-1042), the **management UI** (GB-1040), the **developer guide** (GB-1041),
-> and the first reference plugin, **diagram-source rendering** (GB-910). See
+> `src/plugins/`, loaded at server startup. The **developer guide** has also
+> shipped (GB-1041, `docs/plugin-development-guide.md`). Still open: **desktop
+> delivery** (GB-1039), the **file-diff-viewer** integration (the second
+> integration point, GB-1042), the **management UI** (GB-1040), and the first
+> reference plugin, **diagram-source rendering** (GB-910). See
 > [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
@@ -206,9 +207,9 @@ The build is decomposed into follow-up tickets:
 - **Management UI** (GB-1040) — a Settings **Plugins** tab: list installed
   plugins with status, per-project enable/disable (FR-29.16), install-from-disk /
   uninstall, and manifest-declared preferences (completing FR-29.12).
-- **Developer guide** (GB-1041) — `docs/plugin-development-guide.md` plus a
-  standalone, copy-paste `types.ts` so third parties can build plugins without
-  depending on the Glassbox package.
+- **Developer guide** (GB-1041, **shipped**) — `docs/plugin-development-guide.md`
+  plus a standalone, copy-paste `types.ts` so third parties can build plugins
+  without depending on the Glassbox package.
 - **First reference plugin** ([GB-910](20-ai-review-notes.md)) — diagram-source
   rendering, unblocked by the core loader.
 
