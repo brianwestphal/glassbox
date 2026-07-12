@@ -742,7 +742,13 @@
   padding-left: 19px;
 }
 .settings-checkbox-disabled { opacity: 0.5; }
-.plugin-install { margin-top: 16px; }
+.plugin-install {
+  margin-top: 16px;
+
+  // The shared .settings-key-row bottom-aligns (flex-end) for the API-key blocks;
+  // here the Install button should sit centered against the taller path input.
+  .settings-key-row { align-items: center; }
+}
 .settings-plugin-error {
   margin-top: 6px;
   font-size: 12px;
