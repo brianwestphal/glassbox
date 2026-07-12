@@ -1,0 +1,13 @@
+{
+  "name": "@glassbox/plugin-graphviz",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Glassbox content plugin: renders Graphviz .dot/.gv source to SVG (doc 29, GB-1044).",
+  "glassbox": {
+    "entry": "index.js"
+  },
+  "dependencies": {
+    "@viz-js/viz": "^3.28.0"
+  }
+}

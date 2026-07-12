@@ -1,0 +1,9 @@
+{
+  "id": "graphviz",
+  "name": "Graphviz Diagrams",
+  "version": "1.0.0",
+  "entry": "index.js",
+  "description": "Renders Graphviz .dot / .gv source to SVG server-side (via @viz-js/viz WASM, no DOM).",
+  "author": "Glassbox",
+  "contentTypes": [{ "extensions": [".dot", ".gv"] }]
+}

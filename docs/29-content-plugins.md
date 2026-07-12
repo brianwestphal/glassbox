@@ -8,10 +8,11 @@
 > `src/plugins/`, loaded at server startup. The **file-diff-viewer** integration
 > has also shipped (GB-1042, `src/plugins/fileView.ts`) — so **both** FR-29.2
 > integration points are wired — as has the **developer guide** (GB-1041,
-> `docs/plugin-development-guide.md`). Still open: **desktop delivery** (GB-1039),
-> the **management UI** (GB-1040), a committed fixture-plugin **e2e** (GB-1043),
-> and the first reference plugin, **diagram-source rendering** (GB-910). See
-> [§29.8](#298-status-and-follow-ups).
+> `docs/plugin-development-guide.md`). The **first reference plugin** has shipped
+> too — Graphviz `.dot`/`.gv` → SVG (`plugins/graphviz/`, GB-1044). Still open:
+> **desktop delivery** (GB-1039), the **management UI** (GB-1040), a committed
+> fixture-plugin **e2e** (GB-1043), and the other two diagram renderers, Mermaid
+> (GB-1045) and PlantUML (GB-1046). See [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -155,14 +156,17 @@ content `renderer` / `differ`. Everything else transfers.
 ## 29.7 First reference plugin
 
 - **FR-29.17 — Diagram-source rendering.** The first reference plugin shall be
-  diagram-source rendering (Mermaid / Graphviz / PlantUML — see
-  [GB-910](20-ai-review-notes.md) §20.11), registering a renderer for `.mmd` /
-  `.mermaid` / `.dot` / `.gv` / `.puml` that renders **server-side to SVG**, with
+  diagram-source rendering (Graphviz / Mermaid / PlantUML), registering a
+  renderer for the diagram extensions that renders **server-side to SVG**, with
   the existing code-block view as the fallback for an uninstalled plugin or an
   unsupported syntax. It proves the renderer contract end-to-end across both
   integration points (a diagram file in the diff viewer and a diagram-source
-  review-note artifact). It is **specified here but built as its own follow-up**
-  once the loader and contract exist; it is not part of the core loader work.
+  review-note artifact). Built per-renderer, simplest first: **Graphviz
+  (`.dot` / `.gv`) has shipped** as the first reference plugin
+  (`plugins/graphviz/`, GB-1044) — server-side via `@viz-js/viz` (WebAssembly
+  Graphviz, no DOM, no external process), which fits the server-side-SVG
+  contract most cleanly. **Mermaid** (`.mmd` / `.mermaid`, needs a DOM — GB-1045)
+  and **PlantUML** (`.puml`, needs Java — GB-1046) are the split siblings.
 
 ## Non-functional requirements
 
@@ -214,8 +218,11 @@ The build is decomposed into follow-up tickets:
 - **Developer guide** (GB-1041, **shipped**) — `docs/plugin-development-guide.md`
   plus a standalone, copy-paste `types.ts` so third parties can build plugins
   without depending on the Glassbox package.
-- **First reference plugin** ([GB-910](20-ai-review-notes.md)) — diagram-source
-  rendering, unblocked by the core loader.
+- **First reference plugin** (GB-1044, **shipped**) — the Graphviz `.dot`/`.gv`
+  plugin (`plugins/graphviz/`), server-side to SVG via `@viz-js/viz` (WASM). Built
+  by `scripts/build-plugins.mjs` (`npm run build:plugins`) into a self-contained
+  `plugins/graphviz/index.js`. Split siblings: Mermaid (GB-1045), PlantUML
+  (GB-1046).
 
 ## Implementation pointers
 

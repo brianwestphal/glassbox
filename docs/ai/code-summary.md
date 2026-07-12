@@ -234,6 +234,16 @@ integration points (artifacts + file diff viewer) are wired. **Not yet wired:**
 desktop bundled-plugin delivery (GB-1039), the Settings management UI (GB-1040),
 a committed fixture-plugin e2e (GB-1043).
 
+**First-party plugins** live at repo-root `plugins/<id>/` (source under `src/`,
+a `manifest.json`, a plugin-local `tsconfig.json`), built by
+`scripts/build-plugins.mjs` (`npm run build:plugins`) — esbuild bundles each
+`plugins/<id>/src/index.ts` into a self-contained `plugins/<id>/index.js` (its
+deps inlined; the built file is git-ignored). Shipped: `plugins/graphviz/`
+(GB-1044) — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz` (WASM, no DOM; a
+**devDependency** bundled into the plugin, never into core `dist/cli.js`).
+Install today by copying/symlinking a built plugin dir into `~/.glassbox/plugins/`;
+desktop bundling + auto-install is GB-1039.
+
 ### `src/utils/`
 
 | File | Purpose |

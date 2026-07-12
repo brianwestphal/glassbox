@@ -926,11 +926,13 @@ kill-switch, and the review-note **artifact** integration with code-block
 fallback, loaded at startup. **Both FR-29.2 integration points are now wired** —
 the file-diff-viewer path shipped too (GB-1042, `src/plugins/fileView.ts`:
 render/diff a whole file via a plugin, gated by a cheap path pre-check). The
-developer guide also shipped (GB-1041, `docs/plugin-development-guide.md`). Still
-open: desktop delivery (GB-1039), the management UI (GB-1040), a committed
-fixture-plugin e2e (GB-1043), and the diagram-source first reference plugin
-(GB-910). Implemented FR/NFR units carry real tests in `feature-coverage.json`;
-the rest stay `waived` until their follow-up lands.
+developer guide also shipped (GB-1041, `docs/plugin-development-guide.md`), as
+did the **first reference plugin** — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
+(WASM, no DOM; `plugins/graphviz/`, GB-1044). Still open: desktop delivery
+(GB-1039), the management UI (GB-1040), a committed fixture-plugin e2e (GB-1043),
+and the other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
+(GB-1046, needs Java). Implemented FR/NFR units carry real tests in
+`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 19. Implementation-status snapshot
 

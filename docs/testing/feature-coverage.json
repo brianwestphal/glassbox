@@ -1834,7 +1834,8 @@
       "waived": "Design-only (doc 29): per-project opt-in enablement is a spec only; no code yet. Tracked in GB-1040 (management UI). Flip to a test when enablement lands."
     },
     "FR-29.17": {
-      "waived": "Design-only (doc 29): the diagram-source reference plugin is spec'd here but built separately in GB-910, unblocked by the GB-1038 loader. Flip to a test when the plugin ships."
+      "tests": ["tests/unit/plugins/graphviz.test.ts"],
+      "note": "First reference plugin (GB-1044): the Graphviz .dot/.gv plugin renders server-side to inert SVG via @viz-js/viz (WASM, no DOM); empty/invalid source -> empty view -> code-block fallback. Mermaid (GB-1045) + PlantUML (GB-1046) are the split siblings, still waived."
     },
     "NFR-29.1": {
       "waived": "Design-only (doc 29): lean-core / offline / no-CDN is a design-justification NFR; core has no format-specific renderer dep to assert against yet. The conventions test already pins the external-dep allow-list. Revisit when plugins land."

@@ -173,8 +173,11 @@ export interface ContentPlugin {
 
 ## 6. Worked skeleton — a diagram-source renderer
 
-The first reference plugin ([GB-910](20-ai-review-notes.md)) renders diagram
-*source* (Mermaid / Graphviz / PlantUML) to SVG. Sketch:
+The first reference plugin — **Graphviz** — ships in-repo at `plugins/graphviz/`
+(source `plugins/graphviz/src/index.ts`), rendering `.dot`/`.gv` to SVG
+server-side via `@viz-js/viz` (WebAssembly Graphviz, no DOM). Build it with
+`npm run build:plugins`. It's the concrete example of everything above; the
+sketch below is the shape:
 
 ```ts
 import type { ContentPlugin } from './types.js';

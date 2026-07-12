@@ -31,6 +31,7 @@
   "scripts": {
     "dev": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts",
     "build": "tsup",
+    "build:plugins": "node scripts/build-plugins.mjs",
     "build:client": "node -e \"require('fs').mkdirSync('dist/client',{recursive:true})\" && npx esbuild src/client/app.tsx --bundle --format=iife --outfile=dist/client/app.global.js --target=es2020 --sourcemap --jsx=automatic --jsx-import-source=kerfjs && npx esbuild src/client/history.tsx --bundle --format=iife --outfile=dist/client/history.global.js --target=es2020 --minify --sourcemap --jsx=automatic --jsx-import-source=kerfjs && npx sass src/client/styles.scss dist/client/styles.css --style compressed --no-source-map && node -e \"require('fs').copyFileSync('assets/favicon.svg','dist/client/favicon.svg')\"",
     "dev:server": "npm run build:client && tsx --tsconfig tsconfig.json src/cli.ts --no-open --strict-port",
     "tauri": "tauri",
@@ -86,6 +87,7 @@
     "@types/node": "^25.9.3",
     "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.9",
+    "@viz-js/viz": "^3.28.0",
     "c8": "^11.0.0",
     "domotion-svg": "0.21.1",
     "esbuild": "^0.28.1",
