@@ -9,8 +9,10 @@
 > has also shipped (GB-1042, `src/plugins/fileView.ts`) — so **both** FR-29.2
 > integration points are wired — as has the **developer guide** (GB-1041,
 > `docs/plugin-development-guide.md`). The **first reference plugin** has shipped
-> too — Graphviz `.dot`/`.gv` → SVG (`plugins/graphviz/`, GB-1044). Still open:
-> **desktop delivery** (GB-1039), the **management UI** (GB-1040), a committed
+> too — Graphviz `.dot`/`.gv` → SVG (`plugins/graphviz/`, GB-1044), and **desktop
+> delivery** (GB-1039) — bundled plugins build to `dist/plugins/`, ship in the
+> sidecar, and auto-install into `~/.glassbox/plugins/` at startup (freshness +
+> dismiss-list). Still open: the **management UI** (GB-1040), a committed
 > fixture-plugin **e2e** (GB-1043), and the other two diagram renderers, Mermaid
 > (GB-1045) and PlantUML (GB-1046). See [§29.8](#298-status-and-follow-ups).
 
@@ -209,9 +211,13 @@ The build is decomposed into follow-up tickets:
   else per-side render for a renderer-only plugin), gated by a cheap path
   pre-check so nothing is read without an installed handler. Completes FR-29.2.
   Scope: text content types; binary content types (raw bytes) are a follow-up.
-- **Desktop delivery** (GB-1039) — the esbuild plugin build path, the
-  `build-sidecar.sh` copy, bundled-plugin auto-install (version + content-hash
-  freshness + dismiss-list), and install-from-disk. Realizes FR-29.5 / FR-29.7.
+- **Desktop delivery** (GB-1039, **shipped**) — `scripts/build-plugins.mjs`
+  builds each plugin to `dist/plugins/<id>/`; `build-sidecar.sh` copies that into
+  the sidecar (`server/plugins`); `src/plugins/install.ts` (`installBundledPlugins`)
+  seeds `~/.glassbox/plugins/` at startup with a version + content-hash freshness
+  check and a dismiss-list, plus `installPluginFromDisk` (symlink) / `uninstallPlugin`
+  mechanisms for the management UI. Realizes FR-29.5 / FR-29.7. (The Tauri
+  folder-picker UI that drives install-from-disk is GB-1040.)
 - **Management UI** (GB-1040) — a Settings **Plugins** tab: list installed
   plugins with status, per-project enable/disable (FR-29.16), install-from-disk /
   uninstall, and manifest-declared preferences (completing FR-29.12).
@@ -248,8 +254,16 @@ Shipped in P1 (GB-1038):
   Also called from the `/file/:fileId` route, behind the `mightHandleFile` path
   pre-check (no content read without an installed handler).
 
+- **Desktop delivery** — `scripts/build-plugins.mjs` (`npm run build:plugins`)
+  esbuilds each plugin to `dist/plugins/<id>/`; `scripts/build-sidecar.sh` copies
+  it into the sidecar (`server/plugins`); `src/plugins/install.ts`
+  (`installBundledPlugins`, run from `initContentPlugins` before discovery) seeds
+  `~/.glassbox/plugins/` with a version + content-hash freshness check +
+  `dismissed-plugins.json`; `installPluginFromDisk` / `uninstallPlugin` back the
+  management UI.
+
 Planned by the follow-ups:
 
-- **Desktop** (GB-1039) — `dist/plugins/<id>/` built by an esbuild step, copied
-  into the sidecar by `scripts/build-sidecar.sh`, auto-installed at startup from
-  `global-config.ts`'s `~/.glassbox` dir.
+- **Management UI / from-disk picker** (GB-1040) — the Tauri folder picker + the
+  API that calls `installPluginFromDisk` / `uninstallPlugin`, and the Settings tab
+  listing loaded plugins.

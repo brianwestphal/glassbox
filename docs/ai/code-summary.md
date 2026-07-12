@@ -228,21 +228,24 @@ install = the trust boundary; no sandbox). Gated by `PLUGINS_ENABLED`
 | `index.ts` | Public API + process-global registry: `initContentPlugins()` (startup load, idempotent, fail-soft), `renderContent` / `diffContent` (return `null` on disabled/no-match/throw → caller falls back), `getLoadedPlugins`, `pluginsEnabled`, and `__setContentRegistryForTest` / `__resetContentPluginsForTest` seams. |
 | `artifacts.ts` | `renderNoteArtifacts(views)` — the review-note artifact integration (doc 20 §20.5): offers each text/diagram-source artifact to the dispatcher; a match attaches inert `renderedSvg` / `renderedHtml` to the `ReviewNoteArtifact`, shown by `diffView.tsx` (SVG via an `<img>` data URI) in place of the code block. Called from the `/file/:fileId` route. |
 | `fileView.ts` | `renderFileWithPlugins(mode, diff, cwd)` — the **file-diff-viewer** integration (doc 29 FR-29.2, GB-1042): renders/diffs a whole file via a plugin (`renderContent` for an added/deleted side, `diffContent` for a modified file, else per-side render for a renderer-only plugin → a `PluginFileView` `single`/`pair`). Gated by the cheap `mightHandleFile` path pre-check so no content is read without an installed handler; binary files skipped (text scope). `DiffView` renders it (`PluginFileBody`) in place of the text diff. Called from the `/file/:fileId` route. |
+| `install.ts` | **Desktop delivery** (doc 29 FR-29.7, GB-1039): `installBundledPlugins()` (run from `initContentPlugins` before discovery) seeds `~/.glassbox/plugins/` from the bundled plugins (`bundledPluginsDir()` → `server/plugins` in prod, `dist/plugins` in dev) with a version + content-hash freshness check (`compareVersions` / `hashPluginDir` / `shouldInstall`) and a `dismissed-plugins.json` dismiss-list so uninstalls stick. `installPluginFromDisk` (symlink + un-dismiss) / `uninstallPlugin` (remove + dismiss) back the management UI (GB-1040). Fail-soft. |
 
-Startup: `initContentPlugins()` runs in `server.ts`'s `startServer`. Both FR-29.2
-integration points (artifacts + file diff viewer) are wired. **Not yet wired:**
-desktop bundled-plugin delivery (GB-1039), the Settings management UI (GB-1040),
-a committed fixture-plugin e2e (GB-1043).
+Startup: `initContentPlugins()` runs in `server.ts`'s `startServer` — it calls
+`installBundledPlugins()` (seed) then `loadAllPlugins()` (discover + load). Both
+FR-29.2 integration points (artifacts + file diff viewer) and desktop delivery
+(GB-1039) are wired. **Not yet wired:** the Settings management UI (GB-1040), a
+committed fixture-plugin e2e (GB-1043).
 
 **First-party plugins** live at repo-root `plugins/<id>/` (source under `src/`,
 a `manifest.json`, a plugin-local `tsconfig.json`), built by
 `scripts/build-plugins.mjs` (`npm run build:plugins`) — esbuild bundles each
-`plugins/<id>/src/index.ts` into a self-contained `plugins/<id>/index.js` (its
-deps inlined; the built file is git-ignored). Shipped: `plugins/graphviz/`
-(GB-1044) — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz` (WASM, no DOM; a
-**devDependency** bundled into the plugin, never into core `dist/cli.js`).
-Install today by copying/symlinking a built plugin dir into `~/.glassbox/plugins/`;
-desktop bundling + auto-install is GB-1039.
+`plugins/<id>/src/index.ts` into a self-contained `dist/plugins/<id>/index.js`
+(+ `manifest.json`; deps inlined). `scripts/build-sidecar.sh` copies `dist/plugins`
+into the sidecar (`server/plugins`), from which `installBundledPlugins` auto-installs
+them into `~/.glassbox/plugins/` at startup (freshness + dismiss-list). Shipped:
+`plugins/graphviz/` (GB-1044) — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
+(WASM, no DOM; a **devDependency** bundled into the plugin, never into core
+`dist/cli.js`).
 
 ### `src/utils/`
 

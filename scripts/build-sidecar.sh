@@ -40,6 +40,12 @@ echo "Building sidecar for $TARGET..."
 # --- Step 1: Build the TypeScript server bundle ---
 npm run build
 
+# Build first-party content plugins (doc 29, GB-1039) into dist/plugins/<id>/.
+# Self-contained esbuild bundles (deps inlined), copied into the sidecar below so
+# they can be auto-installed into ~/.glassbox/plugins/ at startup. Runs AFTER the
+# tsup build (which cleans dist/) so dist/plugins survives.
+npm run build:plugins
+
 # --- Step 2: Download Node.js binary for the target platform ---
 mkdir -p src-tauri/binaries
 
@@ -111,6 +117,14 @@ cp dist/client/app.global.js "$SERVER_DIR/client/"
 cp dist/client/history.global.js "$SERVER_DIR/client/"
 cp dist/client/styles.css "$SERVER_DIR/client/"
 cp dist/client/favicon.svg "$SERVER_DIR/client/"
+
+# Bundled first-party content plugins (doc 29, GB-1039). Copied next to cli.js so
+# `bundledPluginsDir()` resolves them (server/plugins) and `installBundledPlugins`
+# seeds ~/.glassbox/plugins/ at startup. Optional: absent if no plugins built.
+if [ -d dist/plugins ]; then
+  cp -R dist/plugins "$SERVER_DIR/plugins"
+  echo "Bundled content plugins: $(ls dist/plugins | tr '\n' ' ')"
+fi
 
 # Copy only the external runtime dependencies (those kept external by tsup's
 # noExternal regex). Must stay in sync with that regex and CLAUDE.md's

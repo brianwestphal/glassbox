@@ -9,6 +9,7 @@
  * installed (the default), dispatch is a cheap no-op (NFR-29.3).
  */
 import { PLUGINS_ENABLED } from '../feature-flags.js';
+import { installBundledPlugins } from './install.js';
 import { loadAllPlugins,type LoadedPlugin } from './loader.js';
 import { ContentPluginRegistry } from './registry.js';
 import type { DiffInput, RenderedView, RenderInput } from './types.js';
@@ -32,6 +33,9 @@ export async function initContentPlugins(): Promise<void> {
   initialized = true;
   if (!PLUGINS_ENABLED) return;
   try {
+    // Seed ~/.glassbox/plugins/ from bundled first-party plugins (desktop
+    // delivery, GB-1039) before discovery. Fail-soft: never throws.
+    installBundledPlugins();
     const res = await loadAllPlugins();
     registry = res.registry;
     loadedPlugins = res.loaded;

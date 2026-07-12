@@ -1781,7 +1781,7 @@
       "note": "Zod manifest validation (the trust boundary): minimal valid, loose extra keys, contentTypes, null on invalid; manifest.json + package.json#glassbox fallback."
     },
     "FR-29.5": {
-      "waived": "Design-only (doc 29): self-contained esbuild-bundled plugin loading is a spec only; no code yet. Tracked in GB-1038/GB-1039. Flip to a test when the load path exists."
+      "waived": "Self-contained esbuild-bundled plugin loading is a build+integration property (a single ESM bundle with deps inlined loads via import(file://) against the frozen sidecar). The unit layer proves the dynamic-import/activate path (loader.test.ts) and a real plugin's source (graphviz.test.ts); the end-to-end 'built bundle auto-installs + loads + renders' is verified live (GB-1044/GB-1039) and gets a committed e2e in GB-1043."
     },
     "FR-29.6": {
       "tests": ["tests/unit/plugins/loader.test.ts"],
@@ -1798,7 +1798,18 @@
       "note": "Fail-soft activation: a bad plugin records an error and is skipped, never crashing startup or disabling others."
     },
     "FR-29.7": {
-      "waived": "Design-only (doc 29): desktop delivery (bundled auto-install + freshness + dismiss-list + install-from-disk) is a spec only; no code yet. Tracked in GB-1039. Flip to tests when the delivery path lands."
+      "tests": ["tests/unit/plugins/install.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "bundled + user-dir empty -> installed",
+        "bundled newer than installed -> upgraded",
+        "installed newer than bundled -> left alone",
+        "same version, byte-different rebuild -> reinstalled",
+        "same version, identical -> skipped",
+        "uninstall -> removed + dismissed -> auto-install skips it",
+        "install-from-disk of a dismissed id -> symlinked + un-dismissed"
+      ],
+      "note": "Desktop delivery (GB-1039): installBundledPlugins freshness (version + content-hash), dismiss-list persistence, install-from-disk symlink + un-dismiss. Verified live: build:plugins -> dist/plugins -> auto-install into a fresh config dir -> loaded + rendered."
     },
     "FR-29.8": {
       "tests": ["tests/unit/plugins/registry.test.ts"],

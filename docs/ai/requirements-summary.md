@@ -928,11 +928,14 @@ the file-diff-viewer path shipped too (GB-1042, `src/plugins/fileView.ts`:
 render/diff a whole file via a plugin, gated by a cheap path pre-check). The
 developer guide also shipped (GB-1041, `docs/plugin-development-guide.md`), as
 did the **first reference plugin** — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
-(WASM, no DOM; `plugins/graphviz/`, GB-1044). Still open: desktop delivery
-(GB-1039), the management UI (GB-1040), a committed fixture-plugin e2e (GB-1043),
-and the other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
-(GB-1046, needs Java). Implemented FR/NFR units carry real tests in
-`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
+(WASM, no DOM; `plugins/graphviz/`, GB-1044) — and **desktop delivery** (GB-1039):
+plugins build to `dist/plugins/`, ship in the sidecar, and auto-install into
+`~/.glassbox/plugins/` at startup with a version + content-hash freshness check +
+dismiss-list (`src/plugins/install.ts`). Still open: the management UI (GB-1040),
+a committed fixture-plugin e2e (GB-1043), and the other two diagram renderers —
+Mermaid (GB-1045, needs a DOM) and PlantUML (GB-1046, needs Java). Implemented
+FR/NFR units carry real tests in `feature-coverage.json`; the rest stay `waived`
+until their follow-up lands.
 
 ## 19. Implementation-status snapshot
 
