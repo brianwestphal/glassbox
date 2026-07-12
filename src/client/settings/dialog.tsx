@@ -30,12 +30,13 @@ import { switchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
+import { doInstallPlugin, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, togglePluginDisabled } from './pluginsTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
 import type { ChannelState, ConfigResponse, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
 import { updatesTab } from './updatesTab.js';
 
-const TABS: Tab[] = [generalTab, profileTab, experimentalTab, updatesTab];
+const TABS: Tab[] = [generalTab, profileTab, experimentalTab, pluginsTab, updatesTab];
 
 interface SettingsUIState {
   activeTab: string;
@@ -56,6 +57,7 @@ interface SettingsUIState {
 }
 
 export function showSettingsDialog(onClose?: () => void): void {
+  resetPluginsTab(); // fresh plugin list per dialog session (doc 29, GB-1040)
   void (async () => {
     const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus] = await Promise.all([
       getAIKeyStatus(),
@@ -490,7 +492,27 @@ function setupDelegates(args: {
   void delegate(overlay, 'click', '#settings-close', closeDialog);
   void delegate(overlay, 'click', '[data-tab]', (_e, btn) => {
     const t = asEl(btn).dataset.tab;
-    if (t !== undefined) setUi({ activeTab: t });
+    if (t === undefined) return;
+    setUi({ activeTab: t });
+    if (t === 'plugins') loadPluginsList();
+  });
+
+  // Plugins tab (doc 29, GB-1040)
+  void delegate(overlay, 'change', '[data-plugin-toggle]', (_e, el) => {
+    const cb = asInput(el);
+    const scope = asEl(el).dataset.pluginToggle;
+    const id = asEl(el).dataset.pluginId;
+    if ((scope === 'global' || scope === 'project') && id !== undefined) {
+      togglePluginDisabled(id, scope, !cb.checked); // unchecked = disabled
+    }
+  });
+  void delegate(overlay, 'click', '[data-plugin-uninstall]', (_e, el) => {
+    const id = asEl(el).dataset.pluginUninstall;
+    if (id !== undefined) doUninstallPlugin(id);
+  });
+  void delegate(overlay, 'click', '#plugin-install-btn', () => {
+    const input = overlay.querySelector('#plugin-install-path');
+    if (input !== null) doInstallPlugin(asInput(input).value);
   });
 
   // General tab

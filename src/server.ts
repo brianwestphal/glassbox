@@ -116,9 +116,9 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   const url = `http://localhost:${actualPort}`;
   console.log(`\n  Glassbox running at ${url}\n`);
 
-  // Discover + load installed content plugins (doc 29). Fail-soft: never throws,
-  // never blocks startup on a broken plugin.
-  await initContentPlugins();
+  // Discover + load installed content plugins (doc 29), honoring per-project +
+  // global enablement. Fail-soft: never throws, never blocks startup.
+  await initContentPlugins(repoRoot);
 
   // Ensure .mcp.json is registered for this project if channel is enabled
   try {

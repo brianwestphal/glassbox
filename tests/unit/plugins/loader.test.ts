@@ -139,3 +139,33 @@ describe('fail-soft activation (doc 29 FR-29.6)', () => {
     expect(registry.rendererCount).toBe(1);
   });
 });
+
+describe('enablement gating (doc 29 FR-29.16)', () => {
+  it('a disabled plugin is recorded but not activated/registered', async () => {
+    const dir = makePlugin('gv', { manifest: { id: 'gv', name: 'GV', version: '1' }, entry: RENDERER_ENTRY });
+    const reg = new ContentPluginRegistry();
+    const res = await loadPluginDir(dir, reg, () => ({ disabled: true, scope: 'project' }));
+    expect(res.status).toBe('disabled');
+    expect(res.disabledScope).toBe('project');
+    expect(reg.rendererCount).toBe(0); // not registered
+  });
+
+  it('an enabled plugin still loads + registers', async () => {
+    const dir = makePlugin('gv', { manifest: { id: 'gv', name: 'GV', version: '1' }, entry: RENDERER_ENTRY });
+    const reg = new ContentPluginRegistry();
+    const res = await loadPluginDir(dir, reg, () => ({ disabled: false }));
+    expect(res.status).toBe('loaded');
+    expect(reg.rendererCount).toBe(1);
+  });
+
+  it('loadAllPlugins applies the enablement check per plugin', async () => {
+    makePlugin('on', { manifest: { id: 'on', name: 'On', version: '1' }, entry: RENDERER_ENTRY });
+    makePlugin('off', { manifest: { id: 'off', name: 'Off', version: '1' }, entry: RENDERER_ENTRY });
+    const { registry, loaded } = await loadAllPlugins(root, (id) =>
+      id === 'off' ? { disabled: true, scope: 'global' } : { disabled: false },
+    );
+    expect(loaded.find((p) => p.id === 'off')?.status).toBe('disabled');
+    expect(loaded.find((p) => p.id === 'on')?.status).toBe('loaded');
+    expect(registry.rendererCount).toBe(1); // only 'on' registered
+  });
+});

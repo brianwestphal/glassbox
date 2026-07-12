@@ -697,3 +697,54 @@
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
+// Content-plugin management tab (doc 29, GB-1040).
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.plugin-row {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+.plugin-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.plugin-row-text { flex: 1; min-width: 0; }
+.plugin-row-title { font-weight: 600; }
+.plugin-version { font-weight: 400; color: var(--text-secondary); font-size: 12px; }
+.plugin-row-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.plugin-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  &.ok { background: var(--success, #3fb950); }
+  &.error { background: var(--danger, #f85149); }
+  &.disabled { background: var(--text-secondary); opacity: 0.5; }
+}
+.plugin-row-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 10px;
+  padding-left: 19px;
+}
+.settings-checkbox-disabled { opacity: 0.5; }
+.plugin-install { margin-top: 16px; }
+.settings-plugin-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger, #f85149);
+}

@@ -7,6 +7,9 @@ import { apiCall } from './_runner.js';
 
 export const ProjectSettingsSchema = z.object({
   appName: z.string().optional(),
+  /** Content-plugin ids disabled for THIS project (doc 29 FR-29.16). A plugin is
+   *  enabled unless it appears here or in the global disabled list. */
+  disabledPlugins: z.array(z.string()).optional(),
 });
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 

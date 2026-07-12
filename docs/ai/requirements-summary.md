@@ -931,11 +931,15 @@ did the **first reference plugin** — Graphviz `.dot`/`.gv` → SVG via `@viz-j
 (WASM, no DOM; `plugins/graphviz/`, GB-1044) — and **desktop delivery** (GB-1039):
 plugins build to `dist/plugins/`, ship in the sidecar, and auto-install into
 `~/.glassbox/plugins/` at startup with a version + content-hash freshness check +
-dismiss-list (`src/plugins/install.ts`). Still open: the management UI (GB-1040),
-a committed fixture-plugin e2e (GB-1043), and the other two diagram renderers —
-Mermaid (GB-1045, needs a DOM) and PlantUML (GB-1046, needs Java). Implemented
-FR/NFR units carry real tests in `feature-coverage.json`; the rest stay `waived`
-until their follow-up lands.
+dismiss-list (`src/plugins/install.ts`) — and the **management UI** (GB-1040): a
+Settings **Plugins** tab that lists installed plugins with status and offers
+per-plugin **global** + **per-project** disable toggles (enabled by default,
+global precedence — `src/plugins/enablement.ts`), install-from-a-folder, and
+uninstall over `/api/plugins`. Still open: a committed fixture-plugin e2e
+(GB-1043), manifest-preferences + native folder picker (GB-1047/1048), and the
+other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
+(GB-1046, needs Java). Implemented FR/NFR units carry real tests in
+`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 19. Implementation-status snapshot
 

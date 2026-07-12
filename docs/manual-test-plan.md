@@ -41,6 +41,27 @@ Automated Coverage Summary below.
   work on the shown side. *(Same shared zoom code as above; this item is the
   focus-view wiring.)*
 
+## Content plugins — management tab (doc 29, GB-1040)
+
+The enablement model + API are unit-tested (`plugins/enablement.test.ts`,
+`plugins/loader.test.ts`) and verified live; a committed e2e that drives the tab
+with a real installed plugin is gated on the fixture-plugin harness (GB-1043).
+Until then, the tab's UI wiring is manual:
+
+- **Plugins tab lists installed plugins** — Open Settings → Plugins with a plugin
+  installed (e.g. the bundled Graphviz). The list shows its name, version,
+  handled extensions, and a status dot (green = active, gray = disabled, red =
+  failed load with the error).
+- **Per-project + global disable toggles** — Unchecking "Enabled (this project)"
+  disables the plugin for the current repo (its diagrams stop rendering, falling
+  back to the code block / text diff); re-checking restores it. Unchecking
+  "Enabled (all projects)" disables it everywhere and greys out the per-project
+  toggle (global precedence).
+- **Install-from-a-folder / uninstall** — Typing a plugin folder path + Install
+  adds it to the list; Uninstall removes it (and a bundled plugin stays gone via
+  the dismiss-list). *(The install-path field is the current UI; a native folder
+  picker is GB-1048.)*
+
 ## Automated Coverage Summary
 
 - _(none yet — items move here as they gain automated coverage)_

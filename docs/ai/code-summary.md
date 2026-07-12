@@ -60,6 +60,7 @@ glassbox/
 | `lock.ts` | PID-based instance lock (`~/.glassbox/glassbox.lock`). Detects and clears stale locks. |
 | `debug.ts` | Debug mode flags (e.g., `--debug`, `--ai-service-test`). |
 | `feature-flags.ts` | Build/kill-switch flags (doc 29 NFR-29.4). `PLUGINS_ENABLED` gates the content-plugin subsystem; `GLASSBOX_PLUGINS_DISABLED=1` forces it off at runtime (used by e2e for hermeticity). |
+| `project-settings-store.ts` | Shared server-side read-modify-write for `.glassbox/settings.json` (`readProjectSettings` / `updateProjectSettings(repoRoot, mutator)`) — the SSOT so the project-settings route (`appName`) and plugin enablement (`disabledPlugins`) don't clobber each other. Mirrors `global-config.ts` for per-repo state. |
 | `demo.ts` | Pre-configured demo scenarios (invoked via `--demo:N`). Bypasses git + locking. The ~400 lines of canned fixture data (`DEMO_FILES`, `RISK_SCORES`, `NARRATIVE_ORDER`, `GUIDED_NOTES`, `ANNOTATIONS`) live in `demo/fixtures.ts`; this file is the setup engine. Includes one binary **image diff** (`src-tauri/icons/128x128.png`, modeled as a rename from `64x64.png`) so the image comparison modes — and the GB-823 slice-tool e2e — have real coverage; demo mode resolves to "uncommitted", so the image bytes are served from git HEAD / the working tree. |
 | `demo/fixtures.ts` | Static fixture data for the demo scenarios — canned file diffs, risk/narrative scores, guided notes, annotations (split out of `demo.ts`). |
 | `update-check.ts` | Daily npm update check against the registry (npm/yarn/pnpm/bun detection). |
@@ -77,7 +78,8 @@ glassbox/
 | `files.ts` | `/files` list / detail / status / reveal / path / open-in-editor. |
 | `outline.ts` | `/outline/:fileId` + `/symbol-definition` (go-to-definition). |
 | `image.ts` | `/image/:fileId/metadata` typed; per-side binary uses an `imageUrl()` URL builder (not a fetch). |
-| `project-settings.ts` | `.glassbox/settings.json` get/update. |
+| `project-settings.ts` | `.glassbox/settings.json` get/update (`appName`, plugin `disabledPlugins`). |
+| `plugins.ts` | Content-plugin management (doc 29, GB-1040): `listPlugins` / `setPluginDisabled` (scope global\|project) / `installPlugin` / `uninstallPlugin`; `PluginInfo` shape. |
 | `reviews.ts` | Review CRUD, complete/reopen/refresh, delete-completed/all. |
 | `share-prompt.ts` | Share-prompt state / dismiss / tick. |
 | `system.ts` | `/open-external` — open an http(s) URL in the OS default browser (used by the client under Tauri, where `target="_blank"` can't). |
@@ -106,7 +108,8 @@ How the layer is used:
 | `api/attachments.ts` | Reviewer file attachments on any annotation (doc 25): `POST/GET /annotations/:id/attachments`, `GET /attachments/all`, `GET /attachments/:id/raw`, `POST /attachments/:id/quicklook`, `DELETE /attachments/:id`. Upload is multipart; preview shells out to OS Quick Look via `openOS(... ,'quicklook')`. |
 | `api/outline.ts` | `/outline/:fileId` and `/symbol-definition` go-to-definition repo scan. |
 | `api/context.ts` | `/context/:fileId` line-range fetch for hunk expansion. |
-| `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`). |
+| `api/project-settings.ts` | `.glassbox/settings.json` read/write (per-repo `appName`), via the shared `project-settings-store.ts`. |
+| `api/plugins.ts` | Content-plugin management (doc 29, GB-1040): `GET /plugins` (list + state), `POST /plugins/:id/disabled` (global\|project toggle), `POST /plugins/install` (from a path), `DELETE /plugins/:id`. Each mutation reloads the subsystem and returns the refreshed list. |
 | `api/image.ts` | Image diff: `/image/:fileId/metadata` and `/image/:fileId/:side`; SVGs served as raw `image/svg+xml` for live `<img>` render. `resolveImageSide()` reads from git refs / disk, then falls back to the persisted blob store (`src/git/image-blobs.ts`) — used outright for a difftool review (doc 19, no git/working tree, GB-863) and as a fallback for demo SVGs seeded into the DB with no on-disk file (GB-947). For ground-truth reviews (doc 26) the disk reads resolve to the manifest's expected (old) / actual (new) paths via `getOldImage`/`getNewImage`. |
 | `api/share-prompt.ts` | Share prompt state / dismiss / tick (uses `global-config.ts`). |
 | `api/system.ts` | `POST /open-external` — opens a validated http(s) URL via `openOS` (same OS-open path as file reveal). |
@@ -229,12 +232,15 @@ install = the trust boundary; no sandbox). Gated by `PLUGINS_ENABLED`
 | `artifacts.ts` | `renderNoteArtifacts(views)` — the review-note artifact integration (doc 20 §20.5): offers each text/diagram-source artifact to the dispatcher; a match attaches inert `renderedSvg` / `renderedHtml` to the `ReviewNoteArtifact`, shown by `diffView.tsx` (SVG via an `<img>` data URI) in place of the code block. Called from the `/file/:fileId` route. |
 | `fileView.ts` | `renderFileWithPlugins(mode, diff, cwd)` — the **file-diff-viewer** integration (doc 29 FR-29.2, GB-1042): renders/diffs a whole file via a plugin (`renderContent` for an added/deleted side, `diffContent` for a modified file, else per-side render for a renderer-only plugin → a `PluginFileView` `single`/`pair`). Gated by the cheap `mightHandleFile` path pre-check so no content is read without an installed handler; binary files skipped (text scope). `DiffView` renders it (`PluginFileBody`) in place of the text diff. Called from the `/file/:fileId` route. |
 | `install.ts` | **Desktop delivery** (doc 29 FR-29.7, GB-1039): `installBundledPlugins()` (run from `initContentPlugins` before discovery) seeds `~/.glassbox/plugins/` from the bundled plugins (`bundledPluginsDir()` → `server/plugins` in prod, `dist/plugins` in dev) with a version + content-hash freshness check (`compareVersions` / `hashPluginDir` / `shouldInstall`) and a `dismissed-plugins.json` dismiss-list so uninstalls stick. `installPluginFromDisk` (symlink + un-dismiss) / `uninstallPlugin` (remove + dismiss) back the management UI (GB-1040). Fail-soft. |
+| `enablement.ts` | **Per-project + global enablement** (doc 29 FR-29.16, GB-1040): an installed plugin is enabled by default; two independent disable lists — **global** (`~/.glassbox/config.json` `disabledPlugins`) and **per-project** (`.glassbox/settings.json` `disabledPlugins`, via `../project-settings-store.ts`). `isPluginEnabled` / `disabledScope` (global wins) + read/set for both scopes. The loader (`loadPluginDir`) gates on the resulting `EnablementCheck` — a disabled plugin gets `status: 'disabled'` and is not activated/registered. `index.ts` `reloadContentPlugins(repoRoot)` re-applies after a toggle; `describeInstalledPlugins` reports state to the UI. |
 
-Startup: `initContentPlugins()` runs in `server.ts`'s `startServer` — it calls
-`installBundledPlugins()` (seed) then `loadAllPlugins()` (discover + load). Both
-FR-29.2 integration points (artifacts + file diff viewer) and desktop delivery
-(GB-1039) are wired. **Not yet wired:** the Settings management UI (GB-1040), a
-committed fixture-plugin e2e (GB-1043).
+Startup: `initContentPlugins(repoRoot)` runs in `server.ts`'s `startServer` — it
+calls `installBundledPlugins()` (seed) then `loadAllPlugins(…, enablementCheck)`
+(discover + load, honoring per-project + global enablement). Both FR-29.2
+integration points (artifacts + file diff viewer), desktop delivery (GB-1039),
+and the Settings **Plugins** management tab + `/api/plugins` (GB-1040) are wired.
+**Not yet wired:** a committed fixture-plugin e2e (GB-1043), manifest preferences
+(GB-1047), the native folder picker (GB-1048).
 
 **First-party plugins** live at repo-root `plugins/<id>/` (source under `src/`,
 a `manifest.json`, a plugin-local `tsconfig.json`), built by
@@ -294,7 +300,7 @@ them into `~/.glassbox/plugins/` at startup (freshness + dismiss-list). Shipped:
 | `annotations/` | `events.tsx`, `form.tsx`, `render.tsx`, `reclassifyPopup.tsx`, `categories.tsx`, `attachments.tsx` | `attachments.tsx` is the reviewer file-attachment UI (chips / upload / drag-drop / paste / preview, doc 25). `bindAnnotationEvents(diffContainer)` + `bindCreateFormEvents(diffContainer)` register `delegate()` handlers for every annotation interaction (delete / edit / dblclick-to-edit / reclassify / keep / dragstart / textarea input / Ctrl+Enter save / Escape cancel). Server-rendered annotation rows carry `data-key={id}`; mid-edit form state lives in `editFormSignal` and picker open state in `categoryPickerSignal` (both in `stores/index.ts`) so a sibling update doesn't clobber an open form. The popup itself is a transient `document.body` overlay with a single `document.addEventListener` for outside-click dismiss (popups outside any `mount()` tree use direct listeners; inside a mount tree we'd use `delegate()` to survive re-renders). |
 | `review/` | `modal.tsx`, `progress.tsx` | Completion modal (with optional "Send to Claude" when channel is on), progress bar. |
 | `difftool/` | `session.tsx` | The accumulating-session client UI for a `git difftool` per-file review (doc 19) — renders the live, growing file list as files arrive over the append/poll API. |
-| `settings/` | `dialog.tsx`, `tabContext.ts`, `generalTab.tsx`, `profileTab.tsx`, `experimentalTab.tsx`, `updatesTab.tsx`, `themeEditor.tsx`, `themeManager.tsx` | Tabbed settings modal. Each tab is a `Tab` registry entry (`{ id, label, icon, enabled?, render, bind }`) sharing a single `TabContext` defined in `tabContext.ts`. Dialog iterates the registry — adding a new tab is a one-line change. Auto-save on change; no Save/Cancel. AI config lives under Experimental. |
+| `settings/` | `dialog.tsx`, `tabContext.ts`, `generalTab.tsx`, `profileTab.tsx`, `experimentalTab.tsx`, `pluginsTab.tsx`, `updatesTab.tsx`, `themeEditor.tsx`, `themeManager.tsx` | Tabbed settings modal. Each tab is a `Tab` registry entry (`{ id, label, icon, enabled?, render, bind }`) sharing a single `TabContext` defined in `tabContext.ts`. Dialog iterates the registry — adding a new tab is a one-line change. Auto-save on change; no Save/Cancel. AI config lives under Experimental. **`pluginsTab.tsx`** (doc 29, GB-1040) is the content-plugin manager — a self-contained tab (module `signal` for the list) that lists installed plugins with status, per-plugin global + per-project disable toggles, install-from-a-folder (path), and uninstall, over `GET/POST/DELETE /api/plugins`. |
 | `styles/` | `_variables.scss`, `_base.scss`, `_sidebar.scss`, `_diff.scss`, `_annotations.scss`, `_buttons.scss`, `_modal.scss`, `_scrollbar.scss`, `_highlight.scss`, `_history.scss`, `_ai-sort.scss`, `_image-diff.scss`, `_lightbox.scss`, `_settings.scss`, `_update-banner.scss` | SCSS partials imported by `styles.scss`. |
 
 ### `src-tauri/src/` — Rust desktop shell

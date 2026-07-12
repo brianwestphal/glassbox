@@ -1828,7 +1828,7 @@
       "note": "activate() -> { renderers?, differs? } additive registration into the registry; counts."
     },
     "FR-29.12": {
-      "waived": "Design-only (doc 29): full PluginContext with persisted, keychain-backed getSetting/setSetting is not built — P1 ships a minimal context (log + no-op settings). Tracked in GB-1040 (management UI). Flip to a test when settings persistence lands."
+      "waived": "Full PluginContext with persisted, keychain-backed getSetting/setSetting + the manifest-preferences UI is not built — the shipped context is minimal (log + no-op settings). Tracked in GB-1047. Flip to a test when preference persistence lands."
     },
     "FR-29.13": {
       "tests": ["tests/unit/plugins/artifacts.test.ts"],
@@ -1842,7 +1842,17 @@
       "waived": "Design-only (doc 29): the opt-in-install / no-sandbox trust model is a design-justification requirement resting on doc 14's threat model; there is no plugin code to test yet. Tracked in GB-1038. Revisit when loading lands."
     },
     "FR-29.16": {
-      "waived": "Design-only (doc 29): per-project opt-in enablement is a spec only; no code yet. Tracked in GB-1040 (management UI). Flip to a test when enablement lands."
+      "tests": ["tests/unit/plugins/enablement.test.ts", "tests/unit/plugins/loader.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "in neither list -> enabled (default)",
+        "project-disabled -> inactive, scope=project",
+        "global-disabled -> inactive, scope=global",
+        "disabled in both -> scope=global (precedence)",
+        "project disable set/clear round-trips in .glassbox/settings.json",
+        "loader: disabled -> status 'disabled', not registered; enabled -> loaded + registered"
+      ],
+      "note": "Enablement (GB-1040): enabled-by-default, two independent disable lists (global + per-project), global precedence; loader gating; verified live end-to-end (disable a plugin -> its .dot stops rendering -> falls back)."
     },
     "FR-29.17": {
       "tests": ["tests/unit/plugins/graphviz.test.ts"],

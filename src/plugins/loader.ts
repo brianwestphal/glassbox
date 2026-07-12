@@ -26,10 +26,19 @@ export interface LoadedPlugin {
   id: string;
   dir: string;
   manifest: PluginManifest | null;
-  status: 'loaded' | 'error';
+  /** `loaded` = activated + registered; `disabled` = installed but not activated
+   *  (disabled for this project / globally, doc 29 FR-29.16); `error` = failed. */
+  status: 'loaded' | 'error' | 'disabled';
   error?: string;
+  /** When `status === 'disabled'`, which scope disabled it (global wins). */
+  disabledScope?: 'global' | 'project';
   registration?: PluginRegistration;
 }
+
+/** Enablement decision for a plugin id (doc 29 FR-29.16). */
+export type EnablementCheck = (id: string) => { disabled: boolean; scope?: 'global' | 'project' };
+
+const ALWAYS_ENABLED: EnablementCheck = () => ({ disabled: false });
 
 /** The global plugins directory (honors `GLASSBOX_CONFIG_DIR`). */
 export function pluginsDir(): string { return join(GLOBAL_CONFIG_DIR, 'plugins'); }
@@ -86,11 +95,16 @@ function makeContext(id: string): PluginContext {
   };
 }
 
-/** Load, activate, and register a single plugin directory. Never throws. */
-export async function loadPluginDir(dir: string, registry: ContentPluginRegistry): Promise<LoadedPlugin> {
+/** Load, activate, and register a single plugin directory. Never throws. A
+ *  disabled plugin (per `isEnabled`) is recorded but not activated/registered. */
+export async function loadPluginDir(dir: string, registry: ContentPluginRegistry, isEnabled: EnablementCheck = ALWAYS_ENABLED): Promise<LoadedPlugin> {
   const manifest = readManifest(dir);
   if (manifest === null) {
     return { id: dir, dir, manifest: null, status: 'error', error: 'invalid or missing manifest' };
+  }
+  const enablement = isEnabled(manifest.id);
+  if (enablement.disabled) {
+    return { id: manifest.id, dir, manifest, status: 'disabled', disabledScope: enablement.scope };
   }
   try {
     const entry = join(dir, manifest.entry ?? 'index.js');
@@ -120,12 +134,12 @@ export async function loadPluginDir(dir: string, registry: ContentPluginRegistry
  * registry and the per-plugin outcomes. A no-op (empty registry) when the
  * subsystem is disabled (doc 29 NFR-29.4).
  */
-export async function loadAllPlugins(root = pluginsDir()): Promise<{ registry: ContentPluginRegistry; loaded: LoadedPlugin[] }> {
+export async function loadAllPlugins(root = pluginsDir(), isEnabled: EnablementCheck = ALWAYS_ENABLED): Promise<{ registry: ContentPluginRegistry; loaded: LoadedPlugin[] }> {
   const registry = new ContentPluginRegistry();
   if (!PLUGINS_ENABLED) return { registry, loaded: [] };
   const loaded: LoadedPlugin[] = [];
   for (const dir of discoverPluginDirs(root)) {
-    loaded.push(await loadPluginDir(dir, registry));
+    loaded.push(await loadPluginDir(dir, registry, isEnabled));
   }
   return { registry, loaded };
 }

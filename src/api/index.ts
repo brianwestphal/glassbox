@@ -41,6 +41,7 @@ export * from './difftool.js';
 export * from './files.js';
 export * from './image.js';
 export * from './outline.js';
+export * from './plugins.js';
 export * from './project-settings.js';
 export * from './review-notes.js';
 export * from './reviews.js';

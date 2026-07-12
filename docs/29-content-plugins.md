@@ -12,9 +12,11 @@
 > too — Graphviz `.dot`/`.gv` → SVG (`plugins/graphviz/`, GB-1044), and **desktop
 > delivery** (GB-1039) — bundled plugins build to `dist/plugins/`, ship in the
 > sidecar, and auto-install into `~/.glassbox/plugins/` at startup (freshness +
-> dismiss-list). Still open: the **management UI** (GB-1040), a committed
-> fixture-plugin **e2e** (GB-1043), and the other two diagram renderers, Mermaid
-> (GB-1045) and PlantUML (GB-1046). See [§29.8](#298-status-and-follow-ups).
+> dismiss-list) — and the **management UI** (GB-1040) — a Settings **Plugins**
+> tab to list / enable-disable (global + per-project) / install / uninstall. Still
+> open: a committed fixture-plugin **e2e** (GB-1043), manifest-preferences +
+> native folder picker (GB-1047/1048), and the other two diagram renderers,
+> Mermaid (GB-1045) and PlantUML (GB-1046). See [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -149,11 +151,18 @@ content `renderer` / `differ`. Everything else transfers.
   adding any npm dependency. Manifest zod-validation (FR-29.4) is the load-time
   boundary; fail-soft loading (FR-29.6) contains buggy plugins. Plugin secrets, if
   any, are keychain-backed (FR-29.12).
-- **FR-29.16 — Per-project, opt-in enablement.** A plugin's *code* is installed
-  globally, but its *enablement* shall be per-project and default **off**. Turning
-  a plugin on for one project shall not enable it for another. (Mirrors Hot
-  Sheet's per-project enablement; the trust decision stays explicit at both
-  install and enable time.)
+- **FR-29.16 — Enablement (enabled by default; two disable scopes).** A plugin's
+  *code* is installed globally, and an installed plugin is **enabled by default**.
+  It becomes inactive only when disabled, and there are two **independent disable
+  lists**: **global** (disabled for every project, stored in `~/.glassbox/config.json`)
+  and **per-project** (disabled for one repo, stored in `.glassbox/settings.json`).
+  A plugin is enabled iff it is in **neither** list. **Global takes precedence**:
+  a globally-disabled plugin is inactive everywhere and reports scope `global`
+  even if also project-disabled (there is no project-level re-enable of a
+  globally-disabled plugin). So the four states are: *uninstalled* (unknown to
+  the system), *installed & enabled*, *installed & globally disabled*, and
+  *installed & disabled for this project*. Changing a disable list takes effect
+  on the next request (the subsystem reloads).
 
 ## 29.7 First reference plugin
 
@@ -218,9 +227,13 @@ The build is decomposed into follow-up tickets:
   check and a dismiss-list, plus `installPluginFromDisk` (symlink) / `uninstallPlugin`
   mechanisms for the management UI. Realizes FR-29.5 / FR-29.7. (The Tauri
   folder-picker UI that drives install-from-disk is GB-1040.)
-- **Management UI** (GB-1040) — a Settings **Plugins** tab: list installed
-  plugins with status, per-project enable/disable (FR-29.16), install-from-disk /
-  uninstall, and manifest-declared preferences (completing FR-29.12).
+- **Management UI** (GB-1040, **shipped**) — a Settings **Plugins** tab
+  (`src/client/settings/pluginsTab.tsx`): lists installed plugins with status
+  (active / disabled / failed), per-plugin **global** and **per-project** disable
+  toggles (FR-29.16), install-from-a-folder (path) and uninstall, backed by
+  `GET/POST/DELETE /api/plugins` (`src/routes/api/plugins.ts`). Manifest-declared
+  **preferences** (FR-29.12) and the **native folder picker** are follow-ups
+  (GB-1047 / GB-1048).
 - **Developer guide** (GB-1041, **shipped**) — `docs/plugin-development-guide.md`
   plus a standalone, copy-paste `types.ts` so third parties can build plugins
   without depending on the Glassbox package.
@@ -262,8 +275,16 @@ Shipped in P1 (GB-1038):
   `dismissed-plugins.json`; `installPluginFromDisk` / `uninstallPlugin` back the
   management UI.
 
+- **Enablement + management UI** — `src/plugins/enablement.ts` (global +
+  per-project disable lists, global-precedence) gates the loader
+  (`LoadedPlugin.status` gains `disabled`); `initContentPlugins(repoRoot)` /
+  `reloadContentPlugins` apply it and `describeInstalledPlugins` reports it. The
+  API is `src/routes/api/plugins.ts` (`GET/POST/DELETE /api/plugins`,
+  `src/api/plugins.ts`); the UI is `src/client/settings/pluginsTab.tsx`. Per-repo
+  state persists via the shared `src/project-settings-store.ts`.
+
 Planned by the follow-ups:
 
-- **Management UI / from-disk picker** (GB-1040) — the Tauri folder picker + the
-  API that calls `installPluginFromDisk` / `uninstallPlugin`, and the Settings tab
-  listing loaded plugins.
+- **Native folder picker + preferences** (GB-1048 / GB-1047) — a Tauri folder
+  picker for install-from-disk (today it takes a path), and rendering
+  manifest-declared plugin preferences (FR-29.12).
