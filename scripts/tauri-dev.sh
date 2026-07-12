@@ -7,6 +7,12 @@ set -e
 
 bash scripts/ensure-sidecar-stub.sh
 
+# Build first-party content plugins (doc 29) so the dev sidecar auto-installs
+# them into ~/.glassbox/plugins/ at startup — Tauri's beforeDevCommand only
+# builds the client. Without this, provided plugins (e.g. Graphviz) wouldn't be
+# available in `tauri:dev`.
+npm run build:plugins
+
 # The on-device Apple Foundation Models provider (doc 22) now comes from the
 # `apple-fm` dependency, which ships its own helper binary. In dev the server
 # runs from source and `apple-fm` resolves its bundled `bin/apple-fm-helper`

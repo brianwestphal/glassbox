@@ -37,14 +37,11 @@ SERVER_DIR="src-tauri/server"
 
 echo "Building sidecar for $TARGET..."
 
-# --- Step 1: Build the TypeScript server bundle ---
+# --- Step 1: Build the TypeScript server bundle (+ first-party content plugins) ---
+# `npm run build` runs tsup then `build:plugins`, producing dist/cli.js and the
+# self-contained dist/plugins/<id>/ bundles (doc 29, GB-1039), which are copied
+# into the sidecar below and auto-installed into ~/.glassbox/plugins/ at startup.
 npm run build
-
-# Build first-party content plugins (doc 29, GB-1039) into dist/plugins/<id>/.
-# Self-contained esbuild bundles (deps inlined), copied into the sidecar below so
-# they can be auto-installed into ~/.glassbox/plugins/ at startup. Runs AFTER the
-# tsup build (which cleans dist/) so dist/plugins survives.
-npm run build:plugins
 
 # --- Step 2: Download Node.js binary for the target platform ---
 mkdir -p src-tauri/binaries

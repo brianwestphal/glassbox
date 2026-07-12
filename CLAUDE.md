@@ -224,10 +224,11 @@ Raw PGLite queries (no ORM). Six tables:
 ## Build
 
 ```bash
-npm run build          # tsup -> dist/cli.js + dist/client/app.global.js + dist/client/styles.css
+npm run build          # tsup -> dist/cli.js + build:plugins -> dist/plugins/<id>/ ; plus client bundles
 npm run build:client   # Build only client assets (JS + CSS) into dist/client/
-npm run dev            # Build client assets, then run via tsx
-npm run tauri:dev      # Build client + run Node server + Tauri window (dev mode)
+npm run build:plugins  # esbuild first-party content plugins -> dist/plugins/<id>/ (doc 29)
+npm run dev            # Build client assets + plugins, then run via tsx
+npm run tauri:dev      # Build client + plugins + run Node server + Tauri window (dev mode)
 npm run tauri:build    # Build sidecar + package native desktop app
 ```
 
@@ -236,6 +237,7 @@ The build produces:
 - `dist/cli.js` — Server ESM bundle with Node shebang. External deps (`@electric-sql/pglite`, `hono`, `@hono/node-server`, `@modelcontextprotocol/sdk`, `kerfjs`, `apple-fm`) are kept external.
 - `dist/client/app.global.js` — Client JS bundle (IIFE, minified, es2020 target)
 - `dist/client/styles.css` — Compiled and compressed CSS from SCSS
+- `dist/plugins/<id>/` — First-party content plugins (doc 29), self-contained esbuild bundles (`index.js` + `manifest.json`). Built by `build:plugins` (folded into `build`, `dev`, `tauri:dev`, and `prepublishOnly`), copied into the sidecar by `build-sidecar.sh`, and auto-installed into `~/.glassbox/plugins/` at startup. So a provided plugin (e.g. `graphviz`) "just works" in dev, npm installs, and the desktop app with no manual step.
 
 ### External Dependencies and Production Builds
 

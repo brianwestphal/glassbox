@@ -246,7 +246,10 @@ and the Settings **Plugins** management tab + `/api/plugins` (GB-1040) are wired
 a `manifest.json`, a plugin-local `tsconfig.json`), built by
 `scripts/build-plugins.mjs` (`npm run build:plugins`) — esbuild bundles each
 `plugins/<id>/src/index.ts` into a self-contained `dist/plugins/<id>/index.js`
-(+ `manifest.json`; deps inlined). `scripts/build-sidecar.sh` copies `dist/plugins`
+(+ `manifest.json`; deps inlined). It is folded into `npm run build`, `dev`,
+`tauri:dev`, and `prepublishOnly` (GB-1049), so `dist/plugins/` is produced
+everywhere — dev, npm publish, and the desktop sidecar — and the provided plugin
+auto-installs with no manual step. `scripts/build-sidecar.sh` copies `dist/plugins`
 into the sidecar (`server/plugins`), from which `installBundledPlugins` auto-installs
 them into `~/.glassbox/plugins/` at startup (freshness + dismiss-list). Shipped:
 `plugins/graphviz/` (GB-1044) — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
@@ -641,11 +644,12 @@ indicator plus a null-byte scan of the first 8 KB.
 
 Scripts (`package.json`):
 
-- `build` — `tsup` server + client bundles
+- `build` — `tsup` server + client bundles, then `build:plugins`
 - `build:client` — client JS + CSS only
-- `dev` — build client, run via `tsx`
+- `build:plugins` — esbuild first-party content plugins → `dist/plugins/<id>/` (doc 29); folded into `build`, `dev`, `tauri:dev`, `prepublishOnly` so provided plugins are prepared everywhere (GB-1049)
+- `dev` — build client + plugins, run via `tsx`
 - `dev:server` — dev with `--no-open --strict-port`
-- `tauri:dev` / `tauri:build` — desktop dev / full desktop build
+- `tauri:dev` / `tauri:build` — desktop dev / full desktop build (both build plugins)
 - `test`, `test:watch`, `test:all`, `test:e2e`, `test:smoke`, `lint`, `typecheck`
 - `check:features` — feature/requirement coverage report (`scripts/check-features.ts`), the axis orthogonal to line coverage. Extracts a requirement unit per documented behavior from `docs/[0-9]*.md` (numbered `## N.M`/`### N.M` headings, or `**FR-N.M**`/`**NFR-N.M**` bold ids for the FR-primary docs) and flags any unit with no asserting test in `docs/testing/feature-coverage.json` — including stateful units that list no state transitions. Map is **complete**; `-- --strict` is an **enforcing CI gate** (Type Check job in `release-candidate.yml`). Genuine untestable NFRs + manual-only UI behaviors (`docs/manual-test-plan.md`) carry a `waived` justification. See `docs/testing/9-feature-coverage.md`; structural invariants in `tests/unit/conventions.test.ts`.
 - `demo:capture-stills` — regenerate the static README screenshots (`assets/demo-{guided-review,risk-mode,narrative-mode,annotations,settings,direct-comparison,review-notes}.{png,svg}`). Boots each `--demo:N` scenario in turn, runs a minimal scenario-specific UI setup (open the showcased file, flip a sort mode, open the settings dialog, …), and captures both a Playwright PNG and a `domotion-svg` stand-alone SVG per scenario. Lives in `scripts/demo/capture-stills.ts`. Must run outside the command sandbox (Chromium).
