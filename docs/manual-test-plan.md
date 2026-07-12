@@ -61,6 +61,16 @@ Until then, the tab's UI wiring is manual:
   adds it to the list; Uninstall removes it (and a bundled plugin stays gone via
   the dismiss-list). *(The install-path field is the current UI; a native folder
   picker is GB-1048.)*
+- **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
+  containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
+  a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of
+  the source; *Rendered* shows the diagram in the image viewer — **zoom** works,
+  and for a modified file the image-mode segmented control (Metadata · A · B ·
+  Side by Side · Difference · Slice) compares the two rendered diagrams. Disabling
+  the plugin removes the toggle and the file falls back to a plain text diff.
+  *(The rendering + image-route serving are unit/integration-tested; this item is
+  the client toggle + zoom/mode wiring, which needs the real UI — a committed e2e
+  is gated on the fixture-plugin harness, GB-1043.)*
 
 ## Automated Coverage Summary
 

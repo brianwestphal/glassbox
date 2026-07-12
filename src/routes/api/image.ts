@@ -5,8 +5,9 @@ import { getReview, getReviewFile } from '../../db/queries.js';
 import type { ReviewMode } from '../../git/diff.js';
 import { parseDiffData, parseModeString } from '../../git/diff.js';
 import type { ImageSide } from '../../git/image.js';
-import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage } from '../../git/image.js';
+import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getOldImage, isImageFile } from '../../git/image.js';
 import { readImageBlob } from '../../git/image-blobs.js';
+import { renderPluginSvgSide } from '../../plugins/fileView.js';
 import type { AppEnv } from '../../types.js';
 import { requirePathParam } from '../../utils/parseBody.js';
 
@@ -99,6 +100,17 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
   const diff = parseDiffData(file.diff_data);
   const oldPath: string | null = diff?.oldPath ?? null;
   const status = diff?.status ?? 'modified';
+
+  // Content-plugin render (doc 29, GB-1052): a non-image file a plugin renders to
+  // SVG (e.g. a `.dot` Graphviz source) is served here as `image/svg+xml`, so the
+  // whole image viewer (zoom + A/B/difference/side-by-side/slice) applies. The
+  // present side only: `added`/`old` and `deleted`/`new` have no content.
+  if (!isImageFile(file.file_path) && !(side === 'old' && status === 'added') && !(side === 'new' && status === 'deleted')) {
+    const svg = await renderPluginSvgSide(mode, file.file_path, oldPath ?? file.file_path, side, repoRoot);
+    if (svg !== null) {
+      return new Response(svg, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' } });
+    }
+  }
 
   const image = resolveImageSide(
     fileIdParam.data, side, status, mode, file.file_path, oldPath, repoRoot,

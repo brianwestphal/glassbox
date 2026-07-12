@@ -19,7 +19,7 @@ import { parseSvgDimensions, svgUsesExternalFonts } from '../git/svg-meta.js';
 import { groundTruthSideLabels, groundTruthStepNav } from '../ground-truth/presentation.js';
 import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
 import { renderNoteArtifacts } from '../plugins/artifacts.js';
-import { renderFileWithPlugins } from '../plugins/fileView.js';
+import { pluginRendersFile, renderPluginSvgSide } from '../plugins/fileView.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
@@ -80,13 +80,18 @@ pageRoutes.get('/file/:fileId', async (c) => {
     ? groundTruthStepNav(reviewMode, file.id, await getReviewFiles(file.review_id))
     : undefined;
 
-  // SVG rendered view: return ImageDiff component
-  if (view === 'rendered' && isSvgFile(file.file_path)) {
+  // SVG rendered view: return ImageDiff component. A file a content plugin
+  // renders to SVG (doc 29, GB-1052 — e.g. a `.dot` Graphviz source) takes this
+  // same path, so it gets zoom + every image comparison mode; the "Code" side is
+  // just the normal text diff of the source.
+  const isSvg = isSvgFile(file.file_path);
+  const isPluginSvg = !isSvg && !diff.isBinary && pluginRendersFile(file.file_path);
+  if (view === 'rendered' && (isSvg || isPluginSvg)) {
     const repoRoot = c.get('repoRoot');
     let fontWarning = false;
     let svgBaseWidth = 300;
     let svgBaseHeight = 150;
-    if (reviewMode) {
+    if (isSvg && reviewMode) {
       const oldImg = diff.status !== 'added' ? getOldImage(reviewMode, file.file_path, diff.oldPath ?? null, repoRoot) : null;
       const newImg = diff.status !== 'deleted' ? getNewImage(reviewMode, file.file_path, repoRoot) : null;
       // Use the new-side SVG for dimensions (or old-side for deletions)
@@ -98,6 +103,15 @@ pageRoutes.get('/file/:fileId', async (c) => {
       }
       if ((oldImg && svgUsesExternalFonts(oldImg.data)) || (newImg && svgUsesExternalFonts(newImg.data))) {
         fontWarning = true;
+      }
+    } else if (isPluginSvg) {
+      // Size the viewer from the plugin's rendered SVG (new side, or old for a deletion).
+      const svg = await renderPluginSvgSide(reviewMode, file.file_path, diff.oldPath ?? file.file_path, diff.status !== 'deleted' ? 'new' : 'old', repoRoot);
+      if (svg !== null) {
+        const dims = parseSvgDimensions(svg);
+        svgBaseWidth = dims.width;
+        svgBaseHeight = dims.height;
+        if (svgUsesExternalFonts(Buffer.from(svg))) fontWarning = true;
       }
     }
 
@@ -152,12 +166,11 @@ pageRoutes.get('/file/:fileId', async (c) => {
   // a match renders it (inert SVG/HTML) in place of the code block (doc 29). A
   // no-op with no plugin installed, so the code-block fallback is unchanged.
   await renderNoteArtifacts(reviewNotes);
-  // Offer the whole file to an installed content plugin (doc 29 FR-29.2); a
-  // match renders/diffs it in place of the built-in text diff. No-op (no content
-  // read) when no plugin handles this path.
-  const pluginView = await renderFileWithPlugins(reviewMode, finalDiff, c.get('repoRoot'));
+  // A file a content plugin renders (doc 29) shows its source as a normal text
+  // diff here (the "Code" side); the "Rendered" view is served above via the
+  // image viewer. So no per-file plugin render happens in the text-diff path.
 
-  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} stepNav={stepNav} pluginView={pluginView ?? undefined} />;
+  const html = <DiffView file={file} diff={finalDiff} annotations={annotations} mode={mode} reviewNotes={reviewNotes} imageSideLabels={imageSideLabels} stepNav={stepNav} />;
   return c.html(html.toString());
 });
 

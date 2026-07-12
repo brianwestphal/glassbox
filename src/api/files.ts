@@ -31,6 +31,10 @@ export type GroundTruthMeta = z.infer<typeof GroundTruthMetaSchema>;
 
 export const ListFilesRespSchema = z.object({
   files: z.array(ReviewFileSchema),
+  /** Ids of files a content plugin renders (doc 29, GB-1052) — the client shows
+   *  the Code/Rendered toggle and routes the Rendered view through the image
+   *  viewer for these, like an SVG file. */
+  pluginRendered: z.array(z.string()).optional(),
   annotationCounts: z.record(z.string(), z.number()),
   staleCounts: z.record(z.string(), z.number()),
   /** Keyed by review-file id; omitted/empty for non-ground-truth reviews. */

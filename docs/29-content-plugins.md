@@ -213,13 +213,18 @@ The build is decomposed into follow-up tickets:
   discovery, fail-soft activation, the `ContentRenderer` / `ContentDiffer` /
   `PluginContext` contract, the content-type dispatcher, the review-note artifact
   integration + fallback, and the feature flag. Lives in `src/plugins/`.
-- **File-diff-viewer integration** (GB-1042, **shipped**) — the second
-  integration point: `src/plugins/fileView.ts` (`renderFileWithPlugins`) consults
-  the dispatcher for an arbitrary content-type *file* in the diff viewer
-  (`renderContent` for an added/deleted side, `diffContent` for a modified file,
-  else per-side render for a renderer-only plugin), gated by a cheap path
-  pre-check so nothing is read without an installed handler. Completes FR-29.2.
-  Scope: text content types; binary content types (raw bytes) are a follow-up.
+- **File-diff-viewer integration** (GB-1042 + GB-1052, **shipped**) — the second
+  integration point. A file a plugin renders to SVG is treated **like an SVG
+  file**: it gets the **Code | Rendered** toggle, and the Rendered view routes
+  its per-side SVG through the existing image viewer, so **zoom + A / B /
+  Side-by-Side / Difference / Slice** all apply (GB-1052). `src/plugins/fileView.ts`
+  (`renderPluginSvgSide` renders one side; `pluginRendersFile` gates); the image
+  route serves the rendered SVG as `image/svg+xml`; the `/file/:id` `view=rendered`
+  branch builds the `data-is-svg` `<ImageDiff>`; `/files` flags such files
+  (`pluginRendered`) so the client shows the toggle. The **Code** side is the
+  normal text diff of the source. Gated by a cheap path pre-check (no content read
+  without an installed handler). Scope: text content types → SVG; binary content
+  types (raw bytes) and non-SVG (HTML) plugin output are follow-ups.
 - **Desktop delivery** (GB-1039, **shipped**) — `scripts/build-plugins.mjs`
   builds each plugin to `dist/plugins/<id>/`; `build-sidecar.sh` copies that into
   the sidecar (`server/plugins`); `src/plugins/install.ts` (`installBundledPlugins`)
@@ -260,12 +265,15 @@ Shipped in P1 (GB-1038):
   which `src/components/diffView.tsx` renders (SVG via an `<img>` data URI) in
   place of the code block. Called from the `/file/:fileId` route
   (`src/routes/pages.tsx`). Zero-plugin installs are a no-op (unchanged behavior).
-- **File-diff-viewer integration** — `src/plugins/fileView.ts`
-  (`renderFileWithPlugins`) renders/diffs a whole file via a plugin; `DiffView`
-  (`PluginFileBody` / `renderPluginView`) shows it (SVG via an `<img>` data URI;
-  a renderer-only modified file as a two-column pair) in place of the text diff.
-  Also called from the `/file/:fileId` route, behind the `mightHandleFile` path
-  pre-check (no content read without an installed handler).
+- **File-diff-viewer integration** (GB-1052) — `src/plugins/fileView.ts`
+  (`renderPluginSvgSide`) renders one side to SVG; the image route
+  (`src/routes/api/image.ts`) serves it as `image/svg+xml`; the `/file/:id`
+  `view=rendered` branch (`src/routes/pages.tsx`) builds the `data-is-svg`
+  `<ImageDiff>` (dims from the rendered SVG); `/files` flags plugin-rendered files
+  (`pluginRendered`) and the client (`src/client/diff/index.tsx`,
+  `stores/index.ts`) shows the Code/Rendered toggle + routes Rendered through the
+  image viewer. The whole ImageDiff + zoom/slice/difference stack is reused
+  unchanged — SVG is already a first-class image source.
 
 - **Desktop delivery** — `scripts/build-plugins.mjs` (`npm run build:plugins`)
   esbuilds each plugin to `dist/plugins/<id>/`; `scripts/build-sidecar.sh` copies

@@ -1769,8 +1769,8 @@
       "waived": "Design-only (doc 29 content-plugin system): the plugin boundary is a spec only; no code yet. Implementation tracked in GB-1038 (core loader/contract). Flip to a test when the loader ships."
     },
     "FR-29.2": {
-      "tests": ["tests/unit/plugins/fileView.test.ts", "tests/unit/plugins/artifacts.test.ts"],
-      "note": "One API, two integration points: renderNoteArtifacts (review-note artifacts) + renderFileWithPlugins (file diff viewer — added/deleted single, modified via differ, modified renderer-only pair, path pre-check no-op). Both go through the same renderContent/diffContent dispatcher."
+      "tests": ["tests/unit/plugins/fileView.test.ts", "tests/unit/plugins/artifacts.test.ts", "tests/integration/api/image-plugin-routes.test.ts"],
+      "note": "One API, two integration points: renderNoteArtifacts (review-note artifacts) + the file diff viewer. GB-1052: a plugin-rendered file is treated like an SVG file — renderPluginSvgSide renders a side, the image route serves it as image/svg+xml (integration test), and the file gets a Code|Rendered toggle routing Rendered through the image viewer (zoom + all comparison modes)."
     },
     "FR-29.3": {
       "tests": ["tests/unit/plugins/loader.test.ts"],

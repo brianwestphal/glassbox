@@ -24,6 +24,9 @@ interface ReviewState {
   /** Ground-truth (doc 26 §26.1): per-file label/expectedKind, keyed by file id.
    *  Non-empty only for ground-truth reviews, so its keys also signal the mode. */
   groundTruth: Record<string, GroundTruthMeta>;
+  /** Ids of files a content plugin renders (doc 29, GB-1052) — these get the
+   *  Code/Rendered toggle and route the Rendered view through the image viewer. */
+  pluginRendered: Set<string>;
 }
 
 export const reviewStore = defineStore({
@@ -35,6 +38,7 @@ export const reviewStore = defineStore({
     staleCounts: {},
     filterText: '',
     groundTruth: {},
+    pluginRendered: new Set<string>(),
   }),
   actions: (set, get) => ({
     update: (partial: Partial<ReviewState>) => { set({ ...get(), ...partial }); },

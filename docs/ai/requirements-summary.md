@@ -919,7 +919,9 @@ plus install-from-disk, in-process full trust (opt-in install = the boundary, no
 runtime sandbox — doc 14), per-project opt-in enablement, server-side rendering to
 safe HTML/SVG, and graceful fallback (code block / `<img>` / "install X" hint)
 when no plugin matches. One API serves both the file diff viewer and review-note
-artifacts (doc 20). The **P1 core shipped** (GB-1038): `src/plugins/` — the
+artifacts (doc 20) — a plugin-rendered file (e.g. `.dot`) is treated like an SVG
+file: a **Code | Rendered** toggle where Rendered routes the plugin SVG through
+the image viewer (zoom + all comparison modes, GB-1052). The **P1 core shipped** (GB-1038): `src/plugins/` — the
 renderer/differ contract, zod manifest, symlink-aware discovery, fail-soft
 dynamic-`import()` activation, priority/specificity dispatcher, `PLUGINS_ENABLED`
 kill-switch, and the review-note **artifact** integration with code-block

@@ -1,66 +1,44 @@
 /**
- * Content-plugin integration for the file diff viewer (doc 29 FR-29.2 — the
- * second integration point, alongside review-note artifacts). Given a file's
- * diff, ask the dispatcher to render/diff the whole file with an installed
- * plugin; the result is handed to `DiffView`, which shows it in place of the
- * built-in text diff. No match (the default) → `null` → the built-in view is
- * unchanged (FR-29.14, NFR-29.3).
+ * Content-plugin integration for the file diff viewer (doc 29 FR-29.2, GB-1042 /
+ * GB-1052). A file a plugin renders to SVG (e.g. a `.dot` Graphviz source) is
+ * treated like an SVG file: it gets the **Code | Rendered** toggle, and in the
+ * Rendered view its per-side SVG flows into the existing image viewer, so zoom
+ * and every comparison mode (A / B / Side-by-Side / Difference / Slice) apply
+ * unchanged.
  *
- * A cheap path pre-check (`mightHandleFile`) gates content reading, so with no
- * plugin installed nothing is read and this is a true no-op. Scope: text content
- * types (the content is read as UTF-8 text). Binary content types (raw bytes —
- * e.g. CAD) are a follow-up; binary files are skipped here.
+ * This module renders one side's SVG on demand; the image route
+ * (`GET /api/image/:fileId/:side`) serves it, and the `/file/:id` rendered branch
+ * uses it to size the viewer. No blob storage — the render is cheap and cached
+ * (the plugin owns its WASM instance).
  */
-import type { FileDiff } from '../git/diff.js';
 import { getModeFileContent } from '../git/diff.js';
 import type { ReviewMode } from '../git/types.js';
-import { diffContent, mightHandleFile, pluginsEnabled, renderContent } from './index.js';
-import type { RenderedView } from './types.js';
+import { mightHandleFile, pluginsEnabled, renderContent } from './index.js';
 
 /**
- * A plugin's view of a file: a single rendered view (added / deleted, or a
- * differ result), or a rendered pair (a modified file handled by a renderer-only
- * plugin — each side rendered independently, doc 29 FR-29.10).
+ * Whether a content plugin handles this file path (cheap ext/MIME pre-check).
+ * Drives the file-list flag + the Code/Rendered gate; `false` when the subsystem
+ * is disabled.
  */
-export type PluginFileView =
-  | { kind: 'single'; view: RenderedView }
-  | { kind: 'pair'; old: RenderedView | null; new: RenderedView | null };
+export function pluginRendersFile(filePath: string): boolean {
+  return pluginsEnabled() && mightHandleFile(filePath);
+}
 
-const enc = (s: string): Uint8Array => new TextEncoder().encode(s);
-
-export async function renderFileWithPlugins(
+/**
+ * Render one side of a file to SVG via the best-matching plugin, or `null` if no
+ * plugin renders it to SVG (empty source, HTML-only output, differ-only plugin).
+ * `side` selects which content to read (old vs new); matching keys off `filePath`.
+ */
+export async function renderPluginSvgSide(
   mode: ReviewMode | null,
-  diff: FileDiff,
+  filePath: string,
+  oldPath: string,
+  side: 'old' | 'new',
   cwd: string,
-): Promise<PluginFileView | null> {
-  // Cheap gates first: nothing read unless a plugin might handle this path.
-  if (!pluginsEnabled() || mode === null || diff.isBinary) return null;
-  const path = diff.filePath;
-  if (!mightHandleFile(path)) return null;
-  const oldPath = diff.oldPath ?? path;
-
-  if (diff.status === 'deleted') {
-    const text = getModeFileContent(mode, oldPath, 'old', cwd);
-    const view = await renderContent({ bytes: enc(text), text, path: oldPath, side: 'old' });
-    return view !== null ? { kind: 'single', view } : null;
-  }
-  if (diff.status === 'added') {
-    const text = getModeFileContent(mode, path, 'new', cwd);
-    const view = await renderContent({ bytes: enc(text), text, path, side: 'new' });
-    return view !== null ? { kind: 'single', view } : null;
-  }
-
-  // Modified (or renamed): prefer a differ; else render each side with a renderer.
-  const oldText = getModeFileContent(mode, oldPath, 'old', cwd);
-  const newText = getModeFileContent(mode, path, 'new', cwd);
-  const oldIn = { bytes: enc(oldText), text: oldText, path: oldPath, side: 'old' as const };
-  const newIn = { bytes: enc(newText), text: newText, path, side: 'new' as const };
-
-  const diffed = await diffContent({ old: oldIn, new: newIn });
-  if (diffed !== null) return { kind: 'single', view: diffed };
-
-  const oldView = await renderContent(oldIn);
-  const newView = await renderContent(newIn);
-  if (oldView !== null || newView !== null) return { kind: 'pair', old: oldView, new: newView };
-  return null;
+): Promise<string | null> {
+  if (mode === null || !pluginRendersFile(filePath)) return null;
+  const source = getModeFileContent(mode, side === 'old' ? oldPath : filePath, side, cwd);
+  if (source.trim() === '') return null;
+  const view = await renderContent({ bytes: new TextEncoder().encode(source), text: source, path: filePath, side });
+  return view?.svg !== undefined && view.svg !== '' ? view.svg : null;
 }

@@ -70,7 +70,10 @@ function setupFetchEffect(): void {
     }
     const { diffMode, ignoreWhitespace, svgViewMode } = diffViewStore.state.value;
     const file = reviewStore.state.value.files.find(f => f.id === fileId);
-    const isSvg = file?.file_path.toLowerCase().endsWith('.svg') ?? false;
+    // A `.svg` file or a file a content plugin renders (doc 29, GB-1052) both get
+    // the Code/Rendered toggle and route the Rendered view through the image viewer.
+    const isSvg = (file?.file_path.toLowerCase().endsWith('.svg') ?? false)
+      || reviewStore.state.value.pluginRendered.has(fileId);
     const svgRendered = isSvg && svgViewMode === 'rendered';
 
     // Dedupe against the LAST set of fetch params. The fetch effect
@@ -172,8 +175,11 @@ function runPostRender(container: HTMLElement, content: DiffContent): void {
 
   const file = fileId !== null ? reviewStore.state.value.files.find(f => f.id === fileId) : undefined;
   const effectiveFilePath = file?.file_path ?? filePath ?? '';
-  // SVG toggle only applies to in-review files (raw views don't have a paired SVG diff).
-  const isSvg = kind !== 'raw' && effectiveFilePath.toLowerCase().endsWith('.svg');
+  // SVG toggle only applies to in-review files (raw views don't have a paired SVG
+  // diff). A plugin-rendered file (doc 29, GB-1052) gets the same toggle.
+  const isSvg = kind !== 'raw'
+    && (effectiveFilePath.toLowerCase().endsWith('.svg')
+      || (fileId !== null && reviewStore.state.value.pluginRendered.has(fileId)));
 
   const imageToolbar = applyDiffChrome(container, kind, isSvg);
 

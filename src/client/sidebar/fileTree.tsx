@@ -8,5 +8,6 @@ export async function loadFiles(): Promise<void> {
     annotationCounts: data.annotationCounts,
     staleCounts: data.staleCounts,
     groundTruth: data.groundTruth ?? {},
+    pluginRendered: new Set(data.pluginRendered ?? []),
   });
 }

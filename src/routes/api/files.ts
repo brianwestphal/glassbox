@@ -6,6 +6,7 @@ import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getRevi
 import { debugLog } from '../../debug.js';
 import { parseModeString } from '../../git/diff.js';
 import { groundTruthMetaByFileId } from '../../ground-truth/presentation.js';
+import { pluginRendersFile } from '../../plugins/fileView.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -24,7 +25,14 @@ filesRoutes.get('/files', async (c) => {
   // Ground-truth reviews (doc 26 §26.1) carry per-file display metadata (label +
   // expectedKind) so the sidebar reads like named comparisons; omitted otherwise.
   const groundTruth = review ? groundTruthMetaByFileId(parseModeString(review.mode), files) : undefined;
-  return c.json({ files, annotationCounts, staleCounts, ...(groundTruth ? { groundTruth } : {}) });
+  // Files a content plugin renders (doc 29, GB-1052) — the client shows the
+  // Code/Rendered toggle for these. Cheap path pre-check; empty when no plugin.
+  const pluginRendered = files.filter((f) => pluginRendersFile(f.file_path)).map((f) => f.id);
+  return c.json({
+    files, annotationCounts, staleCounts,
+    ...(groundTruth ? { groundTruth } : {}),
+    ...(pluginRendered.length > 0 ? { pluginRendered } : {}),
+  });
 });
 
 filesRoutes.get('/files/:fileId', async (c) => {
