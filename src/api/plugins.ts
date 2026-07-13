@@ -38,9 +38,12 @@ export const PluginInfoSchema = z.object({
   /** The two independent disable flags, so the UI can render both toggles. */
   globalDisabled: z.boolean(),
   projectDisabled: z.boolean(),
-  /** Manifest-declared preferences + their current values (doc 29 FR-29.12). */
+  /** Manifest-declared preferences + their current values (doc 29 FR-29.12).
+   *  Secret values are never sent; `secretConfigured` names the secret keys that
+   *  have a stored value (GB-1054). */
   preferences: z.array(PluginPreferenceInfoSchema),
   preferenceValues: z.record(z.string(), z.string()),
+  secretConfigured: z.array(z.string()),
 });
 export type PluginInfo = z.infer<typeof PluginInfoSchema>;
 

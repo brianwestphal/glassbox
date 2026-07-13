@@ -32,14 +32,22 @@ public class CredHelper {
 '@
 `;
 
-export function winCredTarget(platform: AIPlatform): string {
-  return `glassbox-${platform}-api-key`;
+/** The Windows Credential Manager target for a keychain `account`. */
+export function winTargetForAccount(account: string): string {
+  return `glassbox-${account}`;
 }
 
-export function getKeyFromKeychain(platform: AIPlatform): string | null {
-  const os = process.platform;
-  const account = `${platform}-api-key`;
+export function winCredTarget(platform: AIPlatform): string {
+  return winTargetForAccount(`${platform}-api-key`);
+}
 
+/**
+ * Read a secret from the OS keychain by `account` (service is always `glassbox`).
+ * The generic form used by both the AI-key store and content-plugin secret
+ * preferences (doc 29 FR-29.12, GB-1054). Returns null when absent/unavailable.
+ */
+export function getSecretFromKeychain(account: string): string | null {
+  const os = process.platform;
   try {
     if (os === 'darwin') {
       const r = spawnSync('security', ['find-generic-password', '-s', 'glassbox', '-a', account, '-w'], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
@@ -54,7 +62,7 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
     }
 
     if (os === 'win32') {
-      const target = winCredTarget(platform);
+      const target = winTargetForAccount(account);
       // Fast existence gate (GB-868): `cmdkey` is a native command, whereas the
       // `CredRead` path below spins up PowerShell AND compiles a C# P/Invoke
       // helper via `Add-Type` (~3s). When no key is stored — the common case,
@@ -77,6 +85,10 @@ export function getKeyFromKeychain(platform: AIPlatform): string | null {
   return null;
 }
 
+export function getKeyFromKeychain(platform: AIPlatform): string | null {
+  return getSecretFromKeychain(`${platform}-api-key`);
+}
+
 /** Throw a descriptive error if a `spawnSync` keychain-write didn't succeed.
  *  `spawnSync` doesn't throw on a non-zero exit, so without this an OS keychain
  *  failure would store nothing while the caller reports success. */
@@ -88,30 +100,50 @@ function assertSpawnOk(label: string, r: ReturnType<typeof spawnSync>): void {
   }
 }
 
-export function saveKeyToKeychain(platform: AIPlatform, key: string): void {
+/** Store a secret in the OS keychain by `account` (service `glassbox`). `label`
+ *  is the display name in the keyring UI (cosmetic). Generic form, GB-1054. */
+export function saveSecretToKeychain(account: string, value: string, label = 'Glassbox'): void {
   const os = process.platform;
-  const account = `${platform}-api-key`;
 
   if (os === 'darwin') {
     // delete may legitimately fail (no existing entry) — only the add must succeed.
     spawnSync('security', ['delete-generic-password', '-s', 'glassbox', '-a', account], { stdio: 'pipe' });
-    assertSpawnOk('Keychain write', spawnSync('security', ['add-generic-password', '-s', 'glassbox', '-a', account, '-w', key], { encoding: 'utf-8' }));
+    assertSpawnOk('Keychain write', spawnSync('security', ['add-generic-password', '-s', 'glassbox', '-a', account, '-w', value], { encoding: 'utf-8' }));
     return;
   }
 
   if (os === 'linux') {
     // secret-tool reads the password from stdin
-    assertSpawnOk('System keyring write', spawnSync('secret-tool', ['store', '--label=Glassbox API Key', 'service', 'glassbox', 'account', account], { input: key, encoding: 'utf-8' }));
+    assertSpawnOk('System keyring write', spawnSync('secret-tool', ['store', `--label=${label}`, 'service', 'glassbox', 'account', account], { input: value, encoding: 'utf-8' }));
     return;
   }
 
   if (os === 'win32') {
-    const target = winCredTarget(platform);
+    const target = winTargetForAccount(account);
     // Escape single quotes for PowerShell single-quoted string
-    const escapedKey = key.replace(/'/g, "''");
-    const script = `cmdkey /generic:'${target}' /user:'glassbox' /pass:'${escapedKey}'`;
+    const escapedValue = value.replace(/'/g, "''");
+    const script = `cmdkey /generic:'${target}' /user:'glassbox' /pass:'${escapedValue}'`;
     assertSpawnOk('Credential Manager write', spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: script, encoding: 'utf-8' }));
   }
+}
+
+/** Remove a secret from the OS keychain by `account`. Best-effort (a missing
+ *  entry is fine). Generic form, GB-1054. */
+export function deleteSecretFromKeychain(account: string): void {
+  const os = process.platform;
+  try {
+    if (os === 'darwin') {
+      spawnSync('security', ['delete-generic-password', '-s', 'glassbox', '-a', account], { stdio: 'pipe' });
+    } else if (os === 'linux') {
+      spawnSync('secret-tool', ['clear', 'service', 'glassbox', 'account', account], { stdio: 'pipe' });
+    } else if (os === 'win32') {
+      spawnSync('powershell', ['-NoProfile', '-Command', '-'], { input: `cmdkey /delete:'${winTargetForAccount(account)}'`, encoding: 'utf-8' });
+    }
+  } catch { /* may not exist */ }
+}
+
+export function saveKeyToKeychain(platform: AIPlatform, key: string): void {
+  saveSecretToKeychain(`${platform}-api-key`, key, 'Glassbox API Key');
 }
 
 export function isKeychainAvailable(): boolean {

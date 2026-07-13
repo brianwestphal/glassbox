@@ -27,10 +27,10 @@ export const PluginPreferenceSchema = z
     description: z.string().optional(),
     /** `select` options (value === label unless an object form is used later). */
     options: z.array(z.string()).optional(),
-    /** Per-project vs global storage (default global). */
+    /** Per-project vs global storage (default global). Ignored for secrets
+     *  (always keychain). */
     scope: z.enum(['global', 'project']).optional(),
-    /** Secret prefs (keychain-backed) are a follow-up (GB-1054); declaring one is
-     *  accepted but currently stored like a normal pref, so avoid it for secrets. */
+    /** Secret prefs are stored in the OS keychain, never in config (GB-1054). */
     secret: z.boolean().optional(),
   })
   .loose();

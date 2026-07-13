@@ -125,9 +125,11 @@ content `renderer` / `differ`. Everything else transfers.
   the project settings (`.glassbox/settings.json`) per the preference's scope
   (`src/plugins/settings.ts`, GB-1047). Setting a preference **reloads** the
   plugin so it re-reads the value (the reference `graphviz` plugin exposes a
-  layout-`engine` preference). **Secret** preferences (`secret: true`,
-  keychain-backed like API keys, [doc 14](14-security.md) §14.4) are a follow-up
-  (GB-1054); a declared secret is currently stored like a normal pref.
+  layout-`engine` preference). **Secret** preferences (`secret: true`) are stored
+  in the **OS keychain** (account `plugin-<id>-<key>`, the same store as API keys,
+  [doc 14](14-security.md) §14.4), never in config; the API/UI never return a
+  secret's value — only whether it is configured (masked password input,
+  GB-1054).
 
 ## 29.4 Where plugins run
 

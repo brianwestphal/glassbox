@@ -56,10 +56,15 @@ export function doInstallPlugin(path: string): void {
     .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Install failed'; });
 }
 
-function preferenceField(id: string, pref: PluginPreferenceInfo, value: string): SafeHtml {
+function preferenceField(id: string, pref: PluginPreferenceInfo, value: string, secretConfigured: boolean): SafeHtml {
   const common = { 'data-plugin-pref-id': id, 'data-plugin-pref-key': pref.key } as const;
   const control =
-    pref.type === 'boolean' ? (
+    pref.secret === true ? (
+      // Secret prefs (GB-1054): masked, value never pre-filled; the placeholder
+      // reflects whether one is already stored in the keychain.
+      <input type="password" className="settings-input plugin-pref-input" autoComplete="off"
+        {...common} placeholder={secretConfigured ? 'Stored — enter to replace, blank to clear' : 'Not set'} />
+    ) : pref.type === 'boolean' ? (
       <input type="checkbox" className="plugin-pref-checkbox" {...common} checked={value === 'true'} />
     ) : pref.type === 'select' ? (
       <select className="settings-input plugin-pref-select" {...common}>
@@ -82,7 +87,11 @@ function preferencesJsx(p: PluginInfo): SafeHtml | null {
   if (p.preferences.length === 0) return null;
   return (
     <div className="plugin-row-prefs">
-      {p.preferences.map((pref) => preferenceField(p.id, pref, (p.preferenceValues[pref.key] as string | undefined) ?? pref.default ?? ''))}
+      {p.preferences.map((pref) => preferenceField(
+        p.id, pref,
+        (p.preferenceValues[pref.key] as string | undefined) ?? pref.default ?? '',
+        p.secretConfigured.includes(pref.key),
+      ))}
     </div>
   );
 }

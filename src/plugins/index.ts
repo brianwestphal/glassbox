@@ -14,7 +14,7 @@ import { installBundledPlugins } from './install.js';
 import { type EnablementCheck,loadAllPlugins,type LoadedPlugin } from './loader.js';
 import type { PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
-import { readPluginPreferenceValues } from './settings.js';
+import { readPluginPreferenceDisplay } from './settings.js';
 import type { DiffInput, RenderedView, RenderInput } from './types.js';
 
 let registry = new ContentPluginRegistry();
@@ -103,9 +103,12 @@ export interface InstalledPluginInfo {
   disabledScope?: 'global' | 'project';
   globalDisabled: boolean;
   projectDisabled: boolean;
-  /** Manifest-declared preferences + their current values (doc 29 FR-29.12). */
+  /** Manifest-declared preferences + their current values (doc 29 FR-29.12).
+   *  Secret values are never included; `secretConfigured` lists the secret pref
+   *  keys that have a stored value (GB-1054). */
   preferences: PluginPreference[];
   preferenceValues: Record<string, string>;
+  secretConfigured: string[];
 }
 
 /**
@@ -117,6 +120,7 @@ export function describeInstalledPlugins(repoRoot: string): InstalledPluginInfo[
   const projectDisabled = new Set(readProjectDisabled(repoRoot));
   return loadedPlugins.map((p) => {
     const extensions = (p.manifest?.contentTypes ?? []).flatMap((ct) => ct.extensions ?? []);
+    const display = p.manifest ? readPluginPreferenceDisplay(p.manifest, repoRoot) : { values: {}, secretConfigured: [] };
     return {
       id: p.id,
       name: p.manifest?.name ?? p.id,
@@ -129,7 +133,8 @@ export function describeInstalledPlugins(repoRoot: string): InstalledPluginInfo[
       globalDisabled: globalDisabled.has(p.id),
       projectDisabled: projectDisabled.has(p.id),
       preferences: p.manifest?.preferences ?? [],
-      preferenceValues: p.manifest ? readPluginPreferenceValues(p.manifest, repoRoot) : {},
+      preferenceValues: display.values,
+      secretConfigured: display.secretConfigured,
     };
   });
 }
