@@ -11,11 +11,11 @@
 import { PLUGINS_ENABLED } from '../feature-flags.js';
 import { disabledScope, readEnablementLists, readGlobalDisabled, readProjectDisabled } from './enablement.js';
 import { installBundledPlugins } from './install.js';
-import { type EnablementCheck,loadAllPlugins,type LoadedPlugin } from './loader.js';
-import type { PluginManifest, PluginPreference } from './manifest.js';
+import { type EnablementCheck, getConfigLabelOverride, loadAllPlugins,type LoadedPlugin } from './loader.js';
+import type { ConfigLayoutItem, PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginPreferenceDisplay } from './settings.js';
-import type { DiffInput, RenderedView, RenderInput } from './types.js';
+import type { ConfigLabelColor, DiffInput, RenderedView, RenderInput } from './types.js';
 
 let registry = new ContentPluginRegistry();
 let loadedPlugins: LoadedPlugin[] = [];
@@ -109,6 +109,28 @@ export interface InstalledPluginInfo {
   preferences: PluginPreference[];
   preferenceValues: Record<string, string>;
   secretConfigured: string[];
+  /** Optional manifest arrangement of the preferences (doc 29 FR-29.18). */
+  configLayout?: ConfigLayoutItem[];
+  /** Every `label` item's effective text/color (manifest default merged with any
+   *  runtime `updateConfigLabel` override), keyed by label id (doc 29 FR-29.18). */
+  configLabels: Record<string, { text: string; color?: ConfigLabelColor }>;
+}
+
+/** Resolve a plugin's config-layout labels: each `label` item's effective
+ *  text/color = the runtime override (if any) else the manifest defaults. */
+function resolveConfigLabels(manifest: PluginManifest): Record<string, { text: string; color?: ConfigLabelColor }> {
+  const out: Record<string, { text: string; color?: ConfigLabelColor }> = {};
+  const walk = (items: ConfigLayoutItem[] | undefined): void => {
+    for (const item of items ?? []) {
+      if (item.type === 'label' && item.id !== undefined && item.id !== '') {
+        const override = getConfigLabelOverride(manifest.id, item.id);
+        out[item.id] = override ?? { text: item.text ?? '', color: item.color };
+      }
+      if (item.type === 'group') walk(item.items);
+    }
+  };
+  walk(manifest.configLayout);
+  return out;
 }
 
 /**
@@ -135,6 +157,8 @@ export function describeInstalledPlugins(repoRoot: string): InstalledPluginInfo[
       preferences: p.manifest?.preferences ?? [],
       preferenceValues: display.values,
       secretConfigured: display.secretConfigured,
+      configLayout: p.manifest?.configLayout,
+      configLabels: p.manifest ? resolveConfigLabels(p.manifest) : {},
     };
   });
 }
@@ -142,6 +166,26 @@ export function describeInstalledPlugins(repoRoot: string): InstalledPluginInfo[
 /** The manifest for a loaded plugin id (for the preference setter). */
 export function getPluginManifest(id: string): PluginManifest | undefined {
   return loadedPlugins.find((p) => p.id === id)?.manifest ?? undefined;
+}
+
+/**
+ * Invoke a loaded plugin's config-layout `button` action (doc 29 FR-29.18).
+ * Runs the plugin's `onAction(actionId, context)` with the context it was
+ * activated with (so `updateConfigLabel` targets the shared override map).
+ * Throws if the plugin isn't loaded or declares no `onAction` — the route
+ * surfaces the message; the label overrides it set are read on the next
+ * `describeInstalledPlugins`.
+ */
+export async function runPluginAction(id: string, actionId: string): Promise<void> {
+  if (!PLUGINS_ENABLED) throw new Error('Plugins are disabled');
+  const loaded = loadedPlugins.find((p) => p.id === id);
+  if (loaded === undefined || loaded.status !== 'loaded' || loaded.instance === undefined || loaded.context === undefined) {
+    throw new Error('Plugin not active');
+  }
+  if (typeof loaded.instance.onAction !== 'function') {
+    throw new Error('Plugin does not handle actions');
+  }
+  await loaded.instance.onAction(actionId, loaded.context);
 }
 
 /**

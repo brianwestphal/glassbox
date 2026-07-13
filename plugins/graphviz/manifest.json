@@ -15,5 +15,17 @@
       "options": ["dot", "neato", "fdp", "circo", "twopi"],
       "description": "The Graphviz layout algorithm used to render diagrams."
     }
+  ],
+  "configLayout": [
+    {
+      "type": "group",
+      "title": "Rendering",
+      "items": [
+        { "type": "preference", "key": "engine" },
+        { "type": "spacer" },
+        { "type": "label", "id": "engine-status", "text": "Not tested", "color": "transient" },
+        { "type": "button", "id": "test-btn", "label": "Test renderer", "action": "test_renderer" }
+      ]
+    }
   ]
 }

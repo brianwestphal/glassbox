@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { discoverPluginDirs, loadAllPlugins, loadPluginDir, readManifest } from '../../../src/plugins/loader.js';
+import { clearConfigLabelOverrides, discoverPluginDirs, getConfigLabelOverride, loadAllPlugins, loadPluginDir, readManifest } from '../../../src/plugins/loader.js';
 import { ContentPluginRegistry } from '../../../src/plugins/registry.js';
 
 let root: string;
@@ -137,6 +137,51 @@ describe('fail-soft activation (doc 29 FR-29.6)', () => {
     expect(loaded.filter((p) => p.status === 'loaded')).toHaveLength(1);
     expect(loaded.filter((p) => p.status === 'error')).toHaveLength(1);
     expect(registry.rendererCount).toBe(1);
+  });
+});
+
+describe('config-layout actions + dynamic labels (doc 29 FR-29.18)', () => {
+  // A plugin whose activate + onAction both drive a config label.
+  const ACTION_ENTRY = `export default {
+    activate(ctx) { ctx.updateConfigLabel('status', 'ready', 'transient'); return {}; },
+    async onAction(actionId, ctx) {
+      if (actionId === 'ping') ctx.updateConfigLabel('status', 'pong', 'success');
+    },
+  };`;
+
+  it('retains the plugin instance + context when loaded', async () => {
+    const dir = makePlugin('act', { manifest: { id: 'act', name: 'A', version: '1' }, entry: ACTION_ENTRY });
+    const res = await loadPluginDir(dir, new ContentPluginRegistry());
+    expect(res.status).toBe('loaded');
+    expect(typeof res.instance?.onAction).toBe('function');
+    expect(res.context).toBeDefined();
+  });
+
+  it('updateConfigLabel writes an override the getter reads, and clear removes it', async () => {
+    clearConfigLabelOverrides('act');
+    const dir = makePlugin('act', { manifest: { id: 'act', name: 'A', version: '1' }, entry: ACTION_ENTRY });
+    const res = await loadPluginDir(dir, new ContentPluginRegistry());
+    // activate() seeded the label.
+    expect(getConfigLabelOverride('act', 'status')).toEqual({ text: 'ready', color: 'transient' });
+    // onAction mutates it via the retained context.
+    await res.instance?.onAction?.('ping', res.context!);
+    expect(getConfigLabelOverride('act', 'status')).toEqual({ text: 'pong', color: 'success' });
+    clearConfigLabelOverrides('act');
+    expect(getConfigLabelOverride('act', 'status')).toBeUndefined();
+  });
+
+  it('picks up a named onAction export (no default)', async () => {
+    const dir = makePlugin('named-action', {
+      manifest: { id: 'named-action', name: 'N', version: '1' },
+      entry: `export function activate() { return {}; }
+        export function onAction(id, ctx) { ctx.updateConfigLabel('s', id, 'success'); }`,
+    });
+    clearConfigLabelOverrides('named-action');
+    const res = await loadPluginDir(dir, new ContentPluginRegistry());
+    expect(typeof res.instance?.onAction).toBe('function');
+    await res.instance?.onAction?.('hello', res.context!);
+    expect(getConfigLabelOverride('named-action', 's')).toEqual({ text: 'hello', color: 'success' });
+    clearConfigLabelOverrides('named-action');
   });
 });
 

@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import plugin from '../../../plugins/graphviz/src/index.js';
-import type { ContentRenderer, PluginContext, PluginRegistration } from '../../../plugins/graphviz/src/types.js';
+import type { ConfigLabelColor, ContentRenderer, PluginContext, PluginRegistration } from '../../../plugins/graphviz/src/types.js';
 
-function ctxWith(settings: Record<string, string> = {}): PluginContext {
+interface RecordingContext extends PluginContext {
+  labels: Record<string, { text: string; color?: ConfigLabelColor }>;
+}
+
+function ctxWith(settings: Record<string, string> = {}): RecordingContext {
+  const labels: RecordingContext['labels'] = {};
   return {
+    labels,
     log: () => {},
     getSetting: (key) => Promise.resolve(settings[key] ?? null),
     setSetting: () => Promise.resolve(),
+    updateConfigLabel: (labelId, text, color) => { labels[labelId] = { text, color }; },
   };
 }
 
@@ -66,5 +73,18 @@ describe('graphviz plugin (doc 29 FR-29.17)', () => {
     const r = await getRenderer({ engine: 'bogus' });
     const view = await r.render({ bytes: new Uint8Array(), text: 'digraph { A -> B }', path: 'g.dot' });
     expect(view.svg).toContain('<svg');
+  });
+
+  // Config-layout "Test renderer" button (doc 29 FR-29.18).
+  it('onAction(test_renderer) sets a success status label with the engine', async () => {
+    const ctx = ctxWith({ engine: 'neato' });
+    await plugin.onAction?.('test_renderer', ctx);
+    expect(ctx.labels['engine-status']).toEqual({ text: 'Renderer OK (neato)', color: 'success' });
+  });
+
+  it('onAction ignores an unknown action id (no label set)', async () => {
+    const ctx = ctxWith();
+    await plugin.onAction?.('nope', ctx);
+    expect(ctx.labels['engine-status']).toBeUndefined();
   });
 });

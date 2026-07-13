@@ -1859,6 +1859,19 @@
       "tests": ["tests/unit/plugins/graphviz.test.ts"],
       "note": "First reference plugin (GB-1044): the Graphviz .dot/.gv plugin renders server-side to inert SVG via @viz-js/viz (WASM, no DOM); empty/invalid source -> empty view -> code-block fallback. Mermaid (GB-1045) + PlantUML (GB-1046) are the split siblings, still waived."
     },
+    "FR-29.18": {
+      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "manifest: nested configLayout (group/divider/spacer/label/button) parses; bad color / unknown item type -> null",
+        "activate seeds a label override; updateConfigLabel mutates it; clearConfigLabelOverrides removes it (loader)",
+        "loaded -> instance+context retained; named onAction export picked up",
+        "runPluginAction: loaded+onAction -> invoked; unknown id / failed load -> 'not active'; no onAction -> 'does not handle actions'",
+        "POST /plugins/:id/action -> label override reflected in the refreshed list's configLabels; initial state = manifest default; unknown id -> 400 + error",
+        "graphviz onAction(test_renderer) -> success label with engine; unknown action -> no label"
+      ],
+      "note": "Config layout + dynamic labels + actions (GB-1059): manifest configLayout union parse; the updateConfigLabel override map + onAction round-trip through the real loader + POST /plugins/:id/action; label resolution folded into the plugin list (no polling endpoint). The tab's layout RENDERING + button click wiring is manual (docs/manual-test-plan.md), gated on the fixture-plugin e2e harness (GB-1043), like the rest of the Plugins tab."
+    },
     "NFR-29.1": {
       "waived": "Design-only (doc 29): lean-core / offline / no-CDN is a design-justification NFR; core has no format-specific renderer dep to assert against yet. The conventions test already pins the external-dep allow-list. Revisit when plugins land."
     },

@@ -71,6 +71,19 @@ Until then, the tab's UI wiring is manual:
   to the selected engine. *(The store + getSetting/setSetting + engine-applied
   render are unit-tested and verified live; this item is the tab's control
   rendering + auto-save, which needs the real UI.)*
+- **Config layout — groups / labels / action buttons (GB-1059, FR-29.18)** — With
+  the Graphviz plugin enabled, its preferences render inside a collapsible
+  **Rendering** group (chevron toggles it; the engine select sits inside). Below
+  it a **status label** reads "Not tested" and a **Test renderer** button, when
+  clicked, runs the plugin's action and the label updates to "Renderer OK (dot)"
+  in green (or an error in red). Changing the engine and re-testing reflects the
+  new engine in the label. *(The manifest layout parse, the `onAction`/
+  `updateConfigLabel` round-trip, and the label-resolution in the list response
+  are unit/integration-tested — `plugins/manifest.test.ts`,
+  `plugins/loader.test.ts`, `plugins/configLayout.test.ts`, `plugins/graphviz.test.ts`,
+  and `api/plugins-routes.test.ts`; this item is the tab's layout rendering +
+  button wiring, which needs the real UI — a committed e2e is gated on the
+  fixture-plugin harness, GB-1043.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of

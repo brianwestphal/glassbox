@@ -33,4 +33,40 @@ describe('plugin manifest (doc 29 FR-29.4)', () => {
   ])('returns null for an invalid manifest: %s', (_label, raw) => {
     expect(parseManifest(raw)).toBeNull();
   });
+
+  // Config layout (doc 29 FR-29.18).
+  it('parses a nested configLayout (group / divider / spacer / label / button)', () => {
+    const m = parseManifest({
+      id: 'x', name: 'X', version: '1',
+      preferences: [{ key: 'engine', label: 'Engine', type: 'select', options: ['dot'] }],
+      configLayout: [
+        { type: 'divider' },
+        { type: 'spacer' },
+        { type: 'label', id: 's', text: 'Not tested', color: 'transient' },
+        { type: 'button', id: 'b', label: 'Test', action: 'test', style: 'primary' },
+        { type: 'group', title: 'Rendering', collapsed: true, items: [
+          { type: 'preference', key: 'engine' },
+        ] },
+      ],
+    });
+    expect(m?.configLayout).toHaveLength(5);
+    const group = m?.configLayout?.[4];
+    expect(group?.type).toBe('group');
+    expect(group?.items?.[0]).toEqual({ type: 'preference', key: 'engine' });
+    expect(m?.configLayout?.[2]).toEqual({ type: 'label', id: 's', text: 'Not tested', color: 'transient' });
+  });
+
+  it('rejects an invalid configLayout label color', () => {
+    expect(parseManifest({
+      id: 'x', name: 'X', version: '1',
+      configLayout: [{ type: 'label', id: 's', text: 'hi', color: 'chartreuse' }],
+    })).toBeNull();
+  });
+
+  it('rejects an unknown configLayout item type', () => {
+    expect(parseManifest({
+      id: 'x', name: 'X', version: '1',
+      configLayout: [{ type: 'widget' }],
+    })).toBeNull();
+  });
 });

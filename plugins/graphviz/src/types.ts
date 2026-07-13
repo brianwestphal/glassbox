@@ -40,12 +40,15 @@ export interface PluginRegistration {
   renderers?: ContentRenderer[];
   differs?: ContentDiffer[];
 }
+export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
 export interface PluginContext {
   log(level: 'info' | 'warn' | 'error', message: string): void;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
+  updateConfigLabel(labelId: string, text: string, color?: ConfigLabelColor): void;
 }
 export interface ContentPlugin {
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
+  onAction?(actionId: string, context: PluginContext): void | Promise<void>;
 }

@@ -14,11 +14,17 @@
  */
 import { instance } from '@viz-js/viz';
 
-import type { ContentPlugin, RenderedView, RenderInput } from './types.js';
+import type { ContentPlugin, PluginContext, RenderedView, RenderInput } from './types.js';
 
 type Viz = Awaited<ReturnType<typeof instance>>;
 type Engine = 'dot' | 'neato' | 'fdp' | 'circo' | 'twopi';
 const ENGINES: readonly Engine[] = ['dot', 'neato', 'fdp', 'circo', 'twopi'];
+
+/** Resolve the configured layout engine (defaulting to `dot`). */
+async function resolveEngine(context: PluginContext): Promise<Engine> {
+  const stored = await context.getSetting('engine');
+  return ENGINES.includes(stored as Engine) ? (stored as Engine) : 'dot';
+}
 
 // The WASM instance is created once and reused across renders.
 let vizPromise: Promise<Viz> | null = null;
@@ -50,8 +56,7 @@ const plugin: ContentPlugin = {
   async activate(context) {
     // The layout engine is a user preference (doc 29 FR-29.12); read it at
     // activation (a change re-activates the plugin via reloadContentPlugins).
-    const stored = await context.getSetting('engine');
-    const engine: Engine = ENGINES.includes(stored as Engine) ? (stored as Engine) : 'dot';
+    const engine = await resolveEngine(context);
     context.log('info', `graphviz plugin activated (.dot / .gv), engine=${engine}`);
     return {
       renderers: [
@@ -62,6 +67,24 @@ const plugin: ContentPlugin = {
         },
       ],
     };
+  },
+
+  // Config-layout "Test renderer" button (doc 29 FR-29.18): render a trivial
+  // graph with the current engine and report the result as a status label.
+  async onAction(actionId, context) {
+    if (actionId !== 'test_renderer') return;
+    const engine = await resolveEngine(context);
+    try {
+      const viz = await getViz();
+      const svg = viz.renderString('digraph { a -> b }', { format: 'svg', engine });
+      if (typeof svg === 'string' && svg.includes('<svg')) {
+        context.updateConfigLabel('engine-status', `Renderer OK (${engine})`, 'success');
+      } else {
+        context.updateConfigLabel('engine-status', 'Renderer produced no SVG', 'error');
+      }
+    } catch (e) {
+      context.updateConfigLabel('engine-status', `Render failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    }
   },
 };
 

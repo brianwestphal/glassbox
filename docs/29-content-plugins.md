@@ -191,6 +191,35 @@ content `renderer` / `differ`. Everything else transfers.
   contract most cleanly. **Mermaid** (`.mmd` / `.mermaid`, needs a DOM — GB-1045)
   and **PlantUML** (`.puml`, needs Java — GB-1046) are the split siblings.
 
+## 29.9 Settings config layout
+
+- **FR-29.18 — Config layout, dynamic labels, and actions.** Beyond the flat
+  preference list (FR-29.12), a plugin **may** declare an optional manifest
+  **`configLayout`** — an ordered, recursive list of items that arranges its
+  Settings → Plugins UI (`src/plugins/manifest.ts`, `ConfigLayoutItemSchema`).
+  Item types: **`preference`** (renders a declared preference by `key`),
+  **`divider`**, **`spacer`**, **`label`** (static or dynamic status text with a
+  semantic `color` tone — `default` / `success` / `error` / `warning` /
+  `transient`), **`button`** (a caption + an `action` id, optional `primary`
+  style), and **`group`** (a collapsible titled section that nests items;
+  `collapsed` sets the initial state, preserved across re-renders by native
+  `<details>`). When `configLayout` is omitted the preferences render as a flat
+  list (back-compat). A **`button`** invokes the plugin's optional
+  **`onAction(actionId, context)`** (`src/plugins/types.ts`) via
+  `POST /api/plugins/:id/action`; inside it the plugin calls
+  **`context.updateConfigLabel(labelId, text, color?)`** to reflect status back
+  into a `label`. Label overrides live in an in-memory map in `loader.ts`
+  (keyed `pluginId:labelId`, cleared on uninstall); `describeInstalledPlugins`
+  resolves each label's effective text/color (manifest default merged with any
+  override) into the plugin's `configLabels`, so the action's response — the
+  refreshed plugin list, per the "every mutation returns the list" convention —
+  carries the new status with **no separate polling endpoint**. The client
+  renderer is `src/client/settings/pluginsTab.tsx`; the host owns the tone→CSS
+  mapping so labels stay consistent across plugins. The `graphviz` plugin's
+  **Rendering** group + **Test renderer** button (renders a trivial graph, sets
+  an OK/error status label) is the worked example. Plugin output stays
+  content-only (NFR-29.2) — buttons carry no plugin-supplied HTML/icons.
+
 ## Non-functional requirements
 
 - **NFR-29.1 — Lean core, offline, no CDN.** Core shall not gain any
@@ -310,6 +339,15 @@ Shipped in P1 (GB-1038):
   `POST /api/plugins/:id/preferences` setter (reloads the plugin), and the
   Plugins-tab rendering. The `graphviz` plugin's `engine` preference is the
   worked example.
+- **Config layout + dynamic labels + actions** (FR-29.18, GB-1059) — the optional
+  manifest `configLayout` (`ConfigLayoutItemSchema` in `src/plugins/manifest.ts`)
+  arranges preferences into collapsible groups / dividers / spacers / status
+  labels / action buttons; `PluginContext.updateConfigLabel` + the plugin's
+  `onAction` (`src/plugins/types.ts`, run via `POST /api/plugins/:id/action`,
+  `runPluginAction` in `index.ts`) drive dynamic status labels, folded into each
+  plugin's `configLabels` in the list response (no polling endpoint). Rendered by
+  `src/client/settings/pluginsTab.tsx`; the `graphviz` plugin's **Rendering**
+  group + **Test renderer** button is the worked example.
 
 Shipped (native folder picker, GB-1048): the `pick_plugin_folder` Tauri command
 (`src-tauri/src/lib.rs`, `tauri-plugin-dialog`, granted in

@@ -20,7 +20,7 @@ import { GLOBAL_CONFIG_DIR } from '../global-config.js';
 import { parseManifest, type PluginManifest } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginSetting, writePluginSetting } from './settings.js';
-import type { ContentPlugin, PluginContext, PluginRegistration } from './types.js';
+import type { ConfigLabelColor, ContentPlugin, PluginContext, PluginRegistration } from './types.js';
 
 /** One plugin's load outcome — surfaced to the management UI (GB-1040). */
 export interface LoadedPlugin {
@@ -34,6 +34,32 @@ export interface LoadedPlugin {
   /** When `status === 'disabled'`, which scope disabled it (global wins). */
   disabledScope?: 'global' | 'project';
   registration?: PluginRegistration;
+  /** Retained for a config-layout `button` action (doc 29 FR-29.18); present
+   *  only when `status === 'loaded'`. */
+  instance?: ContentPlugin;
+  /** The context passed to `activate` — reused for `onAction`. */
+  context?: PluginContext;
+}
+
+/** A runtime override of a config-layout `label` (doc 29 FR-29.18), set by a
+ *  plugin via `context.updateConfigLabel`. Keyed `${pluginId}:${labelId}`. */
+export interface ConfigLabelOverride {
+  text: string;
+  color?: ConfigLabelColor;
+}
+const configLabelOverrides = new Map<string, ConfigLabelOverride>();
+
+/** The current runtime override for a plugin's config label, if any. */
+export function getConfigLabelOverride(pluginId: string, labelId: string): ConfigLabelOverride | undefined {
+  return configLabelOverrides.get(`${pluginId}:${labelId}`);
+}
+
+/** Drop a plugin's config-label overrides (on uninstall, so status doesn't linger). */
+export function clearConfigLabelOverrides(pluginId: string): void {
+  const prefix = `${pluginId}:`;
+  for (const key of configLabelOverrides.keys()) {
+    if (key.startsWith(prefix)) configLabelOverrides.delete(key);
+  }
 }
 
 /** Enablement decision for a plugin id (doc 29 FR-29.16). */
@@ -94,6 +120,7 @@ function makeContext(manifest: PluginManifest, repoRoot: string): PluginContext 
     },
     getSetting: (key) => Promise.resolve(readPluginSetting(manifest, repoRoot, key)),
     setSetting: (key, value) => { writePluginSetting(manifest, repoRoot, key, value); return Promise.resolve(); },
+    updateConfigLabel: (labelId, text, color) => { configLabelOverrides.set(`${id}:${labelId}`, { text, color }); },
   };
 }
 
@@ -115,18 +142,20 @@ export async function loadPluginDir(dir: string, registry: ContentPluginRegistry
     const mod = (await import(pathToFileURL(entry).href)) as {
       default?: ContentPlugin;
       activate?: ContentPlugin['activate'];
+      onAction?: ContentPlugin['onAction'];
     };
     const plugin: ContentPlugin | undefined =
-      mod.default ?? (typeof mod.activate === 'function' ? { activate: mod.activate } : undefined);
+      mod.default ?? (typeof mod.activate === 'function' ? { activate: mod.activate, onAction: mod.onAction } : undefined);
     if (plugin === undefined || typeof plugin.activate !== 'function') {
       throw new Error('plugin exports no activate()');
     }
-    const registration = (await plugin.activate(makeContext(manifest, repoRoot))) ?? undefined;
+    const context = makeContext(manifest, repoRoot);
+    const registration = (await plugin.activate(context)) ?? undefined;
     if (registration !== undefined) {
       registry.addRenderers(registration.renderers);
       registry.addDiffers(registration.differs);
     }
-    return { id: manifest.id, dir, manifest, status: 'loaded', registration };
+    return { id: manifest.id, dir, manifest, status: 'loaded', registration, instance: plugin, context };
   } catch (e) {
     return { id: manifest.id, dir, manifest, status: 'error', error: e instanceof Error ? e.message : String(e) };
   }

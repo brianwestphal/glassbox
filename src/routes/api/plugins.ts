@@ -6,10 +6,11 @@
  */
 import { Hono } from 'hono';
 
-import { InstallPluginReqSchema, SetPluginDisabledReqSchema, SetPluginPreferenceReqSchema } from '../../api/plugins.js';
+import { InstallPluginReqSchema, RunPluginActionReqSchema, SetPluginDisabledReqSchema, SetPluginPreferenceReqSchema } from '../../api/plugins.js';
 import { setGlobalDisabled, setProjectDisabled } from '../../plugins/enablement.js';
-import { describeInstalledPlugins, getPluginManifest, reloadContentPlugins } from '../../plugins/index.js';
+import { describeInstalledPlugins, getPluginManifest, reloadContentPlugins, runPluginAction } from '../../plugins/index.js';
 import { installPluginFromDisk, uninstallPlugin } from '../../plugins/install.js';
+import { clearConfigLabelOverrides } from '../../plugins/loader.js';
 import { writePluginSetting } from '../../plugins/settings.js';
 import type { AppEnv } from '../../types.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -65,11 +66,32 @@ pluginsRoutes.post('/plugins/:id/preferences', async (c) => {
   return c.json({ plugins: describeInstalledPlugins(repoRoot) });
 });
 
+pluginsRoutes.post('/plugins/:id/action', async (c) => {
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
+  const parsed = await parseBody(c, RunPluginActionReqSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const repoRoot = c.get('repoRoot');
+  try {
+    await runPluginAction(id.data, parsed.data.actionId);
+  } catch (e) {
+    // Return the current list + the message so the client (whose apiCall
+    // validates the body regardless of status) can show a clean error. The
+    // action may still have set config labels before throwing.
+    return c.json({ plugins: describeInstalledPlugins(repoRoot), error: e instanceof Error ? e.message : 'Action failed' }, 400);
+  }
+  // No reload: the plugin ran against its live context; any labels it set are
+  // read straight from the override map by describeInstalledPlugins.
+  return c.json({ plugins: describeInstalledPlugins(repoRoot) });
+});
+
 pluginsRoutes.delete('/plugins/:id', async (c) => {
   const id = requirePathParam(c, 'id');
   if (!id.ok) return id.response;
   const repoRoot = c.get('repoRoot');
   uninstallPlugin(id.data);
+  clearConfigLabelOverrides(id.data);
   await reloadContentPlugins(repoRoot);
   return c.json({ plugins: describeInstalledPlugins(repoRoot) });
 });

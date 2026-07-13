@@ -23,6 +23,41 @@ export const PluginPreferenceInfoSchema = z.object({
 });
 export type PluginPreferenceInfo = z.infer<typeof PluginPreferenceInfoSchema>;
 
+/** A config-layout label tone (doc 29 FR-29.18). Mirrors `ConfigLabelColor`. */
+export const ConfigLabelColorSchema = z.enum(['default', 'success', 'error', 'warning', 'transient']);
+export type ConfigLabelColor = z.infer<typeof ConfigLabelColorSchema>;
+
+/** One config-layout node (doc 29 FR-29.18). Recursive (`group` nests), so the
+ *  interface is declared explicitly and the schema is `z.lazy`-wrapped. */
+export interface ConfigLayoutItem {
+  type: 'preference' | 'divider' | 'spacer' | 'label' | 'button' | 'group';
+  key?: string;
+  id?: string;
+  text?: string;
+  color?: ConfigLabelColor;
+  label?: string;
+  action?: string;
+  style?: string;
+  title?: string;
+  collapsed?: boolean;
+  items?: ConfigLayoutItem[];
+}
+export const ConfigLayoutItemSchema: z.ZodType<ConfigLayoutItem> = z.lazy(() =>
+  z.object({
+    type: z.enum(['preference', 'divider', 'spacer', 'label', 'button', 'group']),
+    key: z.string().optional(),
+    id: z.string().optional(),
+    text: z.string().optional(),
+    color: ConfigLabelColorSchema.optional(),
+    label: z.string().optional(),
+    action: z.string().optional(),
+    style: z.string().optional(),
+    title: z.string().optional(),
+    collapsed: z.boolean().optional(),
+    items: z.array(ConfigLayoutItemSchema).optional(),
+  }),
+);
+
 export const PluginInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -44,6 +79,10 @@ export const PluginInfoSchema = z.object({
   preferences: z.array(PluginPreferenceInfoSchema),
   preferenceValues: z.record(z.string(), z.string()),
   secretConfigured: z.array(z.string()),
+  /** Optional manifest arrangement of the preferences (doc 29 FR-29.18). */
+  configLayout: z.array(ConfigLayoutItemSchema).optional(),
+  /** Effective `label`-item text/color, keyed by label id (doc 29 FR-29.18). */
+  configLabels: z.record(z.string(), z.object({ text: z.string(), color: ConfigLabelColorSchema.optional() })),
 });
 export type PluginInfo = z.infer<typeof PluginInfoSchema>;
 
@@ -67,6 +106,10 @@ export type InstallPluginReq = z.infer<typeof InstallPluginReqSchema>;
 export const SetPluginPreferenceReqSchema = z.object({ key: z.string().min(1), value: z.string() });
 export type SetPluginPreferenceReq = z.infer<typeof SetPluginPreferenceReqSchema>;
 
+/** A config-layout `button` action (doc 29 FR-29.18). */
+export const RunPluginActionReqSchema = z.object({ actionId: z.string().min(1) });
+export type RunPluginActionReq = z.infer<typeof RunPluginActionReqSchema>;
+
 /** Every mutating call returns the refreshed list (after a reload). */
 export async function listPlugins(): Promise<ListPluginsResp> {
   return apiCall(ListPluginsRespSchema, '/plugins');
@@ -86,4 +129,10 @@ export async function uninstallPlugin(id: string): Promise<ListPluginsResp> {
 
 export async function setPluginPreference(id: string, req: SetPluginPreferenceReq): Promise<ListPluginsResp> {
   return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}/preferences`, { method: 'POST', body: req });
+}
+
+/** Run a config-layout button action (doc 29 FR-29.18); returns the refreshed
+ *  list so any `updateConfigLabel` the action made is reflected in the UI. */
+export async function runPluginAction(id: string, req: RunPluginActionReq): Promise<ListPluginsResp> {
+  return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}/action`, { method: 'POST', body: req });
 }

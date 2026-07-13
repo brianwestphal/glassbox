@@ -160,16 +160,44 @@ export interface PluginRegistration {
   renderers?: ContentRenderer[];
   differs?: ContentDiffer[];
 }
+export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
 export interface PluginContext {
   log(level: 'info' | 'warn' | 'error', message: string): void;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
+  updateConfigLabel(labelId: string, text: string, color?: ConfigLabelColor): void;  // config-layout status
 }
 export interface ContentPlugin {
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
+  onAction?(actionId: string, context: PluginContext): void | Promise<void>;  // config-layout button
 }
 ```
+
+### Config layout (optional)
+
+By default the Settings → Plugins tab renders your `preferences` as a flat list.
+A manifest **`configLayout`** array lets you arrange them into collapsible
+**groups**, add **dividers** / **spacers**, show dynamic **status labels**, and
+add **buttons** that invoke your `onAction` handler. Item types:
+
+```jsonc
+"configLayout": [
+  { "type": "group", "title": "Rendering", "collapsed": false, "items": [
+    { "type": "preference", "key": "engine" },   // references a declared preference
+    { "type": "spacer" },
+    { "type": "divider" },
+    { "type": "label", "id": "status", "text": "Not tested", "color": "transient" },
+    { "type": "button", "id": "test", "label": "Test", "action": "test_renderer", "style": "primary" }
+  ]}
+]
+```
+
+A `button` click calls `onAction(action, context)`. Inside it, call
+`context.updateConfigLabel(labelId, text, color?)` to reflect status back into
+the matching `label` (colors: `default` / `success` / `error` / `warning` /
+`transient`). The `plugins/graphviz/` reference plugin uses exactly this — a
+"Test renderer" button that renders a trivial graph and reports OK/failure.
 
 ## 6. Worked skeleton — a diagram-source renderer
 

@@ -941,10 +941,16 @@ global precedence — `src/plugins/enablement.ts`), **manifest-declared preferen
 `PluginContext.getSetting`/`setSetting`; graphviz's `engine` is the worked
 example; **secret** prefs → OS keychain, masked in the UI, GB-1054),
 install-from-a-folder (with a native **Browse…** folder picker on desktop,
-GB-1048), and uninstall over `/api/plugins`. Still open: a committed
-fixture-plugin e2e (GB-1043) and the other two diagram renderers — Mermaid
-(GB-1045, needs a DOM) and PlantUML (GB-1046, needs Java). Implemented FR/NFR
-units carry real tests in
+GB-1048), and uninstall over `/api/plugins`. A manifest **`configLayout`**
+(FR-29.18, GB-1059) can arrange the preferences into collapsible groups /
+dividers / spacers / dynamic **status labels** / **action buttons**; a button
+runs the plugin's `onAction` (`POST /api/plugins/:id/action`) which reports
+status via `context.updateConfigLabel`, folded into the refreshed list's
+`configLabels` (no polling). graphviz's **Rendering** group + **Test renderer**
+button is the worked example. Still open: a committed fixture-plugin e2e
+(GB-1043) — the tab's layout rendering + button wiring is manual until then — and
+the other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
+(GB-1046, needs Java). Implemented FR/NFR units carry real tests in
 `feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 19. Implementation-status snapshot

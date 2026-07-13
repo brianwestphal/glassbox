@@ -779,3 +779,53 @@
   .plugin-pref-input { max-width: 280px; }
 }
 .plugin-pref-label { font-size: 13px; }
+
+// Config-layout constructs (doc 29 FR-29.18): groups / dividers / spacers /
+// dynamic status labels / action buttons.
+.plugin-config-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+.plugin-config-spacer { height: 8px; }
+.plugin-config-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  &.plugin-config-label-success { color: var(--success, #3fb950); }
+  &.plugin-config-label-error { color: var(--danger, #f85149); }
+  &.plugin-config-label-warning { color: var(--warning, #d29922); }
+  &.plugin-config-label-transient { color: var(--text-secondary); opacity: 0.7; font-style: italic; }
+}
+.plugin-config-btn { align-self: start; }
+.plugin-config-group {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+
+  .plugin-config-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    list-style: none; // hide the native disclosure marker
+    user-select: none;
+  }
+  // Cross-browser native marker suppression.
+  .plugin-config-group-header::-webkit-details-marker { display: none; }
+
+  .plugin-config-chevron {
+    display: inline-flex;
+    color: var(--text-secondary);
+    transition: transform 0.12s ease;
+  }
+  &[open] > .plugin-config-group-header .plugin-config-chevron { transform: rotate(90deg); }
+
+  .plugin-config-group-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 10px 10px;
+  }
+}

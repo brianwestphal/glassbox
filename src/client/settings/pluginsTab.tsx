@@ -8,9 +8,9 @@
 import type { SafeHtml } from 'kerfjs';
 import { signal } from 'kerfjs';
 
-import type { PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
-import { installPlugin, listPlugins, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
-import { IconPlug } from '../../icons.js';
+import type { ConfigLabelColor, ConfigLayoutItem, PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
+import { installPlugin, listPlugins, runPluginAction, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
+import { IconChevronRight, IconPlug } from '../../icons.js';
 import { getTauriInvoke } from '../tauri.js';
 import type { Tab } from './tabContext.js';
 
@@ -47,6 +47,15 @@ export function setPreference(id: string, key: string, value: string): void {
   void setPluginPreference(id, { key, value })
     .then((r) => { plugins.value = r.plugins; })
     .catch(() => {});
+}
+
+/** Run a config-layout button action (doc 29 FR-29.18); the refreshed list
+ *  carries any dynamic labels the action set. */
+export function doPluginAction(id: string, actionId: string): void {
+  installError.value = '';
+  void runPluginAction(id, { actionId })
+    .then((r) => { plugins.value = r.plugins; installError.value = r.error ?? ''; })
+    .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Action failed'; });
 }
 
 export function doInstallPlugin(path: string): void {
@@ -110,15 +119,78 @@ function preferenceField(id: string, pref: PluginPreferenceInfo, value: string, 
   );
 }
 
+function prefFieldFor(p: PluginInfo, pref: PluginPreferenceInfo): SafeHtml {
+  // The server resolves each declared preference's value (default folded in) into
+  // preferenceValues, so a declared pref always has an entry here.
+  return preferenceField(p.id, pref, p.preferenceValues[pref.key], p.secretConfigured.includes(pref.key));
+}
+
+/** CSS class for a config-layout label's semantic tone (doc 29 FR-29.18). */
+function labelColorClass(color: ConfigLabelColor | undefined): string {
+  return color === undefined || color === 'default'
+    ? 'plugin-config-label'
+    : `plugin-config-label plugin-config-label-${color}`;
+}
+
+/** Render one config-layout node (doc 29 FR-29.18). `group` recurses. A
+ *  `preference` referencing an unknown key is skipped (like Hot Sheet). */
+function configItemJsx(p: PluginInfo, item: ConfigLayoutItem): SafeHtml | null {
+  switch (item.type) {
+    case 'preference': {
+      const pref = item.key !== undefined ? p.preferences.find((x) => x.key === item.key) : undefined;
+      return pref === undefined ? null : prefFieldFor(p, pref);
+    }
+    case 'divider':
+      return <hr className="plugin-config-divider" />;
+    case 'spacer':
+      return <div className="plugin-config-spacer"></div>;
+    case 'label': {
+      // Prefer the server-resolved effective label (manifest default merged with
+      // any runtime override); fall back to the manifest text.
+      const resolved = item.id !== undefined ? p.configLabels[item.id] : undefined;
+      const text = resolved?.text ?? item.text ?? '';
+      const color = resolved?.color ?? item.color;
+      return <div className={labelColorClass(color)} data-key={`label-${item.id ?? ''}`}>{text}</div>;
+    }
+    case 'button':
+      if (item.action === undefined || item.action === '') return null;
+      return (
+        <button
+          type="button"
+          className={`btn btn-xs${item.style === 'primary' ? ' btn-primary' : ''} plugin-config-btn`}
+          data-plugin-action={p.id}
+          data-plugin-action-id={item.action}
+        >{item.label ?? 'Run'}</button>
+      );
+    case 'group': {
+      const collapsed = item.collapsed === true;
+      return (
+        <details className="plugin-config-group" open={!collapsed} data-key={`group-${item.title ?? ''}`}>
+          <summary className="plugin-config-group-header">
+            <span className="plugin-config-chevron"><IconChevronRight /></span>
+            <span className="plugin-config-group-title">{item.title ?? 'Group'}</span>
+          </summary>
+          <div className="plugin-config-group-body">
+            {(item.items ?? []).map((child) => configItemJsx(p, child))}
+          </div>
+        </details>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
 function preferencesJsx(p: PluginInfo): SafeHtml | null {
+  // A manifest may arrange its preferences via configLayout (doc 29 FR-29.18);
+  // otherwise fall back to a flat list of every declared preference.
+  if (p.configLayout !== undefined && p.configLayout.length > 0) {
+    return <div className="plugin-row-prefs">{p.configLayout.map((item) => configItemJsx(p, item))}</div>;
+  }
   if (p.preferences.length === 0) return null;
   return (
     <div className="plugin-row-prefs">
-      {p.preferences.map((pref) => preferenceField(
-        p.id, pref,
-        (p.preferenceValues[pref.key] as string | undefined) ?? pref.default ?? '',
-        p.secretConfigured.includes(pref.key),
-      ))}
+      {p.preferences.map((pref) => prefFieldFor(p, pref))}
     </div>
   );
 }

@@ -81,6 +81,13 @@ export interface PluginRegistration {
   differs?: ContentDiffer[];
 }
 
+/**
+ * A dynamic config-layout label's semantic tone (doc 29 FR-29.18). The plugin
+ * picks the tone; the host maps it to the actual UI color so labels stay
+ * consistent across plugins.
+ */
+export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
+
 /** Host services handed to a plugin at activation. */
 export interface PluginContext {
   /** Scoped logger; messages are prefixed with the plugin id. */
@@ -89,15 +96,28 @@ export interface PluginContext {
   getSetting(key: string): Promise<string | null>;
   /** Persist a per-plugin setting (GB-1040). */
   setSetting(key: string, value: string): Promise<void>;
+  /**
+   * Update a `label` item in the plugin's manifest `configLayout` at runtime
+   * (doc 29 FR-29.18) — e.g. show "Connected" after a `test` button action. The
+   * Settings → Plugins tab reflects the new text/color the next time the list
+   * refreshes (which an action triggers). No-op for an unknown `labelId`.
+   */
+  updateConfigLabel(labelId: string, text: string, color?: ConfigLabelColor): void;
 }
 
 /**
  * The module contract a plugin's entry point exports — as a `default` object or
- * as a named `activate` export. `activate` returns its registration (renderers
- * / differs), or nothing for a no-op plugin (doc 29 FR-29.11).
+ * as named `activate` / `onAction` exports. `activate` returns its registration
+ * (renderers / differs), or nothing for a no-op plugin (doc 29 FR-29.11).
  */
 export interface ContentPlugin {
   // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- activate may return nothing (void) or a registration, sync or async
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
+  /**
+   * Handle a `button` action declared in the manifest `configLayout` (doc 29
+   * FR-29.18). Invoked with the same `PluginContext` passed to `activate`, so it
+   * can read settings and call `updateConfigLabel` to reflect status in the UI.
+   */
+  onAction?(actionId: string, context: PluginContext): void | Promise<void>;
 }

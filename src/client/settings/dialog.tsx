@@ -30,7 +30,7 @@ import { switchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
-import { browsePluginFolder, doInstallPlugin, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
+import { browsePluginFolder, doInstallPlugin, doPluginAction, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
 import type { ChannelState, ConfigResponse, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
@@ -515,6 +515,13 @@ function setupDelegates(args: {
     if (input !== null) doInstallPlugin(asInput(input).value);
   });
   void delegate(overlay, 'click', '#plugin-browse-btn', () => { browsePluginFolder(); });
+  // Config-layout button actions (doc 29 FR-29.18): run the plugin's onAction,
+  // then the refreshed list re-renders any dynamic labels the action set.
+  void delegate(overlay, 'click', '[data-plugin-action]', (_e, el) => {
+    const id = asEl(el).dataset.pluginAction;
+    const actionId = asEl(el).dataset.pluginActionId;
+    if (id !== undefined && actionId !== undefined) doPluginAction(id, actionId);
+  });
   // Plugin preference edits (doc 29 FR-29.12). Selects/checkboxes save on change;
   // text/number inputs save on blur (change) so we don't reload on every keystroke.
   void delegate(overlay, 'change', '[data-plugin-pref-key]', (_e, el) => {
