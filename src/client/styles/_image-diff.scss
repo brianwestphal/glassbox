@@ -384,6 +384,14 @@
   }
 }
 
+// Metadata mode has no image canvas to draw on, so the "Draw region" affordance
+// is meaningless there — hide the draw bar while the metadata panel is active
+// (GB-1053). The `.image-feedback` panel follows all mode panels as a sibling, so
+// this keys off the active metadata panel without touching the client render.
+.image-diff-panel[data-panel='metadata'].active ~ .image-feedback .image-feedback-bar {
+  display: none;
+}
+
 // "Draw region" button: square-dashed icon + label on one row.
 .image-feedback-draw-btn {
   display: inline-flex;

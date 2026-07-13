@@ -834,3 +834,22 @@ test.describe('Single-side image focus (doc 28)', () => {
     await expect(page.locator('[data-panel="side-by-side"]')).toHaveClass(/active/, { timeout: 5000 });
   });
 });
+
+test.describe('Draw-region button hidden in Metadata mode (GB-1053)', () => {
+  test('the draw-region button shows in a comparison mode but is hidden in Metadata', async ({ page }) => {
+    await openImageDiff(page);
+    // Ensure a comparison mode (not Metadata) is active first.
+    await page.locator('[data-image-mode="side-by-side"]').click();
+    const drawBtn = page.locator('.image-feedback-draw-btn');
+    await expect(drawBtn).toBeVisible();
+
+    // Metadata mode has no canvas to draw on -> the draw affordance is hidden.
+    await page.locator('[data-image-mode="metadata"]').click();
+    await expect(page.locator('[data-panel="metadata"]')).toHaveClass(/active/);
+    await expect(drawBtn).toBeHidden();
+
+    // Back to a comparison mode -> visible again.
+    await page.locator('[data-image-mode="side-by-side"]').click();
+    await expect(drawBtn).toBeVisible();
+  });
+});
