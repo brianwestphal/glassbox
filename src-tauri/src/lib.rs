@@ -389,13 +389,25 @@ fn build_dev_server_args(app_args: &[String]) -> Vec<String> {
 /// folder instead of typing a path (doc 29, GB-1048). Returns the chosen path,
 /// or `None` if the dialog was cancelled. The web/CLI build falls back to the
 /// text-path field.
+///
+/// The command is `async` and runs the blocking dialog on a `spawn_blocking`
+/// thread. A sync command runs on the **main thread**, and blocking it there
+/// (as `blocking_pick_folder` does) freezes the event loop — the dialog appears
+/// but can't be interacted with (GB-1048). Off the main thread, the event loop
+/// stays live and the dialog is usable.
 #[tauri::command]
-fn pick_plugin_folder(app: tauri::AppHandle) -> Option<String> {
-    use tauri_plugin_dialog::DialogExt;
-    app.dialog()
-        .file()
-        .set_title("Select a plugin folder")
-        .blocking_pick_folder()
+async fn pick_plugin_folder(app: tauri::AppHandle) -> Option<String> {
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        use tauri_plugin_dialog::DialogExt;
+        app.dialog()
+            .file()
+            .set_title("Select a plugin folder")
+            .blocking_pick_folder()
+    })
+    .await
+    .ok()
+    .flatten();
+    picked
         .and_then(|f| f.into_path().ok())
         .map(|p| p.to_string_lossy().into_owned())
 }
