@@ -53,17 +53,33 @@ export function doInstallPlugin(path: string): void {
   if (path.trim() === '') return;
   installError.value = '';
   void installPlugin({ path: path.trim() })
-    .then((r) => { plugins.value = r.plugins; installError.value = r.error ?? ''; })
+    .then((r) => {
+      plugins.value = r.plugins;
+      installError.value = r.error ?? '';
+      // On success, clear the field so it's clear the install ran (re-installing
+      // an already-present plugin otherwise looks like nothing happened).
+      if (r.error === undefined) {
+        const input = document.getElementById('plugin-install-path');
+        if (input instanceof HTMLInputElement) input.value = '';
+      }
+    })
     .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Install failed'; });
 }
 
-/** Desktop only (doc 29, GB-1048): open a native folder picker and install the
- *  chosen plugin folder. No-op in the browser (the text-path field is used). */
+/** Desktop only (doc 29, GB-1048): open a native folder picker and put the chosen
+ *  path into the install field — the user then clicks **Install** (Browse only
+ *  fills the field; it doesn't install on its own). No-op in the browser. */
 export function browsePluginFolder(): void {
   const invoke = getTauriInvoke();
   if (invoke === null) return;
   void invoke('pick_plugin_folder').then((path) => {
-    if (typeof path === 'string' && path !== '') doInstallPlugin(path);
+    if (typeof path !== 'string' || path === '') return;
+    const input = document.getElementById('plugin-install-path');
+    if (input instanceof HTMLInputElement) {
+      input.value = path;
+      input.focus();
+    }
+    installError.value = '';
   }).catch(() => {});
 }
 

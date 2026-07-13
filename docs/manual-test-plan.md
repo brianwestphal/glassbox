@@ -58,9 +58,13 @@ Until then, the tab's UI wiring is manual:
   "Enabled (all projects)" disables it everywhere and greys out the per-project
   toggle (global precedence).
 - **Install-from-a-folder / uninstall** — Typing a plugin folder path + Install
-  adds it to the list; Uninstall removes it (and a bundled plugin stays gone via
-  the dismiss-list). *(The install-path field is the current UI; a native folder
-  picker is GB-1048.)*
+  adds it to the list (the field clears on success); Uninstall removes it (and a
+  bundled plugin stays gone via the dismiss-list). Installing a folder with no
+  `manifest.json` shows a clean "not a Glassbox plugin" error, not a crash.
+- **Browse… native folder picker (GB-1048, desktop only)** — Under Tauri, a
+  **Browse…** button next to the install field opens a native folder dialog and
+  **fills the field** with the chosen path (it does not auto-install — the user
+  then clicks **Install**). The dialog must not freeze the app.
 - **Manifest preferences (GB-1047)** — With the Graphviz plugin enabled, its row
   shows a **Layout engine** select (dot / neato / fdp / circo / twopi). Changing
   it auto-saves; re-open a `.dot` diagram in Rendered mode and the layout changes
