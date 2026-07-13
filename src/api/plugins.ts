@@ -47,7 +47,12 @@ export const PluginInfoSchema = z.object({
 });
 export type PluginInfo = z.infer<typeof PluginInfoSchema>;
 
-export const ListPluginsRespSchema = z.object({ plugins: z.array(PluginInfoSchema) });
+export const ListPluginsRespSchema = z.object({
+  plugins: z.array(PluginInfoSchema),
+  /** Set when a mutation (e.g. install-from-disk of a non-plugin folder) failed;
+   *  the list is still returned so the UI stays in sync + can show the message. */
+  error: z.string().optional(),
+});
 export type ListPluginsResp = z.infer<typeof ListPluginsRespSchema>;
 
 export const SetPluginDisabledReqSchema = z.object({

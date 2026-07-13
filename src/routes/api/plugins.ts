@@ -41,7 +41,10 @@ pluginsRoutes.post('/plugins/install', async (c) => {
   try {
     installPluginFromDisk(parsed.data.path);
   } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : 'install failed' }, 400);
+    // Return the current list + the message so the client (whose apiCall
+    // validates the body regardless of status) can show a clean error instead
+    // of a schema-validation failure (GB-1048).
+    return c.json({ plugins: describeInstalledPlugins(repoRoot), error: e instanceof Error ? e.message : 'Install failed' }, 400);
   }
   await reloadContentPlugins(repoRoot);
   return c.json({ plugins: describeInstalledPlugins(repoRoot) });

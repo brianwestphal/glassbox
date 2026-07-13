@@ -10,7 +10,7 @@ import { signal } from 'kerfjs';
 
 import type { PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
 import { installPlugin, listPlugins, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
-import { IconPuzzle } from '../../icons.js';
+import { IconPlug } from '../../icons.js';
 import { getTauriInvoke } from '../tauri.js';
 import type { Tab } from './tabContext.js';
 
@@ -53,7 +53,7 @@ export function doInstallPlugin(path: string): void {
   if (path.trim() === '') return;
   installError.value = '';
   void installPlugin({ path: path.trim() })
-    .then((r) => { plugins.value = r.plugins; })
+    .then((r) => { plugins.value = r.plugins; installError.value = r.error ?? ''; })
     .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Install failed'; });
 }
 
@@ -174,6 +174,6 @@ function renderPluginsTab(): SafeHtml {
 export const pluginsTab: Tab = {
   id: 'plugins',
   label: 'Plugins',
-  icon: <IconPuzzle />,
+  icon: <IconPlug />,
   render: () => renderPluginsTab(),
 };

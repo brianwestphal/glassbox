@@ -128,7 +128,7 @@ export function installBundledPlugins(opts?: { bundledDir?: string; userDir?: st
  */
 export function installPluginFromDisk(sourceDir: string, opts?: { userDir?: string }): { id: string } {
   const manifest = readManifest(sourceDir);
-  if (manifest === null) throw new Error('not a valid plugin (no manifest)');
+  if (manifest === null) throw new Error('The selected folder is not a Glassbox plugin (no manifest.json).');
   const userDir = opts?.userDir ?? pluginsDir();
   mkdirSync(userDir, { recursive: true });
   const dest = join(userDir, manifest.id);
