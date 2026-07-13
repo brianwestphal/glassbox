@@ -114,11 +114,20 @@ content `renderer` / `differ`. Everything else transfers.
   neither is a valid no-op (e.g. a plugin that only contributes a preference or a
   future UI affordance). Registration is additive into the in-memory registry the
   dispatcher reads.
-- **FR-29.12 — Plugin context.** `activate` shall receive a `PluginContext`
-  giving the plugin a scoped logger and access to its own persisted configuration
-  (`getSetting` / `setSetting`), resolving secrets through the OS keychain the
-  same way Glassbox stores API keys ([doc 14](14-security.md) §14.4). The context
-  is the plugin's only sanctioned channel to host services.
+- **FR-29.12 — Plugin context + preferences.** `activate` shall receive a
+  `PluginContext` giving the plugin a scoped logger and access to its own
+  persisted configuration (`getSetting` / `setSetting`). A plugin declares
+  user-facing **preferences** in its manifest (`key` / `label` / `type` of
+  string·number·boolean·select / `default` / `description` / `options` / `scope`
+  of global·project); the Settings → **Plugins** tab renders them and auto-saves,
+  and `getSetting(key)` returns the stored value (or the declared default).
+  Non-secret values persist in the global config (`~/.glassbox/config.json`) or
+  the project settings (`.glassbox/settings.json`) per the preference's scope
+  (`src/plugins/settings.ts`, GB-1047). Setting a preference **reloads** the
+  plugin so it re-reads the value (the reference `graphviz` plugin exposes a
+  layout-`engine` preference). **Secret** preferences (`secret: true`,
+  keychain-backed like API keys, [doc 14](14-security.md) §14.4) are a follow-up
+  (GB-1054); a declared secret is currently stored like a normal pref.
 
 ## 29.4 Where plugins run
 
@@ -237,8 +246,8 @@ The build is decomposed into follow-up tickets:
   (active / disabled / failed), per-plugin **global** and **per-project** disable
   toggles (FR-29.16), install-from-a-folder (path) and uninstall, backed by
   `GET/POST/DELETE /api/plugins` (`src/routes/api/plugins.ts`). Manifest-declared
-  **preferences** (FR-29.12) and the **native folder picker** are follow-ups
-  (GB-1047 / GB-1048).
+  manifest **preferences** (FR-29.12, GB-1047 — **shipped**; the native folder
+  picker is the GB-1048 follow-up).
 - **Developer guide** (GB-1041, **shipped**) — `docs/plugin-development-guide.md`
   plus a standalone, copy-paste `types.ts` so third parties can build plugins
   without depending on the Glassbox package.
@@ -290,6 +299,13 @@ Shipped in P1 (GB-1038):
   API is `src/routes/api/plugins.ts` (`GET/POST/DELETE /api/plugins`,
   `src/api/plugins.ts`); the UI is `src/client/settings/pluginsTab.tsx`. Per-repo
   state persists via the shared `src/project-settings-store.ts`.
+- **Preferences** (FR-29.12, GB-1047) — the manifest `preferences` schema
+  (`src/plugins/manifest.ts`), the value store (`src/plugins/settings.ts`,
+  global config / project settings per scope), `PluginContext.getSetting`/
+  `setSetting` wired in `loader.ts` `makeContext(manifest, repoRoot)`, the
+  `POST /api/plugins/:id/preferences` setter (reloads the plugin), and the
+  Plugins-tab rendering. The `graphviz` plugin's `engine` preference is the
+  worked example.
 
 Planned by the follow-ups:
 

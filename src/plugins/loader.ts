@@ -19,6 +19,7 @@ import { PLUGINS_ENABLED } from '../feature-flags.js';
 import { GLOBAL_CONFIG_DIR } from '../global-config.js';
 import { parseManifest, type PluginManifest } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
+import { readPluginSetting, writePluginSetting } from './settings.js';
 import type { ContentPlugin, PluginContext, PluginRegistration } from './types.js';
 
 /** One plugin's load outcome — surfaced to the management UI (GB-1040). */
@@ -80,9 +81,10 @@ export function readManifest(dir: string): PluginManifest | null {
   return null;
 }
 
-/** The minimal host context for P1. Persisted per-plugin settings + keychain
- *  secrets land with the management UI (GB-1040); `getSetting` is a no-op here. */
-function makeContext(id: string): PluginContext {
+/** The host context handed to a plugin's `activate`. `getSetting`/`setSetting`
+ *  are backed by the manifest-declared preference store (doc 29 FR-29.12). */
+function makeContext(manifest: PluginManifest, repoRoot: string): PluginContext {
+  const id = manifest.id;
   return {
     log: (level, message) => {
       const line = `[plugin:${id}] ${message}`;
@@ -90,14 +92,15 @@ function makeContext(id: string): PluginContext {
       else if (level === 'warn') console.warn(line);
       else console.log(line);
     },
-    getSetting: () => Promise.resolve(null),
-    setSetting: () => Promise.resolve(),
+    getSetting: (key) => Promise.resolve(readPluginSetting(manifest, repoRoot, key)),
+    setSetting: (key, value) => { writePluginSetting(manifest, repoRoot, key, value); return Promise.resolve(); },
   };
 }
 
 /** Load, activate, and register a single plugin directory. Never throws. A
- *  disabled plugin (per `isEnabled`) is recorded but not activated/registered. */
-export async function loadPluginDir(dir: string, registry: ContentPluginRegistry, isEnabled: EnablementCheck = ALWAYS_ENABLED): Promise<LoadedPlugin> {
+ *  disabled plugin (per `isEnabled`) is recorded but not activated/registered.
+ *  `repoRoot` scopes project-scoped preferences (doc 29 FR-29.12). */
+export async function loadPluginDir(dir: string, registry: ContentPluginRegistry, isEnabled: EnablementCheck = ALWAYS_ENABLED, repoRoot = ''): Promise<LoadedPlugin> {
   const manifest = readManifest(dir);
   if (manifest === null) {
     return { id: dir, dir, manifest: null, status: 'error', error: 'invalid or missing manifest' };
@@ -118,7 +121,7 @@ export async function loadPluginDir(dir: string, registry: ContentPluginRegistry
     if (plugin === undefined || typeof plugin.activate !== 'function') {
       throw new Error('plugin exports no activate()');
     }
-    const registration = (await plugin.activate(makeContext(manifest.id))) ?? undefined;
+    const registration = (await plugin.activate(makeContext(manifest, repoRoot))) ?? undefined;
     if (registration !== undefined) {
       registry.addRenderers(registration.renderers);
       registry.addDiffers(registration.differs);
@@ -134,12 +137,12 @@ export async function loadPluginDir(dir: string, registry: ContentPluginRegistry
  * registry and the per-plugin outcomes. A no-op (empty registry) when the
  * subsystem is disabled (doc 29 NFR-29.4).
  */
-export async function loadAllPlugins(root = pluginsDir(), isEnabled: EnablementCheck = ALWAYS_ENABLED): Promise<{ registry: ContentPluginRegistry; loaded: LoadedPlugin[] }> {
+export async function loadAllPlugins(root = pluginsDir(), isEnabled: EnablementCheck = ALWAYS_ENABLED, repoRoot = ''): Promise<{ registry: ContentPluginRegistry; loaded: LoadedPlugin[] }> {
   const registry = new ContentPluginRegistry();
   if (!PLUGINS_ENABLED) return { registry, loaded: [] };
   const loaded: LoadedPlugin[] = [];
   for (const dir of discoverPluginDirs(root)) {
-    loaded.push(await loadPluginDir(dir, registry, isEnabled));
+    loaded.push(await loadPluginDir(dir, registry, isEnabled, repoRoot));
   }
   return { registry, loaded };
 }

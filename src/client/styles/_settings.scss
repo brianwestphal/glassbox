@@ -754,3 +754,28 @@
   font-size: 12px;
   color: var(--danger, #f85149);
 }
+
+// Plugin manifest-declared preferences (doc 29 FR-29.12, GB-1047).
+.plugin-row-prefs {
+  margin-top: 12px;
+  padding-left: 19px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plugin-pref {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 10px;
+  align-items: center;
+
+  .plugin-pref-desc {
+    grid-column: 2;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .plugin-pref-checkbox { justify-self: start; }
+  .plugin-pref-select,
+  .plugin-pref-input { max-width: 280px; }
+}
+.plugin-pref-label { font-size: 13px; }

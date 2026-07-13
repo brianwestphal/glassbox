@@ -6,10 +6,11 @@
  */
 import { Hono } from 'hono';
 
-import { InstallPluginReqSchema, SetPluginDisabledReqSchema } from '../../api/plugins.js';
+import { InstallPluginReqSchema, SetPluginDisabledReqSchema, SetPluginPreferenceReqSchema } from '../../api/plugins.js';
 import { setGlobalDisabled, setProjectDisabled } from '../../plugins/enablement.js';
-import { describeInstalledPlugins, reloadContentPlugins } from '../../plugins/index.js';
+import { describeInstalledPlugins, getPluginManifest, reloadContentPlugins } from '../../plugins/index.js';
 import { installPluginFromDisk, uninstallPlugin } from '../../plugins/install.js';
+import { writePluginSetting } from '../../plugins/settings.js';
 import type { AppEnv } from '../../types.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
 
@@ -42,6 +43,21 @@ pluginsRoutes.post('/plugins/install', async (c) => {
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : 'install failed' }, 400);
   }
+  await reloadContentPlugins(repoRoot);
+  return c.json({ plugins: describeInstalledPlugins(repoRoot) });
+});
+
+pluginsRoutes.post('/plugins/:id/preferences', async (c) => {
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
+  const parsed = await parseBody(c, SetPluginPreferenceReqSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const manifest = getPluginManifest(id.data);
+  if (manifest === undefined) return c.json({ error: 'Plugin not found' }, 404);
+  const repoRoot = c.get('repoRoot');
+  writePluginSetting(manifest, repoRoot, parsed.data.key, parsed.data.value);
+  // Reload so the plugin re-activates and picks up the new value.
   await reloadContentPlugins(repoRoot);
   return c.json({ plugins: describeInstalledPlugins(repoRoot) });
 });

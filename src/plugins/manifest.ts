@@ -14,6 +14,28 @@ const ContentTypeSchema = z
   })
   .loose();
 
+/** A manifest-declared plugin preference (doc 29 FR-29.12, GB-1047). The plugin
+ *  reads it via `PluginContext.getSetting(key)`; the Settings → Plugins tab
+ *  renders it and auto-saves. */
+export const PluginPreferenceSchema = z
+  .object({
+    key: z.string().min(1),
+    label: z.string().min(1),
+    type: z.enum(['string', 'number', 'boolean', 'select']),
+    /** Stored as a string; the plugin coerces. */
+    default: z.string().optional(),
+    description: z.string().optional(),
+    /** `select` options (value === label unless an object form is used later). */
+    options: z.array(z.string()).optional(),
+    /** Per-project vs global storage (default global). */
+    scope: z.enum(['global', 'project']).optional(),
+    /** Secret prefs (keychain-backed) are a follow-up (GB-1054); declaring one is
+     *  accepted but currently stored like a normal pref, so avoid it for secrets. */
+    secret: z.boolean().optional(),
+  })
+  .loose();
+export type PluginPreference = z.infer<typeof PluginPreferenceSchema>;
+
 /** `.loose()` so a manifest may carry extra keys (e.g. plugin-specific config)
  *  without failing validation — only the fields the host reads are asserted. */
 export const PluginManifestSchema = z
@@ -28,6 +50,8 @@ export const PluginManifestSchema = z
     /** The content types this plugin handles (informational for the UI; the
      *  authoritative match lives in the registered renderer/differ). */
     contentTypes: z.array(ContentTypeSchema).optional(),
+    /** User-configurable preferences (doc 29 FR-29.12); rendered in Settings. */
+    preferences: z.array(PluginPreferenceSchema).optional(),
   })
   .loose();
 

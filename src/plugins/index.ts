@@ -12,7 +12,9 @@ import { PLUGINS_ENABLED } from '../feature-flags.js';
 import { disabledScope, readEnablementLists, readGlobalDisabled, readProjectDisabled } from './enablement.js';
 import { installBundledPlugins } from './install.js';
 import { type EnablementCheck,loadAllPlugins,type LoadedPlugin } from './loader.js';
+import type { PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
+import { readPluginPreferenceValues } from './settings.js';
 import type { DiffInput, RenderedView, RenderInput } from './types.js';
 
 let registry = new ContentPluginRegistry();
@@ -41,7 +43,7 @@ async function loadFor(repoRoot: string): Promise<void> {
   // Seed ~/.glassbox/plugins/ from bundled first-party plugins (desktop
   // delivery, GB-1039) before discovery. Fail-soft: never throws.
   installBundledPlugins();
-  const res = await loadAllPlugins(undefined, enablementCheckFor(repoRoot));
+  const res = await loadAllPlugins(undefined, enablementCheckFor(repoRoot), repoRoot);
   registry = res.registry;
   loadedPlugins = res.loaded;
   currentRepoRoot = repoRoot;
@@ -101,6 +103,9 @@ export interface InstalledPluginInfo {
   disabledScope?: 'global' | 'project';
   globalDisabled: boolean;
   projectDisabled: boolean;
+  /** Manifest-declared preferences + their current values (doc 29 FR-29.12). */
+  preferences: PluginPreference[];
+  preferenceValues: Record<string, string>;
 }
 
 /**
@@ -123,8 +128,15 @@ export function describeInstalledPlugins(repoRoot: string): InstalledPluginInfo[
       disabledScope: p.disabledScope,
       globalDisabled: globalDisabled.has(p.id),
       projectDisabled: projectDisabled.has(p.id),
+      preferences: p.manifest?.preferences ?? [],
+      preferenceValues: p.manifest ? readPluginPreferenceValues(p.manifest, repoRoot) : {},
     };
   });
+}
+
+/** The manifest for a loaded plugin id (for the preference setter). */
+export function getPluginManifest(id: string): PluginManifest | undefined {
+  return loadedPlugins.find((p) => p.id === id)?.manifest ?? undefined;
 }
 
 /**

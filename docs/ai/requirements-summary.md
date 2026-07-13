@@ -936,8 +936,11 @@ plugins build to `dist/plugins/`, ship in the sidecar, and auto-install into
 dismiss-list (`src/plugins/install.ts`) — and the **management UI** (GB-1040): a
 Settings **Plugins** tab that lists installed plugins with status and offers
 per-plugin **global** + **per-project** disable toggles (enabled by default,
-global precedence — `src/plugins/enablement.ts`), install-from-a-folder, and
-uninstall over `/api/plugins`. Still open: a committed fixture-plugin e2e
+global precedence — `src/plugins/enablement.ts`), **manifest-declared preferences**
+(GB-1047, `src/plugins/settings.ts` — persist per-scope, back
+`PluginContext.getSetting`/`setSetting`; graphviz's `engine` is the worked
+example), install-from-a-folder, and uninstall over `/api/plugins`. Still open: a
+committed fixture-plugin e2e
 (GB-1043), manifest-preferences + native folder picker (GB-1047/1048), and the
 other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
 (GB-1046, needs Java). Implemented FR/NFR units carry real tests in

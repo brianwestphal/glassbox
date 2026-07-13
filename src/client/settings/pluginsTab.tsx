@@ -8,8 +8,8 @@
 import type { SafeHtml } from 'kerfjs';
 import { signal } from 'kerfjs';
 
-import type { PluginInfo } from '../../api/index.js';
-import { installPlugin, listPlugins, setPluginDisabled, uninstallPlugin } from '../../api/index.js';
+import type { PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
+import { installPlugin, listPlugins, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
 import { IconPuzzle } from '../../icons.js';
 import type { Tab } from './tabContext.js';
 
@@ -42,12 +42,49 @@ export function doUninstallPlugin(id: string): void {
     .catch(() => {});
 }
 
+export function setPreference(id: string, key: string, value: string): void {
+  void setPluginPreference(id, { key, value })
+    .then((r) => { plugins.value = r.plugins; })
+    .catch(() => {});
+}
+
 export function doInstallPlugin(path: string): void {
   if (path.trim() === '') return;
   installError.value = '';
   void installPlugin({ path: path.trim() })
     .then((r) => { plugins.value = r.plugins; })
     .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Install failed'; });
+}
+
+function preferenceField(id: string, pref: PluginPreferenceInfo, value: string): SafeHtml {
+  const common = { 'data-plugin-pref-id': id, 'data-plugin-pref-key': pref.key } as const;
+  const control =
+    pref.type === 'boolean' ? (
+      <input type="checkbox" className="plugin-pref-checkbox" {...common} checked={value === 'true'} />
+    ) : pref.type === 'select' ? (
+      <select className="settings-input plugin-pref-select" {...common}>
+        {(pref.options ?? []).map((opt) => <option value={opt} selected={opt === value}>{opt}</option>)}
+      </select>
+    ) : (
+      <input type={pref.type === 'number' ? 'number' : 'text'} className="settings-input plugin-pref-input"
+        {...common} value={value} />
+    );
+  return (
+    <label className="plugin-pref" data-key={pref.key}>
+      <span className="plugin-pref-label">{pref.label}</span>
+      {control}
+      {pref.description !== undefined && pref.description !== '' && <span className="plugin-pref-desc">{pref.description}</span>}
+    </label>
+  );
+}
+
+function preferencesJsx(p: PluginInfo): SafeHtml | null {
+  if (p.preferences.length === 0) return null;
+  return (
+    <div className="plugin-row-prefs">
+      {p.preferences.map((pref) => preferenceField(p.id, pref, (p.preferenceValues[pref.key] as string | undefined) ?? pref.default ?? ''))}
+    </div>
+  );
 }
 
 function pluginRow(p: PluginInfo): SafeHtml {
@@ -79,6 +116,7 @@ function pluginRow(p: PluginInfo): SafeHtml {
           </label>
         </div>
       )}
+      {p.status !== 'error' && preferencesJsx(p)}
     </div>
   );
 }

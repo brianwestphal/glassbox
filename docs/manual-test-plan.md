@@ -61,6 +61,12 @@ Until then, the tab's UI wiring is manual:
   adds it to the list; Uninstall removes it (and a bundled plugin stays gone via
   the dismiss-list). *(The install-path field is the current UI; a native folder
   picker is GB-1048.)*
+- **Manifest preferences (GB-1047)** — With the Graphviz plugin enabled, its row
+  shows a **Layout engine** select (dot / neato / fdp / circo / twopi). Changing
+  it auto-saves; re-open a `.dot` diagram in Rendered mode and the layout changes
+  to the selected engine. *(The store + getSetting/setSetting + engine-applied
+  render are unit-tested and verified live; this item is the tab's control
+  rendering + auto-save, which needs the real UI.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of

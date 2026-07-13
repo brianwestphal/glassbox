@@ -10,6 +10,19 @@ import { apiCall } from './_runner.js';
 export const PluginStatusSchema = z.enum(['loaded', 'disabled', 'error']);
 export type PluginStatus = z.infer<typeof PluginStatusSchema>;
 
+/** A manifest-declared preference (doc 29 FR-29.12). Mirrors `PluginPreference`. */
+export const PluginPreferenceInfoSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  type: z.enum(['string', 'number', 'boolean', 'select']),
+  default: z.string().optional(),
+  description: z.string().optional(),
+  options: z.array(z.string()).optional(),
+  scope: z.enum(['global', 'project']).optional(),
+  secret: z.boolean().optional(),
+});
+export type PluginPreferenceInfo = z.infer<typeof PluginPreferenceInfoSchema>;
+
 export const PluginInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -25,6 +38,9 @@ export const PluginInfoSchema = z.object({
   /** The two independent disable flags, so the UI can render both toggles. */
   globalDisabled: z.boolean(),
   projectDisabled: z.boolean(),
+  /** Manifest-declared preferences + their current values (doc 29 FR-29.12). */
+  preferences: z.array(PluginPreferenceInfoSchema),
+  preferenceValues: z.record(z.string(), z.string()),
 });
 export type PluginInfo = z.infer<typeof PluginInfoSchema>;
 
@@ -39,6 +55,9 @@ export type SetPluginDisabledReq = z.infer<typeof SetPluginDisabledReqSchema>;
 
 export const InstallPluginReqSchema = z.object({ path: z.string().min(1) });
 export type InstallPluginReq = z.infer<typeof InstallPluginReqSchema>;
+
+export const SetPluginPreferenceReqSchema = z.object({ key: z.string().min(1), value: z.string() });
+export type SetPluginPreferenceReq = z.infer<typeof SetPluginPreferenceReqSchema>;
 
 /** Every mutating call returns the refreshed list (after a reload). */
 export async function listPlugins(): Promise<ListPluginsResp> {
@@ -55,4 +74,8 @@ export async function installPlugin(req: InstallPluginReq): Promise<ListPluginsR
 
 export async function uninstallPlugin(id: string): Promise<ListPluginsResp> {
   return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function setPluginPreference(id: string, req: SetPluginPreferenceReq): Promise<ListPluginsResp> {
+  return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}/preferences`, { method: 'POST', body: req });
 }

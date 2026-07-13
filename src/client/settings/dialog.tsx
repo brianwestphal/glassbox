@@ -30,7 +30,7 @@ import { switchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
-import { doInstallPlugin, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, togglePluginDisabled } from './pluginsTab.js';
+import { doInstallPlugin, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
 import type { ChannelState, ConfigResponse, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
@@ -513,6 +513,16 @@ function setupDelegates(args: {
   void delegate(overlay, 'click', '#plugin-install-btn', () => {
     const input = overlay.querySelector('#plugin-install-path');
     if (input !== null) doInstallPlugin(asInput(input).value);
+  });
+  // Plugin preference edits (doc 29 FR-29.12). Selects/checkboxes save on change;
+  // text/number inputs save on blur (change) so we don't reload on every keystroke.
+  void delegate(overlay, 'change', '[data-plugin-pref-key]', (_e, el) => {
+    const id = asEl(el).dataset.pluginPrefId;
+    const key = asEl(el).dataset.pluginPrefKey;
+    if (id === undefined || key === undefined) return;
+    const input = asInput(el);
+    const value = input.type === 'checkbox' ? String(input.checked) : input.value;
+    setPreference(id, key, value);
   });
 
   // General tab

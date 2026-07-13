@@ -1828,7 +1828,8 @@
       "note": "activate() -> { renderers?, differs? } additive registration into the registry; counts."
     },
     "FR-29.12": {
-      "waived": "Full PluginContext with persisted, keychain-backed getSetting/setSetting + the manifest-preferences UI is not built — the shipped context is minimal (log + no-op settings). Tracked in GB-1047. Flip to a test when preference persistence lands."
+      "tests": ["tests/unit/plugins/settings.test.ts", "tests/unit/plugins/graphviz.test.ts"],
+      "note": "Manifest-declared preferences (GB-1047): the settings store persists per-plugin values (global config / project settings per scope, default fallback), PluginContext.getSetting/setSetting are wired to it, and the graphviz plugin's `engine` preference is applied at render — verified live (set engine -> reload -> render changes). Keychain-backed SECRET prefs are a follow-up (GB-1054)."
     },
     "FR-29.13": {
       "tests": ["tests/unit/plugins/artifacts.test.ts"],

@@ -3,14 +3,16 @@ import { describe, expect, it } from 'vitest';
 import plugin from '../../../plugins/graphviz/src/index.js';
 import type { ContentRenderer, PluginContext, PluginRegistration } from '../../../plugins/graphviz/src/types.js';
 
-const noopCtx: PluginContext = {
-  log: () => {},
-  getSetting: () => Promise.resolve(null),
-  setSetting: () => Promise.resolve(),
-};
+function ctxWith(settings: Record<string, string> = {}): PluginContext {
+  return {
+    log: () => {},
+    getSetting: (key) => Promise.resolve(settings[key] ?? null),
+    setSetting: () => Promise.resolve(),
+  };
+}
 
-async function getRenderer(): Promise<ContentRenderer> {
-  const reg = (await plugin.activate(noopCtx)) as PluginRegistration;
+async function getRenderer(settings: Record<string, string> = {}): Promise<ContentRenderer> {
+  const reg = (await plugin.activate(ctxWith(settings))) as PluginRegistration;
   const r = reg.renderers?.[0];
   if (r === undefined) throw new Error('no renderer registered');
   return r;
@@ -48,5 +50,21 @@ describe('graphviz plugin (doc 29 FR-29.17)', () => {
   it('returns an empty view (no throw) on invalid DOT (fallback, FR-29.14)', async () => {
     const r = await getRenderer();
     expect(await r.render({ bytes: new Uint8Array(), text: 'this is not valid dot {{{', path: 'g.dot' })).toEqual({});
+  });
+
+  it('applies the `engine` preference (doc 29 FR-29.12)', async () => {
+    const dot = { bytes: new Uint8Array(), text: 'digraph { A -> B -> C }', path: 'g.dot' };
+    const withDot = await (await getRenderer({ engine: 'dot' })).render(dot);
+    const withNeato = await (await getRenderer({ engine: 'neato' })).render(dot);
+    expect(withDot.svg).toContain('<svg');
+    expect(withNeato.svg).toContain('<svg');
+    // Different layout engines produce different geometry.
+    expect(withDot.svg).not.toBe(withNeato.svg);
+  });
+
+  it('ignores an invalid engine value and still renders', async () => {
+    const r = await getRenderer({ engine: 'bogus' });
+    const view = await r.render({ bytes: new Uint8Array(), text: 'digraph { A -> B }', path: 'g.dot' });
+    expect(view.svg).toContain('<svg');
   });
 });

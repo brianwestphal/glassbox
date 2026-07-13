@@ -5,5 +5,15 @@
   "entry": "index.js",
   "description": "Renders Graphviz .dot / .gv source to SVG server-side (via @viz-js/viz WASM, no DOM).",
   "author": "Glassbox",
-  "contentTypes": [{ "extensions": [".dot", ".gv"] }]
+  "contentTypes": [{ "extensions": [".dot", ".gv"] }],
+  "preferences": [
+    {
+      "key": "engine",
+      "label": "Layout engine",
+      "type": "select",
+      "default": "dot",
+      "options": ["dot", "neato", "fdp", "circo", "twopi"],
+      "description": "The Graphviz layout algorithm used to render diagrams."
+    }
+  ]
 }

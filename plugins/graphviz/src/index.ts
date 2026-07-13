@@ -17,6 +17,8 @@ import { instance } from '@viz-js/viz';
 import type { ContentPlugin, RenderedView, RenderInput } from './types.js';
 
 type Viz = Awaited<ReturnType<typeof instance>>;
+type Engine = 'dot' | 'neato' | 'fdp' | 'circo' | 'twopi';
+const ENGINES: readonly Engine[] = ['dot', 'neato', 'fdp', 'circo', 'twopi'];
 
 // The WASM instance is created once and reused across renders.
 let vizPromise: Promise<Viz> | null = null;
@@ -31,12 +33,12 @@ function normalizeSvg(svg: string): string {
   return i > 0 ? svg.slice(i) : svg;
 }
 
-async function renderDot(input: RenderInput): Promise<RenderedView> {
+async function renderDot(input: RenderInput, engine: Engine): Promise<RenderedView> {
   const source = input.text ?? new TextDecoder().decode(input.bytes);
   if (source.trim() === '') return {};
   try {
     const viz = await getViz();
-    const svg = viz.renderString(source, { format: 'svg' });
+    const svg = viz.renderString(source, { format: 'svg', engine });
     return typeof svg === 'string' && svg.includes('<svg') ? { svg: normalizeSvg(svg) } : {};
   } catch {
     // Unsupported syntax / render error → empty view → Glassbox code-block fallback.
@@ -45,14 +47,18 @@ async function renderDot(input: RenderInput): Promise<RenderedView> {
 }
 
 const plugin: ContentPlugin = {
-  activate(context) {
-    context.log('info', 'graphviz plugin activated (.dot / .gv)');
+  async activate(context) {
+    // The layout engine is a user preference (doc 29 FR-29.12); read it at
+    // activation (a change re-activates the plugin via reloadContentPlugins).
+    const stored = await context.getSetting('engine');
+    const engine: Engine = ENGINES.includes(stored as Engine) ? (stored as Engine) : 'dot';
+    context.log('info', `graphviz plugin activated (.dot / .gv), engine=${engine}`);
     return {
       renderers: [
         {
           name: 'graphviz',
           match: { extensions: ['.dot', '.gv'] },
-          render: renderDot,
+          render: (input) => renderDot(input, engine),
         },
       ],
     };
