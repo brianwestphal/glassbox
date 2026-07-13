@@ -55,6 +55,49 @@ content `renderer` / `differ`. Everything else transfers.
   shall render it in both places; there is no separate artifact-only or
   diff-only plugin kind.
 
+> **Scope — why image and SVG support stay core, not plugins.** A recurring
+> question is whether the built-in image/SVG viewer should itself be reframed as a
+> content plugin. It should not, for four reasons — recorded here so the decision
+> isn't re-litigated:
+>
+> 1. **They are first-class git content types, not specialized/opt-in ones.** A
+>    binary image (or SVG) diff is ordinary review, not a rare format a user opts
+>    into. The plugin enablement model is opt-in install + disable + uninstall
+>    (FR-29.15 / FR-29.16); routing core image review through it would let a user
+>    *uninstall image support and break an ordinary diff*.
+> 2. **The contract is the wrong shape.** A plugin is
+>    `renderer/differ → RenderedView {svg|html}`, delivered inertly — "specialized
+>    content → a view". Image support is not a leaf renderer: it is an interactive
+>    multi-mode **comparison** viewer (Metadata / A / B / Side-by-Side / Difference
+>    / Slice, [doc 4](4-diff-viewing.md) / [doc 24](24-image-comparison-layouts.md)
+>    / [doc 28](28-image-side-focus.md)) with zoom/pan, drawn-region feedback
+>    (`region_data`, [doc 23](23-image-feedback.md)), perceptual scoring
+>    (`review_files.difference_score` + most-different-first sort,
+>    [doc 26](26-ground-truth-comparison.md)), a ground-truth manifest mode, and
+>    git old/new byte retrieval. The plugin API models none of that, and a plugin
+>    has no business owning DB columns, routes, and a client subsystem.
+> 3. **There is no heavy dependency to externalize.** The lean-core rationale
+>    (FR-29.1, NFR-29.1) is to keep multi-MB format libraries (Mermaid, PlantUML)
+>    out of core. Image/SVG has none: SVGs are served as raw bytes and rendered
+>    live in an `<img>` (the `@resvg` WASM rasterizer was removed — see
+>    [doc 4](4-diff-viewing.md)), and the perceptual-diff libraries
+>    (`pixelmatch` / `pngjs` / `jpeg-js`) are pure JS that tsup **bundles** into
+>    core. Nothing needs to move out.
+> 4. **SVG is the plugin→viewer bridge, so the viewer must be core.** A plugin's
+>    output is **SVG**, which the built-in image/SVG pipeline serves as
+>    `image/svg+xml` and displays through the full comparison viewer (a
+>    plugin-rendered file such as `.dot` is treated exactly like an `.svg`; see
+>    FR-29.2 and the file-diff-viewer integration below). Making the viewer a
+>    plugin would invert this layering — *plugins produce content; the built-in
+>    viewer displays it* — and create a bootstrapping problem (what renders the
+>    plugin's own SVG?).
+>
+> The plugin-shaped opportunity here is the opposite direction: *extending* image
+> support to formats core can't handle (a plugin that decodes WebP/AVIF/HEIC to
+> RGBA for the perceptual diff, or renders an exotic format to a preview) — an
+> additive, opt-in capability, tracked separately, that never replaces the
+> built-in path.
+
 ## 29.2 Discovery and installation
 
 - **FR-29.3 — Plugin directory.** Plugins shall be discovered from a single

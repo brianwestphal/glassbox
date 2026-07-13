@@ -31,6 +31,16 @@ For binary image files (PNG, JPEG, GIF, WebP), the system shall provide these co
 
 For newly added or deleted images (no A or B side), the toolbar shows "Metadata / Image" instead of the full comparison set. Metadata displays single-side properties (no diff). Image mode shows the file in a zoom/pan-enabled viewer.
 
+> **Image and SVG support is built-in, not a content plugin.** These comparison
+> modes, the drawn-region feedback ([doc 23](23-image-feedback.md)), and the
+> perceptual scoring ([doc 26](26-ground-truth-comparison.md)) are a first-class
+> part of core — images/SVG are ordinary git content types, there is no heavy
+> dependency to move out (SVGs are served as bytes; the perceptual-diff libraries
+> are pure-JS and bundled), and the content-plugin contract models an inert
+> renderer, not this interactive comparison viewer. In fact plugin renderers
+> **feed into** this viewer by emitting SVG. See the "why image/SVG stays core"
+> scope note in [29. Content Plugins](29-content-plugins.md) §29.1.
+
 **Zoom / pan controls** (shared by raster and SVG image diffs): the toolbar's zoom buttons (in / out / fit / actual), click-and-drag to pan a zoomed image (with a `grab`/`grabbing` cursor), and macOS-native trackpad gestures (GB-942) — a **pinch zooms** (which the browser delivers as a `wheel` event with `ctrlKey`, so Ctrl/Cmd+wheel zooms too) and a **plain two-finger swipe pans** (a `wheel` event without `ctrlKey`; only acts once the image is zoomed in). The gesture split lives in the canvas `wheel` handler in `src/client/diff/imageDiff/index.ts`.
 
 ### 4.3.1 SVG Dual Mode
