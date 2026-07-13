@@ -16,8 +16,10 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    .loading {
+    .loading, .message {
       text-align: center;
+      max-width: 420px;
+      padding: 0 24px;
     }
     .spinner {
       width: 28px;
@@ -35,12 +37,40 @@
       font-size: 14px;
       letter-spacing: 0.02em;
     }
+    #message-title { font-size: 15px; color: #aaaacc; }
+    .hint { margin-top: 10px; font-size: 12px; color: #666688; line-height: 1.5; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <div class="loading">
+  <div class="loading" id="view-loading">
     <div class="spinner"></div>
     <p>Starting Glassbox&hellip;</p>
   </div>
+  <div class="message hidden" id="view-message">
+    <p id="message-title">No changes to review</p>
+    <p class="hint" id="message-hint"></p>
+  </div>
+  <script>
+    // Called from the Rust launcher (src-tauri/src/lib.rs) when the server
+    // reports it has nothing to review, or exited before becoming ready — so the
+    // window shows a clear message instead of spinning forever (GB-1057).
+    function showMessage(title, hint) {
+      var loading = document.getElementById('view-loading');
+      if (loading) loading.classList.add('hidden');
+      var msg = document.getElementById('view-message');
+      if (msg) msg.classList.remove('hidden');
+      var t = document.getElementById('message-title');
+      if (t) t.textContent = title;
+      var h = document.getElementById('message-hint');
+      if (h) h.textContent = hint;
+    }
+    function showNoChanges() {
+      showMessage('No changes to review', 'This repo has no pending changes. Launch Glassbox with uncommitted changes, a specific commit, or a branch — then reopen it.');
+    }
+    function showExited() {
+      showMessage("Glassbox didn't start", 'The server exited before it was ready. Check the terminal output for errors.');
+    }
+  </script>
 </body>
 </html>

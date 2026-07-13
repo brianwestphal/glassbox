@@ -117,3 +117,22 @@ describe('forbidden imports', () => {
     expect(offenders, `react import(s) found: ${offenders.join(', ')}`).toEqual([]);
   });
 });
+
+describe('Tauri launcher ↔ CLI stdout contract', () => {
+  // The desktop launcher (src-tauri/src/lib.rs) reads the server's stdout to
+  // decide what to show: it navigates on "running at " and shows a "no changes"
+  // message on the empty-diff marker. If the CLI's wording drifts, the launcher
+  // would silently hang on the loading spinner again (GB-1057) — these pin the
+  // two magic strings to the same source of truth.
+  it('the empty-diff "No changes found" marker matches between cli.ts and lib.rs', () => {
+    expect(read('src/cli.ts')).toContain('No changes found');
+    const rust = read('src-tauri/src/lib.rs');
+    expect(rust).toContain('const NO_CHANGES_MARKER: &str = "No changes found"');
+  });
+
+  it('the "running at " readiness line matches between server startup and lib.rs', () => {
+    // The server prints "Glassbox running at <url>"; the launcher parses "running at ".
+    expect(read('src/server.ts')).toContain('running at');
+    expect(read('src-tauri/src/lib.rs')).toContain('running at ');
+  });
+});

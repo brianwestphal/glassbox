@@ -18,6 +18,14 @@ use tauri_plugin_shell::ShellExt;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_updater::UpdaterExt;
 
+/// Substring the server (`src/cli.ts`) prints on stdout when a review mode has
+/// an empty diff — it reports "no changes" and exits without starting the server,
+/// so the "running at …" readiness line never comes. The launcher matches this to
+/// show a "no changes" message instead of hanging on the loading spinner
+/// (GB-1057). KEEP IN SYNC with the message in `src/cli.ts`
+/// (`tests/unit/conventions.test.ts` guards the two staying together).
+const NO_CHANGES_MARKER: &str = "No changes found";
+
 /// Holds the sidecar PID so it can be killed on app exit.
 struct SidecarPid(Mutex<Option<u32>>);
 
@@ -537,6 +545,8 @@ pub fn run() {
                     use std::io::{BufRead, BufReader};
                     let stdout = child.stdout.take().expect("stdout not captured");
                     let reader = BufReader::new(stdout);
+                    let mut navigated = false;
+                    let mut no_changes = false;
                     for line in reader.lines() {
                         let Ok(line) = line else { break };
                         eprintln!("[dev-server] {}", line);
@@ -544,8 +554,19 @@ pub fn run() {
                             let url = line[idx + "running at ".len()..].trim().to_string();
                             if let Ok(parsed) = url.parse() {
                                 let _ = window.navigate(parsed);
+                                navigated = true;
                             }
+                        } else if line.contains(NO_CHANGES_MARKER) {
+                            // Empty-diff mode: the server won't start (GB-1057). Show a
+                            // clear message instead of spinning forever.
+                            no_changes = true;
+                            let _ = window.eval("window.showNoChanges && window.showNoChanges()");
                         }
+                    }
+                    // Stdout closed without a ready URL and it wasn't the no-changes
+                    // case → the server exited/crashed; don't leave the spinner up.
+                    if !navigated && !no_changes {
+                        let _ = window.eval("window.showExited && window.showExited()");
                     }
                     let _ = child.wait();
                 });
@@ -680,6 +701,7 @@ pub fn run() {
                     tauri::async_runtime::spawn(async move {
                         let _child = child;
                         let mut navigated = false;
+                        let mut no_changes = false;
                         while let Some(event) = rx.recv().await {
                             if let CommandEvent::Stdout(line) = event {
                                 if !navigated {
@@ -690,9 +712,18 @@ pub fn run() {
                                             let _ = window.navigate(parsed);
                                             navigated = true;
                                         }
+                                    } else if line_str.contains(NO_CHANGES_MARKER) {
+                                        // Empty-diff mode: the server won't start (GB-1057).
+                                        no_changes = true;
+                                        let _ = window.eval("window.showNoChanges && window.showNoChanges()");
                                     }
                                 }
                             }
+                        }
+                        // Sidecar ended without a ready URL and it wasn't the
+                        // no-changes case → it crashed; replace the spinner.
+                        if !navigated && !no_changes {
+                            let _ = window.eval("window.showExited && window.showExited()");
                         }
                     });
                 }

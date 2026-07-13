@@ -103,6 +103,16 @@ Tauri binary starts with --project-dir
   → Reads sidecar stdout for "running at http://..."
   → Navigates window to that URL
   → Stores sidecar PID for cleanup
+
+Stdout also drives the loading screen's terminal states (GB-1057). If the server
+prints the empty-diff marker (`NO_CHANGES_MARKER` = "No changes found" — the CLI
+reports no changes and exits without starting a server, so no "running at" line
+ever comes), the launcher `eval`s `showNoChanges()` in `loading/index.html`. If
+the stdout stream ends without a ready URL and it wasn't the no-changes case
+(a crash), it `eval`s `showExited()`. Either way the window shows a clear message
+instead of spinning on "Starting Glassbox…" forever. `tests/unit/conventions.test.ts`
+pins the "No changes found" / "running at " strings so the CLI and launcher can't
+drift apart.
 ```
 
 This path works for direct binary execution (e.g., during development or on platforms without stub app complexity).
