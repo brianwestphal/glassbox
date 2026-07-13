@@ -239,9 +239,10 @@ Startup: `initContentPlugins(repoRoot)` runs in `server.ts`'s `startServer` — 
 calls `installBundledPlugins()` (seed) then `loadAllPlugins(…, enablementCheck)`
 (discover + load, honoring per-project + global enablement). Both FR-29.2
 integration points (artifacts + file diff viewer), desktop delivery (GB-1039),
-and the Settings **Plugins** management tab + `/api/plugins` (GB-1040) are wired.
-**Not yet wired:** a committed fixture-plugin e2e (GB-1043), manifest preferences
-(GB-1047), the native folder picker (GB-1048).
+the Settings **Plugins** management tab + `/api/plugins` (GB-1040), manifest
+preferences (GB-1047/1054), and a native folder picker (GB-1048 — the
+`pick_plugin_folder` Tauri command + a **Browse…** button in the Plugins tab)
+are wired. **Not yet wired:** a committed fixture-plugin e2e (GB-1043).
 
 **First-party plugins** live at repo-root `plugins/<id>/` (source under `src/`,
 a `manifest.json`, a plugin-local `tsconfig.json`), built by
@@ -312,7 +313,7 @@ them into `~/.glassbox/plugins/` at startup (freshness + dismiss-list). Shipped:
 | File | Purpose |
 |------|---------|
 | `main.rs` | Entry; calls `glassbox_lib::run()`. |
-| `lib.rs` | Everything: setup, sidecar spawn + PID tracking + exit cleanup, CLI install/check commands (macOS symlink / Linux symlink / Windows .cmd + PATH), updater commands, native Find menu wiring. Has a `#[cfg(test)] mod tests` covering the pure `manual_install_command` (the only Rust unit test today — `cargo test` runs it in CI's `rust` job). See `docs/tauri-architecture.md` for the full picture. |
+| `lib.rs` | Everything: setup, sidecar spawn + PID tracking + exit cleanup, CLI install/check commands (macOS symlink / Linux symlink / Windows .cmd + PATH), updater commands, the `pick_plugin_folder` native folder-picker command (doc 29, GB-1048, via `tauri-plugin-dialog`), native Find menu wiring. Each custom command must be registered in **three** places: `generate_handler!` (here), `build.rs`'s `AppManifest.commands([...])` (generates the `allow-<cmd>` permission), and `capabilities/remote-localhost.json` (grants it to the localhost-origin webview — Tauri 2.11+). Has a `#[cfg(test)] mod tests` covering the pure `manual_install_command` (the only Rust unit test today — `cargo test` runs it in CI's `rust` job). See `docs/tauri-architecture.md` for the full picture. |
 
 Also: `tauri.conf.json`, `Cargo.toml`, `Entitlements.plist`, `loading/` (spinner + welcome HTML), `resources/` (CLI launcher scripts), `binaries/` (downloaded Node.js per target), `server/` (bundled server + client + `node_modules`).
 

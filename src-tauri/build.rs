@@ -24,6 +24,7 @@ fn main() {
             "get_pending_update",
             "check_for_update",
             "install_update",
+            "pick_plugin_folder",
         ]),
     ))
     .expect("failed to run tauri-build");

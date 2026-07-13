@@ -13,10 +13,11 @@
 > delivery** (GB-1039) — bundled plugins build to `dist/plugins/`, ship in the
 > sidecar, and auto-install into `~/.glassbox/plugins/` at startup (freshness +
 > dismiss-list) — and the **management UI** (GB-1040) — a Settings **Plugins**
-> tab to list / enable-disable (global + per-project) / install / uninstall. Still
-> open: a committed fixture-plugin **e2e** (GB-1043), manifest-preferences +
-> native folder picker (GB-1047/1048), and the other two diagram renderers,
-> Mermaid (GB-1045) and PlantUML (GB-1046). See [§29.8](#298-status-and-follow-ups).
+> tab to list / enable-disable (global + per-project) / install / uninstall,
+> manifest **preferences** (GB-1047/1054), and a native **folder picker**
+> (GB-1048). Still open: a committed fixture-plugin **e2e** (GB-1043) and the
+> other two diagram renderers, Mermaid (GB-1045) and PlantUML (GB-1046). See
+> [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -248,8 +249,9 @@ The build is decomposed into follow-up tickets:
   (active / disabled / failed), per-plugin **global** and **per-project** disable
   toggles (FR-29.16), install-from-a-folder (path) and uninstall, backed by
   `GET/POST/DELETE /api/plugins` (`src/routes/api/plugins.ts`). Manifest-declared
-  manifest **preferences** (FR-29.12, GB-1047 — **shipped**; the native folder
-  picker is the GB-1048 follow-up).
+  **preferences** (FR-29.12, GB-1047) render here too. On desktop a **Browse…**
+  button opens a native folder picker (GB-1048, the `pick_plugin_folder` Tauri
+  command); the text-path field is the browser/CLI fallback.
 - **Developer guide** (GB-1041, **shipped**) — `docs/plugin-development-guide.md`
   plus a standalone, copy-paste `types.ts` so third parties can build plugins
   without depending on the Glassbox package.
@@ -309,8 +311,9 @@ Shipped in P1 (GB-1038):
   Plugins-tab rendering. The `graphviz` plugin's `engine` preference is the
   worked example.
 
-Planned by the follow-ups:
-
-- **Native folder picker + preferences** (GB-1048 / GB-1047) — a Tauri folder
-  picker for install-from-disk (today it takes a path), and rendering
-  manifest-declared plugin preferences (FR-29.12).
+Shipped (native folder picker, GB-1048): the `pick_plugin_folder` Tauri command
+(`src-tauri/src/lib.rs`, `tauri-plugin-dialog`, granted in
+`capabilities/remote-localhost.json` + `build.rs`) opens a native folder dialog;
+the Plugins tab shows a **Browse…** button under Tauri that installs the picked
+folder. Compile-verified (`cargo check`); the dialog opening itself needs a
+desktop smoke-test.

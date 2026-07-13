@@ -385,12 +385,28 @@ fn build_dev_server_args(app_args: &[String]) -> Vec<String> {
     server_args
 }
 
+/// Open a native folder picker so a desktop user can browse to a content-plugin
+/// folder instead of typing a path (doc 29, GB-1048). Returns the chosen path,
+/// or `None` if the dialog was cancelled. The web/CLI build falls back to the
+/// text-path field.
+#[tauri::command]
+fn pick_plugin_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    app.dialog()
+        .file()
+        .set_title("Select a plugin folder")
+        .blocking_pick_folder()
+        .and_then(|f| f.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(SidecarPid(Mutex::new(None)))
         .manage(PendingUpdate(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
@@ -398,7 +414,8 @@ pub fn run() {
             install_cli,
             get_pending_update,
             check_for_update,
-            install_update
+            install_update,
+            pick_plugin_folder
         ])
         .setup(|_app| {
             #[allow(unused_variables)]

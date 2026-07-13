@@ -940,11 +940,11 @@ global precedence — `src/plugins/enablement.ts`), **manifest-declared preferen
 (GB-1047, `src/plugins/settings.ts` — persist per-scope, back
 `PluginContext.getSetting`/`setSetting`; graphviz's `engine` is the worked
 example; **secret** prefs → OS keychain, masked in the UI, GB-1054),
-install-from-a-folder, and uninstall over `/api/plugins`. Still open: a
-committed fixture-plugin e2e
-(GB-1043), manifest-preferences + native folder picker (GB-1047/1048), and the
-other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
-(GB-1046, needs Java). Implemented FR/NFR units carry real tests in
+install-from-a-folder (with a native **Browse…** folder picker on desktop,
+GB-1048), and uninstall over `/api/plugins`. Still open: a committed
+fixture-plugin e2e (GB-1043) and the other two diagram renderers — Mermaid
+(GB-1045, needs a DOM) and PlantUML (GB-1046, needs Java). Implemented FR/NFR
+units carry real tests in
 `feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 19. Implementation-status snapshot

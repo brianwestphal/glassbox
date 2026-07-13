@@ -11,6 +11,7 @@
     "allow-install-cli",
     "allow-get-pending-update",
     "allow-check-for-update",
-    "allow-install-update"
+    "allow-install-update",
+    "allow-pick-plugin-folder"
   ]
 }

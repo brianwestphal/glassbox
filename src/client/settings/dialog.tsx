@@ -30,7 +30,7 @@ import { switchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
-import { doInstallPlugin, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
+import { browsePluginFolder, doInstallPlugin, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
 import type { ChannelState, ConfigResponse, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
@@ -514,6 +514,7 @@ function setupDelegates(args: {
     const input = overlay.querySelector('#plugin-install-path');
     if (input !== null) doInstallPlugin(asInput(input).value);
   });
+  void delegate(overlay, 'click', '#plugin-browse-btn', () => { browsePluginFolder(); });
   // Plugin preference edits (doc 29 FR-29.12). Selects/checkboxes save on change;
   // text/number inputs save on blur (change) so we don't reload on every keystroke.
   void delegate(overlay, 'change', '[data-plugin-pref-key]', (_e, el) => {

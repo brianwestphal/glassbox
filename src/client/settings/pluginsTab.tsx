@@ -11,6 +11,7 @@ import { signal } from 'kerfjs';
 import type { PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
 import { installPlugin, listPlugins, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
 import { IconPuzzle } from '../../icons.js';
+import { getTauriInvoke } from '../tauri.js';
 import type { Tab } from './tabContext.js';
 
 const plugins = signal<PluginInfo[] | null>(null);
@@ -54,6 +55,16 @@ export function doInstallPlugin(path: string): void {
   void installPlugin({ path: path.trim() })
     .then((r) => { plugins.value = r.plugins; })
     .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Install failed'; });
+}
+
+/** Desktop only (doc 29, GB-1048): open a native folder picker and install the
+ *  chosen plugin folder. No-op in the browser (the text-path field is used). */
+export function browsePluginFolder(): void {
+  const invoke = getTauriInvoke();
+  if (invoke === null) return;
+  void invoke('pick_plugin_folder').then((path) => {
+    if (typeof path === 'string' && path !== '') doInstallPlugin(path);
+  }).catch(() => {});
 }
 
 function preferenceField(id: string, pref: PluginPreferenceInfo, value: string, secretConfigured: boolean): SafeHtml {
@@ -151,6 +162,7 @@ function renderPluginsTab(): SafeHtml {
         <label className="settings-label" htmlFor="plugin-install-path">Install from a folder</label>
         <div className="settings-key-row">
           <input type="text" className="settings-input" id="plugin-install-path" placeholder="/path/to/plugin-folder" autoComplete="off" />
+          {getTauriInvoke() !== null && <button className="btn btn-xs" id="plugin-browse-btn">Browse…</button>}
           <button className="btn btn-xs btn-primary" id="plugin-install-btn">Install</button>
         </div>
         {installError.value !== '' && <p className="settings-plugin-error">{installError.value}</p>}
