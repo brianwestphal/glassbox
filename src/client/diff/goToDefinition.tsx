@@ -3,9 +3,10 @@
  * in the diff view navigates to its definition.
  */
 import { findSymbolDefinition } from '../../api/index.js';
-import { asElement, toElement } from '../dom.js';
+import { asElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { JUMP_HIGHLIGHT_DURATION_MS } from '../timing.js';
+import { showToast } from '../toast.js';
 import { setRawDiffContent } from './index.js';
 import { navPush } from './navStack.js';
 import { selectFile, updateNavFilePath } from './selection.js';
@@ -134,14 +135,6 @@ async function loadRawFile(filePath: string, targetLine: number) {
 
   // Scroll to the target line (wait a frame for the mount + post-render to flush).
   requestAnimationFrame(() => { scrollToLine(targetLine); });
-}
-
-function showToast(message: string) {
-  const existing = document.querySelector('.goto-toast');
-  if (existing) existing.remove();
-  const toast = toElement(<div className="goto-toast">{message}</div>);
-  document.body.appendChild(toast);
-  setTimeout(() => { toast.remove(); }, 2000);
 }
 
 function scrollToLine(lineNumber: number) {

@@ -11,11 +11,11 @@
 import { PLUGINS_ENABLED } from '../feature-flags.js';
 import { disabledScope, readEnablementLists, readGlobalDisabled, readProjectDisabled } from './enablement.js';
 import { installBundledPlugins } from './install.js';
-import { type EnablementCheck, getConfigLabelOverride, loadAllPlugins,type LoadedPlugin } from './loader.js';
+import { clearAllPluginUIElements, type EnablementCheck, getConfigLabelOverride, getPluginUIElements, loadAllPlugins,type LoadedPlugin } from './loader.js';
 import type { ConfigLayoutItem, PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginPreferenceDisplay } from './settings.js';
-import type { ConfigLabelColor, DiffInput, RenderedView, RenderInput } from './types.js';
+import type { ConfigLabelColor, DiffInput, PluginUIElement, RenderedView, RenderInput, UIActionResult } from './types.js';
 
 let registry = new ContentPluginRegistry();
 let loadedPlugins: LoadedPlugin[] = [];
@@ -43,6 +43,9 @@ async function loadFor(repoRoot: string): Promise<void> {
   // Seed ~/.glassbox/plugins/ from bundled first-party plugins (desktop
   // delivery, GB-1039) before discovery. Fail-soft: never throws.
   installBundledPlugins();
+  // Drop stale UI-element registrations (doc 30) so only plugins that re-activate
+  // (i.e. are still enabled) re-register — a disabled plugin's elements disappear.
+  clearAllPluginUIElements();
   const res = await loadAllPlugins(undefined, enablementCheckFor(repoRoot), repoRoot);
   registry = res.registry;
   loadedPlugins = res.loaded;
@@ -176,7 +179,8 @@ export function getPluginManifest(id: string): PluginManifest | undefined {
  * surfaces the message; the label overrides it set are read on the next
  * `describeInstalledPlugins`.
  */
-export async function runPluginAction(id: string, actionId: string): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- onAction may return nothing (void) or a result
+export async function runPluginAction(id: string, actionId: string): Promise<UIActionResult | void> {
   if (!PLUGINS_ENABLED) throw new Error('Plugins are disabled');
   const loaded = loadedPlugins.find((p) => p.id === id);
   if (loaded === undefined || loaded.status !== 'loaded' || loaded.instance === undefined || loaded.context === undefined) {
@@ -185,7 +189,23 @@ export async function runPluginAction(id: string, actionId: string): Promise<voi
   if (typeof loaded.instance.onAction !== 'function') {
     throw new Error('Plugin does not handle actions');
   }
-  await loaded.instance.onAction(actionId, loaded.context);
+  return await loaded.instance.onAction(actionId, loaded.context);
+}
+
+/**
+ * The registered UI elements (doc 30 FR-30.4) of currently-loaded (enabled)
+ * plugins, each flattened with its `pluginId`, for the client to render. Empty
+ * when the subsystem is disabled.
+ */
+export function listPluginUIElements(): (PluginUIElement & { pluginId: string })[] {
+  if (!PLUGINS_ENABLED) return [];
+  const loadedIds = new Set(loadedPlugins.filter((p) => p.status === 'loaded').map((p) => p.id));
+  const out: (PluginUIElement & { pluginId: string })[] = [];
+  for (const { pluginId, elements } of getPluginUIElements()) {
+    if (!loadedIds.has(pluginId)) continue;
+    for (const el of elements) out.push({ ...el, pluginId });
+  }
+  return out;
 }
 
 /**

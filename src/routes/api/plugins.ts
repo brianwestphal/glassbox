@@ -8,9 +8,9 @@ import { Hono } from 'hono';
 
 import { InstallPluginReqSchema, RunPluginActionReqSchema, SetPluginDisabledReqSchema, SetPluginPreferenceReqSchema } from '../../api/plugins.js';
 import { setGlobalDisabled, setProjectDisabled } from '../../plugins/enablement.js';
-import { describeInstalledPlugins, getPluginManifest, reloadContentPlugins, runPluginAction } from '../../plugins/index.js';
+import { describeInstalledPlugins, getPluginManifest, listPluginUIElements, reloadContentPlugins, runPluginAction } from '../../plugins/index.js';
 import { installPluginFromDisk, uninstallPlugin } from '../../plugins/install.js';
-import { clearConfigLabelOverrides } from '../../plugins/loader.js';
+import { clearConfigLabelOverrides, clearPluginUIElements } from '../../plugins/loader.js';
 import { writePluginSetting } from '../../plugins/settings.js';
 import type { AppEnv } from '../../types.js';
 import { parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -19,6 +19,10 @@ export const pluginsRoutes = new Hono<AppEnv>();
 
 pluginsRoutes.get('/plugins', (c) => {
   return c.json({ plugins: describeInstalledPlugins(c.get('repoRoot')) });
+});
+
+pluginsRoutes.get('/plugins/ui', (c) => {
+  return c.json({ elements: listPluginUIElements() });
 });
 
 pluginsRoutes.post('/plugins/:id/disabled', async (c) => {
@@ -73,8 +77,9 @@ pluginsRoutes.post('/plugins/:id/action', async (c) => {
   if (!parsed.ok) return parsed.response;
 
   const repoRoot = c.get('repoRoot');
+  let result;
   try {
-    await runPluginAction(id.data, parsed.data.actionId);
+    result = await runPluginAction(id.data, parsed.data.actionId);
   } catch (e) {
     // Return the current list + the message so the client (whose apiCall
     // validates the body regardless of status) can show a clean error. The
@@ -82,8 +87,9 @@ pluginsRoutes.post('/plugins/:id/action', async (c) => {
     return c.json({ plugins: describeInstalledPlugins(repoRoot), error: e instanceof Error ? e.message : 'Action failed' }, 400);
   }
   // No reload: the plugin ran against its live context; any labels it set are
-  // read straight from the override map by describeInstalledPlugins.
-  return c.json({ plugins: describeInstalledPlugins(repoRoot) });
+  // read straight from the override map by describeInstalledPlugins. `result` is
+  // the optional UIActionResult (e.g. a `message` toast, doc 30 FR-30.5).
+  return c.json({ plugins: describeInstalledPlugins(repoRoot), result: result ?? undefined });
 });
 
 pluginsRoutes.delete('/plugins/:id', async (c) => {
@@ -92,6 +98,7 @@ pluginsRoutes.delete('/plugins/:id', async (c) => {
   const repoRoot = c.get('repoRoot');
   uninstallPlugin(id.data);
   clearConfigLabelOverrides(id.data);
+  clearPluginUIElements(id.data);
   await reloadContentPlugins(repoRoot);
   return c.json({ plugins: describeInstalledPlugins(repoRoot) });
 });

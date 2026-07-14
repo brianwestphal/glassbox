@@ -15,6 +15,7 @@ function ctxWith(settings: Record<string, string> = {}): RecordingContext {
     getSetting: (key) => Promise.resolve(settings[key] ?? null),
     setSetting: () => Promise.resolve(),
     updateConfigLabel: (labelId, text, color) => { labels[labelId] = { text, color }; },
+    registerUI: () => {},
   };
 }
 
@@ -76,10 +77,22 @@ describe('graphviz plugin (doc 29 FR-29.17)', () => {
   });
 
   // Config-layout "Test renderer" button (doc 29 FR-29.18).
-  it('onAction(test_renderer) sets a success status label with the engine', async () => {
+  it('onAction(test_renderer) sets a success status label + returns a toast message', async () => {
     const ctx = ctxWith({ engine: 'neato' });
-    await plugin.onAction?.('test_renderer', ctx);
+    const result = await plugin.onAction?.('test_renderer', ctx);
     expect(ctx.labels['engine-status']).toEqual({ text: 'Renderer OK (neato)', color: 'success' });
+    expect(result).toEqual({ message: 'Graphviz renderer OK (neato)' });
+  });
+
+  it('registers a diff-toolbar UI element on activate (doc 30)', async () => {
+    const registered: unknown[] = [];
+    const ctx = ctxWith();
+    ctx.registerUI = (els) => { registered.push(...els); };
+    await plugin.activate(ctx);
+    expect(registered).toContainEqual({
+      type: 'button', id: 'graphviz-test', location: 'diff-toolbar',
+      label: 'Graphviz', title: 'Test the Graphviz renderer', action: 'test_renderer',
+    });
   });
 
   it('onAction ignores an unknown action id (no label set)', async () => {

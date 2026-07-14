@@ -10,7 +10,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ListPluginsRespSchema } from '../../../src/api/plugins.js';
+import { ListPluginsRespSchema, ListPluginUiRespSchema, RunPluginActionRespSchema } from '../../../src/api/plugins.js';
 import { __resetContentPluginsForTest, __setContentRegistryForTest } from '../../../src/plugins/index.js';
 import { clearConfigLabelOverrides, loadAllPlugins } from '../../../src/plugins/loader.js';
 import { pluginsRoutes } from '../../../src/routes/api/plugins.js';
@@ -66,9 +66,12 @@ describe('POST /api/plugins/:id/action — config-layout button (doc 29 FR-29.18
       configLayout: [{ type: 'label', id: 'status', text: 'Not tested', color: 'transient' }],
     }));
     writeFileSync(join(dir, 'index.js'), `export default {
-      activate() { return {}; },
+      activate(ctx) {
+        ctx.registerUI([{ type: 'button', id: 'act-btn', location: 'diff-toolbar', label: 'Act', action: 'ok' }]);
+        return {};
+      },
       onAction(actionId, ctx) {
-        if (actionId === 'ok') ctx.updateConfigLabel('status', 'Connected', 'success');
+        if (actionId === 'ok') { ctx.updateConfigLabel('status', 'Connected', 'success'); return { message: 'done' }; }
       },
     };`);
     clearConfigLabelOverrides('act-plugin');
@@ -77,17 +80,34 @@ describe('POST /api/plugins/:id/action — config-layout button (doc 29 FR-29.18
     rmSync(pluginsRoot, { recursive: true, force: true });
   }
 
-  it('runs the action and reflects the updated dynamic label in the returned list', async () => {
+  it('runs the action and reflects the updated dynamic label + returns the result message', async () => {
     await loadActionPlugin();
     const res = await app().request('/api/plugins/act-plugin/action', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ actionId: 'ok' }),
     });
     expect(res.status).toBe(200);
-    const parsed = ListPluginsRespSchema.parse(await res.json());
+    const parsed = RunPluginActionRespSchema.parse(await res.json());
     const plugin = parsed.plugins.find((p) => p.id === 'act-plugin');
     expect(plugin?.configLabels['status']).toEqual({ text: 'Connected', color: 'success' });
+    // doc 30 FR-30.5: the UIActionResult message rides back in the response.
+    expect(parsed.result?.message).toBe('done');
     clearConfigLabelOverrides('act-plugin');
+  });
+
+  it('GET /api/plugins/ui lists a loaded plugin\'s registered UI elements (doc 30)', async () => {
+    await loadActionPlugin();
+    const res = await app().request('/api/plugins/ui');
+    const parsed = ListPluginUiRespSchema.parse(await res.json());
+    expect(parsed.elements).toContainEqual({
+      type: 'button', id: 'act-btn', location: 'diff-toolbar', label: 'Act', action: 'ok', pluginId: 'act-plugin',
+    });
+  });
+
+  it('GET /api/plugins/ui is empty when no plugins are loaded', async () => {
+    __resetContentPluginsForTest();
+    const res = await app().request('/api/plugins/ui');
+    expect(ListPluginUiRespSchema.parse(await res.json()).elements).toEqual([]);
   });
 
   it('initially exposes the manifest label default before any action', async () => {

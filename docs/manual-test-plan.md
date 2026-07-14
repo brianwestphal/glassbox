@@ -84,6 +84,19 @@ Until then, the tab's UI wiring is manual:
   and `api/plugins-routes.test.ts`; this item is the tab's layout rendering +
   button wiring, which needs the real UI — a committed e2e is gated on the
   fixture-plugin harness, GB-1043.)*
+- **Plugin UI extensions — header / diff-toolbar / sidebar-footer (GB-1058, doc 30)**
+  — With the Graphviz plugin enabled, a **Graphviz** button appears in the bottom
+  diff toolbar (the `diff-toolbar` location). Clicking it runs the plugin's action
+  and shows a toast ("Graphviz renderer OK (dot)"). Disabling the plugin removes
+  the button; re-enabling restores it (the slots re-render without a page reload).
+  A plugin registering a `header` or `sidebar-footer` element shows it in the
+  main-content top bar / below the Complete–Reopen controls respectively. A `link`
+  element opens its URL in a new tab. *(The registration, `GET /api/plugins/ui`,
+  and the `onAction`→`result.message` round-trip are unit/integration-tested —
+  `plugins/loader.test.ts`, `plugins/configLayout.test.ts`, `plugins/graphviz.test.ts`,
+  `api/plugins-routes.test.ts`; this item is the client slot rendering + click →
+  toast, which needs the real UI — a committed e2e is gated on the fixture-plugin
+  harness, GB-1043.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of

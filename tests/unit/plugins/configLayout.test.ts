@@ -17,6 +17,7 @@ const ctx: PluginContext = {
   getSetting: () => Promise.resolve(null),
   setSetting: () => Promise.resolve(),
   updateConfigLabel: () => {},
+  registerUI: () => {},
 };
 
 function loaded(over: Partial<LoadedPlugin>): LoadedPlugin {
@@ -26,11 +27,12 @@ function loaded(over: Partial<LoadedPlugin>): LoadedPlugin {
 afterEach(() => __resetContentPluginsForTest());
 
 describe('runPluginAction (doc 29 FR-29.18)', () => {
-  it('invokes the plugin onAction with its retained context', async () => {
-    const onAction = vi.fn<NonNullable<ContentPlugin['onAction']>>();
+  it('invokes the plugin onAction with its retained context and returns its result', async () => {
+    const onAction = vi.fn<NonNullable<ContentPlugin['onAction']>>().mockResolvedValue({ message: 'hi' });
     __setContentRegistryForTest(new ContentPluginRegistry(), [loaded({ instance: { activate: () => {}, onAction }, context: ctx })]);
-    await runPluginAction('p', 'go');
+    const result = await runPluginAction('p', 'go');
     expect(onAction).toHaveBeenCalledWith('go', ctx);
+    expect(result).toEqual({ message: 'hi' }); // doc 30 FR-30.5 result passthrough
   });
 
   it('throws "Plugin not active" for an unknown id', async () => {

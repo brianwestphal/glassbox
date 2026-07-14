@@ -58,6 +58,18 @@ const plugin: ContentPlugin = {
     // activation (a change re-activates the plugin via reloadContentPlugins).
     const engine = await resolveEngine(context);
     context.log('info', `graphviz plugin activated (.dot / .gv), engine=${engine}`);
+    // Reference UI extension (doc 30): a diff-toolbar button that runs the same
+    // renderer self-test as the config-layout button and toasts the result.
+    context.registerUI([
+      {
+        type: 'button',
+        id: 'graphviz-test',
+        location: 'diff-toolbar',
+        label: 'Graphviz',
+        title: 'Test the Graphviz renderer',
+        action: 'test_renderer',
+      },
+    ]);
     return {
       renderers: [
         {
@@ -69,8 +81,10 @@ const plugin: ContentPlugin = {
     };
   },
 
-  // Config-layout "Test renderer" button (doc 29 FR-29.18): render a trivial
-  // graph with the current engine and report the result as a status label.
+  // "Test renderer" action, shared by the config-layout button (doc 29 FR-29.18)
+  // and the diff-toolbar UI element (doc 30): render a trivial graph with the
+  // current engine, report the result as a config-layout status label, and
+  // return a `message` so the UI element surfaces a toast.
   async onAction(actionId, context) {
     if (actionId !== 'test_renderer') return;
     const engine = await resolveEngine(context);
@@ -79,11 +93,14 @@ const plugin: ContentPlugin = {
       const svg = viz.renderString('digraph { a -> b }', { format: 'svg', engine });
       if (typeof svg === 'string' && svg.includes('<svg')) {
         context.updateConfigLabel('engine-status', `Renderer OK (${engine})`, 'success');
-      } else {
-        context.updateConfigLabel('engine-status', 'Renderer produced no SVG', 'error');
+        return { message: `Graphviz renderer OK (${engine})` };
       }
+      context.updateConfigLabel('engine-status', 'Renderer produced no SVG', 'error');
+      return { message: 'Graphviz renderer produced no SVG' };
     } catch (e) {
-      context.updateConfigLabel('engine-status', `Render failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+      const msg = `Render failed: ${e instanceof Error ? e.message : String(e)}`;
+      context.updateConfigLabel('engine-status', msg, 'error');
+      return { message: `Graphviz ${msg}` };
     }
   },
 };

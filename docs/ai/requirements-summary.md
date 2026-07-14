@@ -953,6 +953,30 @@ the other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
 (GB-1046, needs Java). Implemented FR/NFR units carry real tests in
 `feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
+## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
+
+A plugin's second UI surface beyond content rendering (doc 29): it contributes
+**declarative interactive elements** to predefined main-app locations via
+`context.registerUI([...])` in `activate`. Locations (GB-1058): **`header`**
+(main-content top bar), **`diff-toolbar`**, **`sidebar-footer`** — fixed
+server-rendered slots in `reviewShell.tsx`. Element union (`src/plugins/types.ts`
+`PluginUIElement`): **`button`** + **`link`** render; **`toggle`/`switch`/
+`segmented-control`** are declared-but-deferred (need client selection state +
+`stateKey` persistence — follow-up, mirrors Hot Sheet which also declares but
+doesn't render them). Registry: a process-global map in `loader.ts`, **cleared on
+reload** so disabled plugins drop out; `GET /api/plugins/ui` returns loaded
+plugins' elements flattened with `pluginId`. A click round-trips to `onAction` via
+`POST /api/plugins/:id/action`, whose response now carries an optional
+**`result`** (`UIActionResult { message }`) the client shows as a toast (shared
+`src/client/toast.tsx`). Client render: `src/client/plugins/uiExtensions.tsx`
+(`initPluginUi`/`refreshPluginUi`, a single `document.body` delegate). Trust:
+declarative elements only; the icon is inert plugin-supplied SVG trusted via
+opt-in install (doc 29 §29.6). Worked example: the `graphviz` plugin's
+diff-toolbar **Graphviz** button (renderer self-test → toast). Modeled on Hot
+Sheet `docs/18-plugins.md` §18.12. The client rendering + click wiring is
+manual-tested (gated on the fixture-plugin e2e harness GB-1043) like the rest of
+the plugin UI; everything else carries unit/integration tests.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -975,7 +999,11 @@ P1 core (renderer/differ contract, loader, dispatcher, kill-switch, review-note
 artifact integration) shipped in GB-1038 (`src/plugins/`, modeled on Hot Sheet's
 plugin system); the file-diff-viewer integration (GB-1042), desktop delivery
 (GB-1039), management UI (GB-1040), developer guide (GB-1041), and the
-diagram-source first reference plugin (GB-910) remain. When a
+diagram-source first reference plugin (GB-910) remain. Doc **30** (plugin main-app
+UI extensions) is **Shipped** for button/link (GB-1058) — `registerUI`,
+`GET /api/plugins/ui`, the `onAction` result→toast round-trip, three host slots,
+and the graphviz reference button; the stateful controls (toggle/switch/
+segmented-control) are declared-but-deferred. When a
 new feature is spec'd before implementation, add a doc and
 mark the entry here **Design only** until the code lands, then **Partially
 built** / **Shipped** as it progresses.

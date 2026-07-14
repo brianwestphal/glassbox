@@ -18,6 +18,7 @@ import { bindToolbar } from "./diff/toolbar.js";
 import { initDifftoolSession } from "./difftool/session.js";
 import { toElement } from "./dom.js";
 import { triggerGuidedAnalysis } from "./guided.js";
+import { initPluginUi } from "./plugins/uiExtensions.js";
 import { bindCompleteButton, bindReopenButton } from "./review/modal.js";
 import { initProgress } from "./review/progress.js";
 import { initSharePrompt } from "./share.js";
@@ -225,6 +226,9 @@ async function init() {
   // Accumulating git difftool session (doc 19): live file list + Done +
   // tab-close teardown. No-op unless this page was served for a difftool review.
   initDifftoolSession();
+  // Plugin UI extensions (doc 30): render registered elements into the header /
+  // diff-toolbar / sidebar-footer slots. No-op when no plugin registers any.
+  void initPluginUi();
   document.addEventListener("dragend", () => {
     dragStore.actions.setAnnotation(null);
     document.querySelectorAll(".diff-line.drag-over").forEach((d) => {

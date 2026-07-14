@@ -1,0 +1,59 @@
+// Plugin UI extensions (doc 30 FR-30.2): elements a plugin registers into the
+// header / diff-toolbar / sidebar-footer slots. The host owns all styling; a
+// plugin ships only an inline-SVG icon + label + action id.
+
+.plugin-ui-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  // Empty slots take no space (no stray gaps/margins in the chrome).
+  &:not(.has-plugin-ui) { display: none; }
+
+  // Header slot sits at the right end of the main-content top bar.
+  &#plugin-ui-header { margin-left: auto; }
+
+  // Sidebar-footer slot stacks below the Complete/Reopen controls.
+  &#plugin-ui-sidebar-footer {
+    display: none; // overridden to flex by .has-plugin-ui below
+    &.has-plugin-ui {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+  }
+}
+
+.plugin-ui-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+
+  &:hover { color: var(--text); border-color: var(--border-strong, var(--border)); }
+  &.primary { color: var(--accent-fg, #fff); background: var(--accent); border-color: var(--accent); }
+  &.danger { color: var(--danger, #f85149); border-color: var(--danger, #f85149); }
+
+  svg { width: 14px; height: 14px; }
+  .plugin-ui-label { line-height: 1; }
+}
+
+.plugin-ui-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--accent, #6366f1);
+  text-decoration: none;
+  border-radius: var(--radius);
+
+  &:hover { text-decoration: underline; }
+  svg { width: 14px; height: 14px; }
+}

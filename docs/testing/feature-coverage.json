@@ -1885,6 +1885,40 @@
     "NFR-29.4": {
       "tests": ["tests/unit/plugins/dispatch.test.ts"],
       "note": "PLUGINS_ENABLED kill-switch honors GLASSBOX_PLUGINS_DISABLED (off -> subsystem skipped; loadAllPlugins returns empty)."
+    },
+    "FR-30.1": {
+      "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "note": "Plugin UI-extension capability (GB-1058): a content-less plugin registers UI elements via registerUI and they surface through GET /api/plugins/ui; gated by the same enablement/kill-switch as the rest of the subsystem."
+    },
+    "FR-30.2": {
+      "tests": ["tests/integration/api/plugins-routes.test.ts"],
+      "note": "Predefined locations (header / diff-toolbar / sidebar-footer): the element's `location` rides through registerUI -> GET /plugins/ui. The server-rendered slots exist in reviewShell.tsx; the client PLACEMENT into each slot is manual (docs/manual-test-plan.md), gated on GB-1043."
+    },
+    "FR-30.3": {
+      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "note": "Element types: button + link render (graphviz registers a button; the wire schema + GET /plugins/ui carry it). toggle/switch/segmented-control are declared in the contract but not yet rendered (deferred follow-up); the client RENDER of button/link is manual (docs/manual-test-plan.md), gated on GB-1043."
+    },
+    "FR-30.4": {
+      "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "registerUI stores the plugin's element set; re-activation replaces (not appends)",
+        "clearPluginUIElements(id) / clearAllPluginUIElements() remove entries",
+        "GET /plugins/ui returns only loaded (enabled) plugins' elements, flattened with pluginId",
+        "no plugins loaded -> empty element list"
+      ],
+      "note": "Registration + list endpoint (GB-1058): registerUI -> loader map (cleared on reload so disabled plugins drop out) -> listPluginUIElements -> GET /api/plugins/ui."
+    },
+    "FR-30.5": {
+      "tests": ["tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "note": "Action round-trip (GB-1058): onAction may return a UIActionResult; runPluginAction passes it through; POST /api/plugins/:id/action returns `result` alongside the refreshed list; graphviz's onAction returns a `message`. The client toast on `result.message` is manual (docs/manual-test-plan.md), gated on GB-1043."
+    },
+    "FR-30.6": {
+      "waived": "Design-only (doc 30): declarative/inert UI elements (the plugin ships icon+label+action id, never DOM; the icon SVG is trusted plugin data per the opt-in-install boundary, doc 29 §29.6) is a design-justification requirement, same class as NFR-29.2. The wire schema (PluginUIElementSchema) carries no code/handler field, structurally enforcing the declarative contract."
+    },
+    "NFR-30.1": {
+      "tests": ["tests/integration/api/plugins-routes.test.ts"],
+      "note": "Zero-plugin no-op: with no plugin loaded, GET /api/plugins/ui returns an empty element list, so the location slots stay empty (client no-op is manual, gated on GB-1043)."
     }
   }
 }

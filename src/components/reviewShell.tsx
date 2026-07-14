@@ -43,6 +43,8 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
           <div className="sidebar-share" id="sidebar-share"></div>
           <div className="sidebar-footer">
             {footer}
+            {/* Plugin UI extensions (doc 30 FR-30.2): sidebar-footer location. */}
+            <div className="plugin-ui-slot" id="plugin-ui-sidebar-footer"></div>
           </div>
         </aside>
         <div className="sidebar-resize" id="sidebar-resize"></div>
@@ -63,6 +65,8 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <span className="nav-file-path" id="nav-file-path"></span>
+            {/* Plugin UI extensions (doc 30 FR-30.2): header location (main-content top bar). */}
+            <span className="plugin-ui-slot" id="plugin-ui-header"></span>
           </div>
           <div className="diff-container" id="diff-container" style="display:none"></div>
           <div className="diff-toolbar" id="diff-toolbar" style="display:none">
@@ -109,6 +113,8 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
                 <button className="image-zoom-btn" data-zoom-action="in" title="Zoom in"><IconZoomIn /></button>
               </div>
             </div>
+            {/* Plugin UI extensions (doc 30 FR-30.2): diff-toolbar location (always visible, outside the text/image sub-toolbars). */}
+            <div className="plugin-ui-slot" id="plugin-ui-diff-toolbar"></div>
           </div>
         </main>
       </div>

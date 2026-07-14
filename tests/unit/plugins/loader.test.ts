@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { clearConfigLabelOverrides, discoverPluginDirs, getConfigLabelOverride, loadAllPlugins, loadPluginDir, readManifest } from '../../../src/plugins/loader.js';
+import { clearAllPluginUIElements, clearConfigLabelOverrides, clearPluginUIElements, discoverPluginDirs, getConfigLabelOverride, getPluginUIElements, loadAllPlugins, loadPluginDir, readManifest } from '../../../src/plugins/loader.js';
 import { ContentPluginRegistry } from '../../../src/plugins/registry.js';
 
 let root: string;
@@ -182,6 +182,45 @@ describe('config-layout actions + dynamic labels (doc 29 FR-29.18)', () => {
     await res.instance?.onAction?.('hello', res.context!);
     expect(getConfigLabelOverride('named-action', 's')).toEqual({ text: 'hello', color: 'success' });
     clearConfigLabelOverrides('named-action');
+  });
+});
+
+describe('UI-element registration (doc 30 FR-30.4)', () => {
+  const UI_ENTRY = `export default {
+    activate(ctx) {
+      ctx.registerUI([{ type: 'button', id: 'b', location: 'header', label: 'Hi', action: 'go' }]);
+      return {};
+    },
+    async onAction(actionId) { return actionId === 'go' ? { message: 'went' } : undefined; },
+  };`;
+
+  it('registerUI stores the plugin\'s elements; clear removes them', async () => {
+    clearAllPluginUIElements();
+    const dir = makePlugin('ui', { manifest: { id: 'ui', name: 'UI', version: '1' }, entry: UI_ENTRY });
+    await loadPluginDir(dir, new ContentPluginRegistry());
+    const groups = getPluginUIElements();
+    const mine = groups.find((g) => g.pluginId === 'ui');
+    expect(mine?.elements).toEqual([{ type: 'button', id: 'b', location: 'header', label: 'Hi', action: 'go' }]);
+    clearPluginUIElements('ui');
+    expect(getPluginUIElements().find((g) => g.pluginId === 'ui')).toBeUndefined();
+  });
+
+  it('re-activation replaces the previous element set (not appends)', async () => {
+    clearAllPluginUIElements();
+    const dir = makePlugin('ui2', { manifest: { id: 'ui2', name: 'UI2', version: '1' }, entry: UI_ENTRY });
+    await loadPluginDir(dir, new ContentPluginRegistry());
+    await loadPluginDir(dir, new ContentPluginRegistry()); // activate again
+    expect(getPluginUIElements().find((g) => g.pluginId === 'ui2')?.elements).toHaveLength(1);
+    clearAllPluginUIElements();
+    expect(getPluginUIElements()).toHaveLength(0);
+  });
+
+  it('onAction can return a UIActionResult message (doc 30 FR-30.5)', async () => {
+    clearAllPluginUIElements();
+    const dir = makePlugin('ui3', { manifest: { id: 'ui3', name: 'UI3', version: '1' }, entry: UI_ENTRY });
+    const res = await loadPluginDir(dir, new ContentPluginRegistry());
+    expect(await res.instance?.onAction?.('go', res.context!)).toEqual({ message: 'went' });
+    clearAllPluginUIElements();
   });
 });
 

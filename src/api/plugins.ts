@@ -106,9 +106,39 @@ export type InstallPluginReq = z.infer<typeof InstallPluginReqSchema>;
 export const SetPluginPreferenceReqSchema = z.object({ key: z.string().min(1), value: z.string() });
 export type SetPluginPreferenceReq = z.infer<typeof SetPluginPreferenceReqSchema>;
 
-/** A config-layout `button` action (doc 29 FR-29.18). */
+/** A config-layout `button` action (doc 29 FR-29.18) or a UI-element action (doc 30). */
 export const RunPluginActionReqSchema = z.object({ actionId: z.string().min(1) });
 export type RunPluginActionReq = z.infer<typeof RunPluginActionReqSchema>;
+
+/**
+ * A plugin-registered UI element (doc 30 FR-30.3), flattened for the wire with
+ * its `pluginId`. Deliberately permissive (every variant field optional, `type`/
+ * `location` are plain strings) — the client renders the subset it supports.
+ */
+export const PluginUIElementSchema = z.object({
+  pluginId: z.string(),
+  id: z.string(),
+  type: z.string(),
+  location: z.string(),
+  label: z.string().optional(),
+  icon: z.string().optional(),
+  title: z.string().optional(),
+  style: z.string().optional(),
+  action: z.string().optional(),
+  url: z.string().optional(),
+});
+export type PluginUIElementInfo = z.infer<typeof PluginUIElementSchema>;
+
+/** `GET /plugins/ui` → the registered UI elements of enabled plugins. */
+export const ListPluginUiRespSchema = z.object({ elements: z.array(PluginUIElementSchema) });
+export type ListPluginUiResp = z.infer<typeof ListPluginUiRespSchema>;
+
+/** `POST /plugins/:id/action` → the refreshed list (for config-layout labels)
+ *  plus the optional `result` a UI/config action returned (doc 30 FR-30.5). */
+export const RunPluginActionRespSchema = ListPluginsRespSchema.extend({
+  result: z.object({ message: z.string().optional() }).optional(),
+});
+export type RunPluginActionResp = z.infer<typeof RunPluginActionRespSchema>;
 
 /** Every mutating call returns the refreshed list (after a reload). */
 export async function listPlugins(): Promise<ListPluginsResp> {
@@ -131,8 +161,14 @@ export async function setPluginPreference(id: string, req: SetPluginPreferenceRe
   return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}/preferences`, { method: 'POST', body: req });
 }
 
-/** Run a config-layout button action (doc 29 FR-29.18); returns the refreshed
- *  list so any `updateConfigLabel` the action made is reflected in the UI. */
-export async function runPluginAction(id: string, req: RunPluginActionReq): Promise<ListPluginsResp> {
-  return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}/action`, { method: 'POST', body: req });
+/** Run a config-layout button (doc 29 FR-29.18) or UI-element (doc 30) action;
+ *  returns the refreshed list (so `updateConfigLabel` changes show) plus any
+ *  `result` the action returned (e.g. a `message` toast). */
+export async function runPluginAction(id: string, req: RunPluginActionReq): Promise<RunPluginActionResp> {
+  return apiCall(RunPluginActionRespSchema, `/plugins/${encodeURIComponent(id)}/action`, { method: 'POST', body: req });
+}
+
+/** List the registered UI elements of enabled plugins (doc 30 FR-30.4). */
+export async function listPluginUi(): Promise<PluginUIElementInfo[]> {
+  return (await apiCall(ListPluginUiRespSchema, '/plugins/ui')).elements;
 }

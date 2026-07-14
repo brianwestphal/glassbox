@@ -88,6 +88,92 @@ export interface PluginRegistration {
  */
 export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
 
+/**
+ * Where a plugin UI element renders in the host chrome (doc 30 FR-30.2).
+ * `header` = the main-content top bar; `diff-toolbar` = the bottom diff toolbar;
+ * `sidebar-footer` = below the Complete/Reopen controls.
+ */
+export type PluginUILocation = 'header' | 'diff-toolbar' | 'sidebar-footer';
+
+/** Fields shared by every plugin UI element (doc 30). */
+interface PluginUIBase {
+  /** Unique within the plugin. */
+  id: string;
+  location: PluginUILocation;
+}
+
+/** A clickable button that triggers the plugin's `onAction` (doc 30 FR-30.3). */
+export interface PluginUIButton extends PluginUIBase {
+  type: 'button';
+  label?: string;
+  /** Inline SVG string (rendered inertly; the plugin ships no DOM). */
+  icon?: string;
+  /** Tooltip. */
+  title?: string;
+  style?: 'default' | 'primary' | 'danger';
+  /** Action id passed to `onAction` on click. */
+  action: string;
+}
+
+/** A link that opens an external URL in a new tab (doc 30 FR-30.3). */
+export interface PluginUILink extends PluginUIBase {
+  type: 'link';
+  url: string;
+  label?: string;
+  icon?: string;
+  title?: string;
+}
+
+/**
+ * A two-state toggle button (doc 30). **Declared but not yet rendered** by the
+ * host client — tracked as a follow-up (stateful controls need client-side
+ * selection state + `stateKey` persistence). Kept in the contract so plugins can
+ * author against the full surface.
+ */
+export interface PluginUIToggle extends PluginUIBase {
+  type: 'toggle';
+  on: { label?: string; icon?: string; title?: string; style?: string };
+  off: { label?: string; icon?: string; title?: string; style?: string };
+  action: string;
+  /** Setting key the host reads/writes for on/off persistence. */
+  stateKey?: string;
+}
+
+/** A labeled switch (doc 30). Declared but not yet rendered (see `PluginUIToggle`). */
+export interface PluginUISwitch extends PluginUIBase {
+  type: 'switch';
+  onLabel: string;
+  offLabel: string;
+  action: string;
+  stateKey?: string;
+}
+
+/** A segmented control (doc 30). Declared but not yet rendered (see `PluginUIToggle`). */
+export interface PluginUISegmentedControl extends PluginUIBase {
+  type: 'segmented-control';
+  segments: { id: string; label?: string; icon?: string; title?: string }[];
+  selectionMode: 'zero-or-one' | 'exactly-one' | 'zero-or-more' | 'one-or-more';
+  action: string;
+  stateKey?: string;
+}
+
+/** The union of plugin UI elements (doc 30 FR-30.3). */
+export type PluginUIElement =
+  | PluginUIButton
+  | PluginUILink
+  | PluginUIToggle
+  | PluginUISwitch
+  | PluginUISegmentedControl;
+
+/**
+ * What a plugin `onAction` may return (doc 30 FR-30.5). Opaque except `message`,
+ * which the host surfaces as a transient toast. `void` (the common case) means
+ * "no client feedback".
+ */
+export interface UIActionResult {
+  message?: string;
+}
+
 /** Host services handed to a plugin at activation. */
 export interface PluginContext {
   /** Scoped logger; messages are prefixed with the plugin id. */
@@ -103,6 +189,12 @@ export interface PluginContext {
    * refreshes (which an action triggers). No-op for an unknown `labelId`.
    */
   updateConfigLabel(labelId: string, text: string, color?: ConfigLabelColor): void;
+  /**
+   * Register interactive UI elements at predefined host locations (doc 30
+   * FR-30.4). Called during `activate`; replaces this plugin's previously
+   * registered set. A click/interaction round-trips to `onAction`.
+   */
+  registerUI(elements: PluginUIElement[]): void;
 }
 
 /**
@@ -115,9 +207,11 @@ export interface ContentPlugin {
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
   /**
-   * Handle a `button` action declared in the manifest `configLayout` (doc 29
-   * FR-29.18). Invoked with the same `PluginContext` passed to `activate`, so it
-   * can read settings and call `updateConfigLabel` to reflect status in the UI.
+   * Handle an action from a config-layout `button` (doc 29 FR-29.18) or a
+   * registered UI element (doc 30 FR-30.5). Invoked with the same `PluginContext`
+   * passed to `activate`, so it can read settings and call `updateConfigLabel`.
+   * May return a `UIActionResult` (e.g. a `message` toast) or nothing.
    */
-  onAction?(actionId: string, context: PluginContext): void | Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- onAction may return nothing (void) or a result, sync or async
+  onAction?(actionId: string, context: PluginContext): void | UIActionResult | Promise<void | UIActionResult>;
 }

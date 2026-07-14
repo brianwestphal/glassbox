@@ -161,16 +161,31 @@ export interface PluginRegistration {
   differs?: ContentDiffer[];
 }
 export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
+// Plugin UI extensions (doc 30). Only `button` and `link` render today.
+export type PluginUILocation = 'header' | 'diff-toolbar' | 'sidebar-footer';
+export interface PluginUIButton {
+  type: 'button'; id: string; location: PluginUILocation;
+  label?: string; icon?: string; title?: string;   // icon = inline SVG string
+  style?: 'default' | 'primary' | 'danger'; action: string;
+}
+export interface PluginUILink {
+  type: 'link'; id: string; location: PluginUILocation;
+  url: string; label?: string; icon?: string; title?: string;
+}
+export type PluginUIElement = PluginUIButton | PluginUILink;  // (+ toggle/switch/segmented-control, declared not rendered)
+export interface UIActionResult { message?: string }         // onAction may return a toast message
 export interface PluginContext {
   log(level: 'info' | 'warn' | 'error', message: string): void;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
   updateConfigLabel(labelId: string, text: string, color?: ConfigLabelColor): void;  // config-layout status
+  registerUI(elements: PluginUIElement[]): void;   // main-app UI extensions (doc 30)
 }
 export interface ContentPlugin {
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
-  onAction?(actionId: string, context: PluginContext): void | Promise<void>;  // config-layout button
+  // Handles config-layout buttons (doc 29) + UI-element actions (doc 30); may return a toast message.
+  onAction?(actionId: string, context: PluginContext): void | UIActionResult | Promise<void | UIActionResult>;
 }
 ```
 

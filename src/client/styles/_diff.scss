@@ -619,7 +619,8 @@
 }
 
 // Go-to-definition toast
-.goto-toast {
+.goto-toast,
+.app-toast {
   position: fixed;
   bottom: 60px;
   left: 50%;

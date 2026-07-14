@@ -41,14 +41,37 @@ export interface PluginRegistration {
   differs?: ContentDiffer[];
 }
 export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
+export type PluginUILocation = 'header' | 'diff-toolbar' | 'sidebar-footer';
+export interface PluginUIButton {
+  type: 'button';
+  id: string;
+  location: PluginUILocation;
+  label?: string;
+  icon?: string;
+  title?: string;
+  style?: 'default' | 'primary' | 'danger';
+  action: string;
+}
+export interface PluginUILink {
+  type: 'link';
+  id: string;
+  location: PluginUILocation;
+  url: string;
+  label?: string;
+  icon?: string;
+  title?: string;
+}
+export type PluginUIElement = PluginUIButton | PluginUILink;
+export interface UIActionResult { message?: string }
 export interface PluginContext {
   log(level: 'info' | 'warn' | 'error', message: string): void;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
   updateConfigLabel(labelId: string, text: string, color?: ConfigLabelColor): void;
+  registerUI(elements: PluginUIElement[]): void;
 }
 export interface ContentPlugin {
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
-  onAction?(actionId: string, context: PluginContext): void | Promise<void>;
+  onAction?(actionId: string, context: PluginContext): void | UIActionResult | Promise<void | UIActionResult>;
 }

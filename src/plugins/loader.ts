@@ -20,7 +20,7 @@ import { GLOBAL_CONFIG_DIR } from '../global-config.js';
 import { parseManifest, type PluginManifest } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginSetting, writePluginSetting } from './settings.js';
-import type { ConfigLabelColor, ContentPlugin, PluginContext, PluginRegistration } from './types.js';
+import type { ConfigLabelColor, ContentPlugin, PluginContext, PluginRegistration, PluginUIElement } from './types.js';
 
 /** One plugin's load outcome — surfaced to the management UI (GB-1040). */
 export interface LoadedPlugin {
@@ -60,6 +60,26 @@ export function clearConfigLabelOverrides(pluginId: string): void {
   for (const key of configLabelOverrides.keys()) {
     if (key.startsWith(prefix)) configLabelOverrides.delete(key);
   }
+}
+
+/** Plugin-registered UI elements (doc 30 FR-30.4), keyed by plugin id. A plugin's
+ *  `registerUI` call replaces its whole set; the map is cleared before a full
+ *  reload so only currently-activated (enabled) plugins' elements remain. */
+const pluginUIElements = new Map<string, PluginUIElement[]>();
+
+/** Every registered plugin's UI elements, grouped by plugin (doc 30). */
+export function getPluginUIElements(): { pluginId: string; elements: PluginUIElement[] }[] {
+  return Array.from(pluginUIElements.entries()).map(([pluginId, elements]) => ({ pluginId, elements }));
+}
+
+/** Drop one plugin's registered UI elements (on uninstall). */
+export function clearPluginUIElements(pluginId: string): void {
+  pluginUIElements.delete(pluginId);
+}
+
+/** Clear all registered UI elements (before a full reload; only enabled plugins re-register). */
+export function clearAllPluginUIElements(): void {
+  pluginUIElements.clear();
 }
 
 /** Enablement decision for a plugin id (doc 29 FR-29.16). */
@@ -121,6 +141,7 @@ function makeContext(manifest: PluginManifest, repoRoot: string): PluginContext 
     getSetting: (key) => Promise.resolve(readPluginSetting(manifest, repoRoot, key)),
     setSetting: (key, value) => { writePluginSetting(manifest, repoRoot, key, value); return Promise.resolve(); },
     updateConfigLabel: (labelId, text, color) => { configLabelOverrides.set(`${id}:${labelId}`, { text, color }); },
+    registerUI: (elements) => { pluginUIElements.set(id, elements); },
   };
 }
 

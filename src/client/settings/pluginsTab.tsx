@@ -11,6 +11,7 @@ import { signal } from 'kerfjs';
 import type { ConfigLabelColor, ConfigLayoutItem, PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
 import { installPlugin, listPlugins, runPluginAction, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
 import { IconChevronRight, IconPlug } from '../../icons.js';
+import { refreshPluginUi } from '../plugins/uiExtensions.js';
 import { getTauriInvoke } from '../tauri.js';
 import type { Tab } from './tabContext.js';
 
@@ -33,13 +34,13 @@ export function loadPluginsList(): void {
 
 export function togglePluginDisabled(id: string, scope: 'global' | 'project', disabled: boolean): void {
   void setPluginDisabled(id, { scope, disabled })
-    .then((r) => { plugins.value = r.plugins; })
+    .then((r) => { plugins.value = r.plugins; void refreshPluginUi(); })
     .catch(() => { /* leave the current list; the checkbox reflects server truth on next load */ });
 }
 
 export function doUninstallPlugin(id: string): void {
   void uninstallPlugin(id)
-    .then((r) => { plugins.value = r.plugins; })
+    .then((r) => { plugins.value = r.plugins; void refreshPluginUi(); })
     .catch(() => {});
 }
 
@@ -64,6 +65,7 @@ export function doInstallPlugin(path: string): void {
   void installPlugin({ path: path.trim() })
     .then((r) => {
       plugins.value = r.plugins;
+      void refreshPluginUi();
       installError.value = r.error ?? '';
       // On success, clear the field so it's clear the install ran (re-installing
       // an already-present plugin otherwise looks like nothing happened).
