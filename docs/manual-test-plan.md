@@ -111,9 +111,13 @@ Until then, the tab's UI wiring is manual:
   Rendered** toggle (like an SVG); *Rendered* shows the diagram rendered by the
   local `java -jar plantuml.jar` subprocess. With Java or the jar **absent**, the
   file falls back to the plain code-block/text diff (no error). *(The renderer's
-  fail-soft paths + SVG extraction are unit-tested — `plugins/plantuml.test.ts`;
-  the live Java render needs a JRE + jar and can't run in CI, so this item is
-  manual, same class as the Apple Foundation Models on-device path.)*
+  fail-soft paths + SVG extraction are unit-tested, and `plugins/plantuml.test.ts`
+  also has a **Java-gated live-render test** that runs the real `java -jar` path
+  whenever a JRE + jar are present — set `PLANTUML_JAR`, or install via `setup.mjs`
+  — and skips otherwise. Unlike the Apple FM path this is **not** a hardware gate
+  (Java + a downloadable jar are provisionable in CI); it's out of the default
+  suite only because the ~22 MB GPL jar isn't committed. This manual item is the
+  full in-viewer Code|Rendered experience.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of
