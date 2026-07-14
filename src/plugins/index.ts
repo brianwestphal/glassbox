@@ -15,7 +15,7 @@ import { installBundledPlugins } from './install.js';
 import { clearAllPluginUIElements, type EnablementCheck, getConfigLabelOverride, getPluginUIElements, loadAllPlugins,type LoadedPlugin } from './loader.js';
 import type { ConfigLayoutItem, PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
-import { readPluginPreferenceDisplay } from './settings.js';
+import { readPluginPreferenceDisplay, readPluginSetting, writePluginSetting } from './settings.js';
 import type { AnnotationHookInfo, ConfigLabelColor, DiffInput, PluginUIElement, RenderedView, RenderInput, ReviewHookInfo, UIActionResult } from './types.js';
 
 let registry = new ContentPluginRegistry();
@@ -181,7 +181,7 @@ export function getPluginManifest(id: string): PluginManifest | undefined {
  * `describeInstalledPlugins`.
  */
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- onAction may return nothing (void) or a result
-export async function runPluginAction(id: string, actionId: string): Promise<UIActionResult | void> {
+export async function runPluginAction(id: string, actionId: string, value?: string): Promise<UIActionResult | void> {
   if (!PLUGINS_ENABLED) throw new Error('Plugins are disabled');
   const loaded = loadedPlugins.find((p) => p.id === id);
   if (loaded === undefined || loaded.status !== 'loaded' || loaded.instance === undefined || loaded.context === undefined) {
@@ -190,7 +190,35 @@ export async function runPluginAction(id: string, actionId: string): Promise<UIA
   if (typeof loaded.instance.onAction !== 'function') {
     throw new Error('Plugin does not handle actions');
   }
-  return await loaded.instance.onAction(actionId, loaded.context);
+  return await loaded.instance.onAction(actionId, loaded.context, value);
+}
+
+/** A stateful control's `stateKey` (toggle/switch/segmented-control, doc 30), else undefined. */
+function statefulKey(e: PluginUIElement): string | undefined {
+  return e.type === 'toggle' || e.type === 'switch' || e.type === 'segmented-control' ? e.stateKey : undefined;
+}
+
+/** An element's action id (every type except `link`). */
+function elementAction(e: PluginUIElement): string | undefined {
+  return e.type === 'link' ? undefined : e.action;
+}
+
+/**
+ * Persist a stateful UI control's new value to its `stateKey` (doc 30 FR-30.3):
+ * finds the registered element by `(id, actionId)`, and if it declares a
+ * `stateKey`, writes `value` to that plugin setting (the host reflects state so
+ * plugin authors get persistence for free). Fail-soft; a no-op for a plain
+ * button (no stateKey) or an unknown element.
+ */
+export function persistPluginUIState(id: string, actionId: string, value: string, repoRoot: string): void {
+  const manifest = loadedPlugins.find((p) => p.id === id && p.status === 'loaded')?.manifest;
+  if (manifest === null || manifest === undefined) return;
+  const group = getPluginUIElements().find((g) => g.pluginId === id);
+  const el = group?.elements.find((e) => elementAction(e) === actionId && statefulKey(e) !== undefined && statefulKey(e) !== '');
+  const key = el ? statefulKey(el) : undefined;
+  if (key === undefined || key === '') return;
+  try { writePluginSetting(manifest, repoRoot, key, value); }
+  catch { /* fail-soft: persistence best-effort */ }
 }
 
 function toReviewHookInfo(review: Review): ReviewHookInfo {
@@ -237,13 +265,22 @@ export async function notifyReviewCompleted(review: Review, annotations: Annotat
  * plugins, each flattened with its `pluginId`, for the client to render. Empty
  * when the subsystem is disabled.
  */
-export function listPluginUIElements(): (PluginUIElement & { pluginId: string })[] {
+export function listPluginUIElements(repoRoot = ''): (PluginUIElement & { pluginId: string; value?: string })[] {
   if (!PLUGINS_ENABLED) return [];
-  const loadedIds = new Set(loadedPlugins.filter((p) => p.status === 'loaded').map((p) => p.id));
-  const out: (PluginUIElement & { pluginId: string })[] = [];
+  const loaded = new Map(loadedPlugins.filter((p) => p.status === 'loaded').map((p) => [p.id, p]));
+  const out: (PluginUIElement & { pluginId: string; value?: string })[] = [];
   for (const { pluginId, elements } of getPluginUIElements()) {
-    if (!loadedIds.has(pluginId)) continue;
-    for (const el of elements) out.push({ ...el, pluginId });
+    const plugin = loaded.get(pluginId);
+    if (plugin === undefined) continue;
+    for (const el of elements) {
+      // Attach the resolved current state for a stateful control (doc 30 FR-30.3)
+      // by reading its stateKey setting, so the client renders it in that state.
+      const key = statefulKey(el);
+      const value = key !== undefined && key !== '' && plugin.manifest !== null
+        ? readPluginSetting(plugin.manifest, repoRoot, key) ?? undefined
+        : undefined;
+      out.push({ ...el, pluginId, value });
+    }
   }
   return out;
 }

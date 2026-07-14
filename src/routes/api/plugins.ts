@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 
 import { InstallPluginReqSchema, RunPluginActionReqSchema, SetPluginDisabledReqSchema, SetPluginPreferenceReqSchema } from '../../api/plugins.js';
 import { setGlobalDisabled, setProjectDisabled } from '../../plugins/enablement.js';
-import { describeInstalledPlugins, getPluginManifest, listPluginUIElements, reloadContentPlugins, runPluginAction } from '../../plugins/index.js';
+import { describeInstalledPlugins, getPluginManifest, listPluginUIElements, persistPluginUIState, reloadContentPlugins, runPluginAction } from '../../plugins/index.js';
 import { installPluginFromDisk, uninstallPlugin } from '../../plugins/install.js';
 import { clearConfigLabelOverrides, clearPluginUIElements } from '../../plugins/loader.js';
 import { writePluginSetting } from '../../plugins/settings.js';
@@ -22,7 +22,7 @@ pluginsRoutes.get('/plugins', (c) => {
 });
 
 pluginsRoutes.get('/plugins/ui', (c) => {
-  return c.json({ elements: listPluginUIElements() });
+  return c.json({ elements: listPluginUIElements(c.get('repoRoot')) });
 });
 
 pluginsRoutes.post('/plugins/:id/disabled', async (c) => {
@@ -77,9 +77,12 @@ pluginsRoutes.post('/plugins/:id/action', async (c) => {
   if (!parsed.ok) return parsed.response;
 
   const repoRoot = c.get('repoRoot');
+  // Persist a stateful control's new value to its stateKey (doc 30 FR-30.3)
+  // before invoking onAction, so the plugin's handler + the next list reflect it.
+  if (parsed.data.value !== undefined) persistPluginUIState(id.data, parsed.data.actionId, parsed.data.value, repoRoot);
   let result;
   try {
-    result = await runPluginAction(id.data, parsed.data.actionId);
+    result = await runPluginAction(id.data, parsed.data.actionId, parsed.data.value);
   } catch (e) {
     // Return the current list + the message so the client (whose apiCall
     // validates the body regardless of status) can show a clean error. The

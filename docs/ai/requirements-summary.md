@@ -960,10 +960,13 @@ A plugin's second UI surface beyond content rendering (doc 29): it contributes
 `context.registerUI([...])` in `activate`. Locations (GB-1058): **`header`**
 (main-content top bar), **`diff-toolbar`**, **`sidebar-footer`** — fixed
 server-rendered slots in `reviewShell.tsx`. Element union (`src/plugins/types.ts`
-`PluginUIElement`): **`button`** + **`link`** render; **`toggle`/`switch`/
-`segmented-control`** are declared-but-deferred (need client selection state +
-`stateKey` persistence — follow-up, mirrors Hot Sheet which also declares but
-doesn't render them). Registry: a process-global map in `loader.ts`, **cleared on
+`PluginUIElement`): all five render — **`button`** + **`link`** (GB-1058) and the
+**stateful** **`toggle`/`switch`/`segmented-control`** (GB-1068). Stateful controls
+carry a **`stateKey`** the host persists to (plugin-settings store) + resolves into
+each element's `value` in `GET /api/plugins/ui`; the client posts `{ actionId,
+value }` and `onAction(actionId, ctx, value?)` receives it. Segmented selection
+math is pure + unit-tested (`src/client/plugins/segmentSelection.ts`). Registry: a
+process-global map in `loader.ts`, **cleared on
 reload** so disabled plugins drop out; `GET /api/plugins/ui` returns loaded
 plugins' elements flattened with `pluginId`. A click round-trips to `onAction` via
 `POST /api/plugins/:id/action`, whose response now carries an optional
@@ -1022,7 +1025,8 @@ diagram-source first reference plugin (GB-910) remain. Doc **30** (plugin main-a
 UI extensions) is **Shipped** for button/link (GB-1058) — `registerUI`,
 `GET /api/plugins/ui`, the `onAction` result→toast round-trip, three host slots,
 and the graphviz reference button; the stateful controls (toggle/switch/
-segmented-control) are declared-but-deferred. Doc **31** (plugin review lifecycle
+segmented-control) shipped in GB-1068 (host-persisted `stateKey` + `{actionId,
+value}` round-trip + pure selection math). Doc **31** (plugin review lifecycle
 hooks) is **Shipped** (GB-1065) — `reviewHooks` (`onReviewCreated` /
 `onReviewCompleted`), fail-soft dispatch, both wiring points, verified live. When a
 new feature is spec'd before implementation, add a doc and

@@ -131,3 +131,43 @@ describe('POST /api/plugins/:id/action — config-layout button (doc 29 FR-29.18
     expect(parsed.error).toMatch(/not active/);
   });
 });
+
+describe('POST /api/plugins/:id/action — stateful control (doc 30 FR-30.3)', () => {
+  // A toggle whose stateKey is a PROJECT-scoped preference, so persistence lands
+  // in the tmp repo's .glassbox/settings.json (hermetic — no global-config write).
+  async function loadStatePlugin(): Promise<void> {
+    const pluginsRoot = mkdtempSync(join(tmpdir(), 'gb-stateplugins-'));
+    const dir = join(pluginsRoot, 'state-plugin');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({
+      id: 'state-plugin', name: 'State Plugin', version: '1.0.0',
+      preferences: [{ key: 'grid', label: 'Grid', type: 'boolean', scope: 'project' }],
+    }));
+    writeFileSync(join(dir, 'index.js'), `export default {
+      activate(ctx) {
+        ctx.registerUI([{ type: 'toggle', id: 't', location: 'sidebar-footer', stateKey: 'grid', action: 'toggle_grid', on: { label: 'On' }, off: { label: 'Off' } }]);
+        return {};
+      },
+      onAction(actionId, ctx, value) { if (actionId === 'toggle_grid') return { message: 'grid ' + value }; },
+    };`);
+    const { registry, loaded } = await loadAllPlugins(pluginsRoot, undefined, repo);
+    __setContentRegistryForTest(registry, loaded);
+    rmSync(pluginsRoot, { recursive: true, force: true });
+  }
+
+  it('persists the toggled value to stateKey + resolves it in GET /plugins/ui, and threads value to onAction', async () => {
+    await loadStatePlugin();
+    const before = ListPluginUiRespSchema.parse(await (await app().request('/api/plugins/ui')).json());
+    expect(before.elements.find((e) => e.id === 't')?.value).toBeUndefined();
+
+    const actRes = await app().request('/api/plugins/state-plugin/action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionId: 'toggle_grid', value: 'true' }),
+    });
+    expect(actRes.status).toBe(200);
+    expect(RunPluginActionRespSchema.parse(await actRes.json()).result?.message).toBe('grid true');
+
+    const after = ListPluginUiRespSchema.parse(await (await app().request('/api/plugins/ui')).json());
+    expect(after.elements.find((e) => e.id === 't')?.value).toBe('true');
+  });
+});

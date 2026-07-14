@@ -42,6 +42,26 @@
 
   svg { width: 14px; height: 14px; }
   .plugin-ui-label { line-height: 1; }
+
+  // Active state for toggle / switch (doc 30 FR-30.3).
+  &.active {
+    color: var(--accent-fg, #fff);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+}
+
+.plugin-ui-icon {
+  display: inline-flex;
+  align-items: center;
+  svg { width: 14px; height: 14px; }
+}
+
+// Segmented-control reuses the app's .segmented-control / .segment styling; keep
+// it compact + inline in the plugin slots.
+.plugin-ui-segmented {
+  font-size: 12px;
+  .segment { display: inline-flex; align-items: center; gap: 4px; }
 }
 
 .plugin-ui-link {

@@ -106,8 +106,9 @@ export type InstallPluginReq = z.infer<typeof InstallPluginReqSchema>;
 export const SetPluginPreferenceReqSchema = z.object({ key: z.string().min(1), value: z.string() });
 export type SetPluginPreferenceReq = z.infer<typeof SetPluginPreferenceReqSchema>;
 
-/** A config-layout `button` action (doc 29 FR-29.18) or a UI-element action (doc 30). */
-export const RunPluginActionReqSchema = z.object({ actionId: z.string().min(1) });
+/** A config-layout `button` action (doc 29 FR-29.18) or a UI-element action (doc 30).
+ *  `value` carries a stateful control's new state (toggle/switch/segmented-control). */
+export const RunPluginActionReqSchema = z.object({ actionId: z.string().min(1), value: z.string().optional() });
 export type RunPluginActionReq = z.infer<typeof RunPluginActionReqSchema>;
 
 /**
@@ -115,6 +116,21 @@ export type RunPluginActionReq = z.infer<typeof RunPluginActionReqSchema>;
  * its `pluginId`. Deliberately permissive (every variant field optional, `type`/
  * `location` are plain strings) — the client renders the subset it supports.
  */
+/** One face of a two-state control, or a config for a plain button (doc 30). */
+const UIElementFaceSchema = z.object({
+  label: z.string().optional(),
+  icon: z.string().optional(),
+  title: z.string().optional(),
+  style: z.string().optional(),
+});
+/** A segment of a segmented-control (doc 30 FR-30.3). */
+const UISegmentSchema = z.object({
+  id: z.string(),
+  label: z.string().optional(),
+  icon: z.string().optional(),
+  title: z.string().optional(),
+});
+
 export const PluginUIElementSchema = z.object({
   pluginId: z.string(),
   id: z.string(),
@@ -126,6 +142,17 @@ export const PluginUIElementSchema = z.object({
   style: z.string().optional(),
   action: z.string().optional(),
   url: z.string().optional(),
+  // Stateful controls (doc 30 FR-30.3): toggle/switch (`on`/`off`), segmented
+  // (`segments`/`selectionMode`); `stateKey` persists, `value` is the resolved
+  // current state the host attaches when listing.
+  on: UIElementFaceSchema.optional(),
+  off: UIElementFaceSchema.optional(),
+  onLabel: z.string().optional(),
+  offLabel: z.string().optional(),
+  segments: z.array(UISegmentSchema).optional(),
+  selectionMode: z.string().optional(),
+  stateKey: z.string().optional(),
+  value: z.string().optional(),
 });
 export type PluginUIElementInfo = z.infer<typeof PluginUIElementSchema>;
 

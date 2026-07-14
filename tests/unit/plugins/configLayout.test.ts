@@ -31,7 +31,7 @@ describe('runPluginAction (doc 29 FR-29.18)', () => {
     const onAction = vi.fn<NonNullable<ContentPlugin['onAction']>>().mockResolvedValue({ message: 'hi' });
     __setContentRegistryForTest(new ContentPluginRegistry(), [loaded({ instance: { activate: () => {}, onAction }, context: ctx })]);
     const result = await runPluginAction('p', 'go');
-    expect(onAction).toHaveBeenCalledWith('go', ctx);
+    expect(onAction).toHaveBeenCalledWith('go', ctx, undefined);
     expect(result).toEqual({ message: 'hi' }); // doc 30 FR-30.5 result passthrough
   });
 

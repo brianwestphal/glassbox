@@ -256,8 +256,12 @@ export interface ContentPlugin {
    * Handle an action from a config-layout `button` (doc 29 FR-29.18) or a
    * registered UI element (doc 30 FR-30.5). Invoked with the same `PluginContext`
    * passed to `activate`, so it can read settings and call `updateConfigLabel`.
-   * May return a `UIActionResult` (e.g. a `message` toast) or nothing.
+   * For a **stateful** control (toggle / switch / segmented-control, doc 30
+   * FR-30.3) `value` carries the new state the host has already persisted to the
+   * element's `stateKey` (a `'true'`/`'false'` string for toggle/switch, a
+   * segment id or a JSON array for a segmented-control); it is absent for a plain
+   * button. May return a `UIActionResult` (e.g. a `message` toast) or nothing.
    */
   // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- onAction may return nothing (void) or a result, sync or async
-  onAction?(actionId: string, context: PluginContext): void | UIActionResult | Promise<void | UIActionResult>;
+  onAction?(actionId: string, context: PluginContext, value?: string): void | UIActionResult | Promise<void | UIActionResult>;
 }

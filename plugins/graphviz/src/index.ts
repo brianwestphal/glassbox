@@ -69,6 +69,17 @@ const plugin: ContentPlugin = {
         title: 'Test the Graphviz renderer',
         action: 'test_renderer',
       },
+      // Reference stateful control (doc 30 FR-30.3): a toggle whose on/off state
+      // the host persists to `stateKey`; onAction reports the new state.
+      {
+        type: 'toggle',
+        id: 'graphviz-grid',
+        location: 'sidebar-footer',
+        stateKey: 'grid_demo',
+        action: 'toggle_grid',
+        on: { label: 'Grid: on' },
+        off: { label: 'Grid: off' },
+      },
     ]);
     return {
       renderers: [
@@ -85,7 +96,12 @@ const plugin: ContentPlugin = {
   // and the diff-toolbar UI element (doc 30): render a trivial graph with the
   // current engine, report the result as a config-layout status label, and
   // return a `message` so the UI element surfaces a toast.
-  async onAction(actionId, context) {
+  async onAction(actionId, context, value) {
+    // Stateful toggle (doc 30 FR-30.3): the host has already persisted `value`
+    // to the `grid_demo` setting; just acknowledge the new state.
+    if (actionId === 'toggle_grid') {
+      return { message: `Graphviz grid ${value === 'true' ? 'enabled' : 'disabled'}` };
+    }
     if (actionId !== 'test_renderer') return;
     const engine = await resolveEngine(context);
     try {

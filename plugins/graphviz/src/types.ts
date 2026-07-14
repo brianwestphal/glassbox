@@ -61,7 +61,16 @@ export interface PluginUILink {
   icon?: string;
   title?: string;
 }
-export type PluginUIElement = PluginUIButton | PluginUILink;
+export interface PluginUIToggle {
+  type: 'toggle';
+  id: string;
+  location: PluginUILocation;
+  on: { label?: string; icon?: string; title?: string; style?: string };
+  off: { label?: string; icon?: string; title?: string; style?: string };
+  action: string;
+  stateKey?: string;
+}
+export type PluginUIElement = PluginUIButton | PluginUILink | PluginUIToggle;
 export interface UIActionResult { message?: string }
 export interface PluginContext {
   log(level: 'info' | 'warn' | 'error', message: string): void;
@@ -73,5 +82,5 @@ export interface PluginContext {
 export interface ContentPlugin {
   activate(context: PluginContext): PluginRegistration | void | Promise<PluginRegistration | void>;
   deactivate?(): void | Promise<void>;
-  onAction?(actionId: string, context: PluginContext): void | UIActionResult | Promise<void | UIActionResult>;
+  onAction?(actionId: string, context: PluginContext, value?: string): void | UIActionResult | Promise<void | UIActionResult>;
 }

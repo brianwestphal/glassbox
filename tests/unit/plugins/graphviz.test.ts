@@ -100,4 +100,20 @@ describe('graphviz plugin (doc 29 FR-29.17)', () => {
     await plugin.onAction?.('nope', ctx);
     expect(ctx.labels['engine-status']).toBeUndefined();
   });
+
+  // Stateful reference control (doc 30 FR-30.3).
+  it('registers a sidebar-footer toggle bound to a stateKey', async () => {
+    const registered: { type?: string; stateKey?: string }[] = [];
+    const ctx = ctxWith();
+    ctx.registerUI = (els) => { registered.push(...els); };
+    await plugin.activate(ctx);
+    const toggle = registered.find((e) => e.type === 'toggle');
+    expect(toggle).toMatchObject({ type: 'toggle', id: 'graphviz-grid', location: 'sidebar-footer', stateKey: 'grid_demo', action: 'toggle_grid' });
+  });
+
+  it('onAction(toggle_grid) reports the new state from the passed value', async () => {
+    const ctx = ctxWith();
+    expect(await plugin.onAction?.('toggle_grid', ctx, 'true')).toEqual({ message: 'Graphviz grid enabled' });
+    expect(await plugin.onAction?.('toggle_grid', ctx, 'false')).toEqual({ message: 'Graphviz grid disabled' });
+  });
 });

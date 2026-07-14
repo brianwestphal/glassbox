@@ -91,7 +91,14 @@ Until then, the tab's UI wiring is manual:
   the button; re-enabling restores it (the slots re-render without a page reload).
   A plugin registering a `header` or `sidebar-footer` element shows it in the
   main-content top bar / below the Complete–Reopen controls respectively. A `link`
-  element opens its URL in a new tab. *(The registration, `GET /api/plugins/ui`,
+  element opens its URL in a new tab. **Stateful controls (GB-1068):** the Graphviz
+  plugin also shows a **Grid** toggle in the sidebar footer — clicking it flips
+  "Grid: off"↔"Grid: on" (highlighted when on), toasts the new state, and the state
+  **persists** across a settings reopen / plugin re-render (host-persisted per
+  `stateKey`). A `switch` behaves the same with its on/off labels; a
+  `segmented-control` highlights the selected segment(s) per its selection mode
+  (`exactly-one` keeps one selected, `zero-or-more` toggles each independently).
+  *(The registration, `GET /api/plugins/ui`,
   and the `onAction`→`result.message` round-trip are unit/integration-tested —
   `plugins/loader.test.ts`, `plugins/configLayout.test.ts`, `plugins/graphviz.test.ts`,
   `api/plugins-routes.test.ts`; this item is the client slot rendering + click →

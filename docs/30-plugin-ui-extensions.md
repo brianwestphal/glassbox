@@ -40,19 +40,31 @@ id — never DOM or event handlers. The host builds every node and owns all wiri
 ## 30.3 Element types
 
 - **FR-30.3 — Element types.** The element contract (`src/plugins/types.ts`,
-  `PluginUIElement`) is a discriminated union. Two types **render** today:
+  `PluginUIElement`) is a discriminated union. All five types render:
   - **`button`** — `label?`, `icon?` (inline SVG string), `title?` (tooltip),
     `style?` (`default` / `primary` / `danger`), and a required `action` id. A
     click round-trips to `onAction` (FR-30.5).
   - **`link`** — a `url` opened in a new tab (`target="_blank" rel="noopener
     noreferrer"`), plus `label?` / `icon?` / `title?`.
+  - **`toggle`** — a two-state button with distinct `on` / `off` faces (each
+    `{ label?, icon?, title?, style? }`). Shows the current face + an `active`
+    class when on.
+  - **`switch`** — a labeled two-state control (`onLabel` / `offLabel`).
+  - **`segmented-control`** — a row of `segments` (`{ id, label?, icon?, title? }`)
+    with a `selectionMode`: `exactly-one` / `zero-or-one` / `zero-or-more` /
+    `one-or-more`. The selection math (`src/client/plugins/segmentSelection.ts`) is
+    pure + unit-tested.
 
-  Three further types — **`toggle`**, **`switch`**, and **`segmented-control`** —
-  are **declared in the contract but not yet rendered** by the host client (they
-  require client-side selection state + `stateKey` persistence). They are kept in
-  the type surface so plugins can author against the full set; rendering them is a
-  tracked follow-up. This matches Hot Sheet, which likewise declares but does not
-  render the stateful controls.
+  **Stateful controls** (toggle / switch / segmented-control) carry a **`stateKey`**.
+  The host **persists** state there and **reflects** it, so authors get persistence
+  for free: on interaction the client computes the new value and posts
+  `{ actionId, value }`; the route writes `value` to the element's `stateKey` (via
+  the plugin-settings store — global unless the key is a declared project-scoped
+  preference) and passes it to `onAction`; `GET /api/plugins/ui` resolves each
+  stateful element's current `value` from its `stateKey` so the client renders it
+  in the right state. The `value` encoding is `'true'`/`'false'` for toggle/switch,
+  a segment id (single-select modes) or a JSON id array (multi-select modes) for a
+  segmented-control.
 
 ## 30.4 Registration
 
@@ -70,18 +82,19 @@ id — never DOM or event handlers. The host builds every node and owns all wiri
 
 ## 30.5 Action round-trip
 
-- **FR-30.5 — `onAction` + result.** Clicking a `button` calls
-  **`POST /api/plugins/:id/action`** with `{ actionId }`, which invokes the
-  plugin's **`onAction(actionId, context)`** (the same handler shared with
+- **FR-30.5 — `onAction` + result.** Clicking a control calls
+  **`POST /api/plugins/:id/action`** with `{ actionId, value? }`, which invokes the
+  plugin's **`onAction(actionId, context, value?)`** (the same handler shared with
   config-layout buttons, doc 29 FR-29.18) against the plugin's live context — so
-  the handler can read settings and call `updateConfigLabel`. `onAction` **may
-  return a `UIActionResult`** whose `message` the host surfaces as a transient
-  toast; returning nothing means "no client feedback". The result rides back in
-  the action response alongside the refreshed plugin list (no separate endpoint).
-  Errors (unknown plugin/action) return a clean message the client toasts. The
-  `graphviz` plugin's diff-toolbar **Graphviz** button — which runs the same
-  renderer self-test as its config-layout button and toasts the result — is the
-  worked example.
+  the handler can read settings and call `updateConfigLabel`. `value` is present
+  for a stateful control (the new state the host has already persisted, FR-30.3)
+  and absent for a plain button. `onAction` **may return a `UIActionResult`** whose
+  `message` the host surfaces as a transient toast; returning nothing means "no
+  client feedback". The result rides back in the action response alongside the
+  refreshed plugin list (no separate endpoint). Errors (unknown plugin/action)
+  return a clean message the client toasts. The `graphviz` plugin's diff-toolbar
+  **Graphviz** button (renderer self-test → toast) and its sidebar-footer
+  **Grid** toggle (persisted on/off state → toast) are the worked examples.
 
 ## 30.6 Trust and inertness
 
@@ -108,8 +121,13 @@ Shipped (GB-1058): the contract (`PluginUIElement` union + `registerUI` +
 `onAction` result), the loader registry + clear-on-reload, `GET /api/plugins/ui`,
 the action-result passthrough on `POST /api/plugins/:id/action`, the three host
 slots + client rendering (`src/client/plugins/uiExtensions.tsx`) for **button**
-and **link**, and the `graphviz` reference element. **Deferred** (tracked
-follow-up): rendering the stateful controls (`toggle` / `switch` /
-`segmented-control`) with client selection state + `stateKey` persistence. The
-client rendering + click wiring is manual-tested (`docs/manual-test-plan.md`),
+and **link**, and the `graphviz` reference element.
+
+Shipped (GB-1068): the **stateful controls** — `toggle` / `switch` /
+`segmented-control` — with host-persisted `stateKey` state, the `{ actionId, value }`
+round-trip, resolved-state attachment in `GET /api/plugins/ui`, and the pure
+selection math (`src/client/plugins/segmentSelection.ts`). The `graphviz` plugin's
+sidebar-footer **Grid** toggle is the reference. All five element types now render.
+
+The client rendering + click wiring is manual-tested (`docs/manual-test-plan.md`),
 gated on the fixture-plugin e2e harness (GB-1043) like the rest of the plugin UI.

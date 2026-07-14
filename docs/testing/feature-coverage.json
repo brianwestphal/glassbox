@@ -1895,8 +1895,15 @@
       "note": "Predefined locations (header / diff-toolbar / sidebar-footer): the element's `location` rides through registerUI -> GET /plugins/ui. The server-rendered slots exist in reviewShell.tsx; the client PLACEMENT into each slot is manual (docs/manual-test-plan.md), gated on GB-1043."
     },
     "FR-30.3": {
-      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
-      "note": "Element types: button + link render (graphviz registers a button; the wire schema + GET /plugins/ui carry it). toggle/switch/segmented-control are declared in the contract but not yet rendered (deferred follow-up); the client RENDER of button/link is manual (docs/manual-test-plan.md), gated on GB-1043."
+      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/segmentSelection.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "button/link render (graphviz button; wire schema + GET /plugins/ui carry them)",
+        "stateful toggle: value unset -> off; POST value -> persisted to stateKey; GET /plugins/ui resolves value -> on (integration)",
+        "segmented selection math: exactly-one / zero-or-one / zero-or-more / one-or-more transitions + parse/encode round-trip (segmentSelection)",
+        "graphviz toggle registered with stateKey; onAction(toggle_grid, value) reports the new state"
+      ],
+      "note": "All five element types (GB-1058 button/link, GB-1068 toggle/switch/segmented-control). Stateful state persists to stateKey (host reflects) + resolves in the list; selection math is pure + unit-tested. The client RENDER + click wiring is manual (docs/manual-test-plan.md), gated on GB-1043 (verified live via a headed browser check)."
     },
     "FR-30.4": {
       "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],
@@ -1911,7 +1918,7 @@
     },
     "FR-30.5": {
       "tests": ["tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
-      "note": "Action round-trip (GB-1058): onAction may return a UIActionResult; runPluginAction passes it through; POST /api/plugins/:id/action returns `result` alongside the refreshed list; graphviz's onAction returns a `message`. The client toast on `result.message` is manual (docs/manual-test-plan.md), gated on GB-1043."
+      "note": "Action round-trip (GB-1058/GB-1068): onAction(actionId, ctx, value?) may return a UIActionResult; runPluginAction passes value + returns the result; POST /api/plugins/:id/action carries `value` for stateful controls (threaded to onAction, asserted in plugins-routes) and returns `result` alongside the refreshed list. The client toast on `result.message` is manual (docs/manual-test-plan.md), gated on GB-1043."
     },
     "FR-30.6": {
       "waived": "Design-only (doc 30): declarative/inert UI elements (the plugin ships icon+label+action id, never DOM; the icon SVG is trusted plugin data per the opt-in-install boundary, doc 29 §29.6) is a design-justification requirement, same class as NFR-29.2. The wire schema (PluginUIElementSchema) carries no code/handler field, structurally enforcing the declarative contract."

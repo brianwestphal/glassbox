@@ -14,6 +14,7 @@ import type { PluginUIElementInfo } from '../../api/index.js';
 import { listPluginUi, runPluginAction } from '../../api/index.js';
 import { asEl, toElement } from '../dom.js';
 import { showToast } from '../toast.js';
+import { asSelectionMode, encodeSelection, nextSelection, parseSelection } from './segmentSelection.js';
 
 /** Location id → the server-rendered slot's DOM id (reviewShell.tsx). */
 const SLOTS: Record<string, string> = {
@@ -25,35 +26,77 @@ const SLOTS: Record<string, string> = {
 let cached: PluginUIElementInfo[] = [];
 let wired = false;
 
-/** Build a button or link element; null for a type the host doesn't render yet. */
+/** An inline-SVG icon node (inert; trusted per opt-in install), or null. */
+function iconNode(icon: string | undefined): HTMLElement | null {
+  if (icon === undefined || icon === '') return null;
+  // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-supplied inert SVG icon; installed plugins are trusted (doc 29 §29.6).
+  return toElement(<span className="plugin-ui-icon">{raw(icon)}</span>);
+}
+
+/** Build a face (label + icon) into a button-like element. */
+function faceContent(btn: HTMLElement, icon: string | undefined, label: string | undefined): void {
+  const i = iconNode(icon);
+  if (i !== null) btn.appendChild(i);
+  if (label !== undefined && label !== '') btn.appendChild(toElement(<span className="plugin-ui-label">{label}</span>));
+}
+
+/** Build an element for any supported type; null for one the host can't render. */
 function renderElement(el: PluginUIElementInfo): HTMLElement | null {
-  const icon = el.icon !== undefined && el.icon !== '' ? el.icon : null;
+  const action = el.action;
   if (el.type === 'button') {
     const cls = `plugin-ui-btn${el.style === 'primary' ? ' primary' : ''}${el.style === 'danger' ? ' danger' : ''}`;
-    return toElement(
-      <button
-        type="button"
-        className={cls}
-        title={el.title ?? el.label ?? ''}
-        data-plugin-ui-id={el.pluginId}
-        data-plugin-ui-action={el.action ?? ''}
-      >
-        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-supplied inert SVG icon; installed plugins are trusted (doc 29 §29.6). */}
-        {icon !== null ? raw(icon) : null}
-        {el.label !== undefined && el.label !== '' ? <span className="plugin-ui-label">{el.label}</span> : null}
-      </button>,
+    const btn = toElement(
+      <button type="button" className={cls} title={el.title ?? el.label ?? ''}
+        data-plugin-ui-id={el.pluginId} data-plugin-ui-action={el.action ?? ''} />,
     );
+    faceContent(btn, el.icon, el.label);
+    return btn;
   }
   if (el.type === 'link' && el.url !== undefined && el.url !== '') {
-    return toElement(
-      <a className="plugin-ui-link" href={el.url} target="_blank" rel="noopener noreferrer" title={el.title ?? ''}>
-        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-supplied inert SVG icon; installed plugins are trusted (doc 29 §29.6). */}
-        {icon !== null ? raw(icon) : null}
-        {el.label ?? el.url}
-      </a>,
-    );
+    const a = toElement(<a className="plugin-ui-link" href={el.url} target="_blank" rel="noopener noreferrer" title={el.title ?? ''} />);
+    faceContent(a, el.icon, el.label);
+    return a;
   }
-  // toggle / switch / segmented-control: declared in the contract, not yet rendered.
+  // Stateful controls (doc 30 FR-30.3). Direct listeners (not the delegate) so we
+  // can compute the new value; they're rebuilt on every repaint (no stale binds).
+  if (action === undefined || action === '') return null;
+  if (el.type === 'toggle') {
+    const on = el.value === 'true';
+    const face = on ? el.on : el.off;
+    const btn = toElement(
+      <button type="button" className={`plugin-ui-btn plugin-ui-toggle${on ? ' active' : ''}${face?.style === 'primary' ? ' primary' : ''}`}
+        title={face?.title ?? face?.label ?? el.title ?? ''} aria-pressed={on ? 'true' : 'false'} />,
+    );
+    faceContent(btn, face?.icon, face?.label);
+    btn.addEventListener('click', () => void runAction(el.pluginId, action, on ? 'false' : 'true'));
+    return btn;
+  }
+  if (el.type === 'switch') {
+    const on = el.value === 'true';
+    const btn = toElement(
+      <button type="button" className={`plugin-ui-btn plugin-ui-switch${on ? ' active' : ''}`}
+        title={el.title ?? ''} aria-pressed={on ? 'true' : 'false'}>
+        <span className="plugin-ui-label">{on ? el.onLabel ?? 'On' : el.offLabel ?? 'Off'}</span>
+      </button>,
+    );
+    btn.addEventListener('click', () => void runAction(el.pluginId, action, on ? 'false' : 'true'));
+    return btn;
+  }
+  if (el.type === 'segmented-control') {
+    const mode = asSelectionMode(el.selectionMode);
+    const selected = parseSelection(el.value);
+    const group = toElement(<div className="plugin-ui-segmented segmented-control" role="group" title={el.title ?? ''} />);
+    for (const seg of el.segments ?? []) {
+      const active = selected.includes(seg.id);
+      const segBtn = toElement(<button type="button" className={`segment${active ? ' active' : ''}`} title={seg.title ?? seg.label ?? ''} />);
+      faceContent(segBtn, seg.icon, seg.label ?? seg.id);
+      segBtn.addEventListener('click', () => {
+        void runAction(el.pluginId, action, encodeSelection(mode, nextSelection(mode, selected, seg.id)));
+      });
+      group.appendChild(segBtn);
+    }
+    return group;
+  }
   return null;
 }
 
@@ -72,12 +115,15 @@ function paint(): void {
   }
 }
 
-/** Run a UI-element action; surface an error / `message` result as a toast. */
-async function runAction(pluginId: string, actionId: string): Promise<void> {
+/** Run a UI-element action; surface an error / `message` result as a toast. When
+ *  a stateful control passes a `value`, repaint afterward so the new persisted
+ *  state (doc 30 FR-30.3) is reflected. */
+async function runAction(pluginId: string, actionId: string, value?: string): Promise<void> {
   try {
-    const resp = await runPluginAction(pluginId, { actionId });
-    if (resp.error !== undefined && resp.error !== '') { showToast(resp.error); return; }
-    if (resp.result?.message !== undefined && resp.result.message !== '') showToast(resp.result.message);
+    const resp = await runPluginAction(pluginId, { actionId, value });
+    if (resp.error !== undefined && resp.error !== '') showToast(resp.error);
+    else if (resp.result?.message !== undefined && resp.result.message !== '') showToast(resp.result.message);
+    if (value !== undefined) await refreshPluginUi();
   } catch (e) {
     showToast(e instanceof Error ? e.message : 'Plugin action failed');
   }
