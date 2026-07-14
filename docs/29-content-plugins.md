@@ -219,6 +219,18 @@ content `renderer` / `differ`. Everything else transfers.
   *installed & disabled for this project*. Changing a disable list takes effect
   on the next request (the subsystem reloads).
 
+> **Outbound network is a plugin's choice, not the host's.** Glassbox itself binds
+> to loopback and is local-first ([doc 14](14-security.md)). Because plugins run
+> in-process at full trust, a plugin *can* make outbound network calls — nothing in
+> the contract prevents it, and installing it is the trust decision. This matters
+> most for the general (non-content) capabilities: a **review lifecycle hook**
+> ([doc 31](31-plugin-lifecycle-hooks.md)) that phones out — to post results to an
+> issue tracker, notify a chat, trigger CI — shifts the app's default local-only
+> posture. That is a deliberate, documented consequence of installing such a
+> plugin; the host never initiates network I/O on a plugin's behalf. Prefer
+> keeping plugins offline unless the user has knowingly installed one whose purpose
+> is an external integration.
+
 ## 29.7 First reference plugin
 
 - **FR-29.17 — Diagram-source rendering.** The first reference plugin shall be

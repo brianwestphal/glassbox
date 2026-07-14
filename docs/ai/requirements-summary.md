@@ -977,6 +977,25 @@ Sheet `docs/18-plugins.md` §18.12. The client rendering + click wiring is
 manual-tested (gated on the fixture-plugin e2e harness GB-1043) like the rest of
 the plugin UI; everything else carries unit/integration tests.
 
+## 18n. Plugin review lifecycle hooks (`31-plugin-lifecycle-hooks.md`) — **Shipped**
+
+The first **general (non-content)** plugin capability (GB-1065): a plugin's
+`activate` registration may include **`reviewHooks: { onReviewCreated?,
+onReviewCompleted? }`** (`src/plugins/types.ts`) — a hooks-only registration is
+valid (no renderer needed). Hooks receive **stable plugin-facing shapes**
+(`ReviewHookInfo`, `AnnotationHookInfo`) + the plugin context, not raw DB rows.
+Dispatch is **fail-soft** (`notifyReviewCreated` / `notifyReviewCompleted` in
+`src/plugins/index.ts` — a throwing hook is logged + skipped, never blocks the
+review). Wiring: `onReviewCreated` fires from `server.ts` after
+`initContentPlugins` (the review is created in the CLI before the server starts,
+so this is the first observable point); `onReviewCompleted` fires from
+`POST /api/review/complete` after the export, with the review + all annotations +
+the export path. Not a new trust grant, but a hook doing **outbound network**
+shifts the local-first posture — documented in doc 29 §29.6. Unit-tested +
+verified live end-to-end with a fixture plugin; a JSON-summary reference example
+is in the developer guide. The heavier bidirectional integration-backend tier is
+deferred (GB-1066).
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -1003,7 +1022,9 @@ diagram-source first reference plugin (GB-910) remain. Doc **30** (plugin main-a
 UI extensions) is **Shipped** for button/link (GB-1058) — `registerUI`,
 `GET /api/plugins/ui`, the `onAction` result→toast round-trip, three host slots,
 and the graphviz reference button; the stateful controls (toggle/switch/
-segmented-control) are declared-but-deferred. When a
+segmented-control) are declared-but-deferred. Doc **31** (plugin review lifecycle
+hooks) is **Shipped** (GB-1065) — `reviewHooks` (`onReviewCreated` /
+`onReviewCompleted`), fail-soft dispatch, both wiring points, verified live. When a
 new feature is spec'd before implementation, add a doc and
 mark the entry here **Design only** until the code lands, then **Partially
 built** / **Shipped** as it progresses.

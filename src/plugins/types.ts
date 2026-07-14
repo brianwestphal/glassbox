@@ -75,10 +75,56 @@ export interface ContentDiffer {
   diff(input: DiffInput): RenderedView | Promise<RenderedView>;
 }
 
+/**
+ * A review, in the stable plugin-facing shape handed to lifecycle hooks (doc 31
+ * FR-31.2). A curated subset of the DB row so the contract doesn't leak schema
+ * details.
+ */
+export interface ReviewHookInfo {
+  id: string;
+  repoPath: string;
+  repoName: string;
+  /** Review mode string, e.g. `uncommitted` / `branch` / `commit`. */
+  mode: string;
+  status: string;
+}
+
+/** An annotation, in the stable plugin-facing shape (doc 31 FR-31.2). */
+export interface AnnotationHookInfo {
+  id: string;
+  filePath: string;
+  /** 1-based line, or 0 for an image-level annotation (doc 23). */
+  lineNumber: number;
+  side: string;
+  category: string;
+  content: string;
+}
+
+/**
+ * Review lifecycle hooks (doc 31) — a general (non-content) capability. Both are
+ * invoked fail-soft and asynchronously; a throwing or slow hook never blocks the
+ * review. `onReviewCreated` fires once the plugin subsystem is loaded for the
+ * review; `onReviewCompleted` fires after the review is marked complete and the
+ * `.glassbox/latest-review.md` export is written (`exportPath`).
+ */
+export interface ReviewHooks {
+  // Declared as function-property types (not method signatures) so the host can
+  // safely extract + call them as plain callbacks (no `this` binding).
+  onReviewCreated?: (review: ReviewHookInfo, context: PluginContext) => void | Promise<void>;
+  onReviewCompleted?: (
+    review: ReviewHookInfo,
+    annotations: AnnotationHookInfo[],
+    exportPath: string,
+    context: PluginContext,
+  ) => void | Promise<void>;
+}
+
 /** What a plugin's `activate()` returns — the capabilities it contributes. */
 export interface PluginRegistration {
   renderers?: ContentRenderer[];
   differs?: ContentDiffer[];
+  /** Review lifecycle hooks (doc 31). A hooks-only registration is valid. */
+  reviewHooks?: ReviewHooks;
 }
 
 /**

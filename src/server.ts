@@ -5,8 +5,9 @@ import { dirname,join } from 'path';
 import { fileURLToPath } from 'url';
 
 import { registerChannel } from './channel-config.js';
+import { getReview } from './db/queries.js';
 import { readGlobalConfig } from './global-config.js';
-import { initContentPlugins } from './plugins/index.js';
+import { initContentPlugins, notifyReviewCreated } from './plugins/index.js';
 import { aiApiRoutes } from './routes/ai-api.js';
 import { apiRoutes } from './routes/api.js';
 import { channelApiRoutes } from './routes/channel-api.js';
@@ -119,6 +120,14 @@ export async function startServer(port: number, reviewId: string, repoRoot: stri
   // Discover + load installed content plugins (doc 29), honoring per-project +
   // global enablement. Fail-soft: never throws, never blocks startup.
   await initContentPlugins(repoRoot);
+
+  // Fire the onReviewCreated lifecycle hook (doc 31) now that plugins are loaded
+  // — the review was created in the CLI before the server started, so this is the
+  // first point where a hook can see it. Fail-soft: never blocks startup.
+  try {
+    const review = await getReview(reviewId);
+    if (review !== undefined) await notifyReviewCreated(review);
+  } catch { /* fail-soft: a hook error never affects startup */ }
 
   // Ensure .mcp.json is registered for this project if channel is enabled
   try {

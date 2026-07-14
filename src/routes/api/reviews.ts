@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 
-import { deleteReview, getReview, listReviews, updateReviewStatus } from '../../db/queries.js';
+import { deleteReview, getAnnotationsForReview, getReview, listReviews, updateReviewStatus } from '../../db/queries.js';
 import { deleteReviewExport, generateReviewExport } from '../../export/generate.js';
 import { runOnCompleteHook } from '../../export/on-complete-hook.js';
 import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js';
+import { notifyReviewCompleted } from '../../plugins/index.js';
 import { updateReviewDiffs } from '../../review-update.js';
 import type { AppEnv } from '../../types.js';
 import { requirePathParam } from '../../utils/parseBody.js';
@@ -40,6 +41,16 @@ reviewsRoutes.post('/review/complete', async (c) => {
     jsonPath: exportPath.replace(/\.md$/, '.json'),
     markdownPath: exportPath,
   });
+
+  // Fire plugin onReviewCompleted hooks (doc 31) with the completed review + its
+  // annotations + the export path. Fail-soft: after the review is already
+  // completed/exported, so a hook error never affects the response.
+  try {
+    const completed = await getReview(reviewId);
+    if (completed !== undefined) {
+      await notifyReviewCompleted(completed, await getAnnotationsForReview(reviewId), exportPath);
+    }
+  } catch { /* fail-soft */ }
 
   return c.json({ status: 'completed' as const, exportPath, isCurrent, reviewId, hook });
 });

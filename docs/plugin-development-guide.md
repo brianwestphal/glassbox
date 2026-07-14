@@ -156,9 +156,17 @@ export interface ContentDiffer {
   priority?: number;
   diff(input: DiffInput): RenderedView | Promise<RenderedView>;
 }
+// Review lifecycle hooks (doc 31). A hooks-only registration is valid.
+export interface ReviewHookInfo { id: string; repoPath: string; repoName: string; mode: string; status: string }
+export interface AnnotationHookInfo { id: string; filePath: string; lineNumber: number; side: string; category: string; content: string }
+export interface ReviewHooks {
+  onReviewCreated?: (review: ReviewHookInfo, context: PluginContext) => void | Promise<void>;
+  onReviewCompleted?: (review: ReviewHookInfo, annotations: AnnotationHookInfo[], exportPath: string, context: PluginContext) => void | Promise<void>;
+}
 export interface PluginRegistration {
   renderers?: ContentRenderer[];
   differs?: ContentDiffer[];
+  reviewHooks?: ReviewHooks;
 }
 export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
 // Plugin UI extensions (doc 30). Only `button` and `link` render today.
@@ -213,6 +221,41 @@ A `button` click calls `onAction(action, context)`. Inside it, call
 the matching `label` (colors: `default` / `success` / `error` / `warning` /
 `transient`). The `plugins/graphviz/` reference plugin uses exactly this — a
 "Test renderer" button that renders a trivial graph and reports OK/failure.
+
+### Review lifecycle hooks (optional, doc 31)
+
+A plugin can react to the **review lifecycle** — independent of file type — by
+returning `reviewHooks` from `activate`. Both hooks are fail-soft (a throw never
+blocks the review) and receive the plugin's context. Example — write a JSON
+summary next to the export when a review completes:
+
+```ts
+const plugin: ContentPlugin = {
+  activate(ctx) {
+    return {
+      reviewHooks: {
+        onReviewCreated(review) {
+          ctx.log('info', `review started: ${review.repoName} (${review.mode})`);
+        },
+        onReviewCompleted(review, annotations, exportPath) {
+          const byCategory: Record<string, number> = {};
+          for (const a of annotations) byCategory[a.category] = (byCategory[a.category] ?? 0) + 1;
+          const summaryPath = exportPath.replace(/\.md$/, '.summary.json');
+          require('node:fs').writeFileSync(summaryPath, JSON.stringify({ review, total: annotations.length, byCategory }, null, 2));
+        },
+      },
+    };
+  },
+};
+```
+
+`onReviewCreated` fires once the plugin subsystem has loaded for the review;
+`onReviewCompleted` fires after the review is completed and `latest-review.md` is
+written, with all annotations + the export path. **Note:** a hook that makes
+**outbound network calls** (posting to an issue tracker, notifying a chat) shifts
+Glassbox's default local-first posture — that's a deliberate consequence of
+installing such a plugin (doc 29 §29.6). Keep hooks offline unless the plugin's
+purpose is an explicit external integration.
 
 ## 6. Worked skeleton — a diagram-source renderer
 

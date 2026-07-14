@@ -1919,6 +1919,33 @@
     "NFR-30.1": {
       "tests": ["tests/integration/api/plugins-routes.test.ts"],
       "note": "Zero-plugin no-op: with no plugin loaded, GET /api/plugins/ui returns an empty element list, so the location slots stay empty (client no-op is manual, gated on GB-1043)."
+    },
+    "FR-31.1": {
+      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "note": "Review lifecycle hooks capability (GB-1065): a content-less registration carrying only reviewHooks loads and its hooks fire; gated by the same enablement/kill-switch as the subsystem (notify* return early when disabled)."
+    },
+    "FR-31.2": {
+      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "note": "Stable plugin-facing shapes: notifyReviewCreated/Completed map the DB Review row + AnnotationWithFilePath to ReviewHookInfo/AnnotationHookInfo (asserted field-by-field), not raw rows; the plugin context is passed through."
+    },
+    "FR-31.3": {
+      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "loaded plugin with onReviewCreated -> fires with mapped review + context",
+        "loaded plugin with onReviewCompleted -> fires with review + mapped annotations + exportPath",
+        "throwing hook -> swallowed (fail-soft), other plugins' hooks still fire",
+        "status !== loaded -> hook skipped",
+        "no hook registered -> no-op"
+      ],
+      "note": "Invocation + fail-soft (GB-1065): notify* iterate loaded plugins, fire each hook in try/catch, never propagate. The two WIRING points (server.ts after initContentPlugins for onReviewCreated; the /review/complete route after export for onReviewCompleted) were verified live end-to-end with a fixture plugin (writes markers on both events)."
+    },
+    "FR-31.4": {
+      "waived": "Design-only (doc 31): 'hooks are not a new trust grant; outbound network shifts the local-first posture and is documented' is a design-justification requirement (same class as doc 29 FR-29.15 / NFR-29.2). The host initiates no network I/O for a hook; there is no host code path to assert. The doc 29 §29.6 note records the posture."
+    },
+    "NFR-31.1": {
+      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "note": "Zero-hook no-op: a plugin without the hook is a no-op (notifyReviewCreated resolves undefined); the PLUGINS_ENABLED guard makes the whole path a no-op when disabled."
     }
   }
 }
