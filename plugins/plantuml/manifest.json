@@ -1,0 +1,10 @@
+{
+  "id": "plantuml",
+  "name": "PlantUML Diagrams",
+  "version": "1.0.0",
+  "entry": "index.js",
+  "description": "Renders PlantUML .puml source to SVG via a local `java -jar plantuml.jar` subprocess. Separately installable — requires a JRE + plantuml.jar (run `node setup.mjs`). Falls back to the code block when unavailable.",
+  "author": "Glassbox",
+  "autoInstall": false,
+  "contentTypes": [{ "extensions": [".puml", ".plantuml", ".pu", ".iuml"] }]
+}

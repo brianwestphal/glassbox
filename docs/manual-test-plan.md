@@ -104,6 +104,16 @@ Until then, the tab's UI wiring is manual:
   `api/plugins-routes.test.ts`; this item is the client slot rendering + click →
   toast, which needs the real UI — a committed e2e is gated on the fixture-plugin
   harness, GB-1043.)*
+- **PlantUML plugin — local Java render (GB-1046, needs a JRE)** — Install the
+  opt-in PlantUML plugin: `npm run build:plugins` then `node plugins/plantuml/setup.mjs`
+  (checks Java, installs into `~/.glassbox/plugins/plantuml/`, downloads
+  `plantuml.jar`). Review a diff containing a `.puml` file: it shows the **Code |
+  Rendered** toggle (like an SVG); *Rendered* shows the diagram rendered by the
+  local `java -jar plantuml.jar` subprocess. With Java or the jar **absent**, the
+  file falls back to the plain code-block/text diff (no error). *(The renderer's
+  fail-soft paths + SVG extraction are unit-tested — `plugins/plantuml.test.ts`;
+  the live Java render needs a JRE + jar and can't run in CI, so this item is
+  manual, same class as the Apple Foundation Models on-device path.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of

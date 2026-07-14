@@ -930,7 +930,12 @@ the file-diff-viewer path shipped too (GB-1042, `src/plugins/fileView.ts`:
 render/diff a whole file via a plugin, gated by a cheap path pre-check). The
 developer guide also shipped (GB-1041, `docs/plugin-development-guide.md`), as
 did the **first reference plugin** — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
-(WASM, no DOM; `plugins/graphviz/`, GB-1044) — and **desktop delivery** (GB-1039):
+(WASM, no DOM; `plugins/graphviz/`, GB-1044). A **second** reference plugin ships
+too: **PlantUML** (`plugins/plantuml/`, GB-1046) — `.puml` → SVG via a **local**
+`java -jar plantuml.jar` subprocess (no pure-JS/WASM engine exists; local
+subprocess = offline). It's **separately installable** via manifest
+`autoInstall: false` (not force-installed — needs a JRE + jar), with a `setup.mjs`
+helper + README; fail-soft to the code-block fallback. Then **desktop delivery** (GB-1039):
 plugins build to `dist/plugins/`, ship in the sidecar, and auto-install into
 `~/.glassbox/plugins/` at startup with a version + content-hash freshness check +
 dismiss-list (`src/plugins/install.ts`) — and the **management UI** (GB-1040): a

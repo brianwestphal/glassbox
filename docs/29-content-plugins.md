@@ -133,6 +133,11 @@ content `renderer` / `differ`. Everything else transfers.
   Users may also **install from disk** (a native folder picker that symlinks the
   chosen directory into `~/.glassbox/plugins/`). Combined with the self-contained
   bundle rule (FR-29.5), this makes a frozen sidecar irrelevant to plugin loading.
+  A plugin may set **`autoInstall: false`** in its manifest to be **separately
+  installable** — it is built (and may ship in the bundle) but is **not**
+  auto-installed, so a plugin with a system requirement (e.g. PlantUML, which needs
+  a JRE) is never forced on users; they opt in (GB-1046). `installBundledPlugins`
+  skips it.
 
 ## 29.3 The contract
 
@@ -245,12 +250,18 @@ content `renderer` / `differ`. Everything else transfers.
   Graphviz, no DOM, no external process), which fits the server-side-SVG
   contract most cleanly. **Mermaid** (`.mmd` / `.mermaid`, needs a DOM — GB-1045)
   and **PlantUML** (`.puml`, needs Java — GB-1046) are the split siblings.
-  **PlantUML live-rendering is declined** (GB-1046): its only renderers are the
-  **Java** reference (`plantuml.jar` subprocess — needs a JRE, can't be
-  esbuild-bundled) or a **network** encoder that offloads to `plantuml.com`
-  (breaks local-first); no viable pure-JS/WASM PlantUML renderer exists. A `.puml`
-  file therefore keeps the committed **code-block fallback** (source shown,
-  readable) rather than a live render — no `plantuml` plugin ships.
+  **PlantUML ships as a separately-installable, opt-in plugin** (`plugins/plantuml/`,
+  GB-1046): it renders `.puml` → SVG by spawning a **local** `java -jar
+  plantuml.jar` subprocess (PlantUML has no pure-JS/WASM engine; the only
+  alternative — a network encoder offloading to `plantuml.com` — was rejected as it
+  breaks local-first). A local Java subprocess **is** local-first, and because the
+  plugin is **not auto-bundled** (`autoInstall: false` in its manifest → skipped by
+  `installBundledPlugins`), core stays lean and no one is forced to have Java — the
+  user opts in. It requires a **JRE + `plantuml.jar`** (documented system
+  requirements; a `setup` helper checks Java + fetches the jar into the plugin
+  dir). If Java or the jar is absent, or a render fails, the renderer returns an
+  empty view and the committed **code-block fallback** (source shown, readable)
+  applies — nothing regresses.
 
 ## 29.9 Settings config layout
 

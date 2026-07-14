@@ -1807,9 +1807,10 @@
         "same version, byte-different rebuild -> reinstalled",
         "same version, identical -> skipped",
         "uninstall -> removed + dismissed -> auto-install skips it",
-        "install-from-disk of a dismissed id -> symlinked + un-dismissed"
+        "install-from-disk of a dismissed id -> symlinked + un-dismissed",
+        "manifest autoInstall:false -> separately installable, NOT auto-installed (GB-1046)"
       ],
-      "note": "Desktop delivery (GB-1039): installBundledPlugins freshness (version + content-hash), dismiss-list persistence, install-from-disk symlink + un-dismiss. Verified live: build:plugins -> dist/plugins -> auto-install into a fresh config dir -> loaded + rendered."
+      "note": "Desktop delivery (GB-1039): installBundledPlugins freshness (version + content-hash), dismiss-list persistence, install-from-disk symlink + un-dismiss, and the autoInstall:false opt-out (GB-1046 — a system-requirement plugin like PlantUML isn't force-installed). Verified live: build:plugins -> dist/plugins -> auto-install into a fresh config dir -> loaded + rendered."
     },
     "FR-29.8": {
       "tests": ["tests/unit/plugins/registry.test.ts"],
@@ -1856,8 +1857,8 @@
       "note": "Enablement (GB-1040): enabled-by-default, two independent disable lists (global + per-project), global precedence; loader gating; verified live end-to-end (disable a plugin -> its .dot stops rendering -> falls back)."
     },
     "FR-29.17": {
-      "tests": ["tests/unit/plugins/graphviz.test.ts"],
-      "note": "First reference plugin (GB-1044): the Graphviz .dot/.gv plugin renders server-side to inert SVG via @viz-js/viz (WASM, no DOM); empty/invalid source -> empty view -> code-block fallback. Mermaid (GB-1045) + PlantUML (GB-1046) are the split siblings, still waived."
+      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/plantuml.test.ts"],
+      "note": "Reference diagram plugins: Graphviz (GB-1044, .dot/.gv -> inert SVG via @viz-js/viz WASM). PlantUML (GB-1046, .puml/.plantuml/.pu/.iuml) ships as a separately-installable, opt-in plugin that renders via a local `java -jar plantuml.jar -pipe -tsvg` subprocess — plantuml.test covers the pure SVG extraction + every fail-soft path (empty/missing-jar/spawn-error -> empty view -> code-block fallback); the live Java render needs a JRE + jar and is CI-unverifiable (verified live, like the Apple FM path). Mermaid (GB-1045) is pending a maintainer decision on the render approach (no DOM-free engine), still waived."
     },
     "FR-29.18": {
       "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],

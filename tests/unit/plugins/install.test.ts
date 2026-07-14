@@ -96,6 +96,18 @@ describe('installBundledPlugins (doc 29 FR-29.7)', () => {
     expect(existsSync(userDir)).toBe(false);
   });
 
+  it('does NOT auto-install a plugin marked autoInstall:false (separately installable, GB-1046)', () => {
+    // A normal plugin installs; the opt-in one (e.g. PlantUML) is skipped.
+    makePlugin(bundled, 'graphviz', '1.0.0');
+    const optIn = join(bundled, 'plantuml');
+    mkdirSync(optIn, { recursive: true });
+    writeFileSync(join(optIn, 'manifest.json'), JSON.stringify({ id: 'plantuml', name: 'PlantUML', version: '1.0.0', entry: 'index.js', autoInstall: false }));
+    writeFileSync(join(optIn, 'index.js'), '// plantuml');
+    installBundledPlugins({ bundledDir: bundled, userDir });
+    expect(existsSync(join(userDir, 'graphviz'))).toBe(true);
+    expect(existsSync(join(userDir, 'plantuml'))).toBe(false);
+  });
+
   it('skips a dismissed plugin', () => {
     makePlugin(bundled, 'graphviz', '1.0.0');
     makePlugin(userDir, 'graphviz', '1.0.0'); // installed

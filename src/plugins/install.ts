@@ -111,6 +111,9 @@ export function installBundledPlugins(opts?: { bundledDir?: string; userDir?: st
       if (!statSync(src).isDirectory()) continue;
       const manifest = readManifest(src);
       if (manifest === null || dismissed.has(manifest.id)) continue;
+      // Separately-installable plugins (e.g. PlantUML, which needs Java) are not
+      // force-installed — the user opts in (GB-1046, doc 29 FR-29.7).
+      if (manifest.autoInstall === false) continue;
       const dest = join(userDir, manifest.id);
       if (!shouldInstall(src, dest, manifest.version)) continue;
       mkdirSync(userDir, { recursive: true });

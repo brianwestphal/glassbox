@@ -108,6 +108,11 @@ export const PluginManifestSchema = z
     /** Optional arrangement of the preferences into groups/dividers/labels/
      *  buttons (doc 29 FR-29.18). Omitted → flat preference list. */
     configLayout: z.array(ConfigLayoutItemSchema).optional(),
+    /** `false` marks a **separately-installable** plugin (e.g. one with a system
+     *  requirement like Java): it's built + may ship in the bundle, but
+     *  `installBundledPlugins` does NOT auto-install it — the user opts in
+     *  (GB-1046). Defaults to auto-install (true) when omitted. */
+    autoInstall: z.boolean().optional(),
   })
   .loose();
 
