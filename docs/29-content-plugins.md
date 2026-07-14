@@ -245,6 +245,12 @@ content `renderer` / `differ`. Everything else transfers.
   Graphviz, no DOM, no external process), which fits the server-side-SVG
   contract most cleanly. **Mermaid** (`.mmd` / `.mermaid`, needs a DOM — GB-1045)
   and **PlantUML** (`.puml`, needs Java — GB-1046) are the split siblings.
+  **PlantUML live-rendering is declined** (GB-1046): its only renderers are the
+  **Java** reference (`plantuml.jar` subprocess — needs a JRE, can't be
+  esbuild-bundled) or a **network** encoder that offloads to `plantuml.com`
+  (breaks local-first); no viable pure-JS/WASM PlantUML renderer exists. A `.puml`
+  file therefore keeps the committed **code-block fallback** (source shown,
+  readable) rather than a live render — no `plantuml` plugin ships.
 
 ## 29.9 Settings config layout
 
