@@ -256,7 +256,18 @@ into the sidecar (`server/plugins`), from which `installBundledPlugins` auto-ins
 them into `~/.glassbox/plugins/` at startup (freshness + dismiss-list). Shipped:
 `plugins/graphviz/` (GB-1044) — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
 (WASM, no DOM; a **devDependency** bundled into the plugin, never into core
-`dist/cli.js`).
+`dist/cli.js`). Two **separately-installable** diagram plugins also shipped
+(`autoInstall: false` → `installBundledPlugins` skips them, so no one is forced to
+have their heavy system dep): `plugins/plantuml/` (GB-1046) — `.puml` → SVG via a
+local `java -jar plantuml.jar` subprocess — and `plugins/mermaid/` (GB-1045) —
+`.mmd`/`.mermaid` → SVG via a local `mmdc` (`@mermaid-js/mermaid-cli` over
+puppeteer/Chromium) subprocess (Mermaid measures text via the DOM, so it has no
+pure-JS/WASM engine). Both ship a `setup.mjs` that installs the plugin + fetches
+the heavy asset (the jar / Chromium — not committed) into the install dir, use
+only Node builtins in the plugin itself (no core external dep), and fail-soft to
+the code-block fallback. Mermaid: `MERMAID_MMDC` overrides the CLI path,
+`MERMAID_PUPPETEER_CONFIG` supplies a `-p` puppeteer config for rootless
+environments.
 
 ### `src/utils/`
 

@@ -118,6 +118,24 @@ Until then, the tab's UI wiring is manual:
   (Java + a downloadable jar are provisionable in CI); it's out of the default
   suite only because the ~22 MB GPL jar isn't committed. This manual item is the
   full in-viewer Code|Rendered experience.)*
+- **Mermaid plugin — local headless-browser render (GB-1045, needs Chromium)** —
+  Install the opt-in Mermaid plugin: `npm run build:plugins` then
+  `node plugins/mermaid/setup.mjs` (installs into `~/.glassbox/plugins/mermaid/`
+  and `npm install`s `@mermaid-js/mermaid-cli` + puppeteer there, downloading a
+  Chromium). Review a diff containing a `.mmd`/`.mermaid` file: it shows the
+  **Code | Rendered** toggle (like an SVG); *Rendered* shows the diagram rendered
+  by the local `mmdc` subprocess. With `mmdc` **absent**, the file falls back to
+  the plain code-block/text diff (no error). In locked-down/rootless environments
+  where Chromium won't launch, point `MERMAID_PUPPETEER_CONFIG` at a JSON config
+  (e.g. `{"args":["--no-sandbox"]}`). *(The renderer's fail-soft paths + SVG
+  extraction + CLI-path resolution are unit-tested, and `plugins/mermaid.test.ts`
+  also has a **browser-gated live-render test** that runs the real `mmdc` path
+  whenever it's present — set `MERMAID_MMDC`, or install via `setup.mjs` — and
+  skips otherwise. Like PlantUML and unlike the Apple FM path this is **not** a
+  hardware gate (a headless browser is provisionable in CI); it's out of the
+  default suite only because the ~hundreds-of-MB Chromium isn't committed —
+  verified live via headless Chromium. This manual item is the full in-viewer
+  Code|Rendered experience.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of

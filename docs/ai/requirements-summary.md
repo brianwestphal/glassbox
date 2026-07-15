@@ -930,12 +930,17 @@ the file-diff-viewer path shipped too (GB-1042, `src/plugins/fileView.ts`:
 render/diff a whole file via a plugin, gated by a cheap path pre-check). The
 developer guide also shipped (GB-1041, `docs/plugin-development-guide.md`), as
 did the **first reference plugin** — Graphviz `.dot`/`.gv` → SVG via `@viz-js/viz`
-(WASM, no DOM; `plugins/graphviz/`, GB-1044). A **second** reference plugin ships
-too: **PlantUML** (`plugins/plantuml/`, GB-1046) — `.puml` → SVG via a **local**
-`java -jar plantuml.jar` subprocess (no pure-JS/WASM engine exists; local
-subprocess = offline). It's **separately installable** via manifest
-`autoInstall: false` (not force-installed — needs a JRE + jar), with a `setup.mjs`
-helper + README; fail-soft to the code-block fallback. Then **desktop delivery** (GB-1039):
+(WASM, no DOM; `plugins/graphviz/`, GB-1044). Two more reference plugins ship
+too, both **separately installable** via manifest `autoInstall: false` (not
+force-installed — they need a heavy system dep), each with a `setup.mjs` helper +
+README and fail-soft to the code-block fallback: **PlantUML** (`plugins/plantuml/`,
+GB-1046) — `.puml` → SVG via a **local** `java -jar plantuml.jar` subprocess
+(needs a JRE + jar) — and **Mermaid** (`plugins/mermaid/`, GB-1045) —
+`.mmd`/`.mermaid` → SVG via a **local** `mmdc` (`@mermaid-js/mermaid-cli` over
+puppeteer/Chromium) subprocess (Mermaid measures text via the DOM, so it has no
+pure-JS/WASM engine — every Node renderer drives a headless browser; needs
+Chromium, `setup.mjs` `npm install`s it into the plugin dir). Both plugins use
+only Node builtins (no core external dep). Then **desktop delivery** (GB-1039):
 plugins build to `dist/plugins/`, ship in the sidecar, and auto-install into
 `~/.glassbox/plugins/` at startup with a version + content-hash freshness check +
 dismiss-list (`src/plugins/install.ts`) — and the **management UI** (GB-1040): a
@@ -953,10 +958,9 @@ runs the plugin's `onAction` (`POST /api/plugins/:id/action`) which reports
 status via `context.updateConfigLabel`, folded into the refreshed list's
 `configLabels` (no polling). graphviz's **Rendering** group + **Test renderer**
 button is the worked example. Still open: a committed fixture-plugin e2e
-(GB-1043) — the tab's layout rendering + button wiring is manual until then — and
-the other two diagram renderers — Mermaid (GB-1045, needs a DOM) and PlantUML
-(GB-1046, needs Java). Implemented FR/NFR units carry real tests in
-`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
+(GB-1043) — the tab's layout rendering + button wiring is manual until then.
+Implemented FR/NFR units carry real tests in `feature-coverage.json`; the rest
+stay `waived` until their follow-up lands.
 
 ## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
 

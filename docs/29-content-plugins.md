@@ -15,8 +15,11 @@
 > dismiss-list) — and the **management UI** (GB-1040) — a Settings **Plugins**
 > tab to list / enable-disable (global + per-project) / install / uninstall,
 > manifest **preferences** (GB-1047/1054), and a native **folder picker**
-> (GB-1048). Still open: a committed fixture-plugin **e2e** (GB-1043) and the
-> other two diagram renderers, Mermaid (GB-1045) and PlantUML (GB-1046). See
+> (GB-1048). The other two diagram renderers have also shipped as
+> separately-installable, opt-in plugins: **Mermaid** (`plugins/mermaid/`,
+> GB-1045; local `mmdc`/puppeteer subprocess) and **PlantUML**
+> (`plugins/plantuml/`, GB-1046; local `java -jar` subprocess). Still open: a
+> committed fixture-plugin **e2e** (GB-1043). See
 > [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
@@ -250,6 +253,21 @@ content `renderer` / `differ`. Everything else transfers.
   Graphviz, no DOM, no external process), which fits the server-side-SVG
   contract most cleanly. **Mermaid** (`.mmd` / `.mermaid`, needs a DOM — GB-1045)
   and **PlantUML** (`.puml`, needs Java — GB-1046) are the split siblings.
+  **Mermaid ships as a separately-installable, opt-in plugin** (`plugins/mermaid/`,
+  GB-1045), following the same model as PlantUML: Mermaid is fundamentally a
+  **browser** library (it measures text via the DOM's `getBBox`), so there is no
+  pure-JS/WASM engine and every maintained Node renderer drives a **headless
+  browser**. It renders `.mmd` → SVG by spawning a **local** `mmdc`
+  (`@mermaid-js/mermaid-cli` over puppeteer/Chromium) subprocess — offline /
+  local-first, nothing sent to a network render service. Because it needs a
+  headless browser it is **not auto-bundled** (`autoInstall: false` → skipped by
+  `installBundledPlugins`), so core stays lean and no one is forced to have
+  Chromium; a `setup` helper installs `@mermaid-js/mermaid-cli` + puppeteer into
+  the plugin's install dir (fetching a Chromium on demand — not committed or
+  shipped in the bundle). If `mmdc` is absent or a render fails, the renderer
+  returns an empty view and the committed **code-block fallback** applies —
+  nothing regresses. (`MERMAID_PUPPETEER_CONFIG` passes a puppeteer config through
+  to `mmdc -p` for locked-down / rootless environments.)
   **PlantUML ships as a separately-installable, opt-in plugin** (`plugins/plantuml/`,
   GB-1046): it renders `.puml` → SVG by spawning a **local** `java -jar
   plantuml.jar` subprocess (PlantUML has no pure-JS/WASM engine; the only
@@ -359,8 +377,10 @@ The build is decomposed into follow-up tickets:
 - **First reference plugin** (GB-1044, **shipped**) — the Graphviz `.dot`/`.gv`
   plugin (`plugins/graphviz/`), server-side to SVG via `@viz-js/viz` (WASM). Built
   by `scripts/build-plugins.mjs` (`npm run build:plugins`) into a self-contained
-  `plugins/graphviz/index.js`. Split siblings: Mermaid (GB-1045), PlantUML
-  (GB-1046).
+  `plugins/graphviz/index.js`. Split siblings both **shipped** as
+  separately-installable, opt-in plugins: **Mermaid** (`plugins/mermaid/`,
+  GB-1045; local `mmdc`/puppeteer subprocess) and **PlantUML**
+  (`plugins/plantuml/`, GB-1046; local `java -jar` subprocess).
 
 ## Implementation pointers
 

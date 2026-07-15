@@ -1,0 +1,10 @@
+{
+  "id": "mermaid",
+  "name": "Mermaid Diagrams",
+  "version": "1.0.0",
+  "entry": "index.js",
+  "description": "Renders Mermaid .mmd / .mermaid source to SVG via a local `mmdc` (mermaid-cli) subprocess. Separately installable — requires a headless browser via `@mermaid-js/mermaid-cli` + puppeteer (run `node setup.mjs`). Falls back to the code block when unavailable.",
+  "author": "Glassbox",
+  "autoInstall": false,
+  "contentTypes": [{ "extensions": [".mmd", ".mermaid"] }]
+}
