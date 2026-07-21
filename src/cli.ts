@@ -444,11 +444,16 @@ async function main() {
     }
     // Perceptual diff (doc 26 P2): score each pair so the review can be triaged
     // and identical pairs hidden. Scores are stored per file at creation below.
+    // Load content plugins first so an installed image-decoder plugin (doc 29
+    // imageDecoders) can score formats core can't decode (WebP/AVIF). Idempotent:
+    // the later startServer() init is a no-op.
+    const { initContentPlugins } = await import("./plugins/index.js");
+    await initContentPlugins(cwd);
     const { comparePerceptual } = await import("./ground-truth/perceptual-diff.js");
     let identical = 0;
     let undecodable = 0;
     for (const entry of comparisons) {
-      const result = comparePerceptual(entry.actualPath, entry.expectedPath);
+      const result = await comparePerceptual(entry.actualPath, entry.expectedPath);
       groundTruthScores.set(entry.key, result.score);
       if (result.reason === "undecodable") undecodable++;
       else if (result.score === 0) identical++;

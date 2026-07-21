@@ -119,10 +119,47 @@ export interface ReviewHooks {
   ) => void | Promise<void>;
 }
 
+/**
+ * A decoded image as RGBA pixels (doc 29 imageDecoders capability). The shape the
+ * perceptual diff (doc 26 P2) consumes: a plugin decodes a format core can't
+ * (WebP/AVIF/…) so those ground-truth pairs become scorable.
+ */
+export interface DecodedImage {
+  width: number;
+  height: number;
+  /** RGBA bytes, length = width * height * 4. */
+  data: Uint8Array;
+}
+
+/** The bytes handed to an image decoder. */
+export interface ImageDecodeInput {
+  /** Raw image bytes. */
+  bytes: Uint8Array;
+  /** Display path / URI — used for extension matching and labeling. */
+  path: string;
+}
+
+/**
+ * An image decoder capability (doc 29): bytes → RGBA. Additive — independent of
+ * renderer/differ. Dispatched by the same (priority, specificity) match as a
+ * renderer. `decode` returns `null` for bytes it can't handle (fail-soft); it may
+ * be async (WASM codecs load asynchronously).
+ */
+export interface ImageDecoder {
+  /** Human-readable name (shown in logs). */
+  name: string;
+  match: ContentMatch;
+  /** Higher wins when several decoders match; default 0. */
+  priority?: number;
+  decode(input: ImageDecodeInput): DecodedImage | null | Promise<DecodedImage | null>;
+}
+
 /** What a plugin's `activate()` returns — the capabilities it contributes. */
 export interface PluginRegistration {
   renderers?: ContentRenderer[];
   differs?: ContentDiffer[];
+  /** Image decoders (bytes → RGBA) for the perceptual diff (doc 29 / doc 26). */
+  imageDecoders?: ImageDecoder[];
   /** Review lifecycle hooks (doc 31). A hooks-only registration is valid. */
   reviewHooks?: ReviewHooks;
 }

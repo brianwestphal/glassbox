@@ -4,24 +4,25 @@ import { extname } from 'path';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 
+import { decodeImageWithPlugin } from '../plugins/index.js';
+import type { DecodedImage } from '../plugins/types.js';
+
 /**
  * Perceptual image comparison for ground-truth review (doc 26 P2). Decodes the
  * actual + expected images to RGBA and runs a pixelmatch-style per-pixel compare
  * (YIQ color space, anti-aliasing-tolerant threshold) to produce a difference
  * score used to filter identical pairs and triage the review list.
  *
- * Decode is dependency-light pure JS (no native bindings): `pngjs` for PNG,
- * `jpeg-js` for JPEG. Formats we can't decode without rasterizing (SVG/WebP/GIF)
- * return `undecodable` — they're surfaced in the review with no score rather than
+ * Core decode is dependency-light pure JS (no native bindings): `pngjs` for PNG,
+ * `jpeg-js` for JPEG. Formats core can't decode without rasterizing (SVG/WebP/GIF)
+ * fall through to an installed **image-decoder plugin** (doc 29 imageDecoders
+ * capability, e.g. WebP/AVIF WASM codecs); only when neither can decode does a
+ * pair return `undecodable` — surfaced in the review with no score rather than
  * silently dropped.
  */
 
-export interface DecodedImage {
-  width: number;
-  height: number;
-  /** RGBA bytes, length = width * height * 4. */
-  data: Uint8Array;
-}
+/** The RGBA shape the compare consumes — the plugin-contract `DecodedImage`. */
+export type { DecodedImage };
 
 export type PerceptualReason = 'ok' | 'undecodable' | 'dimension-mismatch';
 
@@ -69,13 +70,39 @@ export function decodeImage(path: string): DecodedImage | null {
 }
 
 /**
+ * A plugin image decoder: bytes → RGBA, or null when it can't handle them
+ * (doc 29 imageDecoders). Defaults to the real dispatch; injectable for tests.
+ */
+export type PluginImageDecode = (bytes: Uint8Array, path: string, mime?: string) => Promise<DecodedImage | null>;
+
+/**
+ * Decode `path` to RGBA: try the core PNG/JPEG decoder first, then fall back to an
+ * installed image-decoder plugin (doc 29) for formats core can't handle. Returns
+ * null only when neither can decode (unreadable / unsupported everywhere).
+ */
+async function decodeWithFallback(path: string, pluginDecode: PluginImageDecode): Promise<DecodedImage | null> {
+  const core = decodeImage(path);
+  if (core !== null) return core;
+  let buf: Buffer;
+  try { buf = readFileSync(path); } catch { return null; }
+  // Defense-in-depth: the plugin decode is untrusted — a throw (or rejection)
+  // must never crash launch-time scoring, only yield `undecodable`.
+  try { return await pluginDecode(new Uint8Array(buf), path); } catch { return null; }
+}
+
+/**
  * Compare an actual image against an expected image. Returns a difference score
  * (fraction of changed pixels). Differing dimensions can't be pixel-compared, so
- * they score as fully changed; an undecodable side yields no score.
+ * they score as fully changed; a side neither core nor a plugin can decode yields
+ * no score. Async because plugin decoders (WASM codecs) may decode asynchronously.
  */
-export function comparePerceptual(actualPath: string, expectedPath: string): PerceptualResult {
-  const actual = decodeImage(actualPath);
-  const expected = decodeImage(expectedPath);
+export async function comparePerceptual(
+  actualPath: string,
+  expectedPath: string,
+  pluginDecode: PluginImageDecode = decodeImageWithPlugin,
+): Promise<PerceptualResult> {
+  const actual = await decodeWithFallback(actualPath, pluginDecode);
+  const expected = await decodeWithFallback(expectedPath, pluginDecode);
   if (actual === null || expected === null) {
     return { scorable: false, score: null, reason: 'undecodable' };
   }

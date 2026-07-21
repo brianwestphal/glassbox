@@ -163,9 +163,19 @@ export interface ReviewHooks {
   onReviewCreated?: (review: ReviewHookInfo, context: PluginContext) => void | Promise<void>;
   onReviewCompleted?: (review: ReviewHookInfo, annotations: AnnotationHookInfo[], exportPath: string, context: PluginContext) => void | Promise<void>;
 }
+// Image-decoder capability (doc 29 FR-29.19): bytes → RGBA, for the perceptual diff.
+export interface DecodedImage { width: number; height: number; data: Uint8Array }  // RGBA, length = w*h*4
+export interface ImageDecodeInput { bytes: Uint8Array; path: string }
+export interface ImageDecoder {
+  name: string;
+  match: ContentMatch;
+  priority?: number;                     // higher wins; default 0
+  decode(input: ImageDecodeInput): DecodedImage | null | Promise<DecodedImage | null>;  // null = can't handle
+}
 export interface PluginRegistration {
   renderers?: ContentRenderer[];
   differs?: ContentDiffer[];
+  imageDecoders?: ImageDecoder[];
   reviewHooks?: ReviewHooks;
 }
 export type ConfigLabelColor = 'default' | 'success' | 'error' | 'warning' | 'transient';
@@ -256,6 +266,39 @@ written, with all annotations + the export path. **Note:** a hook that makes
 Glassbox's default local-first posture — that's a deliberate consequence of
 installing such a plugin (doc 29 §29.6). Keep hooks offline unless the plugin's
 purpose is an explicit external integration.
+
+### Image decoders (optional, doc 29 FR-29.19)
+
+A plugin can teach Glassbox to decode an **image format core can't** — WebP, AVIF,
+etc. — so ground-truth image comparisons ([doc 26](26-ground-truth-comparison.md))
+in that format get a **perceptual difference score** (and most-different-first
+sorting) instead of "no score". Return `imageDecoders` from `activate`; each
+decodes bytes → RGBA:
+
+```ts
+const plugin: ContentPlugin = {
+  activate(ctx) {
+    return {
+      imageDecoders: [{
+        name: 'webp',
+        match: { extensions: ['.webp'], mimeTypes: ['image/webp'] },
+        async decode({ bytes }) {
+          try {
+            const { data, width, height } = await decodeWebpToRgba(bytes);  // your bundled WASM codec
+            return { width, height, data };   // data = RGBA, length = width*height*4
+          } catch { return null; }            // null → Glassbox leaves the pair unscored
+        },
+      }],
+    };
+  },
+};
+```
+
+Core decodes PNG/JPEG itself; your decoder is consulted only for formats it can't.
+A decoder that returns `null` or throws is fail-soft — the pair stays "no score",
+nothing crashes. WASM codecs (`@jsquash/webp`, `@jsquash/avif`) esbuild-bundle into
+your plugin exactly like a WASM renderer. The `plugins/image-codecs/` reference
+plugin (GB-1064) does exactly this.
 
 ## 6. Worked skeleton — a diagram-source renderer
 

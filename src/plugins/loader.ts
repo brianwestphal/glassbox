@@ -175,6 +175,7 @@ export async function loadPluginDir(dir: string, registry: ContentPluginRegistry
     if (registration !== undefined) {
       registry.addRenderers(registration.renderers);
       registry.addDiffers(registration.differs);
+      registry.addImageDecoders(registration.imageDecoders);
     }
     return { id: manifest.id, dir, manifest, status: 'loaded', registration, instance: plugin, context };
   } catch (e) {

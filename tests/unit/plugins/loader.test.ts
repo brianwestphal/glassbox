@@ -81,6 +81,17 @@ describe('fail-soft activation (doc 29 FR-29.6)', () => {
     expect(reg.rendererCount).toBe(1);
   });
 
+  it('registers a plugin\'s imageDecoders (doc 29 imageDecoders, GB-1063)', async () => {
+    const dir = makePlugin('dec', {
+      manifest: { id: 'dec', name: 'D', version: '1' },
+      entry: `export function activate() { return { imageDecoders: [{ name: 'webp', match: { extensions: ['.webp'] }, decode: () => ({ width: 1, height: 1, data: new Uint8Array(4) }) }] }; }`,
+    });
+    const reg = new ContentPluginRegistry();
+    expect((await loadPluginDir(dir, reg)).status).toBe('loaded');
+    expect(reg.imageDecoderCount).toBe(1);
+    expect(reg.rendererCount).toBe(0);
+  });
+
   it('records an error for an invalid manifest and does not throw', async () => {
     const dir = makePlugin('bad', { manifest: { name: 'no id' }, entry: RENDERER_ENTRY });
     const res = await loadPluginDir(dir, new ContentPluginRegistry());

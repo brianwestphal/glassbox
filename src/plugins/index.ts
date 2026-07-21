@@ -16,7 +16,7 @@ import { clearAllPluginUIElements, type EnablementCheck, getConfigLabelOverride,
 import type { ConfigLayoutItem, PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginPreferenceDisplay, readPluginSetting, writePluginSetting } from './settings.js';
-import type { AnnotationHookInfo, ConfigLabelColor, DiffInput, PluginUIElement, RenderedView, RenderInput, ReviewHookInfo, UIActionResult } from './types.js';
+import type { AnnotationHookInfo, ConfigLabelColor, DecodedImage, DiffInput, PluginUIElement, RenderedView, RenderInput, ReviewHookInfo, UIActionResult } from './types.js';
 
 let registry = new ContentPluginRegistry();
 let loadedPlugins: LoadedPlugin[] = [];
@@ -26,7 +26,7 @@ let initialized = false;
 let currentRepoRoot = '';
 
 export { type LoadedPlugin } from './loader.js';
-export type { DiffInput, RenderedView, RenderInput } from './types.js';
+export type { DecodedImage, DiffInput, RenderedView, RenderInput } from './types.js';
 
 /** Whether the content-plugin subsystem is enabled (the kill-switch). */
 export function pluginsEnabled(): boolean { return PLUGINS_ENABLED; }
@@ -312,6 +312,23 @@ export async function renderContent(input: RenderInput): Promise<RenderedView | 
   if (renderer === undefined) return null;
   try {
     return usableView(await renderer.render(input));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decode an image's bytes to RGBA with the best-matching plugin image decoder
+ * (doc 29 imageDecoders capability), or `null` if disabled / no match / the
+ * decoder returns null or throws. Lets the perceptual diff (doc 26 P2) score a
+ * format core can't decode (WebP/AVIF/…) when a codec plugin is installed.
+ */
+export async function decodeImageWithPlugin(bytes: Uint8Array, path: string, mime?: string): Promise<DecodedImage | null> {
+  if (!PLUGINS_ENABLED) return null;
+  const decoder = registry.findImageDecoder({ bytes, path, mime });
+  if (decoder === undefined) return null;
+  try {
+    return (await decoder.decode({ bytes, path })) ?? null;
   } catch {
     return null;
   }

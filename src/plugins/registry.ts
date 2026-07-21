@@ -8,7 +8,7 @@
  */
 import { extname } from 'path';
 
-import type { ContentDiffer, ContentMatch, ContentRenderer, DiffInput, RenderInput } from './types.js';
+import type { ContentDiffer, ContentMatch, ContentRenderer, DiffInput, ImageDecoder, RenderInput } from './types.js';
 
 /**
  * Specificity of a match for tie-breaking: a content sniff (3) is more specific
@@ -60,9 +60,11 @@ function pickBest<T extends Handler>(handlers: readonly T[], input: RenderInput)
 export class ContentPluginRegistry {
   private renderers: ContentRenderer[] = [];
   private differs: ContentDiffer[] = [];
+  private imageDecoders: ImageDecoder[] = [];
 
   addRenderers(rs: ContentRenderer[] | undefined): void { if (rs) this.renderers.push(...rs); }
   addDiffers(ds: ContentDiffer[] | undefined): void { if (ds) this.differs.push(...ds); }
+  addImageDecoders(ds: ImageDecoder[] | undefined): void { if (ds) this.imageDecoders.push(...ds); }
 
   /** The best-matching renderer for a single content blob, or undefined. */
   findRenderer(input: RenderInput): ContentRenderer | undefined {
@@ -72,6 +74,11 @@ export class ContentPluginRegistry {
   /** The best-matching differ for a pair; matching keys off the new side. */
   findDiffer(input: DiffInput): ContentDiffer | undefined {
     return pickBest(this.differs, input.new);
+  }
+
+  /** The best-matching image decoder (bytes → RGBA) for a blob, or undefined. */
+  findImageDecoder(input: RenderInput): ImageDecoder | undefined {
+    return pickBest(this.imageDecoders, input);
   }
 
   /** Cheap path pre-check: could any renderer/differ handle this path (by ext /
@@ -84,4 +91,5 @@ export class ContentPluginRegistry {
 
   get rendererCount(): number { return this.renderers.length; }
   get differCount(): number { return this.differs.length; }
+  get imageDecoderCount(): number { return this.imageDecoders.length; }
 }

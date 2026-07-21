@@ -18,9 +18,13 @@
 > (GB-1048). The other two diagram renderers have also shipped as
 > separately-installable, opt-in plugins: **Mermaid** (`plugins/mermaid/`,
 > GB-1045; local `mmdc`/puppeteer subprocess) and **PlantUML**
-> (`plugins/plantuml/`, GB-1046; local `java -jar` subprocess). Still open: a
-> committed fixture-plugin **e2e** (GB-1043). See
-> [§29.8](#298-status-and-follow-ups).
+> (`plugins/plantuml/`, GB-1046; local `java -jar` subprocess). Beyond
+> renderers/differs, an additive **image-decoder capability** (`imageDecoders`,
+> FR-29.19, GB-1063) now lets a plugin decode bytes → RGBA so the perceptual diff
+> ([doc 26](26-ground-truth-comparison.md) P2) can score formats core can't; its
+> first reference plugin is **image-codecs** (WebP/AVIF, GB-1064). Still open: the
+> image-codecs plugin (GB-1064) and a committed fixture-plugin **e2e** (GB-1043).
+> See [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -162,10 +166,10 @@ content `renderer` / `differ`. Everything else transfers.
   plugin handles a modified file but supplies only a renderer, the viewer shows
   the two sides rendered independently (as the image comparison modes already do).
 - **FR-29.11 — Registration.** A plugin's `activate(context)` shall return its
-  registration — `{ renderers?, differs? }` — or nothing. A plugin that returns
-  neither is a valid no-op (e.g. a plugin that only contributes a preference or a
-  future UI affordance). Registration is additive into the in-memory registry the
-  dispatcher reads.
+  registration — `{ renderers?, differs?, imageDecoders?, reviewHooks? }` — or
+  nothing. A plugin that returns none of these is a valid no-op (e.g. a plugin that
+  only contributes a preference or a UI affordance). Registration is additive into
+  the in-memory registry the dispatcher reads.
 - **FR-29.12 — Plugin context + preferences.** `activate` shall receive a
   `PluginContext` giving the plugin a scoped logger and access to its own
   persisted configuration (`getSetting` / `setSetting`). A plugin declares
@@ -182,6 +186,24 @@ content `renderer` / `differ`. Everything else transfers.
   [doc 14](14-security.md) §14.4), never in config; the API/UI never return a
   secret's value — only whether it is configured (masked password input,
   GB-1054).
+- **FR-29.19 — Image-decoder capability (bytes → RGBA).** A plugin **may**
+  contribute one or more **image decoders** — `{ name, match, priority?,
+  decode(input) }` where `decode({ bytes, path }) → DecodedImage | null` and
+  `DecodedImage = { width, height, data: RGBA }` — via the additive
+  `imageDecoders` registration key. Decoders are matched + tie-broken by the same
+  `(priority, specificity)` rule as renderers (FR-29.8) and dispatched through
+  `decodeImageWithPlugin(bytes, path, mime?)` (`src/plugins/index.ts`), which
+  returns `null` fail-soft when the subsystem is disabled, no decoder matches, or a
+  decoder returns null / throws. This lets the **perceptual diff** ([doc 26](26-ground-truth-comparison.md)
+  §26 P2, `src/ground-truth/perceptual-diff.ts`) score ground-truth image pairs in
+  formats core can't decode: core decodes PNG/JPEG (`pngjs`/`jpeg-js`) synchronously,
+  and only when core can't does `comparePerceptual` (now async) consult an installed
+  decoder before returning `undecodable`. The capability is purely additive — it
+  does **not** touch the renderer/differ contract — so heavy/rare codecs (WebP/AVIF
+  WASM) stay out of core and opt in by install (NFR-29.1). The first reference
+  decoder plugin is `plugins/image-codecs/` (WebP/AVIF, GB-1064). At launch the
+  ground-truth branch initializes the plugin subsystem before scoring so an
+  installed decoder is available (idempotent with the server's later init).
 
 ## 29.4 Where plugins run
 
@@ -381,6 +403,16 @@ The build is decomposed into follow-up tickets:
   separately-installable, opt-in plugins: **Mermaid** (`plugins/mermaid/`,
   GB-1045; local `mmdc`/puppeteer subprocess) and **PlantUML**
   (`plugins/plantuml/`, GB-1046; local `java -jar` subprocess).
+- **Image-decoder capability** (GB-1063, **shipped**) — the additive
+  `imageDecoders` registration key (FR-29.19): `ImageDecoder` in
+  `src/plugins/types.ts`, registered/dispatched by `ContentPluginRegistry`
+  (`addImageDecoders` / `findImageDecoder`), exposed via
+  `decodeImageWithPlugin(bytes, path, mime?)` in `src/plugins/index.ts`, and
+  consulted by `comparePerceptual` (now async) in
+  `src/ground-truth/perceptual-diff.ts` when core can't decode a format. The
+  ground-truth launch path initializes plugins before scoring. Purely additive; no
+  change to renderer/differ. First reference decoder: **image-codecs** (WebP/AVIF,
+  GB-1064, *pending*).
 
 ## Implementation pointers
 

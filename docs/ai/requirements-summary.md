@@ -957,10 +957,22 @@ dividers / spacers / dynamic **status labels** / **action buttons**; a button
 runs the plugin's `onAction` (`POST /api/plugins/:id/action`) which reports
 status via `context.updateConfigLabel`, folded into the refreshed list's
 `configLabels` (no polling). graphviz's **Rendering** group + **Test renderer**
-button is the worked example. Still open: a committed fixture-plugin e2e
-(GB-1043) — the tab's layout rendering + button wiring is manual until then.
-Implemented FR/NFR units carry real tests in `feature-coverage.json`; the rest
-stay `waived` until their follow-up lands.
+button is the worked example. Beyond renderers/differs, an **image-decoder
+capability** (FR-29.19, GB-1063) makes `PluginRegistration` additive with an
+`imageDecoders?` key: an `ImageDecoder` (`{ name, match, priority?, decode({ bytes,
+path }) → DecodedImage|null }`, bytes → RGBA) registered/dispatched by the same
+`(priority, specificity)` rule (`ContentPluginRegistry.findImageDecoder`) and
+exposed via `decodeImageWithPlugin(bytes, path, mime?)`. The **perceptual diff**
+(doc 26 P2, `src/ground-truth/perceptual-diff.ts`) consumes it: `comparePerceptual`
+is now **async** and, when core (PNG/JPEG) can't decode a format, consults an
+installed decoder before returning `undecodable` — so WebP/AVIF ground-truth pairs
+become scorable once a codec plugin is installed (heavy/rare codecs stay out of
+core, opt in by install). The ground-truth launch branch inits plugins before
+scoring. First reference decoder plugin: **image-codecs** (WebP/AVIF, GB-1064,
+*pending*). Still open: the image-codecs plugin (GB-1064) and a committed
+fixture-plugin e2e (GB-1043) — the tab's layout rendering + button wiring is manual
+until then. Implemented FR/NFR units carry real tests in `feature-coverage.json`;
+the rest stay `waived` until their follow-up lands.
 
 ## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
 

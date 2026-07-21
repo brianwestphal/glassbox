@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ContentPluginRegistry, matches, matchSpecificity, pathMatches } from '../../../src/plugins/registry.js';
-import type { ContentRenderer, RenderInput } from '../../../src/plugins/types.js';
+import type { ContentRenderer, ImageDecoder, RenderInput } from '../../../src/plugins/types.js';
 
 function input(over: Partial<RenderInput> = {}): RenderInput {
   return { bytes: new Uint8Array(), path: 'a.mmd', ...over };
@@ -61,8 +61,41 @@ describe('registry dispatch (doc 29 FR-29.8/29.11)', () => {
     const reg = new ContentPluginRegistry();
     reg.addRenderers([renderer('a'), renderer('b')]);
     reg.addDiffers(undefined);
+    reg.addImageDecoders(undefined);
     expect(reg.rendererCount).toBe(2);
     expect(reg.differCount).toBe(0);
+    expect(reg.imageDecoderCount).toBe(0);
+  });
+});
+
+describe('image-decoder dispatch (doc 29 imageDecoders, GB-1063)', () => {
+  const decoder = (name: string, over: Partial<ImageDecoder> = {}): ImageDecoder => ({
+    name, match: { extensions: ['.webp'] }, decode: () => ({ width: 1, height: 1, data: new Uint8Array(4) }), ...over,
+  });
+
+  it('dispatches to a matching decoder and counts them', () => {
+    const reg = new ContentPluginRegistry();
+    reg.addImageDecoders([decoder('webp')]);
+    expect(reg.imageDecoderCount).toBe(1);
+    expect(reg.findImageDecoder(input({ path: 'shot.webp' }))?.name).toBe('webp');
+    expect(reg.findImageDecoder(input({ path: 'shot.png' }))).toBeUndefined();
+  });
+
+  it('picks the higher-priority decoder among matches', () => {
+    const reg = new ContentPluginRegistry();
+    reg.addImageDecoders([decoder('low', { priority: 0 }), decoder('high', { priority: 5 })]);
+    expect(reg.findImageDecoder(input({ path: 'x.webp' }))?.name).toBe('high');
+  });
+
+  it('keeps image decoders independent of renderers/differs', () => {
+    const reg = new ContentPluginRegistry();
+    reg.addRenderers([renderer('r', { match: { extensions: ['.webp'] } })]);
+    reg.addImageDecoders([decoder('d')]);
+    // A renderer match does not satisfy a decoder lookup and vice versa.
+    expect(reg.findRenderer(input({ path: 'x.webp' }))?.name).toBe('r');
+    expect(reg.findImageDecoder(input({ path: 'x.webp' }))?.name).toBe('d');
+    expect(reg.rendererCount).toBe(1);
+    expect(reg.imageDecoderCount).toBe(1);
   });
 });
 
