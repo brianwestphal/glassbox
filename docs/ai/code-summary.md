@@ -267,7 +267,16 @@ the heavy asset (the jar / Chromium — not committed) into the install dir, use
 only Node builtins in the plugin itself (no core external dep), and fail-soft to
 the code-block fallback. Mermaid: `MERMAID_MMDC` overrides the CLI path,
 `MERMAID_PUPPETEER_CONFIG` supplies a `-p` puppeteer config for rootless
-environments.
+environments. `plugins/image-codecs/` (GB-1064) — the reference **image-decoder**
+plugin (doc 29 FR-29.19, not a renderer): registers WebP + AVIF `imageDecoders`
+(bytes → RGBA) via the jSquash WASM codecs (`@jsquash/webp`, `@jsquash/avif`),
+esbuild-inlined via a new `.wasm` `binary` loader in `build-plugins.mjs`; codec
+bytes are injected through a `WasmLoader` (`src/decoder.ts` builds the decoders,
+`src/plugin.ts` the `activate`, `src/index.ts` binds the inlined binaries) so the
+decoders unit-test in plain Node. Separately installable (`autoInstall: false`,
+~1.8 MB WASM; `setup.mjs` copies the self-contained build — no runtime download).
+Makes WebP/AVIF ground-truth pairs perceptually scorable; `@jsquash/*` are
+**devDependencies bundled into the plugin**, never core deps.
 
 ### `src/utils/`
 

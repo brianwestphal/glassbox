@@ -20,11 +20,11 @@
 > GB-1045; local `mmdc`/puppeteer subprocess) and **PlantUML**
 > (`plugins/plantuml/`, GB-1046; local `java -jar` subprocess). Beyond
 > renderers/differs, an additive **image-decoder capability** (`imageDecoders`,
-> FR-29.19, GB-1063) now lets a plugin decode bytes → RGBA so the perceptual diff
+> FR-29.19, GB-1063) lets a plugin decode bytes → RGBA so the perceptual diff
 > ([doc 26](26-ground-truth-comparison.md) P2) can score formats core can't; its
-> first reference plugin is **image-codecs** (WebP/AVIF, GB-1064). Still open: the
-> image-codecs plugin (GB-1064) and a committed fixture-plugin **e2e** (GB-1043).
-> See [§29.8](#298-status-and-follow-ups).
+> first reference plugin, **image-codecs** (WebP/AVIF via jSquash WASM,
+> `plugins/image-codecs/`, GB-1064), has shipped too. Still open: a committed
+> fixture-plugin **e2e** (GB-1043). See [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -201,9 +201,12 @@ content `renderer` / `differ`. Everything else transfers.
   decoder before returning `undecodable`. The capability is purely additive — it
   does **not** touch the renderer/differ contract — so heavy/rare codecs (WebP/AVIF
   WASM) stay out of core and opt in by install (NFR-29.1). The first reference
-  decoder plugin is `plugins/image-codecs/` (WebP/AVIF, GB-1064). At launch the
-  ground-truth branch initializes the plugin subsystem before scoring so an
-  installed decoder is available (idempotent with the server's later init).
+  decoder plugin — `plugins/image-codecs/` (WebP/AVIF via jSquash WASM, GB-1064) —
+  has **shipped**: it registers `.webp`/`.avif` decoders, is separately installable
+  (`autoInstall: false`, ~1.8 MB of codec WASM), and makes those ground-truth pairs
+  scorable. At launch the ground-truth branch initializes the plugin subsystem
+  before scoring so an installed decoder is available (idempotent with the server's
+  later init).
 
 ## 29.4 Where plugins run
 
@@ -411,8 +414,19 @@ The build is decomposed into follow-up tickets:
   consulted by `comparePerceptual` (now async) in
   `src/ground-truth/perceptual-diff.ts` when core can't decode a format. The
   ground-truth launch path initializes plugins before scoring. Purely additive; no
-  change to renderer/differ. First reference decoder: **image-codecs** (WebP/AVIF,
-  GB-1064, *pending*).
+  change to renderer/differ.
+- **Reference decoder plugin: image-codecs** (GB-1064, **shipped**) —
+  `plugins/image-codecs/` registers WebP + AVIF `imageDecoders` (bytes → RGBA) via
+  the [jSquash](https://github.com/jamsinclair/jSquash) WASM codecs
+  (`@jsquash/webp`, `@jsquash/avif`), esbuild-bundled into the self-contained
+  `index.js` (the `.wasm` inlined via the `binary` loader added to
+  `scripts/build-plugins.mjs`; the codec bytes are injected via a `WasmLoader` so
+  the decoders unit-test in plain Node). No system dep, but **separately
+  installable** (`autoInstall: false`, `setup.mjs` copies the self-contained build)
+  to keep ~1.8 MB of codec WASM out of the default install. It contributes no
+  renderer — browsers display WebP/AVIF natively; it only adds the decode-to-RGBA
+  the perceptual diff needs. `@jsquash/*` are **devDependencies bundled into the
+  plugin**, NOT core external deps (like graphviz's `@viz-js/viz`).
 
 ## Implementation pointers
 

@@ -35,3 +35,6 @@ external/
 
 
 # Built content-plugin bundles (doc 29) go to dist/plugins/ (already ignored via dist/).
+
+# Stray npm cache (never commit)
+.npmcache/

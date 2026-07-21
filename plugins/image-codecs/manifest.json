@@ -1,0 +1,10 @@
+{
+  "id": "image-codecs",
+  "name": "Image Codecs (WebP / AVIF)",
+  "version": "1.0.0",
+  "entry": "index.js",
+  "description": "Adds WebP + AVIF image decoders (bytes -> RGBA) so ground-truth comparisons in those formats get a perceptual difference score. Self-contained WASM (no system dependency); separately installable (run `node setup.mjs`) to keep the ~1.8 MB codecs out of the default install.",
+  "author": "Glassbox",
+  "autoInstall": false,
+  "contentTypes": [{ "extensions": [".webp", ".avif"] }]
+}

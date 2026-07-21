@@ -968,11 +968,17 @@ is now **async** and, when core (PNG/JPEG) can't decode a format, consults an
 installed decoder before returning `undecodable` — so WebP/AVIF ground-truth pairs
 become scorable once a codec plugin is installed (heavy/rare codecs stay out of
 core, opt in by install). The ground-truth launch branch inits plugins before
-scoring. First reference decoder plugin: **image-codecs** (WebP/AVIF, GB-1064,
-*pending*). Still open: the image-codecs plugin (GB-1064) and a committed
-fixture-plugin e2e (GB-1043) — the tab's layout rendering + button wiring is manual
-until then. Implemented FR/NFR units carry real tests in `feature-coverage.json`;
-the rest stay `waived` until their follow-up lands.
+scoring. Its first reference decoder plugin, **image-codecs**
+(`plugins/image-codecs/`, GB-1064), has **shipped**: WebP + AVIF `imageDecoders`
+via the jSquash WASM codecs (`@jsquash/webp`, `@jsquash/avif`), esbuild-inlined
+into a self-contained bundle (a new `.wasm` `binary` loader in
+`build-plugins.mjs`; codec bytes injected through a `WasmLoader` so the decoders
+unit-test in plain Node). No system dep but separately installable
+(`autoInstall: false`, ~1.8 MB WASM) to keep the codecs out of the default install;
+contributes no renderer (browsers show WebP/AVIF natively), only the decode. Still
+open: a committed fixture-plugin e2e (GB-1043) — the tab's layout rendering + button
+wiring is manual until then. Implemented FR/NFR units carry real tests in
+`feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
 

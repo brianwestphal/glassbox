@@ -136,6 +136,20 @@ Until then, the tab's UI wiring is manual:
   default suite only because the ~hundreds-of-MB Chromium isn't committed —
   verified live via headless Chromium. This manual item is the full in-viewer
   Code|Rendered experience.)*
+- **Image-codecs plugin — WebP/AVIF ground-truth scoring (GB-1064)** — Install the
+  opt-in image-codecs plugin: `npm run build:plugins` then
+  `node plugins/image-codecs/setup.mjs` (copies the self-contained plugin into
+  `~/.glassbox/plugins/image-codecs/`; no download). Launch a **ground-truth**
+  review (`glassbox --ground-truth <manifest.json>`, doc 26) whose comparisons use
+  **`.webp`** and/or **`.avif`** images. With the plugin **enabled**, each such pair
+  shows a **perceptual difference score** badge and participates in
+  most-different-first sorting / identical-hidden filtering — exactly like a
+  PNG/JPEG pair. With the plugin **disabled** (or uninstalled), the same pairs show
+  the images but **no score** (unscored, unsupported format) — nothing crashes.
+  *(The decoders + the capability wiring are unit-tested against real WebP/AVIF
+  fixtures — `plugins/image-codecs.test.ts` — and the built self-contained bundle
+  was verified live decoding them; this manual item is the full in-app ground-truth
+  scoring experience with the plugin toggled.)*
 - **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
   containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
   a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of

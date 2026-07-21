@@ -48,6 +48,11 @@ for (const name of dirs) {
     platform: 'node',
     target: 'node20',
     minify: true,
+    // Inline any imported `.wasm` as a Uint8Array so a plugin's WASM codecs
+    // (e.g. image-codecs' jSquash decoders) ship inside the self-contained
+    // bundle — nothing to locate at runtime in the frozen sidecar. Harmless to
+    // plugins that import no `.wasm`.
+    loader: { '.wasm': 'binary' },
     logLevel: 'warning',
   });
   if (existsSync(manifestPath)) copyFileSync(manifestPath, join(outDir, 'manifest.json'));
