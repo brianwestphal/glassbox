@@ -12,6 +12,13 @@ set "SCRIPT_DIR=%~dp0"
 set "PROJECT_DIR=%CD%"
 set "BROWSER_MODE=0"
 
+REM Standalone CLI subcommands (doc 20 / doc 19 -- "note ...", "ground-truth
+REM promote ...") run cli.js directly and exit: no app launch. Without this the
+REM wrapper prepends --no-open/--project-dir, so cli.js never sees the
+REM subcommand as argv[0] and dies with "Unknown option" (Hot Sheet HS-9371).
+if "%~1"=="note" goto run_cli_direct
+if "%~1"=="ground-truth" goto run_cli_direct
+
 :parse_args
 if "%~1"=="" goto done_args
 if "%~1"=="--browser" (
@@ -36,3 +43,8 @@ if "%BROWSER_MODE%"=="1" (
         start "" "%SCRIPT_DIR%..\glassbox.exe" --project-dir "%PROJECT_DIR%" %*
     )
 )
+goto :eof
+
+:run_cli_direct
+"%SCRIPT_DIR%..\glassbox-node.exe" "%SCRIPT_DIR%..\server\cli.js" %*
+exit /b %ERRORLEVEL%

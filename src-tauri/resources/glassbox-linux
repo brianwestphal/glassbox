@@ -20,6 +20,16 @@ NODE_BIN="$BIN_DIR/glassbox-node"
 TAURI_BIN="$BIN_DIR/glassbox"
 CLI_JS="$APP_ROOT/server/cli.js"
 
+# Standalone CLI subcommands (doc 20 / doc 19 — `note …`, `ground-truth promote …`)
+# run cli.js directly and exit: no app launch. Without this early exec the
+# wrapper below prepends `--project-dir`, so cli.js never sees the subcommand
+# as argv[0] and dies with "Unknown option" (Hot Sheet HS-9371).
+case "$1" in
+  note|ground-truth)
+    exec "$NODE_BIN" "$CLI_JS" "$@"
+    ;;
+esac
+
 PROJECT_DIR="$(pwd)"
 BROWSER_MODE=false
 PASSTHROUGH_ARGS=()

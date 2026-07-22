@@ -20,6 +20,17 @@ APP_BUNDLE="$(dirname "$CONTENTS_DIR")"
 GLASSBOX_BIN="$CONTENTS_DIR/MacOS/glassbox"
 MAIN_ICON="$CONTENTS_DIR/Resources/icon.icns"
 
+# Standalone CLI subcommands (doc 20 / doc 19 — `note …`, `ground-truth promote …`)
+# run cli.js directly and exit: no server launch, no stub app. Without this
+# early exec the launch wrapper below prepends `--no-open --project-dir`, so
+# cli.js never sees the subcommand as argv[0] and dies with "Unknown option"
+# (Hot Sheet HS-9371 — broke `glassbox note add` for every driven agent).
+case "$1" in
+  note|ground-truth)
+    exec "$NODE_BIN" "$CLI_JS" "$@"
+    ;;
+esac
+
 PROJECT_DIR="$(pwd)"
 BROWSER_MODE=false
 PASSTHROUGH_ARGS=()
