@@ -9,7 +9,7 @@ import { groundTruthMetaByFileId } from '../../ground-truth/presentation.js';
 import { pluginRendersFile } from '../../plugins/fileView.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
-import { parseBody, requirePathParam } from '../../utils/parseBody.js';
+import { errorResponse, parseBody, requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const filesRoutes = new Hono<AppEnv>();
@@ -39,7 +39,7 @@ filesRoutes.get('/files/:fileId', async (c) => {
   const fileId = requirePathParam(c, 'fileId');
   if (!fileId.ok) return fileId.response;
   const file = await getReviewFile(fileId.data);
-  if (!file) return c.json({ error: 'Not found' }, 404);
+  if (!file) return errorResponse(c, 'Not found', 404);
   const annotations = await getAnnotationsForFile(file.id);
   return c.json({ file, annotations });
 });
@@ -58,7 +58,7 @@ filesRoutes.post('/files/:fileId/reveal', async (c) => {
   const fileId = requirePathParam(c, 'fileId');
   if (!fileId.ok) return fileId.response;
   const file = await getReviewFile(fileId.data);
-  if (!file) return c.json({ error: 'Not found' }, 404);
+  if (!file) return errorResponse(c, 'Not found', 404);
   const repoRoot = c.get('repoRoot');
   const fullPath = resolve(repoRoot, file.file_path);
   try {
@@ -76,7 +76,7 @@ filesRoutes.get('/files/:fileId/path', async (c) => {
   const fileId = requirePathParam(c, 'fileId');
   if (!fileId.ok) return fileId.response;
   const file = await getReviewFile(fileId.data);
-  if (!file) return c.json({ error: 'Not found' }, 404);
+  if (!file) return errorResponse(c, 'Not found', 404);
   const repoRoot = c.get('repoRoot');
   return c.json({ relativePath: file.file_path, absolutePath: resolve(repoRoot, file.file_path) } as const);
 });
@@ -85,7 +85,7 @@ filesRoutes.post('/files/:fileId/open', async (c) => {
   const fileId = requirePathParam(c, 'fileId');
   if (!fileId.ok) return fileId.response;
   const file = await getReviewFile(fileId.data);
-  if (!file) return c.json({ error: 'Not found' }, 404);
+  if (!file) return errorResponse(c, 'Not found', 404);
   const repoRoot = c.get('repoRoot');
   const fullPath = resolve(repoRoot, file.file_path);
   try {

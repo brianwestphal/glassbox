@@ -7,7 +7,7 @@ import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js'
 import { notifyReviewCompleted } from '../../plugins/index.js';
 import { updateReviewDiffs } from '../../review-update.js';
 import type { AppEnv } from '../../types.js';
-import { requirePathParam } from '../../utils/parseBody.js';
+import { errorResponse, requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const reviewsRoutes = new Hono<AppEnv>();
@@ -65,7 +65,7 @@ reviewsRoutes.post('/review/refresh', async (c) => {
   const reviewId = resolveReviewId(c);
   const repoRoot = c.get('repoRoot');
   const review = await getReview(reviewId);
-  if (!review) return c.json({ error: 'Review not found' }, 404);
+  if (!review) return errorResponse(c, 'Review not found', 404);
 
   const mode = parseModeString(review.mode);
   const headCommit = getHeadCommit(repoRoot);
@@ -86,7 +86,7 @@ reviewsRoutes.delete('/review/:id', async (c) => {
   const reviewId = idParam.data;
   const currentReviewId = c.get('currentReviewId');
   if (reviewId === currentReviewId) {
-    return c.json({ error: 'Cannot delete the current review' }, 400);
+    return errorResponse(c, 'Cannot delete the current review', 400);
   }
   const repoRoot = c.get('repoRoot');
   deleteReviewExport(reviewId, repoRoot);

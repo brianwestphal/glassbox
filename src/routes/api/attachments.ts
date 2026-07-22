@@ -2,11 +2,13 @@ import { readFileSync, statSync } from 'node:fs';
 
 import { Hono } from 'hono';
 
-import { writeAttachmentFile } from '../../attachments/store.js';
+import { deleteAttachmentFile, writeAttachmentFile } from '../../attachments/store.js';
 import { createAttachment, deleteAttachment, getAttachment, getAttachmentsForAnnotation, getAttachmentsForReview } from '../../db/attachment-queries.js';
+import { generateId } from '../../db/ids.js';
 import { getAnnotationById } from '../../db/queries.js';
 import type { AppEnv } from '../../types.js';
 import { mimeForFilename } from '../../utils/mime.js';
+import { openOS } from '../../utils/openOS.js';
 import { errorResponse, requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
@@ -64,7 +66,6 @@ attachmentsRoutes.post('/annotations/:id/attachments', async (c) => {
   if (bytes.length === 0) return errorResponse(c, 'Empty file', 400);
 
   const originalFilename = file.name === '' ? 'attachment' : file.name;
-  const { generateId } = await import('../../db/ids.js');
   const id = generateId();
   let stored;
   try {
@@ -130,7 +131,6 @@ attachmentsRoutes.post('/attachments/:id/quicklook', async (c) => {
   } catch {
     return errorResponse(c, 'Attachment file missing', 404);
   }
-  const { openOS } = await import('../../utils/openOS.js');
   try {
     openOS(attachment.stored_path, 'quicklook');
   } catch {
@@ -145,7 +145,6 @@ attachmentsRoutes.delete('/attachments/:id', async (c) => {
   if (!idParam.ok) return idParam.response;
   const removed = await deleteAttachment(idParam.data);
   if (removed !== undefined) {
-    const { deleteAttachmentFile } = await import('../../attachments/store.js');
     deleteAttachmentFile(removed.stored_path);
   }
   return c.json({ ok: true } as const);

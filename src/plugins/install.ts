@@ -16,6 +16,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
+import { compareVersions } from '../utils/compareVersions.js';
 import { pluginsDir, readManifest } from './loader.js';
 import type { PluginManifest } from './manifest.js';
 
@@ -84,16 +85,7 @@ function writeDismissed(ids: string[], userDir: string): void {
   writeFileSync(path, JSON.stringify([...new Set(ids)], null, 2), 'utf-8');
 }
 
-/** Compare dotted numeric versions: 1 if a is newer, -1 if b is newer, 0 if equal. */
-export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map((p) => parseInt(p, 10) || 0);
-  const pb = b.split('.').map((p) => parseInt(p, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d !== 0) return d > 0 ? 1 : -1;
-  }
-  return 0;
-}
+export { compareVersions } from '../utils/compareVersions.js';
 
 /** sha-1 over a directory's files (path + bytes), sorted — a content fingerprint. */
 export function hashPluginDir(dir: string): string {

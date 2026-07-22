@@ -63,7 +63,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
   // the client's check (`client.ts`) and `GET /api/ai/config`'s keyConfigured.
   if (config.apiKey === null && !testMode && !KEYLESS_PLATFORMS.has(config.platform)) {
     debugLog('POST /analyze: no API key configured');
-    return c.json({ error: 'No API key configured' }, 400);
+    return errorResponse(c, 'No API key configured', 400);
   }
 
   debugLog(`POST /analyze: platform=${config.platform}, model=${config.model}${testMode ? ' (TEST MODE)' : ''}`);
@@ -71,7 +71,7 @@ aiAnalysisRoutes.post('/analyze', async (c) => {
   const files = await getReviewFiles(reviewId);
   debugLog(`POST /analyze: ${String(files.length)} files in review`);
   if (files.length === 0) {
-    return c.json({ error: 'No files in review' }, 400);
+    return errorResponse(c, 'No files in review', 400);
   }
 
   // When invalidating cache, cancel running analyses of all types

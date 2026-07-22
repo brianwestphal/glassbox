@@ -7,7 +7,12 @@ import { TriggerChannelReqSchema } from '../api/index.js';
 import { isChannelAlive, registerChannel, triggerChannel, unregisterChannel } from '../channel-config.js';
 import { readGlobalConfig, updateGlobalConfig } from '../global-config.js';
 import type { AppEnv } from '../types.js';
-import { parseBody } from '../utils/parseBody.js';
+import { compareVersions } from '../utils/compareVersions.js';
+import { errorResponse, parseBody } from '../utils/parseBody.js';
+
+/** Minimum Claude Code CLI version with working channel support (the
+ *  experimental `claude/channel` capability landed in 2.1.80). */
+const MIN_CLAUDE_VERSION = '2.1.80';
 
 export const channelApiRoutes = new Hono<AppEnv>();
 
@@ -52,7 +57,7 @@ channelApiRoutes.post('/trigger', async (c) => {
   const dataDir = join(repoRoot, '.glassbox');
   const sent = await triggerChannel(dataDir, parsed.data.message);
   if (!sent) {
-    return c.json({ error: 'Channel not connected' }, 503);
+    return errorResponse(c, 'Channel not connected', 503);
   }
   return c.json({ ok: true } as const);
 });
@@ -68,12 +73,7 @@ channelApiRoutes.get('/claude-check', (c) => {
     // Extract version number (e.g., "claude v2.1.80" → "2.1.80")
     const match = version.match(/(\d+\.\d+\.\d+)/);
     const ver = match !== null ? match[1] : null;
-    // Check minimum version (2.1.80)
-    let meetsMinimum = false;
-    if (ver !== null) {
-      const parts = ver.split('.').map(Number);
-      meetsMinimum = parts[0] > 2 || (parts[0] === 2 && parts[1] > 1) || (parts[0] === 2 && parts[1] === 1 && parts[2] >= 80);
-    }
+    const meetsMinimum = ver !== null && compareVersions(ver, MIN_CLAUDE_VERSION) >= 0;
     return c.json({ installed: true, version: ver, meetsMinimum });
   } catch {
     return c.json({ installed: false, version: null, meetsMinimum: false });

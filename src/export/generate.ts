@@ -10,6 +10,7 @@ import { reviewNotesExportSection } from '../review-notes/format.js';
 import { formatReviewMode } from '../utils/formatReviewMode.js';
 import type { ImageDims } from './build-data.js';
 import { buildReviewExportData } from './build-data.js';
+import { buildReviewMarkdown } from './build-markdown.js';
 
 export function deleteReviewExport(reviewId: string, repoRoot: string): void {
   const exportDir = join(repoRoot, '.glassbox');
@@ -60,58 +61,10 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
   const exportDir = join(repoRoot, '.glassbox');
   mkdirSync(exportDir, { recursive: true });
 
-  // Group annotations by file
-  const byFile: Record<string, typeof annotations> = {};
-  for (const a of annotations) {
-    if (!(a.file_path in byFile)) byFile[a.file_path] = [];
-    byFile[a.file_path].push(a);
-  }
-
-  const lines: string[] = [];
-
   // A clean, short mode label — never the raw serialized mode string, which for
   // ground-truth (doc 26) is a large JSON payload (the GB-971 bug class).
   const modeLabel = formatReviewMode(review.mode, review.mode_args);
   const exportDate = new Date().toISOString();
-
-  lines.push('# Code Review');
-  lines.push('');
-  lines.push(`- **Repository**: ${review.repo_name}`);
-  lines.push(`- **Review mode**: ${modeLabel}`);
-  lines.push(`- **Review ID**: ${review.id}`);
-  lines.push(`- **Date**: ${exportDate}`);
-  lines.push(`- **Files reviewed**: ${files.filter(f => f.status === 'reviewed').length}/${files.length}`);
-  lines.push(`- **Total annotations**: ${annotations.length}`);
-  lines.push('');
-
-  // Summary of categories
-  const categoryCounts: Record<string, number> = {};
-  for (const a of annotations) {
-    categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
-  }
-  if (Object.keys(categoryCounts).length > 0) {
-    lines.push('## Annotation Summary');
-    lines.push('');
-    for (const [cat, count] of Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])) {
-      lines.push(`- **${cat}**: ${count}`);
-    }
-    lines.push('');
-  }
-
-  // Items tagged "remember" should be prominent for AI tools
-  const rememberItems = annotations.filter(a => a.category === 'remember');
-  if (rememberItems.length > 0) {
-    lines.push('## Items to Remember');
-    lines.push('');
-    lines.push('> These annotations are flagged for long-term retention. AI tools should consider updating');
-    lines.push('> project configuration (CLAUDE.md, .cursorrules, etc.) with these preferences/rules.');
-    lines.push('');
-    for (const item of rememberItems) {
-      const anchor = item.line_number === 0 ? `${item.file_path} (image)` : `${item.file_path}:${item.line_number}`;
-      lines.push(`- **${anchor}** - ${item.content}`);
-    }
-    lines.push('');
-  }
 
   // Reviewer attachments, grouped by the annotation they hang off (doc 25), so
   // they can be listed inline under each comment with their on-disk paths.
@@ -121,47 +74,18 @@ export async function generateReviewExport(reviewId: string, repoRoot: string, i
     (attByAnnotation[at.annotation_id] ??= []).push(at);
   }
 
-  // Per-file annotations
-  lines.push('## File Annotations');
-  lines.push('');
-
-  for (const filePath of Object.keys(byFile).sort()) {
-    const fileAnns = byFile[filePath];
-    lines.push(`### ${filePath}`);
-    lines.push('');
-    for (const a of fileAnns) {
-      lines.push(`- ${annotationAnchorLabel(a)} [${a.category}]: ${a.content}`);
-      const atts = attByAnnotation[a.id] ?? [];
-      if (atts.length > 0) {
-        lines.push('  - Attachments (readable files on disk):');
-        for (const at of atts) lines.push(`    - \`${at.stored_path}\` (${at.original_filename})`);
-      }
-    }
-    lines.push('');
-  }
-
-  // AI-authored review notes from `.pr-notes/` (docs/20 §20.8, P5) — fold the
-  // generating AI's own rationale/proof into the export for the next session.
-  const reviewNoteLines = reviewNotesExportSection(repoRoot, files.map(f => f.file_path));
-  if (reviewNoteLines.length > 0) lines.push(...reviewNoteLines);
-
-  // Instructions for AI tools
-  lines.push('---');
-  lines.push('');
-  lines.push('## Instructions for AI Tools');
-  lines.push('');
-  lines.push('When processing this code review:');
-  lines.push('');
-  lines.push('1. **bug** and **fix** annotations indicate code that needs to be changed. Apply the suggested fixes.');
-  lines.push('2. **style** annotations indicate stylistic preferences. Apply them to the indicated lines and similar patterns nearby.');
-  lines.push('3. **pattern-follow** annotations highlight good patterns. Continue using these patterns in new code.');
-  lines.push('4. **pattern-avoid** annotations highlight anti-patterns. Refactor the indicated code and avoid the pattern elsewhere.');
-  lines.push('5. **remember** annotations are rules/preferences to persist. Update the project\'s AI configuration file (e.g., CLAUDE.md) with these.');
-  lines.push('6. **note** annotations are informational context. Consider them but they may not require code changes.');
-  lines.push('7. **Attachments** listed under an annotation are real files on disk (screenshots, logs, specs, etc.) — read them from the given path for additional context when acting on that comment.');
-  lines.push('');
-
-  const content = lines.join('\n');
+  const content = buildReviewMarkdown({
+    review,
+    files,
+    annotations,
+    attachmentsByAnnotation: attByAnnotation,
+    modeLabel,
+    date: exportDate,
+    // AI-authored review notes from `.pr-notes/` (docs/20 §20.8, P5) — fold the
+    // generating AI's own rationale/proof into the export for the next session.
+    reviewNoteLines: reviewNotesExportSection(repoRoot, files.map(f => f.file_path)),
+    anchorLabel: annotationAnchorLabel,
+  });
 
   // Structured JSON companion (doc 6) for programmatic consumers (e.g. a
   // --on-complete hook that files tickets). Built from the same data so it never

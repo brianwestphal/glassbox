@@ -13,7 +13,7 @@ import {
   getAllThemes, resolveTheme, saveCustomTheme, setActiveThemeId,
 } from '../themes/config.js';
 import type { AppEnv } from '../types.js';
-import { parseBody, requireSlugParam } from '../utils/parseBody.js';
+import { errorResponse, parseBody, requireSlugParam } from '../utils/parseBody.js';
 
 export const themeApiRoutes = new Hono<AppEnv>();
 
@@ -46,7 +46,7 @@ themeApiRoutes.post('/active', async (c) => {
   if (!parsed.ok) return parsed.response;
 
   const theme = resolveTheme(parsed.data.id);
-  if (!theme) return c.json({ error: 'Theme not found' }, 404);
+  if (!theme) return errorResponse(c, 'Theme not found', 404);
 
   setActiveThemeId(parsed.data.id);
   return c.json({ id: parsed.data.id, colors: theme.colors });
@@ -59,7 +59,7 @@ themeApiRoutes.post('/', async (c) => {
   const body = parsed.data;
 
   const source = resolveTheme(body.sourceId);
-  if (!source) return c.json({ error: 'Source theme not found' }, 404);
+  if (!source) return errorResponse(c, 'Source theme not found', 404);
 
   const baseTheme = source.builtIn ? source.id : source.baseTheme;
   const name = body.name ?? `${source.name} (Copy)`;
@@ -76,6 +76,19 @@ themeApiRoutes.post('/', async (c) => {
   return c.json(newTheme, 201);
 });
 
+/** Apply a rename/recolor edit onto a theme — the shared merge used by both
+ *  POST /:id/edit and PATCH /:id. */
+function mergeThemeEdit(
+  source: CustomTheme,
+  body: { name?: string; colors?: Partial<CustomTheme['colors']> },
+): CustomTheme {
+  return {
+    ...source,
+    name: body.name !== undefined && body.name !== '' ? body.name : source.name,
+    colors: body.colors ? { ...source.colors, ...body.colors } : source.colors,
+  };
+}
+
 /** POST /themes/:id/edit — edit a theme; auto-copies built-in themes */
 themeApiRoutes.post('/:id/edit', async (c) => {
   const idParam = requireSlugParam(c, 'id');
@@ -86,29 +99,22 @@ themeApiRoutes.post('/:id/edit', async (c) => {
   const body = parsed.data;
 
   const source = resolveTheme(id);
-  if (!source) return c.json({ error: 'Theme not found' }, 404);
+  if (!source) return errorResponse(c, 'Theme not found', 404);
 
   if (source.builtIn) {
     // Auto-copy: create a "(Customized)" copy and apply the edit to it
     const newTheme: CustomTheme = {
+      ...mergeThemeEdit({ ...source, builtIn: false, baseTheme: source.id }, body),
       id: generateThemeId(),
-      name: `${source.name} (Customized)`,
-      builtIn: false,
-      baseTheme: source.id,
-      colors: body.colors ? { ...source.colors, ...body.colors } : { ...source.colors },
+      name: body.name !== undefined && body.name !== '' ? body.name : `${source.name} (Customized)`,
     };
-    if (body.name !== undefined && body.name !== '') newTheme.name = body.name;
     saveCustomTheme(newTheme);
     setActiveThemeId(newTheme.id);
     return c.json({ theme: newTheme, copied: true }, 201);
   }
 
   // Custom theme: edit in place
-  const updated: CustomTheme = {
-    ...source,
-    name: body.name ?? source.name,
-    colors: body.colors ? { ...source.colors, ...body.colors } : source.colors,
-  };
+  const updated = mergeThemeEdit(source, body);
   saveCustomTheme(updated);
   return c.json({ theme: updated, copied: false });
 });
@@ -121,24 +127,19 @@ themeApiRoutes.patch('/:id', async (c) => {
 
   // Built-in themes can't be directly edited
   if (getBuiltInTheme(id)) {
-    return c.json({ error: 'Cannot edit built-in theme' }, 400);
+    return errorResponse(c, 'Cannot edit built-in theme', 400);
   }
 
   const existing = resolveTheme(id);
   if (!existing || existing.builtIn) {
-    return c.json({ error: 'Theme not found' }, 404);
+    return errorResponse(c, 'Theme not found', 404);
   }
 
   const parsed = await parseBody(c, UpdateThemeBodySchema);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
 
-  const updated: CustomTheme = {
-    ...existing,
-    name: body.name ?? existing.name,
-    colors: body.colors ? { ...existing.colors, ...body.colors } : existing.colors,
-  };
-
+  const updated = mergeThemeEdit(existing, body);
   saveCustomTheme(updated);
   return c.json(updated);
 });
@@ -150,7 +151,7 @@ themeApiRoutes.delete('/:id', (c) => {
   const id = idParam.data;
 
   if (getBuiltInTheme(id)) {
-    return c.json({ error: 'Cannot delete built-in theme' }, 400);
+    return errorResponse(c, 'Cannot delete built-in theme', 400);
   }
 
   deleteCustomTheme(id);

@@ -5,6 +5,8 @@ import { dirname,join } from 'path';
 import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
+import { compareVersions } from './utils/compareVersions.js';
+
 const DATA_DIR = join(homedir(), '.glassbox');
 const CHECK_FILE = join(DATA_DIR, 'last-update-check');
 const PACKAGE_NAME = 'glassbox';
@@ -81,16 +83,6 @@ function detectUpgradeCommand(): string {
   }
 
   return `npm update -g ${PACKAGE_NAME}`;
-}
-
-function compareVersions(current: string, latest: string): number {
-  const a = current.split('.').map(Number);
-  const b = latest.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] || 0) < (b[i] || 0)) return -1;
-    if ((a[i] || 0) > (b[i] || 0)) return 1;
-  }
-  return 0;
 }
 
 export async function checkForUpdates(force: boolean): Promise<void> {

@@ -9,7 +9,7 @@ import { extractMetadata, formatMetadataLines, getContentType, getNewImage, getO
 import { readImageBlob } from '../../git/image-blobs.js';
 import { renderPluginSvgSide } from '../../plugins/fileView.js';
 import type { AppEnv } from '../../types.js';
-import { requirePathParam } from '../../utils/parseBody.js';
+import { errorResponse, requirePathParam } from '../../utils/parseBody.js';
 
 export const imageRoutes = new Hono<AppEnv>();
 
@@ -59,11 +59,11 @@ imageRoutes.get('/image/:fileId/metadata', async (c) => {
   const fileIdParam = requirePathParam(c, 'fileId');
   if (!fileIdParam.ok) return fileIdParam.response;
   const file = await getReviewFile(fileIdParam.data);
-  if (!file) return c.json({ error: 'Not found' }, 404);
+  if (!file) return errorResponse(c, 'Not found', 404);
 
   const repoRoot = c.get('repoRoot');
   const review = await getReview(file.review_id);
-  if (!review) return c.json({ error: 'Review not found' }, 404);
+  if (!review) return errorResponse(c, 'Review not found', 404);
 
   const mode = parseModeString(review.mode);
   const diff = parseDiffData(file.diff_data);
@@ -87,14 +87,14 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
   const fileIdParam = requirePathParam(c, 'fileId');
   if (!fileIdParam.ok) return fileIdParam.response;
   const side = c.req.param('side');
-  if (side !== 'old' && side !== 'new') return c.text('Invalid side', 400);
+  if (side !== 'old' && side !== 'new') return errorResponse(c, 'Invalid side', 400);
 
   const file = await getReviewFile(fileIdParam.data);
-  if (!file) return c.text('Not found', 404);
+  if (!file) return errorResponse(c, 'Not found', 404);
 
   const repoRoot = c.get('repoRoot');
   const review = await getReview(file.review_id);
-  if (!review) return c.text('Review not found', 404);
+  if (!review) return errorResponse(c, 'Review not found', 404);
 
   const mode = parseModeString(review.mode);
   const diff = parseDiffData(file.diff_data);
@@ -117,7 +117,7 @@ imageRoutes.get('/image/:fileId/:side', async (c) => {
     review.mode === 'difftool',
   );
 
-  if (!image) return c.text('Image not available', 404);
+  if (!image) return errorResponse(c, 'Image not available', 404);
 
   // GB-836: pick the content-type from the side's *own* path. `file.file_path`
   // is always the new-side path, so using it on the old side broke rename-shaped

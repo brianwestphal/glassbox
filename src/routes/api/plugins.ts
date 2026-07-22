@@ -15,7 +15,7 @@ import { installAvailablePlugin } from '../../plugins/install-action.js';
 import { clearConfigLabelOverrides, clearPluginUIElements } from '../../plugins/loader.js';
 import { writePluginSetting } from '../../plugins/settings.js';
 import type { AppEnv } from '../../types.js';
-import { parseBody, requireSlugParam } from '../../utils/parseBody.js';
+import { errorResponse, parseBody, requireSlugParam } from '../../utils/parseBody.js';
 
 export const pluginsRoutes = new Hono<AppEnv>();
 
@@ -84,7 +84,7 @@ pluginsRoutes.post('/plugins/:id/preferences', async (c) => {
   if (!parsed.ok) return parsed.response;
 
   const manifest = getPluginManifest(id.data);
-  if (manifest === undefined) return c.json({ error: 'Plugin not found' }, 404);
+  if (manifest === undefined) return errorResponse(c, 'Plugin not found', 404);
   const repoRoot = c.get('repoRoot');
   writePluginSetting(manifest, repoRoot, parsed.data.key, parsed.data.value);
   // Reload so the plugin re-activates and picks up the new value.

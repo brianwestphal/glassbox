@@ -93,6 +93,25 @@ function parseInteger(label: string, value: string): number {
   return n;
 }
 
+/** Parse + validate the shared `--confidence` (0..1) and `--rank` (0..100 int)
+ *  flags, used identically by `note add` and `note update`. */
+function parseConfidenceRank(flags: Map<string, string>): { confidence?: number; rank?: number } {
+  const out: { confidence?: number; rank?: number } = {};
+  const confidence = flags.get('confidence');
+  if (confidence !== undefined) {
+    const c = Number(confidence);
+    if (Number.isNaN(c) || c < 0 || c > 1) throw new Error('--confidence must be between 0 and 1');
+    out.confidence = c;
+  }
+  const rank = flags.get('rank');
+  if (rank !== undefined) {
+    const r = Number(rank);
+    if (!Number.isInteger(r) || r < 0 || r > 100) throw new Error('--rank must be an integer 0..100');
+    out.rank = r;
+  }
+  return out;
+}
+
 /** Parse `note add` flags. Pure (no I/O) so it can be unit-tested directly. */
 export function parseNoteAdd(args: string[]): ParsedAdd {
   const flags = parseFlags(args);
@@ -114,18 +133,7 @@ export function parseNoteAdd(args: string[]): ParsedAdd {
 
   const parsed: ParsedAdd = { file, startLine, endLine, kind: kindRaw, artifacts: collectRepeatable(args, 'artifact'), bodyStdin: false };
 
-  const confidence = flags.get('confidence');
-  if (confidence !== undefined) {
-    const c = Number(confidence);
-    if (Number.isNaN(c) || c < 0 || c > 1) throw new Error('--confidence must be between 0 and 1');
-    parsed.confidence = c;
-  }
-  const rank = flags.get('rank');
-  if (rank !== undefined) {
-    const r = Number(rank);
-    if (!Number.isInteger(r) || r < 0 || r > 100) throw new Error('--rank must be an integer 0..100');
-    parsed.rank = r;
-  }
+  Object.assign(parsed, parseConfidenceRank(flags));
   if (flags.has('ticket')) parsed.ticket = flags.get('ticket');
   if (flags.has('producer')) parsed.producer = flags.get('producer');
   if (flags.has('producer-version')) parsed.producerVersion = flags.get('producer-version');
@@ -225,18 +233,7 @@ async function runUpdate(args: string[], cwd: string): Promise<void> {
     if (!isNoteKind(kind)) throw new Error(`--kind must be one of: ${NOTE_KINDS.join(', ')}`);
     patch.kind = kind;
   }
-  const confidence = flags.get('confidence');
-  if (confidence !== undefined) {
-    const c = Number(confidence);
-    if (Number.isNaN(c) || c < 0 || c > 1) throw new Error('--confidence must be between 0 and 1');
-    patch.confidence = c;
-  }
-  const rank = flags.get('rank');
-  if (rank !== undefined) {
-    const r = Number(rank);
-    if (!Number.isInteger(r) || r < 0 || r > 100) throw new Error('--rank must be an integer 0..100');
-    patch.rank = r;
-  }
+  Object.assign(patch, parseConfidenceRank(flags));
   if (flags.has('ticket')) patch.ticket = flags.get('ticket');
 
   if (Object.keys(patch).length === 0) throw new Error('nothing to update — pass at least one of --body/--kind/--confidence/--rank/--ticket');

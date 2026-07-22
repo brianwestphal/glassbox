@@ -256,6 +256,98 @@ export function parseArgs(
   return { mode, port, dataDir, resume, forceUpdateCheck, debug, aiServiceTest, demo, noOpen, strictPort, projectDir, onComplete, difftoolAction, difftoolLocal, difftoolForce, difftoolServe };
 }
 
+/**
+ * Detached accumulating `git difftool` server (doc 19). Started by the
+ * `glassbox-difftool` wrapper; hosts a single review that grows as the wrapper
+ * appends files. It deliberately does NOT take the single-instance lock — it
+ * coexists with a normal `glassbox` run and manages its own lifetime via the
+ * session hold + discovery lockfile.
+ */
+async function runDifftoolServe(
+  dataDir: string,
+  port: number,
+  opts: { noOpen: boolean; strictPort: boolean; onComplete: string | null },
+): Promise<void> {
+  const { initDifftoolSession } = await import("./difftool/session.js");
+  const { writeDiscovery, clearDiscovery, releaseStartingLock } = await import("./git/difftool-discovery.js");
+  const { clearImageBlobs } = await import("./git/image-blobs.js");
+  mkdirSync(dataDir, { recursive: true });
+  setDataDir(dataDir);
+  // A difftool session also writes `.glassbox/` into the repo — keep it
+  // gitignored automatically (doc 27).
+  ensureGlassboxGitignored(dataDir);
+  // Clear any image blobs left by a previous session that was hard-killed
+  // (e.g. desktop window force-close) before it could run teardown (GB-863).
+  clearImageBlobs(dataDir);
+  const repoRoot = process.cwd();
+  const review = await createReview(repoRoot, "git difftool", "difftool");
+  const { port: actualPort, server } = await startServer(port, review.id, repoRoot, opts);
+  initDifftoolSession({
+    reviewId: review.id,
+    repoRoot,
+    shutdown: () => {
+      try { server.close(); } catch { /* already closing */ }
+      clearImageBlobs(dataDir);
+      clearDiscovery();
+      releaseStartingLock();
+      process.exit(0);
+    },
+  });
+  // Record the port for the wrapper's discover-or-start loop, then release the
+  // start election so waiting invocations append instead of starting another.
+  writeDiscovery(actualPort);
+  releaseStartingLock();
+}
+
+/**
+ * Ground-truth launch resolution (doc 26): load + validate the manifest,
+ * confirm every actual/expected image exists, and compute the perceptual
+ * difference score per comparison (doc 26 P2) — with content plugins loaded
+ * first so an installed image-decoder plugin (doc 29 imageDecoders) can score
+ * formats core can't decode (WebP/AVIF). Like --diff, needs no git repository.
+ */
+async function resolveGroundTruthLaunch(
+  mode: Extract<ReviewMode, { type: "ground-truth" }>,
+  cwd: string,
+): Promise<{ mode: Extract<ReviewMode, { type: "ground-truth" }>; scores: Map<string, number | null> }> {
+  const { loadGroundTruthManifest } = await import("./ground-truth/manifest.js");
+  let comparisons;
+  try {
+    comparisons = loadGroundTruthManifest(mode.manifestPath);
+  } catch (err) {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+  for (const entry of comparisons) {
+    for (const [role, p] of [["actual", entry.actualPath], ["expected", entry.expectedPath]] as const) {
+      if (!existsSync(p)) {
+        console.error(`Error: ${role} image does not exist: ${p}`);
+        process.exit(1);
+      }
+    }
+  }
+  // Idempotent: the later startServer() init is a no-op.
+  const { initContentPlugins } = await import("./plugins/index.js");
+  await initContentPlugins(cwd);
+  const { comparePerceptual } = await import("./ground-truth/perceptual-diff.js");
+  const scores = new Map<string, number | null>();
+  let identical = 0;
+  let undecodable = 0;
+  for (const entry of comparisons) {
+    const result = await comparePerceptual(entry.actualPath, entry.expectedPath);
+    scores.set(entry.key, result.score);
+    if (result.reason === "undecodable") undecodable++;
+    else if (result.score === 0) identical++;
+  }
+  if (identical > 0 || undecodable > 0) {
+    const parts: string[] = [];
+    if (identical > 0) parts.push(`${identical} identical (hidden by default)`);
+    if (undecodable > 0) parts.push(`${undecodable} not scored (unsupported format)`);
+    console.log(`Perceptual diff: ${parts.join(", ")}.`);
+  }
+  return { mode: { ...mode, comparisons }, scores };
+}
+
 async function main() {
   // Standalone subcommands (doc 20 / doc 26 / doc 19) handle their work and exit
   // without booting the server or touching the review DB — see cli-subcommands.ts.
@@ -313,38 +405,7 @@ async function main() {
   // lock — it coexists with a normal `glassbox` run and manages its own
   // lifetime via the session hold + discovery lockfile.
   if (difftoolServe) {
-    const { initDifftoolSession } = await import("./difftool/session.js");
-    const { writeDiscovery, clearDiscovery, releaseStartingLock } = await import("./git/difftool-discovery.js");
-    const { clearImageBlobs } = await import("./git/image-blobs.js");
-    mkdirSync(dataDir, { recursive: true });
-    setDataDir(dataDir);
-    // A difftool session also writes `.glassbox/` into the repo — keep it
-    // gitignored automatically (doc 27).
-    ensureGlassboxGitignored(dataDir);
-    // Capture as a const so the shutdown closure below sees a non-null string
-    // (TS won't narrow the captured `let dataDir`).
-    const sessionDataDir = dataDir;
-    // Clear any image blobs left by a previous session that was hard-killed
-    // (e.g. desktop window force-close) before it could run teardown (GB-863).
-    clearImageBlobs(sessionDataDir);
-    const repoRoot = process.cwd();
-    const review = await createReview(repoRoot, "git difftool", "difftool");
-    const { port: actualPort, server } = await startServer(port, review.id, repoRoot, { noOpen, strictPort, onComplete });
-    initDifftoolSession({
-      reviewId: review.id,
-      repoRoot,
-      shutdown: () => {
-        try { server.close(); } catch { /* already closing */ }
-        clearImageBlobs(sessionDataDir);
-        clearDiscovery();
-        releaseStartingLock();
-        process.exit(0);
-      },
-    });
-    // Record the port for the wrapper's discover-or-start loop, then release the
-    // start election so waiting invocations append instead of starting another.
-    writeDiscovery(actualPort);
-    releaseStartingLock();
+    await runDifftoolServe(dataDir, port, { noOpen, strictPort, onComplete });
     return;
   }
 
@@ -423,48 +484,9 @@ async function main() {
     repoRoot = cwd;
     repoName = `${basename(pathA)} ↔ ${basename(pathB)}`;
   } else if (mode.type === "ground-truth") {
-    // Ground-truth (doc 26): load + validate the manifest, resolve each
-    // actual/expected pair, and confirm the images exist. Like --diff, this
-    // needs no git repository.
-    const { loadGroundTruthManifest } = await import("./ground-truth/manifest.js");
-    let comparisons;
-    try {
-      comparisons = loadGroundTruthManifest(mode.manifestPath);
-    } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
-    for (const entry of comparisons) {
-      for (const [role, p] of [["actual", entry.actualPath], ["expected", entry.expectedPath]] as const) {
-        if (!existsSync(p)) {
-          console.error(`Error: ${role} image does not exist: ${p}`);
-          process.exit(1);
-        }
-      }
-    }
-    // Perceptual diff (doc 26 P2): score each pair so the review can be triaged
-    // and identical pairs hidden. Scores are stored per file at creation below.
-    // Load content plugins first so an installed image-decoder plugin (doc 29
-    // imageDecoders) can score formats core can't decode (WebP/AVIF). Idempotent:
-    // the later startServer() init is a no-op.
-    const { initContentPlugins } = await import("./plugins/index.js");
-    await initContentPlugins(cwd);
-    const { comparePerceptual } = await import("./ground-truth/perceptual-diff.js");
-    let identical = 0;
-    let undecodable = 0;
-    for (const entry of comparisons) {
-      const result = await comparePerceptual(entry.actualPath, entry.expectedPath);
-      groundTruthScores.set(entry.key, result.score);
-      if (result.reason === "undecodable") undecodable++;
-      else if (result.score === 0) identical++;
-    }
-    if (identical > 0 || undecodable > 0) {
-      const parts: string[] = [];
-      if (identical > 0) parts.push(`${identical} identical (hidden by default)`);
-      if (undecodable > 0) parts.push(`${undecodable} not scored (unsupported format)`);
-      console.log(`Perceptual diff: ${parts.join(", ")}.`);
-    }
-    mode = { ...mode, comparisons };
+    const resolved = await resolveGroundTruthLaunch(mode, cwd);
+    mode = resolved.mode;
+    for (const [k, v] of resolved.scores) groundTruthScores.set(k, v);
     repoRoot = cwd;
     repoName = `Ground truth: ${basename(mode.manifestPath)}`;
   } else {
@@ -477,6 +499,32 @@ async function main() {
     headCommit = getHeadCommit(cwd);
   }
 
+  await launchReview({
+    mode, cwd, repoRoot, repoName, headCommit, groundTruthScores,
+    port, resume, noOpen, strictPort, onComplete,
+  });
+}
+
+/**
+ * The reuse/resume/create tail of a normal launch: update an existing
+ * in-progress review at the same HEAD, resume one at a different HEAD, or
+ * scan the diffs and create a fresh review — then start the server.
+ */
+async function launchReview(args: {
+  mode: ReviewMode;
+  cwd: string;
+  repoRoot: string;
+  repoName: string;
+  headCommit: string;
+  /** Per-comparison perceptual scores for ground-truth mode (doc 26 P2). */
+  groundTruthScores: Map<string, number | null>;
+  port: number;
+  resume: boolean;
+  noOpen: boolean;
+  strictPort: boolean;
+  onComplete: string | null;
+}): Promise<void> {
+  const { mode, cwd, repoRoot, repoName, headCommit, groundTruthScores, port, resume, noOpen, strictPort, onComplete } = args;
   const modeStr = getModeString(mode);
   const modeArgs = getModeArgs(mode);
 

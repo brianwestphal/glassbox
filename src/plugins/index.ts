@@ -8,7 +8,6 @@
  * fall-through to the built-in view (doc 29 FR-29.14). With no plugins
  * installed (the default), dispatch is a cheap no-op (NFR-29.3).
  */
-import type { AnnotationWithFilePath, Review } from '../db/schemas.js';
 import { PLUGINS_ENABLED } from '../feature-flags.js';
 import { disabledScope, readEnablementLists, readGlobalDisabled, readProjectDisabled } from './enablement.js';
 import { installBundledPlugins } from './install.js';
@@ -17,7 +16,7 @@ import type { ConfigLayoutItem, PluginManifest, PluginPreference } from './manif
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginPreferenceDisplay, readPluginSetting, writePluginSetting } from './settings.js';
 import { ensureIntrinsicSvgSize } from './svgSize.js';
-import type { AnnotationHookInfo, ConfigLabelColor, DecodedImage, DiffInput, PluginUIElement, RenderedView, RenderInput, ReviewHookInfo, UIActionResult } from './types.js';
+import type { ConfigLabelColor, DecodedImage, DiffInput, PluginUIElement, RenderedView, RenderInput, UIActionResult } from './types.js';
 
 let registry = new ContentPluginRegistry();
 let loadedPlugins: LoadedPlugin[] = [];
@@ -222,44 +221,9 @@ export function persistPluginUIState(id: string, actionId: string, value: string
   catch { /* fail-soft: persistence best-effort */ }
 }
 
-function toReviewHookInfo(review: Review): ReviewHookInfo {
-  return { id: review.id, repoPath: review.repo_path, repoName: review.repo_name, mode: review.mode, status: review.status };
-}
-
-function toAnnotationHookInfo(a: AnnotationWithFilePath): AnnotationHookInfo {
-  return { id: a.id, filePath: a.file_path, lineNumber: a.line_number, side: a.side, category: a.category, content: a.content };
-}
-
-/**
- * Fire every loaded plugin's `onReviewCreated` hook (doc 31 FR-31.3), fail-soft:
- * a throwing hook is logged and skipped, never propagated. No-op when disabled.
- */
-export async function notifyReviewCreated(review: Review): Promise<void> {
-  if (!PLUGINS_ENABLED) return;
-  const info = toReviewHookInfo(review);
-  for (const p of loadedPlugins) {
-    const hook = p.registration?.reviewHooks?.onReviewCreated;
-    if (p.status !== 'loaded' || hook === undefined || p.context === undefined) continue;
-    try { await hook(info, p.context); }
-    catch (e) { console.warn(`  [plugin:${p.id}] onReviewCreated hook failed: ${e instanceof Error ? e.message : String(e)}`); }
-  }
-}
-
-/**
- * Fire every loaded plugin's `onReviewCompleted` hook (doc 31 FR-31.3) with the
- * review, its annotations, and the export path. Fail-soft. No-op when disabled.
- */
-export async function notifyReviewCompleted(review: Review, annotations: AnnotationWithFilePath[], exportPath: string): Promise<void> {
-  if (!PLUGINS_ENABLED) return;
-  const info = toReviewHookInfo(review);
-  const anns = annotations.map(toAnnotationHookInfo);
-  for (const p of loadedPlugins) {
-    const hook = p.registration?.reviewHooks?.onReviewCompleted;
-    if (p.status !== 'loaded' || hook === undefined || p.context === undefined) continue;
-    try { await hook(info, anns, exportPath, p.context); }
-    catch (e) { console.warn(`  [plugin:${p.id}] onReviewCompleted hook failed: ${e instanceof Error ? e.message : String(e)}`); }
-  }
-}
+// Review lifecycle hook dispatch (doc 31) lives in `./hooks.js`; re-exported
+// here so call sites (server.ts, routes/api/reviews.ts) keep one import path.
+export { notifyReviewCompleted, notifyReviewCreated } from './hooks.js';
 
 /**
  * The registered UI elements (doc 30 FR-30.4) of currently-loaded (enabled)

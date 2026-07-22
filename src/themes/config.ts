@@ -35,21 +35,30 @@ export function setActiveThemeId(id: string): void {
   });
 }
 
+/** Read + validate one stored theme file, mapped to the `CustomTheme` shape —
+ *  the shared body of `loadCustomThemes` and `getCustomTheme`. Returns
+ *  undefined for missing / corrupt / schema-invalid files. */
+function readStoredTheme(filePath: string): CustomTheme | undefined {
+  try {
+    const parsed = StoredCustomThemeSchema.safeParse(JSON.parse(readFileSync(filePath, 'utf-8')));
+    if (!parsed.success) return undefined;
+    const d = parsed.data;
+    // `d.colors` is validated as a string→string map above; the cast to the
+    // exact `ThemeColors` shape is the post-validation tightening.
+    return { id: d.id, name: d.name, colors: d.colors as unknown as ThemeColors, builtIn: false, baseTheme: d.baseTheme ?? '' };
+  } catch {
+    return undefined; // corrupt file (bad JSON) / unreadable
+  }
+}
+
 /** Load all custom themes from ~/.glassbox/themes/. */
 export function loadCustomThemes(): CustomTheme[] {
   if (!existsSync(THEMES_DIR)) return [];
   const themes: CustomTheme[] = [];
   try {
-    const files = readdirSync(THEMES_DIR).filter(f => f.endsWith('.json'));
-    for (const file of files) {
-      try {
-        const parsed = StoredCustomThemeSchema.safeParse(JSON.parse(readFileSync(join(THEMES_DIR, file), 'utf-8')));
-        if (!parsed.success) continue; // skip malformed theme files
-        const d = parsed.data;
-        // `d.colors` is validated as a string→string map above; the cast to the
-        // exact `ThemeColors` shape is the post-validation tightening.
-        themes.push({ id: d.id, name: d.name, colors: d.colors as unknown as ThemeColors, builtIn: false, baseTheme: d.baseTheme ?? '' });
-      } catch { /* skip corrupt theme files (bad JSON) */ }
+    for (const file of readdirSync(THEMES_DIR).filter(f => f.endsWith('.json'))) {
+      const theme = readStoredTheme(join(THEMES_DIR, file));
+      if (theme !== undefined) themes.push(theme);
     }
   } catch { /* themes dir unreadable */ }
   return themes;
@@ -74,14 +83,7 @@ export function deleteCustomTheme(id: string): void {
 export function getCustomTheme(id: string): CustomTheme | undefined {
   const filePath = join(THEMES_DIR, `${id}.json`);
   if (!existsSync(filePath)) return undefined;
-  try {
-    const parsed = StoredCustomThemeSchema.safeParse(JSON.parse(readFileSync(filePath, 'utf-8')));
-    if (!parsed.success) return undefined;
-    const d = parsed.data;
-    return { id: d.id, name: d.name, colors: d.colors as unknown as ThemeColors, builtIn: false, baseTheme: d.baseTheme ?? '' };
-  } catch {
-    return undefined;
-  }
+  return readStoredTheme(filePath);
 }
 
 /** Get all themes (built-in + custom). */

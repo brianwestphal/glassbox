@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { deleteAttachmentFile } from '../attachments/store.js';
+import { getAttachmentsForAnnotation } from './attachment-queries.js';
 import { getDb } from './connection.js';
 import { generateId } from './ids.js';
 import type { Annotation, AnnotationWithFilePath, ImageRegion, Review, ReviewFile } from './schemas.js';
@@ -68,7 +70,6 @@ export async function deleteReview(id: string): Promise<void> {
   // `stored_path` with them, which previously leaked the bytes on disk
   // (doc 25; the per-annotation cleanup in `deleteAnnotation` never ran here
   // because the rows were deleted via raw SQL).
-  const { deleteAttachmentFile } = await import('../attachments/store.js');
   const attachments = await db.query(
     `SELECT a.stored_path FROM attachments a
      JOIN annotations an ON an.id = a.annotation_id
@@ -203,8 +204,6 @@ export async function deleteAnnotation(id: string): Promise<void> {
   const db = await getDb();
   // Remove any attachment bytes from disk before the row goes away (the DB
   // cascade drops the `attachments` rows, but not their files — doc 25).
-  const { getAttachmentsForAnnotation } = await import('./attachment-queries.js');
-  const { deleteAttachmentFile } = await import('../attachments/store.js');
   for (const att of await getAttachmentsForAnnotation(id)) deleteAttachmentFile(att.stored_path);
   await db.query('DELETE FROM annotations WHERE id = $1', [id]);
 }
@@ -266,36 +265,28 @@ const CountRowSchema = z.object({
   count: z.string(),
 });
 
-export async function getStaleCountsForReview(reviewId: string): Promise<Record<string, number>> {
+/** Per-file annotation counts for a review, optionally restricted to stale
+ *  rows — the shared body of the two public count readers below. */
+async function countAnnotationsByFile(reviewId: string, staleOnly: boolean): Promise<Record<string, number>> {
   const db = await getDb();
   const result = await db.query(
     `SELECT a.review_file_id, COUNT(*)::text as count FROM annotations a
      JOIN review_files rf ON a.review_file_id = rf.id
-     WHERE rf.review_id = $1 AND a.is_stale = TRUE
+     WHERE rf.review_id = $1${staleOnly ? ' AND a.is_stale = TRUE' : ''}
      GROUP BY a.review_file_id`,
     [reviewId]
   );
-  const rows = parseRows(CountRowSchema, result.rows);
   const counts: Record<string, number> = {};
-  for (const row of rows) {
+  for (const row of parseRows(CountRowSchema, result.rows)) {
     counts[row.review_file_id] = parseInt(row.count, 10);
   }
   return counts;
 }
 
+export async function getStaleCountsForReview(reviewId: string): Promise<Record<string, number>> {
+  return countAnnotationsByFile(reviewId, true);
+}
+
 export async function getAnnotationCountsForReview(reviewId: string): Promise<Record<string, number>> {
-  const db = await getDb();
-  const result = await db.query(
-    `SELECT a.review_file_id, COUNT(*)::text as count FROM annotations a
-     JOIN review_files rf ON a.review_file_id = rf.id
-     WHERE rf.review_id = $1
-     GROUP BY a.review_file_id`,
-    [reviewId]
-  );
-  const rows = parseRows(CountRowSchema, result.rows);
-  const counts: Record<string, number> = {};
-  for (const row of rows) {
-    counts[row.review_file_id] = parseInt(row.count, 10);
-  }
-  return counts;
+  return countAnnotationsByFile(reviewId, false);
 }
