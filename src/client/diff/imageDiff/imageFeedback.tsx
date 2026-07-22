@@ -1,7 +1,6 @@
 import type { SafeHtml } from 'kerfjs';
 
 import {
-  type AnnotationCategory,
   createAnnotation,
   deleteAnnotation as deleteAnnotationApi,
   type ImageRegion,
@@ -13,6 +12,7 @@ import { IconEdit, IconPaperclip, IconSquareDashed, IconTrash } from '../../../i
 import { hydrateAttachments } from '../../annotations/attachments.js';
 import { showCategoryPicker } from '../../annotations/categories.js';
 import { toElement } from '../../dom.js';
+import { asCategory } from '../../narrow.js';
 import { CATEGORIES } from '../../state.js';
 import { reviewStore } from '../../stores/index.js';
 import { showToast } from '../../toast.js';
@@ -171,7 +171,7 @@ export function initImageFeedback(container: HTMLElement): void {
       // an image region carries its own scope in `region.side`. Mirror the scope
       // here so the column is at least consistent, defaulting to `new`.
       side: region?.side === 'old' ? 'old' : 'new',
-      category: category as AnnotationCategory,
+      category: asCategory(category),
       content,
       ...(region !== undefined ? { region } : {}),
     });
@@ -192,7 +192,7 @@ export function initImageFeedback(container: HTMLElement): void {
     const region = regions.find((r) => r.id === id);
     const comment = comments.find((c) => c.id === id);
     const category = region?.category ?? comment?.category ?? DEFAULT_CATEGORY;
-    await updateAnnotationApi({ id, content, category: category as AnnotationCategory });
+    await updateAnnotationApi({ id, content, category: asCategory(category) });
     if (region !== undefined) region.content = content;
     if (comment !== undefined) comment.content = content;
     renderAll();
@@ -203,7 +203,7 @@ export function initImageFeedback(container: HTMLElement): void {
     const comment = comments.find((c) => c.id === id);
     const content = region?.content ?? comment?.content ?? '';
     if (content === '') return;
-    await updateAnnotationApi({ id, content, category: category as AnnotationCategory });
+    await updateAnnotationApi({ id, content, category: asCategory(category) });
     if (region !== undefined) region.category = category;
     if (comment !== undefined) comment.category = category;
     renderAll();

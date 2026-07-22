@@ -2,6 +2,7 @@ import type { SafeHtml } from 'kerfjs';
 import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { editTheme, listThemes } from '../../api/index.js';
+import { IconX } from '../../icons.js';
 import { asEl, asInput, toElement } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
 
@@ -180,7 +181,7 @@ function renderEditor(isBuiltIn: boolean, editName: string, editColors: Record<s
     <>
       <div className="settings-header">
         <h3>{headerText}</h3>
-        <button className="settings-close" id="te-close">&times;</button>
+        <button className="settings-close" id="te-close"><IconX /></button>
       </div>
       <div className="theme-editor-body">
         {!isBuiltIn && (

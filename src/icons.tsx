@@ -154,6 +154,11 @@ export function IconChevronDown(): SafeHtml {
   return <svg {...S12}><path d="m6 9 6 6 6-6"/></svg>;
 }
 
+/** Chevron-up icon (lucide) — previous-match in the find bar. */
+export function IconChevronUp(): SafeHtml {
+  return <svg {...S12}><path d="m18 15-6-6-6 6"/></svg>;
+}
+
 /** Chevron-left icon (lucide) — previous step in a ground-truth set (doc 26). */
 export function IconChevronLeft(): SafeHtml {
   return <svg {...S14}><path d="m15 18-6-6 6-6"/></svg>;

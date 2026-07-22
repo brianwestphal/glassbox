@@ -1,8 +1,9 @@
 import { delegate, morph } from 'kerfjs';
 
-import type { AnnotationCategory } from '../../api/index.js';
 import { updateAnnotation } from '../../api/index.js';
 import { asEl, toElement } from '../dom.js';
+import { asCategory } from '../narrow.js';
+import { dismissOnOutsideClick, positionBelowAnchor } from '../popup.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import {
@@ -13,7 +14,7 @@ import { buildAnnotationItemHtml } from './render.js';
 
 function renderPopup(activeCategory: string): HTMLElement {
   return toElement(
-    <div className="reclassify-popup" style="z-index:1000">
+    <div className="reclassify-popup">
       {CATEGORIES.map(c => (
         <div className={`reclassify-option${c.value === activeCategory ? ' active' : ''}`} data-value={c.value}>
           <span className={`annotation-category category-${c.value}`}>{c.label}</span>
@@ -23,30 +24,8 @@ function renderPopup(activeCategory: string): HTMLElement {
   );
 }
 
-function positionPopup(popup: HTMLElement, anchor: HTMLElement): void {
-  const rect = anchor.getBoundingClientRect();
-  popup.style.position = 'fixed';
-  popup.style.left = `${String(rect.left)}px`;
-  popup.style.top = `${String(rect.bottom + 4)}px`;
-}
-
 function dismissExistingPopups(): void {
   document.querySelectorAll('.reclassify-popup').forEach(el => { el.remove(); });
-}
-
-function registerOutsideClickDismiss(popup: HTMLElement): void {
-  // The popup is a transient document-body overlay and never lives inside a
-  // mount() tree, so a direct `document.addEventListener` is stable here (and
-  // is removed when the popup closes). Inside a mount() tree we'd use
-  // delegate() instead, because re-renders would silently drop per-element
-  // listeners.
-  const close = (e: Event) => {
-    if (!popup.contains(e.target as Node)) {
-      popup.remove();
-      document.removeEventListener('click', close, true);
-    }
-  };
-  setTimeout(() => { document.addEventListener('click', close, true); }, 0);
 }
 
 /** Generic category picker: opens the shared popup anchored to `anchor`,
@@ -60,7 +39,7 @@ export function showCategoryPicker(
 ): void {
   dismissExistingPopups();
   const popup = renderPopup(current);
-  positionPopup(popup, anchor);
+  positionBelowAnchor(popup, anchor);
   document.body.appendChild(popup);
 
   void delegate(popup, 'click', '.reclassify-option', (e, opt) => {
@@ -70,7 +49,7 @@ export function showCategoryPicker(
     onPick(value);
   });
 
-  registerOutsideClickDismiss(popup);
+  dismissOnOutsideClick(popup);
 }
 
 /** Picker for an existing annotation row — saves via PATCH and updates the
@@ -82,7 +61,7 @@ export function showReclassifyPopup(anchor: HTMLElement, item: HTMLElement, anno
       await updateAnnotation({
         id: annotation.id,
         content: annotation.content,
-        category: newCategory as AnnotationCategory,
+        category: asCategory(newCategory),
       });
       const updated: Annotation = { ...annotation, category: newCategory };
       morph(item, buildAnnotationItemHtml(updated));

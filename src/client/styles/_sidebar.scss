@@ -354,20 +354,6 @@
 
 // --- Share toast ---
 
-.share-toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-active);
-  color: var(--text-bright);
-  padding: 8px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  z-index: 10000;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  animation: toast-fade 2s ease-in-out;
-}
 
 @keyframes toast-fade {
   0%, 80% { opacity: 1; }

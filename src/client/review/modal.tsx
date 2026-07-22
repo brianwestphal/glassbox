@@ -11,7 +11,7 @@ import {
 } from '../../api/index.js';
 import { asButton, asEl, toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
-import { TOAST_DURATION_MS } from '../timing.js';
+import { SEND_TO_CLAUDE_CLOSE_MS, TOAST_DURATION_MS } from '../timing.js';
 
 const ACTIONS = {
   cancelComplete: attr('data-action', 'cancel-complete'),
@@ -138,7 +138,7 @@ function showCompleteModal(): void {
       }
       sendBtn.textContent = 'Sent!';
       sendBtn.setAttribute('disabled', 'true');
-      setTimeout(() => { close(); }, 1000);
+      setTimeout(() => { close(); }, SEND_TO_CLAUDE_CLOSE_MS);
     })();
   });
 

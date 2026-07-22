@@ -20,8 +20,8 @@ import { endDifftool, pollDifftool } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
 import { toElement } from '../dom.js';
 import { reviewStore, visibleFileOrder } from '../stores/index.js';
+import { DIFFTOOL_SESSION_POLL_MS } from '../timing.js';
 
-const POLL_INTERVAL_MS = 1000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let sessionEnded = false;
@@ -51,7 +51,7 @@ function bindTabClose(): void {
 }
 
 function startPolling(): void {
-  pollTimer = setInterval(() => { void pollOnce(); }, POLL_INTERVAL_MS);
+  pollTimer = setInterval(() => { void pollOnce(); }, DIFFTOOL_SESSION_POLL_MS);
   // Run one immediately so a file appended before the page finished loading
   // appears without waiting a full interval.
   void pollOnce();

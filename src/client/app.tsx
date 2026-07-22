@@ -28,6 +28,7 @@ import { loadAnalysisResults, triggerAnalysis } from "./sidebar/sortMode.js";
 import { aiStore, diffViewStore, dragStore, reviewStore, visibleFileOrder } from "./stores/index.js";
 // --- Tauri update notification ---
 import { getTauriInvoke, showUpdateBanner } from "./tauri.js";
+import { SCROLL_SAVE_DEBOUNCE_MS, UPDATE_POLL_DELAYS_MS } from './timing.js';
 
 async function initAISorting() {
   try {
@@ -80,49 +81,56 @@ async function initAISorting() {
     aiStore.actions.update({ sortMode: "folder" });
   }
 
-  // Add refresh and settings buttons to sidebar header
+}
+
+/**
+ * Add the refresh + settings-gear buttons to the sidebar header. Split from
+ * `initAISorting()` (GB-1087), which is preference/config bootstrap — button
+ * creation is a sidebar concern.
+ *
+ * The share section (#sidebar-share) is populated by the time-gated share
+ * prompt in `share.tsx` once the user has spent ~5 min in Glassbox — see
+ * `initSharePrompt()`. It is intentionally NOT shown immediately on launch.
+ */
+function bindSidebarHeaderButtons(): void {
   const sidebarHeader = document.querySelector(".sidebar-header");
-  if (sidebarHeader !== null) {
-    const refreshBtn = toElement(
-      <button className="btn btn-xs refresh-btn" title="Refresh diffs"><IconRefresh /></button>
-    );
-    refreshBtn.addEventListener("click", () => {
-      void (async () => {
-      refreshBtn.style.opacity = "0.4";
-      refreshBtn.style.pointerEvents = "none";
-      try {
-        await refreshReview();
-        await loadFiles();
-        // Server-side diff content changed; same fileId so the fetch
-        // effect's dedupe would skip the refetch otherwise.
-        invalidateDiffCache();
-        const currentFileId = reviewStore.state.value.currentFileId;
-        if (currentFileId !== null) {
-          void selectFile(currentFileId);
-        }
-      } catch {
-        /* ignore */
+  if (sidebarHeader === null) return;
+
+  const refreshBtn = toElement(
+    <button className="btn btn-xs refresh-btn" title="Refresh diffs"><IconRefresh /></button>
+  );
+  refreshBtn.addEventListener("click", () => {
+    void (async () => {
+    refreshBtn.style.opacity = "0.4";
+    refreshBtn.style.pointerEvents = "none";
+    try {
+      await refreshReview();
+      await loadFiles();
+      // Server-side diff content changed; same fileId so the fetch
+      // effect's dedupe would skip the refetch otherwise.
+      invalidateDiffCache();
+      const currentFileId = reviewStore.state.value.currentFileId;
+      if (currentFileId !== null) {
+        void selectFile(currentFileId);
       }
-      refreshBtn.style.opacity = "";
-      refreshBtn.style.pointerEvents = "";
-      })();
-    });
-    sidebarHeader.appendChild(refreshBtn);
+    } catch {
+      /* ignore */
+    }
+    refreshBtn.style.opacity = "";
+    refreshBtn.style.pointerEvents = "";
+    })();
+  });
+  sidebarHeader.appendChild(refreshBtn);
 
-    const gearBtn = toElement(
-      <button className="btn btn-xs settings-gear" title="Settings"><IconGear /></button>
-    );
-    gearBtn.addEventListener("click", () => {
-      void import("./settings/dialog.js").then((m) => {
-        m.showSettingsDialog();
-      });
+  const gearBtn = toElement(
+    <button className="btn btn-xs settings-gear" title="Settings"><IconGear /></button>
+  );
+  gearBtn.addEventListener("click", () => {
+    void import("./settings/dialog.js").then((m) => {
+      m.showSettingsDialog();
     });
-    sidebarHeader.appendChild(gearBtn);
-  }
-
-  // The share section (#sidebar-share) is populated by the time-gated share
-  // prompt in `share.tsx` once the user has spent ~5 min in Glassbox — see
-  // `initSharePrompt()`. It is intentionally NOT shown immediately on launch.
+  });
+  sidebarHeader.appendChild(gearBtn);
 }
 
 async function navigateToEntry(entry: { fileId: string | null; filePath: string | null; scrollLine: number }) {
@@ -190,6 +198,7 @@ function bindNavButtons() {
 async function init() {
   await initDebug();
   await initAISorting();
+  bindSidebarHeaderButtons();
   await loadFiles();
   initSidebar();
 
@@ -246,7 +255,7 @@ async function init() {
     if (scrollTimer) clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => {
       navUpdateScroll(getVisibleScrollLine());
-    }, 300);
+    }, SCROLL_SAVE_DEBOUNCE_MS);
   });
 }
 
@@ -256,7 +265,7 @@ async function checkForUpdate() {
 
   // The Rust update check is async and may not have completed yet.
   // Poll a few times with increasing delays to catch it.
-  const delays = [0, 3000, 10000];
+  const delays = UPDATE_POLL_DELAYS_MS;
   for (const delay of delays) {
     if (delay > 0) await new Promise((r) => setTimeout(r, delay));
     try {

@@ -5,6 +5,7 @@ import { selectFile } from '../diff/selection.js';
 import { asEl, asElement, asInput, asSelect, toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
 import { aiStore, diffViewStore, reviewStore, visibleFileOrder } from '../stores/index.js';
+import { FILTER_DEBOUNCE_MS } from '../timing.js';
 import { ACTIONS } from './actions.js';
 import { bindFileContextMenu } from './contextMenu.js';
 import { fileListJsx } from './fileListView.js';
@@ -12,7 +13,6 @@ import { showRiskPopover } from './riskPopover.js';
 import { sortControlJsx } from './sortControl.js';
 import { switchSortMode } from './sortMode.js';
 
-const FILTER_DEBOUNCE_MS = 150;
 
 export function initSidebar(): void {
   const sidebar = document.querySelector<HTMLElement>('.sidebar');

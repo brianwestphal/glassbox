@@ -1,7 +1,8 @@
 import type { SafeHtml } from 'kerfjs';
 
-import type { AIKeyStatusEntry, AIPlatform } from '../../api/index.js';
+import type { AIKeyStatusEntry } from '../../api/index.js';
 import { IconCheck, IconFlask } from '../../icons.js';
+import { asPlatform } from '../narrow.js';
 import type { ChannelState, KeyStatusResponse, Tab, TabContext } from './tabContext.js';
 
 /** Element ids for one API-key block, so the same markup serves the primary
@@ -103,16 +104,16 @@ function channelStatusHtml(channelState: ChannelState): SafeHtml {
 function renderExperimentalTab(ctx: TabContext): SafeHtml {
   const { modelsData, currentPlatform, currentModel, localEndpoint, keyStatus, guidedEnabled, channelState, fallbackPlatform, fallbackModel } = ctx;
   const platforms = modelsData.platforms;
-  const platformModels = modelsData.models[currentPlatform as AIPlatform];
-  const keyInfo = keyStatus.status[currentPlatform as AIPlatform];
+  const platformModels = modelsData.models[asPlatform(currentPlatform)];
+  const keyInfo = keyStatus.status[asPlatform(currentPlatform)];
   const isLocal = currentPlatform === 'local';
   // Apple Foundation Models are on-device and keyless — no endpoint, no key.
   const isApple = currentPlatform === 'apple';
   // Apple-FM fallback: the secondary model picked for batches the on-device
   // model can't handle. Only meaningful while Apple is the selected platform.
   const hasFallback = fallbackPlatform !== '';
-  const fallbackModels = hasFallback ? modelsData.models[fallbackPlatform as AIPlatform] : [];
-  const fallbackKeyInfo = hasFallback ? keyStatus.status[fallbackPlatform as AIPlatform] : undefined;
+  const fallbackModels = hasFallback ? modelsData.models[asPlatform(fallbackPlatform)] : [];
+  const fallbackKeyInfo = hasFallback ? keyStatus.status[asPlatform(fallbackPlatform)] : undefined;
 
   return (
     <>

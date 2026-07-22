@@ -3,6 +3,7 @@ import { delegate, effect, morph, signal } from 'kerfjs';
 
 import { getOutline } from '../../api/index.js';
 import { asEl, toElement } from '../dom.js';
+import { dismissOnOutsideClick } from '../popup.js';
 
 interface OutlineSymbol {
   name: string;
@@ -12,9 +13,9 @@ interface OutlineSymbol {
   children: OutlineSymbol[];
 }
 
-interface OutlineContainer extends HTMLElement {
-  _outlineScrollHandler?: () => void;
-}
+// Per-container scroll handler, keyed in a WeakMap (same pattern as
+// imageDiff/zoom.ts) instead of poking a mystery expando property on the node.
+const scrollHandlers = new WeakMap<HTMLElement, () => void>();
 
 // Reactive sources for the breadcrumb: the file's symbol tree and the
 // currently top-most visible line. The effect() in `loadOutline()` reads both
@@ -169,13 +170,7 @@ function showDropdown() {
 
   bar.appendChild(dropdown);
 
-  const close = (e: Event) => {
-    if (!dropdown.contains(e.target as Node) && (bar.querySelector('.outline-breadcrumb')?.contains(e.target as Node) !== true)) {
-      dropdown.remove();
-      document.removeEventListener('click', close, true);
-    }
-  };
-  setTimeout(() => { document.addEventListener('click', close, true); }, 0);
+  dismissOnOutsideClick(dropdown, undefined, () => [bar.querySelector('.outline-breadcrumb')]);
 }
 
 function renderSymbolList(symbols: OutlineSymbol[], depth: number): SafeHtml {
@@ -217,10 +212,10 @@ function scrollToLine(lineNum: number) {
 }
 
 function bindScrollTracking() {
-  const container: OutlineContainer | null = document.getElementById('diff-container');
+  const container = document.getElementById('diff-container');
   if (container === null) return;
 
-  const prev = container._outlineScrollHandler;
+  const prev = scrollHandlers.get(container);
   if (prev !== undefined) container.removeEventListener('scroll', prev);
 
   const handler = () => {
@@ -231,6 +226,6 @@ function bindScrollTracking() {
     });
   };
 
-  container._outlineScrollHandler = handler;
+  scrollHandlers.set(container, handler);
   container.addEventListener('scroll', handler, { passive: true });
 }

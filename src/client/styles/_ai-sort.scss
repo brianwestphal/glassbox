@@ -185,6 +185,7 @@
 // --- Risk Popover ---
 
 .risk-popover {
+  z-index: 1000; // same transient-popup layer as .reclassify-popup (was inline 200, GB-1087)
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);

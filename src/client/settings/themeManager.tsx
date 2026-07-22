@@ -3,8 +3,9 @@ import { attr, delegate, mount, signal } from 'kerfjs';
 
 import type { ListThemesResp, ThemeSummary as ApiThemeSummary } from '../../api/index.js';
 import { createTheme, deleteTheme, getActiveTheme, listThemes } from '../../api/index.js';
-import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash } from '../../icons.js';
+import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash, IconX } from '../../icons.js';
 import { asEl, toElement } from '../dom.js';
+import { dismissOnOutsideClick } from '../popup.js';
 import { applyThemeColors, switchTheme } from '../themes.js';
 import { showThemeEditor } from './themeEditor.js';
 
@@ -170,13 +171,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
         });
       });
 
-      // Outside-click dismiss for a transient document-body overlay: register a
-      // one-shot document-level listener (popups that live outside any mount()
-      // tree need a direct addEventListener, not a delegate()).
-      const closeOnClick = (e: MouseEvent) => {
-        if (!menu.contains(e.target as Node)) removeContextMenu();
-      };
-      setTimeout(() => { document.addEventListener('click', closeOnClick, { once: true }); }, 0);
+      dismissOnOutsideClick(menu, removeContextMenu);
     }
 
     disposeMount = mount(modalEl, () => renderManager(themesSignal.value));
@@ -235,7 +230,7 @@ function renderManager(data: ThemesResponse): SafeHtml {
     <>
       <div className="settings-header">
         <h3>Manage Themes</h3>
-        <button className="settings-close" id="tm-close">&times;</button>
+        <button className="settings-close" id="tm-close"><IconX /></button>
       </div>
       <div className="theme-manager-body">
         <div className="theme-manager-list">

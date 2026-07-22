@@ -1,7 +1,7 @@
 /**
  * Doc 16.3 — the share action. `triggerShare()` uses the Web Share API when
  * available (so the OS share sheet carries the npm package URL), and otherwise
- * falls back to copying the URL to the clipboard and surfacing a `.share-toast`
+ * falls back to copying the URL to the clipboard and surfacing an `.app-toast`
  * confirmation.
  *
  * The suite runs under the default node vitest environment (this repo ships no
@@ -37,17 +37,21 @@ function removeFromBody(el: FakeEl): void {
 }
 
 function installFakeDocument(): void {
+  const findByClass = (selector: string) => {
+    const cls = selector.startsWith('.') ? selector.slice(1) : selector;
+    return bodyChildren.find((c) => c.className.split(/\s+/).includes(cls)) ?? null;
+  };
   const doc = {
     body: {
       appendChild(node: FakeEl) {
         bodyChildren.push(node);
         return node;
       },
+      // The shared showToast queries its container (document.body) for an
+      // existing toast before appending (GB-1087).
+      querySelector: findByClass,
     },
-    querySelector(selector: string) {
-      const cls = selector.startsWith('.') ? selector.slice(1) : selector;
-      return bodyChildren.find((c) => c.className.split(/\s+/).includes(cls)) ?? null;
-    },
+    querySelector: findByClass,
   };
   vi.stubGlobal('document', doc);
 }
@@ -73,7 +77,7 @@ describe('triggerShare (doc 16.3)', () => {
     expect(writeTextSpy).not.toHaveBeenCalled();
   });
 
-  it('falls back to clipboard copy and shows a .share-toast when Web Share is unavailable', async () => {
+  it('falls back to clipboard copy and shows an .app-toast when Web Share is unavailable', async () => {
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     // No `share` on navigator → the fallback branch.
     vi.stubGlobal('navigator', { clipboard: { writeText: writeTextSpy } });
@@ -83,6 +87,6 @@ describe('triggerShare (doc 16.3)', () => {
 
     expect(writeTextSpy).toHaveBeenCalledTimes(1);
     expect(writeTextSpy).toHaveBeenCalledWith(SHARE_URL);
-    expect(document.querySelector('.share-toast')).not.toBeNull();
+    expect(document.querySelector('.app-toast')).not.toBeNull();
   });
 });

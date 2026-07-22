@@ -1,8 +1,8 @@
 import { delegate, morph } from 'kerfjs';
 
-import type { AnnotationCategory } from '../../api/index.js';
 import { deleteAnnotation, keepAnnotation, updateAnnotation } from '../../api/index.js';
 import { asEl, asElement, asElOrNull, asTextarea, cssEscape, toElement } from '../dom.js';
+import { asCategory } from '../narrow.js';
 import type { Annotation } from '../state.js';
 import {
   dragStore,
@@ -217,7 +217,7 @@ async function saveEdit(): Promise<void> {
   await updateAnnotation({
     id: state.annotationId,
     content,
-    category: state.category as AnnotationCategory,
+    category: asCategory(state.category),
   });
 
   const item = findAnnotationItem(state.annotationId);

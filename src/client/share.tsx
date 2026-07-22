@@ -6,9 +6,10 @@
 import { delegate } from 'kerfjs';
 
 import { dismissSharePrompt, getSharePromptState } from '../api/index.js';
-import { IconHeart } from '../icons.js';
+import { IconHeart, IconX } from '../icons.js';
 import { toElement } from './dom.js';
 import { openExternalUrl } from './tauri.js';
+import { showToast } from './toast.js';
 
 const SHARE_URL = 'https://www.npmjs.com/package/glassbox';
 const SPONSOR_URL = 'https://github.com/sponsors/brianwestphal';
@@ -37,19 +38,11 @@ export async function triggerShare(): Promise<void> {
   // Fallback: copy to clipboard
   try {
     await navigator.clipboard.writeText(SHARE_URL);
-    showCopyToast();
+    showToast('Link copied to clipboard!');
   } catch {
     // Last resort: open in new tab
     window.open(SHARE_URL, '_blank');
   }
-}
-
-function showCopyToast() {
-  const existing = document.querySelector('.share-toast');
-  if (existing) existing.remove();
-  const toast = toElement(<div className="share-toast">Link copied to clipboard!</div>);
-  document.body.appendChild(toast);
-  setTimeout(() => { toast.remove(); }, 2000);
 }
 
 /** Record a dismiss (share or no thanks) — suppresses prompt for 30 days. */
@@ -74,7 +67,7 @@ function showPrompt() {
 
   const section = toElement(
     <div className="sidebar-share-section">
-      <button className="sidebar-share-dismiss" id="share-dismiss-btn" title="Dismiss">&times;</button>
+      <button className="sidebar-share-dismiss" id="share-dismiss-btn" title="Dismiss"><IconX /></button>
       <p className="sidebar-share-label">Love Glassbox?</p>
       <div className="sidebar-share-actions">
         <button className="btn btn-share" id="share-glassbox-btn">Share</button>

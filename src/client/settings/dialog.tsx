@@ -1,7 +1,7 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
-import type { AIPlatform, DifftoolStatusResp, KeyStorage } from '../../api/index.js';
+import type { DifftoolStatusResp } from '../../api/index.js';
 import {
   deleteAIKey,
   disableChannel,
@@ -20,14 +20,17 @@ import {
   unregisterDifftool,
   updateProjectSettings,
 } from '../../api/index.js';
+import { IconX } from '../../icons.js';
 import { asButton, asEl, asInput, asSelect, toElement } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
+import { asKeyStorage, asPlatform } from '../narrow.js';
 import { triggerShare } from '../share.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { aiStore } from '../stores/index.js';
 import { getTauriGlobal, getTauriInvoke, showUpdateBanner } from '../tauri.js';
 import { switchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
+import { showToast } from '../toast.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
 import { browsePluginFolder, doInstallBundled, doInstallPlugin, doPluginAction, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
@@ -222,10 +225,7 @@ function createActions(deps: ActionDeps): Actions {
    *  failure isn't silent. Appended to `overlay` (not the mounted modal body)
    *  so a re-render can't clobber it; auto-dismisses. */
   function flashSettingsError(message: string): void {
-    overlay.querySelector('.settings-error-toast')?.remove();
-    const toast = toElement(<div className="settings-error-toast">{message}</div>);
-    overlay.appendChild(toast);
-    setTimeout(() => { toast.remove(); }, TOAST_DURATION_MS);
+    showToast(message, { container: overlay, className: 'settings-error-toast' });
   }
 
   function saveConfig(): void {
@@ -238,7 +238,7 @@ function createActions(deps: ActionDeps): Actions {
     void (async () => {
       try {
         await saveAIConfig({
-          platform: cur.currentPlatform as AIPlatform,
+          platform: asPlatform(cur.currentPlatform),
           model: cur.currentModel,
           localEndpoint: cur.localEndpoint,
           guidedReview: { enabled: cur.guidedEnabled, topics: newTopics },
@@ -276,7 +276,7 @@ function createActions(deps: ActionDeps): Actions {
     void (async () => {
       try {
         const cur = ui.value;
-        await saveAIConfig({ platform: cur.currentPlatform as AIPlatform, model: cur.currentModel, localEndpoint: endpoint });
+        await saveAIConfig({ platform: asPlatform(cur.currentPlatform), model: cur.currentModel, localEndpoint: endpoint });
         const fresh = await listAIModels();
         deps.modelsData.models.local = fresh.models.local;
         forceRerender();
@@ -312,7 +312,7 @@ function createActions(deps: ActionDeps): Actions {
     const storage = storageRadio?.value ?? 'config';
     void (async () => {
       try {
-        await saveAIKey({ platform: platform as AIPlatform, key: keyInput.value.trim(), storage: storage as KeyStorage });
+        await saveAIKey({ platform: asPlatform(platform), key: keyInput.value.trim(), storage: asKeyStorage(storage) });
         const newStatus = await getAIKeyStatus();
         keyStatus.status = newStatus.status;
         const newConfig = await getAIConfig();
@@ -328,7 +328,7 @@ function createActions(deps: ActionDeps): Actions {
     if (platform === '') return;
     void (async () => {
       try {
-        await deleteAIKey({ platform: platform as AIPlatform });
+        await deleteAIKey({ platform: asPlatform(platform) });
         const newStatus = await getAIKeyStatus();
         keyStatus.status = newStatus.status;
         const newConfig = await getAIConfig();
@@ -581,7 +581,7 @@ function setupDelegates(args: {
   void delegate(overlay, 'click', '.settings-platform-control [data-platform]', (_e, btn) => {
     const platform = asEl(btn).dataset.platform;
     if (platform === undefined) return;
-    const models = modelsData.models[platform as AIPlatform];
+    const models = modelsData.models[asPlatform(platform)];
     const defaultModel = models.find(m => m.isDefault);
     const newModel = defaultModel ? defaultModel.id : (models[0]?.id ?? '');
     setUi({ currentPlatform: platform, currentModel: newModel });
@@ -605,7 +605,7 @@ function setupDelegates(args: {
     const platform = asSelect(sel).value;
     let model = '';
     if (platform !== '') {
-      const models = modelsData.models[platform as AIPlatform];
+      const models = modelsData.models[asPlatform(platform)];
       const def = models.find(m => m.isDefault);
       model = def ? def.id : (models[0]?.id ?? '');
     }
@@ -683,7 +683,7 @@ function renderShell(visible: Tab[], activeTabId: string, ctx: TabContext): Safe
     <>
       <div className="settings-header">
         <h3>Settings</h3>
-        <button className="settings-close" id="settings-close">&times;</button>
+        <button className="settings-close" id="settings-close"><IconX /></button>
       </div>
 
       <div className="settings-tabs">

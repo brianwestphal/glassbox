@@ -1,30 +1,16 @@
-import { reviewStore } from './stores/index.js';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
-  const separator = path.includes('?') ? '&' : '?';
-  const url = '/api' + path + separator + 'reviewId=' + encodeURIComponent(reviewStore.state.value.reviewId);
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
-  return res.json() as Promise<T>;
-}
-
-export function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { z } from 'zod';
 
 // --- Client-side debug logging (sends to server console when --debug is active) ---
 
 let debugEnabled: boolean | null = null; // null = not yet checked
 
+const DebugStatusSchema = z.object({ enabled: z.boolean() }).loose();
+
 /** Initialize debug state by checking the server. Call once at startup. */
 export async function initDebug(): Promise<void> {
   try {
-    const result = await api<{ enabled: boolean }>('/ai/debug-status');
-    debugEnabled = result.enabled;
+    const res = await fetch('/api/ai/debug-status');
+    debugEnabled = DebugStatusSchema.parse(await res.json()).enabled;
   } catch {
     debugEnabled = false;
   }

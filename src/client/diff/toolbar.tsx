@@ -3,6 +3,7 @@ import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { ImageModeSchema, saveAIPreferences } from '../../api/index.js';
 import { asEl, asInput, toElement } from '../dom.js';
+import { dismissOnOutsideClick } from '../popup.js';
 import { diffViewStore } from '../stores/index.js';
 import { applyHighlighting, getLanguageList } from './highlight.js';
 import { updateToolbarLanguage } from './index.js';
@@ -193,15 +194,5 @@ function showLanguagePicker(btn: HTMLElement): void {
 
   filterInput.focus();
 
-  function close(): void {
-    disposeMount();
-    document.removeEventListener('click', handleOutsideClick, true);
-    popup.remove();
-  }
-
-  function handleOutsideClick(e: Event): void {
-    if (!popup.contains(e.target as Node)) close();
-  }
-
-  setTimeout(() => { document.addEventListener('click', handleOutsideClick, true); }, 0);
+  dismissOnOutsideClick(popup, () => { disposeMount(); });
 }

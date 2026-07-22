@@ -1,4 +1,5 @@
 import { toElement } from '../dom.js';
+import { dismissOnOutsideClick, positionBelowAnchor } from '../popup.js';
 import type { RiskFileScore } from '../state.js';
 import { riskColor } from './riskScore.js';
 
@@ -29,19 +30,7 @@ export function showRiskPopover(anchor: HTMLElement, score: RiskFileScore): void
     </div>
   );
 
-  const rect = anchor.getBoundingClientRect();
-  popover.style.position = 'fixed';
-  popover.style.left = String(rect.left) + 'px';
-  popover.style.top = String(rect.bottom + 4) + 'px';
-  popover.style.zIndex = '200';
-
+  positionBelowAnchor(popover, anchor);
   document.body.appendChild(popover);
-
-  const close = (e: MouseEvent) => {
-    if (!popover.contains(e.target as Node)) {
-      popover.remove();
-      document.removeEventListener('click', close);
-    }
-  };
-  setTimeout(() => { document.addEventListener('click', close); }, 0);
+  dismissOnOutsideClick(popover);
 }

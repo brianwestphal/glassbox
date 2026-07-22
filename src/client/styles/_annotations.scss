@@ -219,6 +219,7 @@
 // --- Reclassify Popup ---
 
 .reclassify-popup {
+  z-index: 1000; // transient body-appended popup layer (was inline, GB-1087)
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);

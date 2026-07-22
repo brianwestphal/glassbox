@@ -3,15 +3,20 @@
  * Triggered by Cmd/Ctrl+F. Searches visible text in the diff container,
  * highlights matches, and allows navigation between them.
  */
+import { IconChevronDown, IconChevronUp, IconX } from '../../icons.js';
 import { toElement } from '../dom.js';
 import { getTauriGlobal } from '../tauri.js';
 
-let findBar: HTMLElement | null = null;
-let findInput: HTMLInputElement | null = null;
-let currentQuery = '';
-let matchCount = 0;
-let currentMatch = -1;
-let matchLabel: HTMLElement | null = null;
+/** The lazily-created find widget. All mutable widget state (elements, query,
+ *  match cursor) lives inside the controller closure — not at module scope
+ *  (GB-1087) — so the module carries no live UI state of its own. */
+interface FindController {
+  show(): void;
+  hide(): void;
+  goToMatch(direction: number): void;
+  isOpen(): boolean;
+}
+let controller: FindController | null = null;
 
 const HIGHLIGHT_CLASS = 'find-highlight';
 const ACTIVE_HIGHLIGHT_CLASS = 'find-highlight-active';
@@ -26,82 +31,130 @@ export function bindFind() {
     // Cmd/Ctrl+F: open find bar
     if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
       e.preventDefault();
-      showFindBar();
+      (controller ??= createFindController()).show();
       return;
     }
+    if (controller === null || !controller.isOpen()) return;
     // Escape: close find bar
-    if (e.key === 'Escape' && findBar?.style.display !== 'none') {
-      hideFindBar();
+    if (e.key === 'Escape') {
+      controller.hide();
       return;
     }
     // Find next/previous — OS-standard shortcuts
     // macOS: Cmd+G / Shift+Cmd+G
     // Windows/Linux: F3 / Shift+F3
-    if (findBar?.style.display !== 'none') {
-      if ((e.metaKey && e.key === 'g') || e.key === 'F3') {
-        e.preventDefault();
-        if (e.shiftKey) goToMatch(-1);
-        else goToMatch(1);
-      }
+    if ((e.metaKey && e.key === 'g') || e.key === 'F3') {
+      e.preventDefault();
+      controller.goToMatch(e.shiftKey ? -1 : 1);
     }
   });
 
   // Listen for Tauri menu event (Edit > Find)
   tauri.event?.listen('menu-find', () => {
-    showFindBar();
+    (controller ??= createFindController()).show();
   });
 }
 
-function showFindBar() {
-  if (findBar === null) createFindBar();
-  if (findBar !== null) findBar.style.display = 'flex';
-  if (findInput !== null) {
-    findInput.focus();
-    findInput.select();
-  }
-}
+/** Build the find-bar DOM once and return its controller. The bar is a
+ *  Tauri-only, imperative widget outside every kerf mount tree, so direct
+ *  listeners are stable here. */
+function createFindController(): FindController {
+  let currentQuery = '';
+  let matchCount = 0;
+  let currentMatch = -1;
 
-function hideFindBar() {
-  if (findBar) findBar.style.display = 'none';
-  clearHighlights();
-  currentQuery = '';
-  matchCount = 0;
-  currentMatch = -1;
-}
-
-function createFindBar() {
   const isMac = navigator.userAgent.includes('Mac');
-  findBar = toElement(
+  const findBar = toElement(
     <div className="find-bar">
       <input type="text" className="find-input" placeholder="Find in diff..." />
       <span className="find-match-count"></span>
       <button className="find-nav-btn" data-dir="prev"
-        title={isMac ? 'Previous (\u21E7\u2318G)' : 'Previous (Shift+F3)'}>{'\u25B2'}</button>
+        title={isMac ? 'Previous (\u21E7\u2318G)' : 'Previous (Shift+F3)'}><IconChevronUp /></button>
       <button className="find-nav-btn" data-dir="next"
-        title={isMac ? 'Next (\u2318G)' : 'Next (F3)'}>{'\u25BC'}</button>
-      <button className="find-close-btn" title="Close (Esc)">{'\u00D7'}</button>
+        title={isMac ? 'Next (\u2318G)' : 'Next (F3)'}><IconChevronDown /></button>
+      <button className="find-close-btn" title="Close (Esc)"><IconX /></button>
     </div>
   );
 
-  findInput = findBar.querySelector<HTMLInputElement>('.find-input');
-  matchLabel = findBar.querySelector<HTMLElement>('.find-match-count');
-  if (findInput === null) return;
+  const findInput = findBar.querySelector<HTMLInputElement>('.find-input');
+  const matchLabel = findBar.querySelector<HTMLElement>('.find-match-count');
 
-  findInput.addEventListener('input', () => {
-    if (findInput !== null) runSearch(findInput.value);
-  });
+  function updateLabel(): void {
+    if (matchLabel === null) return;
+    if (currentQuery.length < 2) {
+      matchLabel.textContent = '';
+    } else if (matchCount === 0) {
+      matchLabel.textContent = 'No matches';
+    } else {
+      matchLabel.textContent = `${currentMatch + 1} of ${matchCount}`;
+    }
+  }
 
-  findInput.addEventListener('keydown', (e) => {
+  function runSearch(query: string): void {
+    clearHighlights();
+    matchCount = 0;
+    currentMatch = -1;
+    currentQuery = query;
+
+    if (query.length < 2) {
+      updateLabel();
+      return;
+    }
+
+    const container = document.getElementById('diff-container');
+    if (container === null) return;
+
+    const { text, segments } = buildTextIndex(container);
+    if (segments.length === 0) {
+      updateLabel();
+      return;
+    }
+
+    const spans = findMatchSpans(text, segments, query);
+
+    // Wrap matches in reverse order so DOM mutation of later matches doesn't
+    // shift earlier offsets (see wrapMatch).
+    for (let m = spans.length - 1; m >= 0; m--) {
+      wrapMatch(spans[m], segments, m);
+    }
+
+    matchCount = spans.length;
+    if (matchCount > 0) {
+      currentMatch = 0;
+      activateMatch(0);
+    }
+
+    updateLabel();
+  }
+
+  function goToMatch(direction: number): void {
+    if (matchCount === 0) return;
+    currentMatch += direction;
+    if (currentMatch >= matchCount) currentMatch = 0;
+    if (currentMatch < 0) currentMatch = matchCount - 1;
+    activateMatch(currentMatch);
+    updateLabel();
+  }
+
+  function hide(): void {
+    findBar.style.display = 'none';
+    clearHighlights();
+    currentQuery = '';
+    matchCount = 0;
+    currentMatch = -1;
+  }
+
+  // `findInput` is a const — TS narrows it through the `?.` for the whole closure.
+  findInput?.addEventListener('input', () => { runSearch(findInput.value); });
+  findInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (e.shiftKey) goToMatch(-1);
-      else goToMatch(1);
+      goToMatch(e.shiftKey ? -1 : 1);
     }
   });
-
   findBar.querySelector('[data-dir="prev"]')?.addEventListener('click', () => { goToMatch(-1); });
   findBar.querySelector('[data-dir="next"]')?.addEventListener('click', () => { goToMatch(1); });
-  findBar.querySelector('.find-close-btn')?.addEventListener('click', () => { hideFindBar(); });
+  findBar.querySelector('.find-close-btn')?.addEventListener('click', () => { hide(); });
 
   // Prevent clicks in the find bar from bubbling (e.g. triggering annotation creation)
   findBar.addEventListener('mousedown', (e) => { e.stopPropagation(); });
@@ -112,6 +165,17 @@ function createFindBar() {
   } else {
     document.body.appendChild(findBar);
   }
+
+  return {
+    show(): void {
+      findBar.style.display = 'flex';
+      findInput?.focus();
+      findInput?.select();
+    },
+    hide,
+    goToMatch,
+    isOpen: () => findBar.style.display !== 'none',
+  };
 }
 
 interface TextSegment {
@@ -195,46 +259,6 @@ export function findMatchSpans(text: string, segments: SegmentInfo[], query: str
   return spans;
 }
 
-function runSearch(query: string) {
-  clearHighlights();
-  matchCount = 0;
-  currentMatch = -1;
-  currentQuery = query;
-
-  if (!query || query.length < 2) {
-    updateLabel();
-    return;
-  }
-
-  const container = document.getElementById('diff-container');
-  if (!container) return;
-
-  const { text, segments } = buildTextIndex(container);
-  if (segments.length === 0) {
-    updateLabel();
-    return;
-  }
-
-  const spans = findMatchSpans(text, segments, query);
-
-  // Wrap matches in reverse order so DOM mutation of later matches doesn't
-  // shift earlier offsets. Within each match, wrap segment-by-segment from
-  // the last involved node back to the first — same reason. All wraps stay
-  // within a single text node (after slicing), so `surroundContents` never
-  // crosses element boundaries.
-  for (let m = spans.length - 1; m >= 0; m--) {
-    wrapMatch(spans[m], segments, m);
-  }
-
-  matchCount = spans.length;
-  if (matchCount > 0) {
-    currentMatch = 0;
-    activateMatch(0);
-  }
-
-  updateLabel();
-}
-
 function wrapMatch(span: MatchSpan, segments: TextSegment[], matchIndex: number): void {
   for (let i = span.endSeg; i >= span.startSeg; i--) {
     const seg = segments[i];
@@ -282,24 +306,3 @@ function activateMatch(index: number) {
   marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
-function goToMatch(direction: number) {
-  if (matchCount === 0) return;
-
-  currentMatch += direction;
-  if (currentMatch >= matchCount) currentMatch = 0;
-  if (currentMatch < 0) currentMatch = matchCount - 1;
-
-  activateMatch(currentMatch);
-  updateLabel();
-}
-
-function updateLabel() {
-  if (!matchLabel) return;
-  if (!currentQuery || currentQuery.length < 2) {
-    matchLabel.textContent = '';
-  } else if (matchCount === 0) {
-    matchLabel.textContent = 'No matches';
-  } else {
-    matchLabel.textContent = `${currentMatch + 1} of ${matchCount}`;
-  }
-}
