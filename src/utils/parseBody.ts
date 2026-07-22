@@ -15,6 +15,8 @@ import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { z } from 'zod';
 
+import { SAFE_SLUG_RE } from './safeSlug.js';
+
 export type ParseResult<T> = { ok: true; data: T } | { ok: false; response: Response };
 
 /**
@@ -71,6 +73,22 @@ export function requirePathParam(c: Context, name: string): ParseResult<string> 
     return { ok: false, response: c.json({ error: `Missing or empty path parameter: ${name}` }, 400) };
   }
   return { ok: true, data: value };
+}
+
+/**
+ * Like `requirePathParam`, but additionally requires the value to be a safe
+ * slug (`SAFE_SLUG_RE`). Use for any path parameter that reaches the
+ * filesystem (plugin ids, theme ids) — Hono percent-decodes params, so
+ * without this an encoded `..%2F..%2F<dir>` id would escape the target
+ * directory before hitting `rmSync`/`unlinkSync` (doc 14, FR-14.2).
+ */
+export function requireSlugParam(c: Context, name: string): ParseResult<string> {
+  const value = requirePathParam(c, name);
+  if (!value.ok) return value;
+  if (!SAFE_SLUG_RE.test(value.data)) {
+    return { ok: false, response: c.json({ error: `Invalid ${name}: must be alphanumeric with . _ - (no path separators)` }, 400) };
+  }
+  return value;
 }
 
 /** Build a structured-error JSON response without going through the

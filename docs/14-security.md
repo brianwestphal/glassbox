@@ -14,6 +14,8 @@ Requirements for network security, input validation, and safe system interaction
 - All API endpoints that accept request bodies shall validate the body structure at runtime before processing. TypeScript type annotations alone are not sufficient.
 - All API endpoints that accept query parameters shall validate parameter types and ranges (e.g., numeric parameters shall be checked for `NaN`, string parameters shall be checked for presence when required).
 - Path parameters (e.g., `:fileId`, `:id`) shall be validated as non-empty strings before use in database lookups.
+- Path parameters that reach the **filesystem** (plugin ids, theme ids) shall additionally be validated as safe slugs — alphanumeric first character, then alphanumerics/`.`/`_`/`-`, no path separators (`requireSlugParam`, `src/utils/safeSlug.ts`). Hono percent-decodes params, so without this an encoded `..%2F` id would traverse out of the target directory before a destructive call like `rmSync`/`unlinkSync`. The plugin-manifest `id` field enforces the same pattern at the schema (doc 29), since it becomes an install-directory path segment.
+- File paths accepted via query parameters (e.g. `/file-raw?path=`) shall be contained to the repository root — resolve, then reject any result whose relative path escapes (`403`).
 - Validation failures shall return HTTP 400 with a descriptive error message.
 
 ### 14.3 Command Execution

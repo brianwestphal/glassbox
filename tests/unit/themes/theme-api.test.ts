@@ -276,6 +276,20 @@ describe('DELETE /themes/:id', () => {
     expect(deleteCustomTheme).toHaveBeenCalledWith('custom-1');
   });
 
+  // Slug guard (doc 14): Hono percent-decodes the param, so an encoded
+  // traversal id would otherwise reach unlinkSync(join(THEMES_DIR, id + '.json')).
+  it('rejects a traversal id with 400 without touching the filesystem', async () => {
+    const res = await app.request(`/themes/${encodeURIComponent('../../config')}`, { method: 'DELETE' });
+    expect(res.status).toBe(400);
+    expect(deleteCustomTheme).not.toHaveBeenCalled();
+  });
+
+  it('rejects a leading-dot id with 400', async () => {
+    const res = await app.request('/themes/.hidden', { method: 'DELETE' });
+    expect(res.status).toBe(400);
+    expect(deleteCustomTheme).not.toHaveBeenCalled();
+  });
+
   it('falls back to default when deleting active theme', async () => {
     vi.mocked(getActiveThemeId).mockReturnValue('custom-1');
     const res = await app.request('/themes/custom-1', { method: 'DELETE' });

@@ -4,7 +4,7 @@
  * `error` message (not a bare `{error}`), so the client's response validation
  * passes and the UI shows a clean message instead of a schema-validation failure.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { Hono } from 'hono';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -50,6 +50,45 @@ describe('POST /api/plugins/install — error shape (GB-1048)', () => {
     const parsed = ListPluginsRespSchema.parse(body);
     expect(parsed.plugins).toEqual([]);
     expect(parsed.error).toMatch(/manifest\.json/);
+  });
+});
+
+describe('slug guard on /api/plugins/:id (doc 14, GB-1081)', () => {
+  // Hono percent-decodes path params, so without the slug guard an encoded
+  // `..%2F..%2F<dir>` id reaches uninstallPlugin's recursive rmSync and
+  // escapes the plugins dir. The guard must reject BEFORE any fs work: prove
+  // it by pointing the traversal at a real directory and asserting it survives.
+  it('DELETE with an encoded traversal id returns 400 and deletes nothing', async () => {
+    const victim = mkdtempSync(join(tmpdir(), 'gb-victim-'));
+    writeFileSync(join(victim, 'keep.txt'), 'still here');
+    try {
+      const id = encodeURIComponent(`../../${victim.split('/').filter(Boolean).join('/')}`);
+      const res = await app().request(`/api/plugins/${id}`, { method: 'DELETE' });
+      expect(res.status).toBe(400);
+      expect(readFileSync(join(victim, 'keep.txt'), 'utf-8')).toBe('still here');
+    } finally {
+      rmSync(victim, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects traversal / separator / leading-dot ids on every :id route', async () => {
+    // A literal `..` segment is URL-normalized away before routing (404s);
+    // everything else must be caught by the slug guard (400). Either status
+    // means the id never reached the filesystem.
+    for (const bad of ['..', '.hidden', encodeURIComponent('a/b'), encodeURIComponent('..\\x')]) {
+      for (const [method, path] of [
+        ['DELETE', `/api/plugins/${bad}`],
+        ['POST', `/api/plugins/${bad}/disabled`],
+        ['POST', `/api/plugins/${bad}/install-bundled`],
+      ] as const) {
+        const res = await app().request(path, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: method === 'POST' ? JSON.stringify({ scope: 'global', disabled: true }) : undefined,
+        });
+        expect([400, 404], `${method} ${path} -> ${String(res.status)}`).toContain(res.status);
+      }
+    }
   });
 });
 

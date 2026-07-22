@@ -7,6 +7,8 @@
  */
 import { z } from 'zod';
 
+import { SAFE_SLUG_RE } from '../utils/safeSlug.js';
+
 const ContentTypeSchema = z
   .object({
     extensions: z.array(z.string()).optional(),
@@ -163,7 +165,10 @@ export type PluginInstall = z.infer<typeof PluginInstallSchema>;
  *  without failing validation — only the fields the host reads are asserted. */
 export const PluginManifestSchema = z
   .object({
-    id: z.string().min(1),
+    // The id is used as a filesystem path segment (install/uninstall under the
+    // plugins dir, ahead of a recursive rmSync) and in keychain account names,
+    // so it must be a safe slug: no path separators, no leading dot (doc 14).
+    id: z.string().regex(SAFE_SLUG_RE, 'plugin id must be alphanumeric with . _ - (no path separators, no leading dot)'),
     name: z.string().min(1),
     version: z.string().min(1),
     /** Entry module relative to the plugin dir; defaults to `index.js`. */

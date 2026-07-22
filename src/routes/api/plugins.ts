@@ -15,7 +15,7 @@ import { installAvailablePlugin } from '../../plugins/install-action.js';
 import { clearConfigLabelOverrides, clearPluginUIElements } from '../../plugins/loader.js';
 import { writePluginSetting } from '../../plugins/settings.js';
 import type { AppEnv } from '../../types.js';
-import { parseBody, requirePathParam } from '../../utils/parseBody.js';
+import { parseBody, requireSlugParam } from '../../utils/parseBody.js';
 
 export const pluginsRoutes = new Hono<AppEnv>();
 
@@ -39,7 +39,7 @@ pluginsRoutes.get('/plugins/available', (c) => {
  * setup steps. Reloads the subsystem so a ready plugin takes effect immediately.
  */
 pluginsRoutes.post('/plugins/:id/install-bundled', async (c) => {
-  const id = requirePathParam(c, 'id');
+  const id = requireSlugParam(c, 'id');
   if (!id.ok) return id.response;
   const repoRoot = c.get('repoRoot');
   const result = await installAvailablePlugin(id.data);
@@ -48,7 +48,7 @@ pluginsRoutes.post('/plugins/:id/install-bundled', async (c) => {
 });
 
 pluginsRoutes.post('/plugins/:id/disabled', async (c) => {
-  const id = requirePathParam(c, 'id');
+  const id = requireSlugParam(c, 'id');
   if (!id.ok) return id.response;
   const parsed = await parseBody(c, SetPluginDisabledReqSchema);
   if (!parsed.ok) return parsed.response;
@@ -78,7 +78,7 @@ pluginsRoutes.post('/plugins/install', async (c) => {
 });
 
 pluginsRoutes.post('/plugins/:id/preferences', async (c) => {
-  const id = requirePathParam(c, 'id');
+  const id = requireSlugParam(c, 'id');
   if (!id.ok) return id.response;
   const parsed = await parseBody(c, SetPluginPreferenceReqSchema);
   if (!parsed.ok) return parsed.response;
@@ -93,7 +93,7 @@ pluginsRoutes.post('/plugins/:id/preferences', async (c) => {
 });
 
 pluginsRoutes.post('/plugins/:id/action', async (c) => {
-  const id = requirePathParam(c, 'id');
+  const id = requireSlugParam(c, 'id');
   if (!id.ok) return id.response;
   const parsed = await parseBody(c, RunPluginActionReqSchema);
   if (!parsed.ok) return parsed.response;
@@ -118,7 +118,7 @@ pluginsRoutes.post('/plugins/:id/action', async (c) => {
 });
 
 pluginsRoutes.delete('/plugins/:id', async (c) => {
-  const id = requirePathParam(c, 'id');
+  const id = requireSlugParam(c, 'id');
   if (!id.ok) return id.response;
   const repoRoot = c.get('repoRoot');
   uninstallPlugin(id.data);

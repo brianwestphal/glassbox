@@ -30,8 +30,21 @@ describe('plugin manifest (doc 29 FR-29.4)', () => {
     ['missing version', { id: 'x', name: 'X' }],
     ['not an object', 'nope'],
     ['null', null],
+    // Unsafe ids (GB-1081): the id is a filesystem path segment ahead of a
+    // recursive rmSync, so path separators and leading dots must fail.
+    ['traversal id', { id: '../escape', name: 'X', version: '1' }],
+    ['id with slash', { id: 'a/b', name: 'X', version: '1' }],
+    ['id with backslash', { id: 'a\\b', name: 'X', version: '1' }],
+    ['leading-dot id', { id: '.hidden', name: 'X', version: '1' }],
+    ['bare dot-dot id', { id: '..', name: 'X', version: '1' }],
   ])('returns null for an invalid manifest: %s', (_label, raw) => {
     expect(parseManifest(raw)).toBeNull();
+  });
+
+  it('accepts real-world slug ids (image-codecs, dots, underscores)', () => {
+    for (const id of ['image-codecs', 'my.plugin_v2', 'A1']) {
+      expect(parseManifest({ id, name: 'X', version: '1' })?.id).toBe(id);
+    }
   });
 
   // Config layout (doc 29 FR-29.18).
