@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { existsSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { setupTestDb, teardownTestDb } from '../../helpers/db.js';
 
 import { getDb } from '../../../src/db/connection.js';
@@ -160,6 +163,31 @@ describe('queries', () => {
       expect(await getReviewFile(file.id)).toBeUndefined();
       expect((await getAnnotationsForFile(file.id)).length).toBe(0);
       expect((await getAttachmentsForAnnotation(annotation.id)).length).toBe(0);
+    });
+
+    it('deleteReview removes attachment FILES from disk, not just the rows (GB-1084)', async () => {
+      // Previously deleteReview removed rows via raw SQL, so the per-annotation
+      // disk cleanup never ran and the cascading attachments rows took the only
+      // record of stored_path with them — leaking the bytes forever.
+      const bytesPath = join(tmpdir(), `gb-att-${Date.now().toString(36)}.bin`);
+      writeFileSync(bytesPath, 'attachment bytes');
+      const review = await createReview('/repo/delete-files', 'delete-files', 'uncommitted');
+      const file = await addReviewFile(review.id, 'test.ts', '{}');
+      const annotation = await addAnnotation(file.id, 3, 'new', 'note', 'with attachment');
+      await createAttachment({
+        annotationId: annotation.id,
+        originalFilename: 'bytes.bin',
+        storedPath: bytesPath,
+        mimeType: 'application/octet-stream',
+        size: 16,
+        sha256: null,
+      });
+      expect(existsSync(bytesPath)).toBe(true);
+
+      await deleteReview(review.id);
+
+      expect(existsSync(bytesPath)).toBe(false);
+      expect(await getReview(review.id)).toBeUndefined();
     });
 
     it('getLatestInProgressReview matches by repo+mode', async () => {

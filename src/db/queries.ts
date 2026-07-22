@@ -59,10 +59,28 @@ export async function updateReviewHead(id: string, headCommit: string): Promise<
   await db.query('UPDATE reviews SET head_commit = $1, updated_at = NOW() WHERE id = $2', [headCommit, id]);
 }
 
+const AttachmentPathSchema = z.object({ stored_path: z.string() }).loose();
+
 export async function deleteReview(id: string): Promise<void> {
   const db = await getDb();
-  await db.query('DELETE FROM annotations WHERE review_file_id IN (SELECT id FROM review_files WHERE review_id = $1)', [id]);
-  await db.query('DELETE FROM review_files WHERE review_id = $1', [id]);
+  // Collect the review's attachment files BEFORE any rows go away — the DB
+  // cascade drops the `attachments` rows, taking the only record of each
+  // `stored_path` with them, which previously leaked the bytes on disk
+  // (doc 25; the per-annotation cleanup in `deleteAnnotation` never ran here
+  // because the rows were deleted via raw SQL).
+  const { deleteAttachmentFile } = await import('../attachments/store.js');
+  const attachments = await db.query(
+    `SELECT a.stored_path FROM attachments a
+     JOIN annotations an ON an.id = a.annotation_id
+     JOIN review_files rf ON rf.id = an.review_file_id
+     WHERE rf.review_id = $1`,
+    [id],
+  );
+  for (const row of parseRows(AttachmentPathSchema, attachments.rows)) {
+    deleteAttachmentFile(row.stored_path);
+  }
+  // One transactional delete: `ON DELETE CASCADE` (ddl.ts) removes the
+  // review_files → annotations → attachments rows with the review, atomically.
   await db.query('DELETE FROM reviews WHERE id = $1', [id]);
 }
 
