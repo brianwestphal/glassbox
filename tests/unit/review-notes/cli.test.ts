@@ -31,6 +31,19 @@ describe('reviewNoteInstructions (GB-900)', () => {
     expect(text).toContain('Link related notes across files');
     expect(text).not.toContain('glassbox note link');
   });
+
+  it('induces diagram-as-proof artifacts — Mermaid SOURCE via --artifact (doc 20 §20.5)', () => {
+    const text = reviewNoteInstructions();
+    expect(text).toContain('--artifact <path>');
+    expect(text).toContain('Proof artifacts');
+    // Diagrams as source (Mermaid), never rendered images / ASCII art.
+    expect(text).toContain('Mermaid SOURCE');
+    expect(text).toContain('.mmd');
+    expect(text).toContain('never attach a rendered diagram image');
+    expect(text).toContain('.pr-notes/artifacts/');
+    // The §20.5 economy rules: prefer text/source, one artifact per claim.
+    expect(text).toContain('one artifact per *claim*');
+  });
 });
 
 describe('parseNoteAdd', () => {

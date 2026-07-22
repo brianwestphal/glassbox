@@ -170,6 +170,12 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   runner) runs the command and injects the output into the coding AI's context,
   so the wording never forks from the actual `glassbox note` CLI surface. See
   §20.7 for the cross-tool obligation to actually induce note production.
+  The canonical text also carries the §20.5 artifact guidance (GB via Hot Sheet
+  HS-9377): a "Proof artifacts" section instructing the generating AI to attach
+  evidence with `--artifact` — and, **when a diagram is the clearest proof or
+  rationale** (state machine, data/control flow, sequence, architecture), to
+  write it as **Mermaid source** under `.pr-notes/artifacts/` rather than a
+  rendered image or ASCII art.
 
 ### 20.5 Artifacts
 
