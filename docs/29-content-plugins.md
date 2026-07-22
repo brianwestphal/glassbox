@@ -147,6 +147,28 @@ content `renderer` / `differ`. Everything else transfers.
   auto-installed, so a plugin with a system requirement (e.g. PlantUML, which needs
   a JRE) is never forced on users; they opt in (GB-1046). `installBundledPlugins`
   skips it.
+- **FR-29.20 — Opt-in install from the UI, with readiness checks + guided setup.**
+  A separately-installable (`autoInstall: false`) bundled plugin shall be
+  installable from **Settings → Plugins** with a single click — the desktop app has
+  no CLI, so a `setup.mjs` isn't reachable there. The "Available to install" list
+  enumerates the opt-in bundled plugins not yet installed. Clicking **Install**
+  shall: (1) **check system readiness** — run each manifest-declared requirement's
+  probe (`command <checkArgs>`, e.g. `java -version`, `npm --version`); (2)
+  **auto-fix what it can** — copy the plugin out of the bundle and run the
+  provisioning steps whose prerequisites are met (`fetch` a file — always runnable;
+  `npm-install` — only when `npm` is present); (3) for anything it can't do
+  (a missing JRE, an absent `npm`, a failed download), return **specific
+  instructions** — the requirement's remediation `hint`, the failed/skipped step,
+  and a fallback CLI command — so the user can finish and click Install again
+  (idempotent; a re-install completes the remaining steps and preserves already-
+  provisioned assets). The install descriptor is manifest-declared (`install:
+  { requirements[], provision[], cliHint }`); a plugin with no descriptor is
+  **self-contained** (install = copy). The whole action runs **server-side in the
+  local Node sidecar** (filesystem + network + `child_process`), so it works
+  identically in the browser and the desktop app with no native code (GB-1069).
+  The image-codecs plugin is self-contained; PlantUML declares a `java` requirement
+  + a jar `fetch`; Mermaid declares an `npm` requirement + an `npm-install`
+  (a Chromium download, so it warns).
 
 ## 29.3 The contract
 

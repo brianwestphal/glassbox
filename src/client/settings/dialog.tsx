@@ -30,7 +30,7 @@ import { switchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { experimentalTab } from './experimentalTab.js';
 import { generalTab } from './generalTab.js';
-import { browsePluginFolder, doInstallPlugin, doPluginAction, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
+import { browsePluginFolder, doInstallBundled, doInstallPlugin, doPluginAction, doUninstallPlugin, loadPluginsList, pluginsTab, resetPluginsTab, setPreference, togglePluginDisabled } from './pluginsTab.js';
 import { ALL_LANG_KEYS, profileTab } from './profileTab.js';
 import type { ChannelState, ConfigResponse, KeyStatusResponse, ModelsResponse, ProjectSettings, Tab, TabContext, ThemesResponse } from './tabContext.js';
 import { showThemeManager } from './themeManager.js';
@@ -515,6 +515,12 @@ function setupDelegates(args: {
     if (input !== null) doInstallPlugin(asInput(input).value);
   });
   void delegate(overlay, 'click', '#plugin-browse-btn', () => { browsePluginFolder(); });
+  // Install an opt-in bundled plugin (doc 29 §29.2, GB-1069): readiness check +
+  // auto-provision; the result (ready / needs-setup instructions) renders in the row.
+  void delegate(overlay, 'click', '[data-plugin-install-bundled]', (_e, el) => {
+    const id = asEl(el).dataset.pluginInstallBundled;
+    if (id !== undefined) doInstallBundled(id);
+  });
   // Config-layout button actions (doc 29 FR-29.18): run the plugin's onAction,
   // then the refreshed list re-renders any dynamic labels the action set.
   void delegate(overlay, 'click', '[data-plugin-action]', (_e, el) => {

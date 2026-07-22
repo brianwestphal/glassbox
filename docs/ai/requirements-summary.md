@@ -951,7 +951,19 @@ global precedence — `src/plugins/enablement.ts`), **manifest-declared preferen
 `PluginContext.getSetting`/`setSetting`; graphviz's `engine` is the worked
 example; **secret** prefs → OS keychain, masked in the UI, GB-1054),
 install-from-a-folder (with a native **Browse…** folder picker on desktop,
-GB-1048), and uninstall over `/api/plugins`. A manifest **`configLayout`**
+GB-1048), and uninstall over `/api/plugins`. **Opt-in install from the UI**
+(FR-29.20, GB-1069) adds an **Available to install** section listing the
+`autoInstall:false` bundled plugins not yet installed; clicking **Install** runs a
+server-side (no native code) action that **checks system readiness** (a manifest
+`install.requirements[]` probed via `command <checkArgs>` — a JRE, `npm`),
+**auto-fixes what it can** (copy the bundle + run `install.provision[]` steps whose
+prereqs are met — `fetch` a file always, `npm-install` only when `npm` is present),
+and for the rest returns **specific instructions** (the requirement hint, the
+skipped/failed step, a CLI fallback) so the user finishes + clicks Install again
+(idempotent, non-destructive). image-codecs is self-contained; PlantUML declares a
+`java` req + a jar fetch; Mermaid declares an `npm` req + an npm-install (Chromium
+download). `src/plugins/{readiness,available,install-action}.ts`. A manifest
+**`configLayout`**
 (FR-29.18, GB-1059) can arrange the preferences into collapsible groups /
 dividers / spacers / dynamic **status labels** / **action buttons**; a button
 runs the plugin's `onAction` (`POST /api/plugins/:id/action`) which reports

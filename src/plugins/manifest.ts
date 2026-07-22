@@ -89,6 +89,76 @@ export const ConfigLayoutItemSchema: z.ZodType<ConfigLayoutItem> = z.lazy(() =>
     .loose(),
 );
 
+/**
+ * A system requirement an opt-in plugin needs before it can render (doc 29
+ * §29.2, GB-1069) — e.g. a JRE for PlantUML, `npm` for Mermaid. The host checks
+ * readiness by running `command <checkArgs>`; if it's missing (or non-zero), the
+ * UI shows `hint` (and `docUrl`) so the user can install it, then retry. A
+ * requirement is something the host can't install for the user; it can only
+ * detect + instruct.
+ */
+export const PluginRequirementSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    /** Executable whose presence proves the requirement (run with `checkArgs`). */
+    command: z.string().min(1),
+    /** Args for the presence check (default `['--version']`). */
+    checkArgs: z.array(z.string()).optional(),
+    /** Human remediation shown when the requirement is missing. */
+    hint: z.string().min(1),
+    docUrl: z.string().optional(),
+  })
+  .loose();
+export type PluginRequirement = z.infer<typeof PluginRequirementSchema>;
+
+/**
+ * A provisioning step the host performs automatically at install (the "auto-fix
+ * where possible" half of GB-1069). `fetch` downloads a URL into the install dir
+ * (needs no external tooling — always runnable); `npm-install` runs `npm install`
+ * into the install dir (needs the `npm` requirement, and downloads whatever the
+ * packages pull, e.g. a Chromium — so its `note` warns the user).
+ */
+export const PluginProvisionStepSchema = z.union([
+  z
+    .object({
+      kind: z.literal('fetch'),
+      url: z.string().min(1),
+      /** Destination filename inside the install dir. */
+      dest: z.string().min(1),
+      /** Optional expected sha-256 (hex) of the downloaded bytes. */
+      sha256: z.string().optional(),
+    })
+    .loose(),
+  z
+    .object({
+      kind: z.literal('npm-install'),
+      packages: z.array(z.string().min(1)).min(1),
+      /** Requirement id whose command must be present to run this (default `npm`). */
+      requires: z.string().optional(),
+      note: z.string().optional(),
+    })
+    .loose(),
+]);
+export type PluginProvisionStep = z.infer<typeof PluginProvisionStepSchema>;
+
+/**
+ * An opt-in plugin's install descriptor (doc 29 §29.2, GB-1069). Drives the
+ * "Available to install" UI: the host checks `requirements`, runs the
+ * auto-fixable `provision` steps whose prerequisites are met, and reports the
+ * rest as actionable instructions. A plugin with no `install` descriptor (or an
+ * empty one) is **self-contained** — installing it is just copying the bundle.
+ */
+export const PluginInstallSchema = z
+  .object({
+    requirements: z.array(PluginRequirementSchema).optional(),
+    provision: z.array(PluginProvisionStepSchema).optional(),
+    /** Fallback command to run by hand when auto-provisioning can't complete. */
+    cliHint: z.string().optional(),
+  })
+  .loose();
+export type PluginInstall = z.infer<typeof PluginInstallSchema>;
+
 /** `.loose()` so a manifest may carry extra keys (e.g. plugin-specific config)
  *  without failing validation — only the fields the host reads are asserted. */
 export const PluginManifestSchema = z
@@ -113,6 +183,9 @@ export const PluginManifestSchema = z
      *  `installBundledPlugins` does NOT auto-install it — the user opts in
      *  (GB-1046). Defaults to auto-install (true) when omitted. */
     autoInstall: z.boolean().optional(),
+    /** How to install an opt-in plugin from the UI (doc 29 §29.2, GB-1069):
+     *  system requirements + auto-run provisioning steps. Absent → self-contained. */
+    install: PluginInstallSchema.optional(),
   })
   .loose();
 

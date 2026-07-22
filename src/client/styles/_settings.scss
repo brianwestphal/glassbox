@@ -755,6 +755,82 @@
   color: var(--danger, #f85149);
 }
 
+// Available-to-install opt-in plugins (doc 29 §29.2, GB-1069).
+.settings-subheading {
+  margin: 18px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.plugin-available-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.plugin-available-row {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+.plugin-dot.available { background: var(--accent, #58a6ff); }
+.plugin-available-detail {
+  margin-top: 8px;
+  padding-left: 19px;
+}
+.plugin-req-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plugin-req {
+  display: grid;
+  grid-template-columns: 16px auto 1fr;
+  gap: 4px 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.plugin-req-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+
+  svg { width: 13px; height: 13px; }
+}
+.plugin-req-met .plugin-req-status { color: var(--success, #3fb950); }
+.plugin-req-unmet .plugin-req-status { color: var(--warning, #d29922); }
+.plugin-req-label { font-weight: 500; }
+.plugin-req-hint { color: var(--text-secondary); }
+.plugin-provision-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.plugin-install-result {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+
+  &.plugin-install-needs-setup { border-color: var(--warning, #d29922); }
+  &.plugin-install-error { border-color: var(--danger, #f85149); }
+}
+.plugin-install-result-head { font-weight: 500; margin-bottom: 4px; }
+.plugin-install-instructions {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.plugin-install-error-line { color: var(--danger, #f85149); }
+
 // Plugin manifest-declared preferences (doc 29 FR-29.12, GB-1047).
 .plugin-row-prefs {
   margin-top: 12px;

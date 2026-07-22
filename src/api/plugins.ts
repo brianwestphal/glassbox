@@ -103,6 +103,62 @@ export type SetPluginDisabledReq = z.infer<typeof SetPluginDisabledReqSchema>;
 export const InstallPluginReqSchema = z.object({ path: z.string().min(1) });
 export type InstallPluginReq = z.infer<typeof InstallPluginReqSchema>;
 
+/** One system requirement's readiness (doc 29 §29.2, GB-1069). Mirrors `RequirementStatus`. */
+export const RequirementStatusSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  met: z.boolean(),
+  hint: z.string(),
+  docUrl: z.string().optional(),
+});
+export type RequirementStatusInfo = z.infer<typeof RequirementStatusSchema>;
+
+/** An opt-in plugin available to install, with its readiness report (GB-1069). */
+export const AvailablePluginSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.string(),
+  description: z.string().optional(),
+  extensions: z.array(z.string()),
+  requirements: z.array(RequirementStatusSchema),
+  provisionNotes: z.array(z.string()),
+  selfContained: z.boolean(),
+  cliHint: z.string().optional(),
+});
+export type AvailablePluginInfo = z.infer<typeof AvailablePluginSchema>;
+
+/** `GET /plugins/available` → the opt-in bundled plugins not yet installed. */
+export const ListAvailablePluginsRespSchema = z.object({ available: z.array(AvailablePluginSchema) });
+export type ListAvailablePluginsResp = z.infer<typeof ListAvailablePluginsRespSchema>;
+
+/** One provisioning step's outcome (GB-1069). Mirrors `ProvisionOutcome`. */
+export const ProvisionOutcomeSchema = z.object({
+  step: z.string(),
+  ok: z.boolean(),
+  skipped: z.boolean(),
+  detail: z.string(),
+});
+
+/** The result of an install attempt (GB-1069). Mirrors `InstallResult`. */
+export const InstallResultSchema = z.object({
+  id: z.string(),
+  installed: z.boolean(),
+  status: z.enum(['ready', 'needs-setup', 'error']),
+  requirements: z.array(RequirementStatusSchema),
+  provisioned: z.array(ProvisionOutcomeSchema),
+  instructions: z.array(z.string()),
+  error: z.string().optional(),
+});
+export type InstallResultInfo = z.infer<typeof InstallResultSchema>;
+
+/** `POST /plugins/:id/install-bundled` → the install result + refreshed lists. */
+export const InstallBundledPluginRespSchema = z.object({
+  result: InstallResultSchema,
+  plugins: z.array(PluginInfoSchema),
+  available: z.array(AvailablePluginSchema),
+});
+export type InstallBundledPluginResp = z.infer<typeof InstallBundledPluginRespSchema>;
+
 export const SetPluginPreferenceReqSchema = z.object({ key: z.string().min(1), value: z.string() });
 export type SetPluginPreferenceReq = z.infer<typeof SetPluginPreferenceReqSchema>;
 
@@ -198,4 +254,15 @@ export async function runPluginAction(id: string, req: RunPluginActionReq): Prom
 /** List the registered UI elements of enabled plugins (doc 30 FR-30.4). */
 export async function listPluginUi(): Promise<PluginUIElementInfo[]> {
   return (await apiCall(ListPluginUiRespSchema, '/plugins/ui')).elements;
+}
+
+/** List the opt-in bundled plugins available to install (doc 29 §29.2, GB-1069). */
+export async function listAvailablePlugins(): Promise<AvailablePluginInfo[]> {
+  return (await apiCall(ListAvailablePluginsRespSchema, '/plugins/available')).available;
+}
+
+/** Install an opt-in bundled plugin by id (copy + readiness check + auto-provision,
+ *  GB-1069); returns the install result plus the refreshed installed + available lists. */
+export async function installBundledPlugin(id: string): Promise<InstallBundledPluginResp> {
+  return apiCall(InstallBundledPluginRespSchema, `/plugins/${encodeURIComponent(id)}/install-bundled`, { method: 'POST' });
 }

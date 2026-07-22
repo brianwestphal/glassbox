@@ -69,4 +69,55 @@ describe('plugin manifest (doc 29 FR-29.4)', () => {
       configLayout: [{ type: 'widget' }],
     })).toBeNull();
   });
+
+  // The install descriptor (doc 29 §29.2, GB-1069).
+  it('parses install requirements + a fetch provision step', () => {
+    const m = parseManifest({
+      id: 'puml', name: 'PlantUML', version: '1', autoInstall: false,
+      install: {
+        requirements: [{ id: 'java', label: 'Java', command: 'java', checkArgs: ['-version'], hint: 'install a JRE', docUrl: 'https://adoptium.net' }],
+        provision: [{ kind: 'fetch', url: 'https://x/plantuml.jar', dest: 'plantuml.jar', sha256: 'abc' }],
+        cliHint: 'node setup.mjs',
+      },
+    });
+    expect(m).not.toBeNull();
+    expect(m?.install?.requirements?.[0]).toMatchObject({ id: 'java', command: 'java' });
+    const step = m?.install?.provision?.[0];
+    expect(step?.kind).toBe('fetch');
+    if (step?.kind === 'fetch') expect(step.dest).toBe('plantuml.jar');
+    expect(m?.install?.cliHint).toBe('node setup.mjs');
+  });
+
+  it('parses an npm-install provision step (the other union variant)', () => {
+    const m = parseManifest({
+      id: 'mmd', name: 'Mermaid', version: '1', autoInstall: false,
+      install: { provision: [{ kind: 'npm-install', packages: ['@mermaid-js/mermaid-cli@11', 'puppeteer@24'], requires: 'npm', note: 'downloads Chromium' }] },
+    });
+    const step = m?.install?.provision?.[0];
+    expect(step?.kind).toBe('npm-install');
+    if (step?.kind === 'npm-install') {
+      expect(step.packages).toEqual(['@mermaid-js/mermaid-cli@11', 'puppeteer@24']);
+      expect(step.requires).toBe('npm');
+    }
+  });
+
+  it('rejects an unknown provision step kind', () => {
+    expect(parseManifest({
+      id: 'x', name: 'X', version: '1',
+      install: { provision: [{ kind: 'brew-install', packages: ['x'] }] },
+    })).toBeNull();
+  });
+
+  it('rejects an npm-install step with no packages', () => {
+    expect(parseManifest({
+      id: 'x', name: 'X', version: '1',
+      install: { provision: [{ kind: 'npm-install', packages: [] }] },
+    })).toBeNull();
+  });
+
+  it('a manifest with no install descriptor still parses (self-contained)', () => {
+    const m = parseManifest({ id: 'codec', name: 'Codecs', version: '1', autoInstall: false });
+    expect(m).not.toBeNull();
+    expect(m?.install).toBeUndefined();
+  });
 });

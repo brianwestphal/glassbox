@@ -6,5 +6,25 @@
   "description": "Renders PlantUML .puml source to SVG via a local `java -jar plantuml.jar` subprocess. Separately installable — requires a JRE + plantuml.jar (run `node setup.mjs`). Falls back to the code block when unavailable.",
   "author": "Glassbox",
   "autoInstall": false,
-  "contentTypes": [{ "extensions": [".puml", ".plantuml", ".pu", ".iuml"] }]
+  "contentTypes": [{ "extensions": [".puml", ".plantuml", ".pu", ".iuml"] }],
+  "install": {
+    "requirements": [
+      {
+        "id": "java",
+        "label": "Java (JRE 8+)",
+        "command": "java",
+        "checkArgs": ["-version"],
+        "hint": "Install a Java runtime — e.g. `brew install openjdk` (macOS), `apt install default-jre` (Linux), or from adoptium.net — then click Install again.",
+        "docUrl": "https://adoptium.net"
+      }
+    ],
+    "provision": [
+      {
+        "kind": "fetch",
+        "url": "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/1.2024.8/plantuml-1.2024.8.jar",
+        "dest": "plantuml.jar"
+      }
+    ],
+    "cliHint": "node plugins/plantuml/setup.mjs"
+  }
 }

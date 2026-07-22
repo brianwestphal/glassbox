@@ -7,9 +7,11 @@
 import { Hono } from 'hono';
 
 import { InstallPluginReqSchema, RunPluginActionReqSchema, SetPluginDisabledReqSchema, SetPluginPreferenceReqSchema } from '../../api/plugins.js';
+import { listAvailablePlugins } from '../../plugins/available.js';
 import { setGlobalDisabled, setProjectDisabled } from '../../plugins/enablement.js';
 import { describeInstalledPlugins, getPluginManifest, listPluginUIElements, persistPluginUIState, reloadContentPlugins, runPluginAction } from '../../plugins/index.js';
 import { installPluginFromDisk, uninstallPlugin } from '../../plugins/install.js';
+import { installAvailablePlugin } from '../../plugins/install-action.js';
 import { clearConfigLabelOverrides, clearPluginUIElements } from '../../plugins/loader.js';
 import { writePluginSetting } from '../../plugins/settings.js';
 import type { AppEnv } from '../../types.js';
@@ -23,6 +25,26 @@ pluginsRoutes.get('/plugins', (c) => {
 
 pluginsRoutes.get('/plugins/ui', (c) => {
   return c.json({ elements: listPluginUIElements(c.get('repoRoot')) });
+});
+
+/** Opt-in bundled plugins not yet installed, each with a readiness report (GB-1069). */
+pluginsRoutes.get('/plugins/available', (c) => {
+  return c.json({ available: listAvailablePlugins() });
+});
+
+/**
+ * Install an opt-in bundled plugin (GB-1069): copy the bundle, check readiness,
+ * auto-run the provisioning it can, and return the result + refreshed lists. The
+ * result's `status`/`instructions` tell the UI whether it's ready or needs manual
+ * setup steps. Reloads the subsystem so a ready plugin takes effect immediately.
+ */
+pluginsRoutes.post('/plugins/:id/install-bundled', async (c) => {
+  const id = requirePathParam(c, 'id');
+  if (!id.ok) return id.response;
+  const repoRoot = c.get('repoRoot');
+  const result = await installAvailablePlugin(id.data);
+  if (result.installed) await reloadContentPlugins(repoRoot);
+  return c.json({ result, plugins: describeInstalledPlugins(repoRoot), available: listAvailablePlugins() });
 });
 
 pluginsRoutes.post('/plugins/:id/disabled', async (c) => {

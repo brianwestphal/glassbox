@@ -17,6 +17,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 import { pluginsDir, readManifest } from './loader.js';
+import type { PluginManifest } from './manifest.js';
 
 const DISMISSED_FILE = 'dismissed-plugins.json';
 
@@ -32,9 +33,40 @@ function dismissedPathFor(userDir: string): string {
  * else the dev build output (`dist/plugins`).
  */
 export function bundledPluginsDir(): string {
+  // `GLASSBOX_BUNDLED_PLUGINS_DIR` relocates the bundle (used by tests + any
+  // deployment that ships plugins elsewhere), mirroring `GLASSBOX_CONFIG_DIR`.
+  const override = process.env.GLASSBOX_BUNDLED_PLUGINS_DIR;
+  if (override !== undefined && override.trim() !== '') return override;
   const sibling = join(dirname(fileURLToPath(import.meta.url)), 'plugins');
   if (existsSync(sibling)) return sibling;
   return join(process.cwd(), 'dist', 'plugins');
+}
+
+/** One bundled plugin: its directory + validated manifest. */
+export interface BundledPlugin {
+  dir: string;
+  manifest: PluginManifest;
+}
+
+/**
+ * Every bundled plugin under `bundledDir` (each subdir with a valid manifest),
+ * sorted by id. Shared by `installBundledPlugins` (auto-install), the
+ * available-to-install list, and the install action (GB-1069). Fail-soft.
+ */
+export function discoverBundledPlugins(bundledDir: string = bundledPluginsDir()): BundledPlugin[] {
+  if (!existsSync(bundledDir)) return [];
+  let entries: string[];
+  try { entries = readdirSync(bundledDir); } catch { return []; }
+  const out: BundledPlugin[] = [];
+  for (const name of entries.sort()) {
+    const dir = join(bundledDir, name);
+    try {
+      if (!statSync(dir).isDirectory()) continue;
+      const manifest = readManifest(dir);
+      if (manifest !== null) out.push({ dir, manifest });
+    } catch { /* skip a bad bundled plugin */ }
+  }
+  return out;
 }
 
 export function readDismissed(userDir: string = pluginsDir()): string[] {
@@ -143,6 +175,12 @@ export function installPluginFromDisk(sourceDir: string, opts?: { userDir?: stri
   }
   writeDismissed(readDismissed(userDir).filter((x) => x !== manifest.id), userDir);
   return { id: manifest.id };
+}
+
+/** Remove `id` from the dismiss-list — so an opt-in install (GB-1069) of a
+ *  previously-uninstalled bundled plugin takes and isn't re-suppressed. */
+export function undismissPlugin(id: string, userDir: string = pluginsDir()): void {
+  writeDismissed(readDismissed(userDir).filter((x) => x !== id), userDir);
 }
 
 /**

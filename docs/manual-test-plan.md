@@ -65,6 +65,25 @@ Until then, the tab's UI wiring is manual:
   **Browse…** button next to the install field opens a native folder dialog and
   **fills the field** with the chosen path (it does not auto-install — the user
   then clicks **Install**). The dialog must not freeze the app.
+- **Available to install — opt-in plugins with readiness + guided setup (GB-1069)**
+  — Open Settings → Plugins with the opt-in plugins **not** installed. An
+  **Available to install** section lists **image-codecs**, **PlantUML**, and
+  **Mermaid**, each showing its system requirements (a check when satisfied, a
+  warning + hint when not) and what installing will provision. Clicking **Install**:
+  - **image-codecs** (self-contained) → installs immediately, a "Installed" toast,
+    and the row moves to the installed list.
+  - **PlantUML** with a JRE present → installs and fetches `plantuml.jar`
+    automatically → ready. With **no JRE**, it still installs + fetches the jar but
+    shows an instruction to install Java, then click Install again.
+  - **Mermaid** with `npm` present → installs and runs `npm install` (downloading a
+    Chromium — slow) → ready. With **no `npm`**, it installs the plugin but shows an
+    instruction to install Node.js (or run the CLI `setup.mjs`), then Install again.
+  In each case the row reflects the outcome (ready vs. the remaining steps), and a
+  re-install after satisfying a requirement completes it. *(The readiness checks,
+  the available list, and the install action — copy + auto-provision + instruction
+  assembly — are unit/integration-tested and verified live against the real built
+  plugins; this item is the Settings-tab rendering + Install-button flow, which
+  needs the real UI — a committed e2e reuses the GB-1043 harness in GB-1070.)*
 - **Manifest preferences (GB-1047)** — With the Graphviz plugin enabled, its row
   shows a **Layout engine** select (dot / neato / fdp / circo / twopi). Changing
   it auto-saves; re-open a `.dot` diagram in Rendered mode and the layout changes

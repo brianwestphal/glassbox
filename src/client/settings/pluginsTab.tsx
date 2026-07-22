@@ -8,28 +8,62 @@
 import type { SafeHtml } from 'kerfjs';
 import { signal } from 'kerfjs';
 
-import type { ConfigLabelColor, ConfigLayoutItem, PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
-import { installPlugin, listPlugins, runPluginAction, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
-import { IconChevronRight, IconPlug } from '../../icons.js';
+import type { AvailablePluginInfo, ConfigLabelColor, ConfigLayoutItem, InstallResultInfo, PluginInfo, PluginPreferenceInfo } from '../../api/index.js';
+import { installBundledPlugin, installPlugin, listAvailablePlugins, listPlugins, runPluginAction, setPluginDisabled, setPluginPreference, uninstallPlugin } from '../../api/index.js';
+import { IconCheck, IconChevronRight, IconPlug, IconX } from '../../icons.js';
 import { refreshPluginUi } from '../plugins/uiExtensions.js';
 import { getTauriInvoke } from '../tauri.js';
+import { showToast } from '../toast.js';
 import type { Tab } from './tabContext.js';
 
 const plugins = signal<PluginInfo[] | null>(null);
+const available = signal<AvailablePluginInfo[] | null>(null);
+/** Per-plugin-id result of the last install attempt (its instructions/status). */
+const installResults = signal<Map<string, InstallResultInfo>>(new Map());
+/** Plugin ids with an install request in flight (so the button shows "Installing…"). */
+const installing = signal<Set<string>>(new Set());
 const installError = signal<string>('');
 
 /** Reset the tab's state — called when the dialog opens. */
 export function resetPluginsTab(): void {
   plugins.value = null;
+  available.value = null;
+  installResults.value = new Map();
+  installing.value = new Set();
   installError.value = '';
 }
 
-/** Fetch the installed-plugin list (called when the tab is first shown). */
+/** Fetch the installed + available plugin lists (called when the tab is first shown). */
 export function loadPluginsList(): void {
   if (plugins.value !== null) return;
   void listPlugins()
     .then((r) => { plugins.value = r.plugins; })
     .catch(() => { plugins.value = []; });
+  void listAvailablePlugins()
+    .then((a) => { available.value = a; })
+    .catch(() => { available.value = []; });
+}
+
+/** Install an opt-in bundled plugin (GB-1069): copy + readiness check +
+ *  auto-provision. On success it moves to the installed list; if it needs manual
+ *  setup, its instructions render under the row. */
+export function doInstallBundled(id: string): void {
+  installError.value = '';
+  installing.value = new Set([...installing.value, id]);
+  void installBundledPlugin(id)
+    .then((r) => {
+      plugins.value = r.plugins;
+      available.value = r.available;
+      installResults.value = new Map(installResults.value).set(id, r.result);
+      void refreshPluginUi();
+      if (r.result.status === 'ready') showToast(`Installed ${r.result.id}`);
+      else if (r.result.status === 'error') showToast(r.result.error ?? 'Install failed');
+      else showToast('Installed — a few setup steps remain');
+    })
+    .catch((e: unknown) => { installError.value = e instanceof Error ? e.message : 'Install failed'; })
+    .finally(() => {
+      const next = new Set(installing.value); next.delete(id); installing.value = next;
+    });
 }
 
 export function togglePluginDisabled(id: string, scope: 'global' | 'project', disabled: boolean): void {
@@ -231,6 +265,79 @@ function pluginRow(p: PluginInfo): SafeHtml {
   );
 }
 
+/** One requirement's readiness line (met = check; unmet = the remediation hint). */
+function requirementLine(r: AvailablePluginInfo['requirements'][number]): SafeHtml {
+  return (
+    <li className={`plugin-req ${r.met ? 'plugin-req-met' : 'plugin-req-unmet'}`} data-key={r.id}>
+      <span className="plugin-req-status">{r.met ? <IconCheck /> : <IconX />}</span>
+      <span className="plugin-req-label">{r.label}</span>
+      {!r.met && <span className="plugin-req-hint">{r.hint}</span>}
+    </li>
+  );
+}
+
+/** A row for an opt-in plugin available to install, with its readiness report and
+ *  (after an attempt) the remaining setup instructions. */
+function availableRow(a: AvailablePluginInfo): SafeHtml {
+  const result = installResults.value.get(a.id);
+  const busy = installing.value.has(a.id);
+  const unmet = a.requirements.filter((r) => !r.met).length;
+  return (
+    <div className="plugin-available-row" data-key={a.id}>
+      <div className="plugin-row-main">
+        <span className="plugin-dot available"></span>
+        <div className="plugin-row-text">
+          <div className="plugin-row-title">{a.name} <span className="plugin-version">v{a.version}</span></div>
+          {a.description !== undefined && a.description !== '' && <div className="plugin-row-meta">{a.description}</div>}
+          <div className="plugin-row-meta">
+            {a.extensions.length > 0 ? a.extensions.join('  ') : 'no declared types'}
+            {a.selfContained ? ' · ready to install' : unmet > 0 ? ` · ${String(unmet)} requirement${unmet === 1 ? '' : 's'} to satisfy` : ' · needs provisioning'}
+          </div>
+        </div>
+        <button className="btn btn-xs btn-primary" data-plugin-install-bundled={a.id} disabled={busy}>
+          {busy ? 'Installing…' : result !== undefined ? 'Install again' : 'Install'}
+        </button>
+      </div>
+      {(a.requirements.length > 0 || a.provisionNotes.length > 0) && (
+        <div className="plugin-available-detail">
+          {a.requirements.length > 0 && <ul className="plugin-req-list">{a.requirements.map((r) => requirementLine(r))}</ul>}
+          {a.provisionNotes.map((n) => <div className="plugin-provision-note" data-key={n}>{n}</div>)}
+        </div>
+      )}
+      {result !== undefined && result.status !== 'ready' && (
+        <div className={`plugin-install-result plugin-install-${result.status}`}>
+          {result.status === 'error' ? (
+            <div className="plugin-install-error-line">{result.error ?? 'Install failed.'}</div>
+          ) : (
+            <>
+              <div className="plugin-install-result-head">Installed — finish these steps, then click Install again:</div>
+              <ul className="plugin-install-instructions">
+                {result.instructions.map((i, idx) => <li data-key={`${a.id}-i${String(idx)}`}>{i}</li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function availableSection(): SafeHtml | null {
+  const list = available.value;
+  if (list === null || list.length === 0) return null;
+  return (
+    <div className="plugin-available">
+      <h4 className="settings-subheading">Available to install</h4>
+      <p className="settings-hint">
+        These plugins ship with Glassbox but aren't installed (they need a system dependency or a
+        download). Click Install — Glassbox checks what's needed, provisions what it can, and tells
+        you how to finish the rest.
+      </p>
+      <div className="plugin-available-list">{list.map((a) => availableRow(a))}</div>
+    </div>
+  );
+}
+
 function renderPluginsTab(): SafeHtml {
   const list = plugins.value;
   return (
@@ -248,6 +355,7 @@ function renderPluginsTab(): SafeHtml {
       ) : (
         <div className="plugin-list">{list.map((p) => pluginRow(p))}</div>
       )}
+      {availableSection()}
       <div className="plugin-install">
         <label className="settings-label" htmlFor="plugin-install-path">Install from a folder</label>
         <div className="settings-key-row">

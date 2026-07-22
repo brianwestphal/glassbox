@@ -1877,6 +1877,23 @@
       "tests": ["tests/unit/plugins/registry.test.ts", "tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/plugins/image-codecs.test.ts"],
       "note": "Image-decoder capability (GB-1063) + its reference plugin image-codecs (GB-1064). registry.test covers addImageDecoders/findImageDecoder dispatch + (priority, specificity) tie-break + independence from renderers/differs; loader.test covers a plugin's imageDecoders being registered on activate; dispatch.test covers decodeImageWithPlugin (match -> decode; no-match/null/throw/disabled -> null, fail-soft); perceptual-diff.test covers the ground-truth wiring: comparePerceptual (now async) tries core (PNG/JPEG) first then falls back to an injected plugin decoder, scoring an otherwise-undecodable pair, preferring core when it can decode, and staying `undecodable` (no crash) when the decoder throws or returns null. image-codecs.test drives the REAL jSquash WebP+AVIF decoders (WASM read from the on-disk codec, the same bytes esbuild inlines into the bundle) end-to-end: decode fixtures to RGBA (lossless webp -> exact color; avif dims), fail-soft on garbage bytes, and — installed via the registry — make an otherwise-undecodable WebP pair scorable through comparePerceptual (identical->0, different->>0). The bundled self-contained plugin was additionally verified live decoding the fixtures. The launch path (cli.ts ground-truth branch) initializes plugins before scoring."
     },
+    "FR-29.20": {
+      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/readiness.test.ts", "tests/unit/plugins/available.test.ts", "tests/unit/plugins/install-action.test.ts", "tests/integration/api/plugins-install-bundled.test.ts"],
+      "stateful": true,
+      "transitions": [
+        "manifest: install descriptor parses (requirements + fetch/npm-install provision variants); unknown provision kind / empty packages -> null; no descriptor -> self-contained",
+        "readiness: probe present -> met; absent -> unmet + hint carried; default checkArgs=['--version']",
+        "available: opt-in-not-installed listed; auto-install excluded; already-installed excluded; readiness reflected; self-contained flag; provision notes; sorted",
+        "install self-contained -> copied, status 'ready', no instructions",
+        "install fetch (req met) -> file written, ready; (req unmet) -> fetch still runs (auto-fix) but instructions list the unmet requirement + cliHint, needs-setup",
+        "install npm-install (npm present) -> ran, ready; (npm absent) -> skipped, needs-setup with instructions",
+        "install fetch failure / checksum mismatch -> step not-ok, needs-setup, dest not written",
+        "install unknown id -> status 'error', not installed",
+        "re-install preserves already-provisioned assets (non-destructive copy)",
+        "route GET /plugins/available lists opt-in fixture (schema-valid); POST /plugins/:id/install-bundled self-contained -> ready + moves installed<->available + on disk; unknown id -> error result"
+      ],
+      "note": "Opt-in install from the UI with readiness checks + guided setup (GB-1069): the manifest `install` descriptor (requirements + fetch/npm-install provision), readiness probing (injectable), the available-to-install list, and the install action (copy + check + auto-provision what it can, else return specific instructions). Every external effect (spawn/fetch/fs dirs) is injected so the flow is fully unit-tested; the route wiring + response shapes are integration-tested against a self-contained fixture in isolated temp dirs (stubEnv GLASSBOX_CONFIG_DIR + GLASSBOX_BUNDLED_PLUGINS_DIR). Verified live against the REAL built dist/plugins: image-codecs (self-contained) installs to 'ready'; PlantUML/Mermaid list with their java/npm readiness + provision notes. The Settings-tab CLIENT rendering + Install-button click is manual (docs/manual-test-plan.md), reusing the GB-1043 fixture-plugin e2e harness in the GB-1070 follow-up."
+    },
     "NFR-29.1": {
       "waived": "Design-only (doc 29): lean-core / offline / no-CDN is a design-justification NFR; core has no format-specific renderer dep to assert against yet. The conventions test already pins the external-dep allow-list. Revisit when plugins land."
     },

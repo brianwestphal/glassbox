@@ -6,5 +6,26 @@
   "description": "Renders Mermaid .mmd / .mermaid source to SVG via a local `mmdc` (mermaid-cli) subprocess. Separately installable — requires a headless browser via `@mermaid-js/mermaid-cli` + puppeteer (run `node setup.mjs`). Falls back to the code block when unavailable.",
   "author": "Glassbox",
   "autoInstall": false,
-  "contentTypes": [{ "extensions": [".mmd", ".mermaid"] }]
+  "contentTypes": [{ "extensions": [".mmd", ".mermaid"] }],
+  "install": {
+    "requirements": [
+      {
+        "id": "npm",
+        "label": "npm (Node package manager)",
+        "command": "npm",
+        "checkArgs": ["--version"],
+        "hint": "Mermaid renders in a headless browser and needs `npm` to provision its renderer (@mermaid-js/mermaid-cli + puppeteer). Install Node.js (which includes npm) from nodejs.org, then click Install again — or run the CLI setup below.",
+        "docUrl": "https://nodejs.org"
+      }
+    ],
+    "provision": [
+      {
+        "kind": "npm-install",
+        "packages": ["@mermaid-js/mermaid-cli@11", "puppeteer@24"],
+        "requires": "npm",
+        "note": "Installs @mermaid-js/mermaid-cli + puppeteer and downloads a headless Chromium (~hundreds of MB) on first install."
+      }
+    ],
+    "cliHint": "node plugins/mermaid/setup.mjs"
+  }
 }
