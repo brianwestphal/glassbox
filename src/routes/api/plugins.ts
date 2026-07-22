@@ -125,5 +125,7 @@ pluginsRoutes.delete('/plugins/:id', async (c) => {
   clearConfigLabelOverrides(id.data);
   clearPluginUIElements(id.data);
   await reloadContentPlugins(repoRoot);
-  return c.json({ plugins: describeInstalledPlugins(repoRoot) });
+  // Include the refreshed available list: uninstalling a bundled opt-in plugin
+  // makes it available to install again (GB-1070).
+  return c.json({ plugins: describeInstalledPlugins(repoRoot), available: listAvailablePlugins() });
 });

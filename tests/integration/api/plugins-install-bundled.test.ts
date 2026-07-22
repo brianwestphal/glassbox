@@ -93,4 +93,16 @@ describe('opt-in bundled-plugin install routes (GB-1069)', () => {
     expect(body.result.status).toBe('error');
     expect(body.result.installed).toBe(false);
   });
+
+  it('DELETE returns the available list so an uninstalled opt-in plugin re-appears (GB-1070)', async () => {
+    const { UninstallPluginRespSchema } = await import('../../../src/api/plugins.js');
+    const a = await app();
+    // Install it, then uninstall it.
+    await a.request('/api/plugins/fixture-codec/install-bundled', { method: 'POST' });
+    const res = await a.request('/api/plugins/fixture-codec', { method: 'DELETE' });
+    const body = UninstallPluginRespSchema.parse(await res.json());
+    // Gone from installed, back in available.
+    expect(body.plugins.map((p) => p.id)).not.toContain('fixture-codec');
+    expect((body.available ?? []).map((av) => av.id)).toContain('fixture-codec');
+  });
 });

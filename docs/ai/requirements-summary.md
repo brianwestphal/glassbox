@@ -991,9 +991,18 @@ contributes no renderer (browsers show WebP/AVIF natively), only the decode. A
 committed **fixture-plugin e2e** (GB-1043) now drives both render paths (file-diff
 + review-note artifact) end-to-end with a real installed plugin (the
 `chromium-plugin` Playwright project boots a `--diff` server with a fixture plugin
-in an isolated config dir + a `.pr-notes/` note). Still open: a management-tab UI
-e2e reusing that harness (GB-1070) — the tab's layout rendering + button wiring is
-manual until then. Implemented FR/NFR units carry real tests in
+in an isolated config dir + a `.pr-notes/` note). A **management-tab UI e2e**
+(GB-1070, `tests/e2e/plugin-manage.test.ts`, same server) now drives the Settings →
+Plugins tab: the installed list + status, the global enable/disable toggle
+(removing/restoring a plugin's UI element), a `select` preference (save +
+persist-across-reload), the config-layout Test-button → status-label round-trip, a
+diff-toolbar UI element (click → toast), and the Available-to-install → Install →
+ready → uninstall flow. That e2e caught + fixed a **real bug** (the
+preference-change delegate's `asInput` threw on a `<select>`, so no select
+preference — incl. graphviz `engine` — saved from the UI) and a UX gap (uninstall
+now returns a bundled opt-in plugin to the Available list). Remaining-manual:
+install-from-arbitrary-folder, per-project enablement scope, and the stateful UI
+controls (toggle/switch/segmented). Implemented FR/NFR units carry real tests in
 `feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
@@ -1019,9 +1028,9 @@ plugins' elements flattened with `pluginId`. A click round-trips to `onAction` v
 declarative elements only; the icon is inert plugin-supplied SVG trusted via
 opt-in install (doc 29 §29.6). Worked example: the `graphviz` plugin's
 diff-toolbar **Graphviz** button (renderer self-test → toast). Modeled on Hot
-Sheet `docs/18-plugins.md` §18.12. The client rendering + click wiring is
-manual-tested (a management-tab UI e2e reusing the GB-1043 fixture-plugin harness
-is the follow-up, GB-1070) like the rest of the plugin UI; everything else carries
+Sheet `docs/18-plugins.md` §18.12. The **button** client render + click → toast +
+the enable/disable show/hide is now e2e-covered (GB-1070, `plugin-manage.test.ts`);
+the stateful toggle/switch/segmented client render stays manual; everything else carries
 unit/integration tests.
 
 ## 18n. Plugin review lifecycle hooks (`31-plugin-lifecycle-hooks.md`) — **Shipped**

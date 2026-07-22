@@ -531,11 +531,15 @@ function setupDelegates(args: {
   // Plugin preference edits (doc 29 FR-29.12). Selects/checkboxes save on change;
   // text/number inputs save on blur (change) so we don't reload on every keystroke.
   void delegate(overlay, 'change', '[data-plugin-pref-key]', (_e, el) => {
-    const id = asEl(el).dataset.pluginPrefId;
-    const key = asEl(el).dataset.pluginPrefKey;
+    const node = asEl(el);
+    const id = node.dataset.pluginPrefId;
+    const key = node.dataset.pluginPrefKey;
     if (id === undefined || key === undefined) return;
-    const input = asInput(el);
-    const value = input.type === 'checkbox' ? String(input.checked) : input.value;
+    // A `select`-type preference is an HTMLSelectElement, not an <input>; read its
+    // value directly (asInput would throw on it — GB-1070).
+    const value = node instanceof HTMLSelectElement
+      ? node.value
+      : (() => { const input = asInput(node); return input.type === 'checkbox' ? String(input.checked) : input.value; })();
     setPreference(id, key, value);
   });
 

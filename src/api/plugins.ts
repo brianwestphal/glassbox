@@ -159,6 +159,13 @@ export const InstallBundledPluginRespSchema = z.object({
 });
 export type InstallBundledPluginResp = z.infer<typeof InstallBundledPluginRespSchema>;
 
+/** `DELETE /plugins/:id` → the refreshed installed list + the available list
+ *  (uninstalling a bundled opt-in plugin makes it available to install again). */
+export const UninstallPluginRespSchema = ListPluginsRespSchema.extend({
+  available: z.array(AvailablePluginSchema).optional(),
+});
+export type UninstallPluginResp = z.infer<typeof UninstallPluginRespSchema>;
+
 export const SetPluginPreferenceReqSchema = z.object({ key: z.string().min(1), value: z.string() });
 export type SetPluginPreferenceReq = z.infer<typeof SetPluginPreferenceReqSchema>;
 
@@ -236,8 +243,8 @@ export async function installPlugin(req: InstallPluginReq): Promise<ListPluginsR
   return apiCall(ListPluginsRespSchema, '/plugins/install', { method: 'POST', body: req });
 }
 
-export async function uninstallPlugin(id: string): Promise<ListPluginsResp> {
-  return apiCall(ListPluginsRespSchema, `/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export async function uninstallPlugin(id: string): Promise<UninstallPluginResp> {
+  return apiCall(UninstallPluginRespSchema, `/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export async function setPluginPreference(id: string, req: SetPluginPreferenceReq): Promise<ListPluginsResp> {

@@ -245,11 +245,16 @@ integration points (artifacts + file diff viewer), desktop delivery (GB-1039),
 the Settings **Plugins** management tab + `/api/plugins` (GB-1040), manifest
 preferences (GB-1047/1054), and a native folder picker (GB-1048 — the
 `pick_plugin_folder` Tauri command + a **Browse…** button in the Plugins tab)
-are wired. A committed **fixture-plugin e2e** (GB-1043) drives both render paths
-(file-diff + review-note artifact) end-to-end via the `chromium-plugin` Playwright
-project (`tests/e2e/plugin-render.test.ts` + `tests/fixtures/plugin/`,
-`tests/fixtures/plugin-diff*/`); the Plugins-tab management UI e2e is the remaining
-follow-up (GB-1070).
+are wired. Committed **e2es** on the `chromium-plugin` Playwright project (a
+`--diff` server with a fixture plugin in an isolated config dir +
+`GLASSBOX_BUNDLED_PLUGINS_DIR`): `plugin-render.test.ts` (GB-1043) drives both
+render paths (file-diff + review-note artifact); `plugin-manage.test.ts` (GB-1070)
+drives the Settings → Plugins tab — installed list, global enable/disable, a
+`select` preference (save + persist), config-layout Test→label, a diff-toolbar UI
+element (click→toast), and Available→Install→ready→uninstall. `plugin-manage`
+caught + fixed a real bug (`asInput` threw on a `<select>` in the pref-change
+delegate → no select preference saved) and made uninstall return the refreshed
+`available` list.
 
 **First-party plugins** live at repo-root `plugins/<id>/` (source under `src/`,
 a `manifest.json`, a plugin-local `tsconfig.json`), built by

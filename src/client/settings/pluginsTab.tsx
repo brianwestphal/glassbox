@@ -74,7 +74,12 @@ export function togglePluginDisabled(id: string, scope: 'global' | 'project', di
 
 export function doUninstallPlugin(id: string): void {
   void uninstallPlugin(id)
-    .then((r) => { plugins.value = r.plugins; void refreshPluginUi(); })
+    .then((r) => {
+      plugins.value = r.plugins;
+      // A bundled opt-in plugin returns to the available list after uninstall.
+      if (r.available !== undefined) available.value = r.available;
+      void refreshPluginUi();
+    })
     .catch(() => {});
 }
 

@@ -25,8 +25,11 @@
 > first reference plugin, **image-codecs** (WebP/AVIF via jSquash WASM,
 > `plugins/image-codecs/`, GB-1064), has shipped too. A committed **fixture-plugin
 > e2e** (GB-1043) now drives both render paths (file-diff + review-note artifact)
-> end-to-end with a real installed plugin. Still open: a management-tab UI e2e
-> (GB-1070). See [§29.8](#298-status-and-follow-ups).
+> end-to-end with a real installed plugin, and a **management-tab UI e2e**
+> (GB-1070) now drives the Settings → Plugins tab (list / enable-disable /
+> preferences / config-layout actions / UI elements / opt-in install) — it caught
+> + fixed a real bug where a `<select>` preference never saved from the UI. See
+> [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -459,9 +462,21 @@ The build is decomposed into follow-up tickets:
   drives **both** FR-29.2 integration points end-to-end: the file-diff path (the
   Code|Rendered toggle → the plugin's SVG served `image/svg+xml`) and the artifact
   path (a review-note `.fdiag` artifact → an inline `data:image/svg+xml` `<img>`).
-  The Plugins-tab management UI (enable/disable/install/uninstall/config) still
-  relies on the manual plan; a committed e2e for it, reusing this harness, is a
-  follow-up (GB-1070).
+- **Management-tab UI e2e** (GB-1070, **shipped**) — `tests/e2e/plugin-manage.test.ts`
+  (same `chromium-plugin` server) drives the Settings → Plugins tab against the
+  installed fixture plugin (which now declares a preference + a config-layout Test
+  button + a diff-toolbar UI element) and a self-contained opt-in fixture in the
+  fixture bundle (`GLASSBOX_BUNDLED_PLUGINS_DIR`): the installed list + status dot,
+  the global enable/disable toggle (removing + restoring the plugin's UI element),
+  a `select` preference (render + save + persist-across-reload), the config-layout
+  Test-button → status-label round-trip, a diff-toolbar UI element (render + click →
+  toast), and the Available-to-install → Install → ready → uninstall flow. It caught
+  + drove the fix for a real bug (`asInput` threw on a `<select>` in the
+  preference-change delegate, so no select preference — incl. graphviz `engine` —
+  saved from the UI) and a UX gap (uninstalling a bundled opt-in plugin now returns
+  it to the Available list). The install-from-an-arbitrary-folder path, the
+  per-project (vs global) enablement scope, and the stateful UI controls
+  (toggle/switch/segmented) remain in the manual plan.
 
 ## Implementation pointers
 

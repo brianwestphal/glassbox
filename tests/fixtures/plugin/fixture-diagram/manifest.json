@@ -3,7 +3,29 @@
   "name": "Fixture Diagram (e2e)",
   "version": "1.0.0",
   "entry": "index.js",
-  "description": "Test-only content plugin (GB-1043): renders a .fdiag file to a fixed inert SVG so the content-plugin file-diff render path can be exercised end-to-end in Playwright.",
+  "description": "Test-only content plugin (GB-1043 / GB-1070): renders a .fdiag file to a fixed inert SVG and declares management-tab surfaces (a preference + a config-layout Test button + a diff-toolbar UI element) so the Settings → Plugins e2e can drive them.",
   "author": "Glassbox tests",
-  "contentTypes": [{ "extensions": [".fdiag"] }]
+  "contentTypes": [{ "extensions": [".fdiag"] }],
+  "preferences": [
+    {
+      "key": "tint",
+      "label": "Tint",
+      "type": "select",
+      "default": "blue",
+      "options": ["blue", "green"],
+      "description": "Fixture-only preference used by the management-tab e2e."
+    }
+  ],
+  "configLayout": [
+    {
+      "type": "group",
+      "title": "Rendering",
+      "items": [
+        { "type": "preference", "key": "tint" },
+        { "type": "spacer" },
+        { "type": "label", "id": "fixture-status", "text": "Not tested", "color": "transient" },
+        { "type": "button", "id": "fixture-test-btn", "label": "Test", "action": "test", "style": "primary" }
+      ]
+    }
+  ]
 }

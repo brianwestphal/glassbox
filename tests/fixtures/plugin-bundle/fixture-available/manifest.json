@@ -1,0 +1,10 @@
+{
+  "id": "fixture-available",
+  "name": "Fixture Available (e2e)",
+  "version": "1.0.0",
+  "entry": "index.js",
+  "description": "Test-only opt-in (autoInstall:false) content plugin (GB-1070). Self-contained (no install descriptor), so the Available-to-install e2e can install it with one click and assert it moves to the installed list.",
+  "author": "Glassbox tests",
+  "autoInstall": false,
+  "contentTypes": [{ "extensions": [".favail"] }]
+}

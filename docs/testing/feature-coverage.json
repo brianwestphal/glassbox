@@ -1829,8 +1829,8 @@
       "note": "activate() -> { renderers?, differs? } additive registration into the registry; counts."
     },
     "FR-29.12": {
-      "tests": ["tests/unit/plugins/settings.test.ts", "tests/unit/plugins/graphviz.test.ts"],
-      "note": "Manifest-declared preferences (GB-1047): the settings store persists per-plugin values (global config / project settings per scope, default fallback), PluginContext.getSetting/setSetting are wired to it, and the graphviz `engine` preference is applied at render (verified live). SECRET prefs (GB-1054) are stored in the OS keychain (account plugin-<id>-<key>) and the display reader masks them (only reports `configured`) — settings.test.ts covers routing/masking/clear against a mocked keychain; the real darwin keychain round-trip was verified live."
+      "tests": ["tests/unit/plugins/settings.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "note": "Manifest-declared preferences (GB-1047): the settings store persists per-plugin values (global config / project settings per scope, default fallback), PluginContext.getSetting/setSetting are wired to it, and the graphviz `engine` preference is applied at render (verified live). SECRET prefs (GB-1054) are stored in the OS keychain (account plugin-<id>-<key>) and the display reader masks them (only reports `configured`) — settings.test.ts covers routing/masking/clear against a mocked keychain; the real darwin keychain round-trip was verified live. The Settings-tab SELECT preference render + auto-save + persist-across-reload is now e2e-covered (chromium-plugin, GB-1070) — that e2e caught + drove the fix for a real bug where the change delegate's `asInput` threw on a `<select>`, so no select preference (incl. graphviz `engine`) actually saved from the UI."
     },
     "FR-29.13": {
       "tests": ["tests/unit/plugins/artifacts.test.ts", "tests/e2e/plugin-render.test.ts"],
@@ -1844,7 +1844,7 @@
       "waived": "Design-only (doc 29): the opt-in-install / no-sandbox trust model is a design-justification requirement resting on doc 14's threat model; there is no plugin code to test yet. Tracked in GB-1038. Revisit when loading lands."
     },
     "FR-29.16": {
-      "tests": ["tests/unit/plugins/enablement.test.ts", "tests/unit/plugins/loader.test.ts"],
+      "tests": ["tests/unit/plugins/enablement.test.ts", "tests/unit/plugins/loader.test.ts", "tests/e2e/plugin-manage.test.ts"],
       "stateful": true,
       "transitions": [
         "in neither list -> enabled (default)",
@@ -1852,16 +1852,17 @@
         "global-disabled -> inactive, scope=global",
         "disabled in both -> scope=global (precedence)",
         "project disable set/clear round-trips in .glassbox/settings.json",
-        "loader: disabled -> status 'disabled', not registered; enabled -> loaded + registered"
+        "loader: disabled -> status 'disabled', not registered; enabled -> loaded + registered",
+        "e2e: unchecking 'Enabled (all projects)' unloads the plugin (its UI element disappears); re-checking reloads it (UI element returns)"
       ],
-      "note": "Enablement (GB-1040): enabled-by-default, two independent disable lists (global + per-project), global precedence; loader gating; verified live end-to-end (disable a plugin -> its .dot stops rendering -> falls back)."
+      "note": "Enablement (GB-1040): enabled-by-default, two independent disable lists (global + per-project), global precedence; loader gating; verified live end-to-end (disable a plugin -> its .dot stops rendering -> falls back). The Settings-tab global disable/enable toggle is now e2e-covered (chromium-plugin, GB-1070: disabling removes the plugin's diff-toolbar UI element, re-enabling restores it)."
     },
     "FR-29.17": {
       "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/plantuml.test.ts", "tests/unit/plugins/mermaid.test.ts"],
       "note": "Reference diagram plugins: Graphviz (GB-1044, .dot/.gv -> inert SVG via @viz-js/viz WASM). PlantUML (GB-1046, .puml/.plantuml/.pu/.iuml) ships as a separately-installable, opt-in plugin that renders via a local `java -jar plantuml.jar -pipe -tsvg` subprocess — plantuml.test covers the pure SVG extraction, every fail-soft path (empty/missing-jar/spawn-error -> empty view -> code-block fallback), AND a Java-gated LIVE render (renders real source -> inert SVG containing the diagram content) that runs whenever a JRE + jar are present (Java is provisionable in CI; point PLANTUML_JAR at a jar) and skips otherwise. NOT a hardware gate like Apple FM — kept out of the default suite only because the ~22 MB GPL jar isn't committed; verified live (OpenJDK 11). Mermaid (GB-1045, .mmd/.mermaid) also ships as a separately-installable, opt-in plugin following the PlantUML model — Mermaid is a browser library (measures text via DOM getBBox), no pure-JS/WASM engine, so it renders via a local `mmdc` (@mermaid-js/mermaid-cli over puppeteer/Chromium) subprocess. mermaid.test covers the SVG extractor, the mmdcCli path resolver (MERMAID_MMDC override + default), every fail-soft path (empty/missing-cli/non-zero-exit -> empty view -> code-block fallback), AND a browser-gated LIVE render (describe.skipIf(!mmdc): renders real source -> inert SVG) that runs whenever mmdc is present (a headless browser is provisionable in CI; point MERMAID_MMDC at mermaid-cli's src/cli.js or install via setup.mjs) and skips otherwise. Kept out of the default suite only because the ~hundreds-of-MB Chromium isn't committed; verified live (headless Chromium via puppeteer 24)."
     },
     "FR-29.18": {
-      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts"],
       "stateful": true,
       "transitions": [
         "manifest: nested configLayout (group/divider/spacer/label/button) parses; bad color / unknown item type -> null",
@@ -1869,16 +1870,17 @@
         "loaded -> instance+context retained; named onAction export picked up",
         "runPluginAction: loaded+onAction -> invoked; unknown id / failed load -> 'not active'; no onAction -> 'does not handle actions'",
         "POST /plugins/:id/action -> label override reflected in the refreshed list's configLabels; initial state = manifest default; unknown id -> 400 + error",
-        "graphviz onAction(test_renderer) -> success label with engine; unknown action -> no label"
+        "graphviz onAction(test_renderer) -> success label with engine; unknown action -> no label",
+        "e2e: the fixture's config-layout Test button click runs onAction -> the group's status label updates to 'Renderer OK'"
       ],
-      "note": "Config layout + dynamic labels + actions (GB-1059): manifest configLayout union parse; the updateConfigLabel override map + onAction round-trip through the real loader + POST /plugins/:id/action; label resolution folded into the plugin list (no polling endpoint). The tab's layout RENDERING + button click wiring is manual (docs/manual-test-plan.md), gated on the fixture-plugin e2e harness (GB-1043), like the rest of the Plugins tab."
+      "note": "Config layout + dynamic labels + actions (GB-1059): manifest configLayout union parse; the updateConfigLabel override map + onAction round-trip through the real loader + POST /plugins/:id/action; label resolution folded into the plugin list (no polling endpoint). The tab's layout RENDERING (group + preference + label + button) + the button-click -> status-label round-trip is now e2e-covered (chromium-plugin, GB-1070)."
     },
     "FR-29.19": {
       "tests": ["tests/unit/plugins/registry.test.ts", "tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/plugins/image-codecs.test.ts"],
       "note": "Image-decoder capability (GB-1063) + its reference plugin image-codecs (GB-1064). registry.test covers addImageDecoders/findImageDecoder dispatch + (priority, specificity) tie-break + independence from renderers/differs; loader.test covers a plugin's imageDecoders being registered on activate; dispatch.test covers decodeImageWithPlugin (match -> decode; no-match/null/throw/disabled -> null, fail-soft); perceptual-diff.test covers the ground-truth wiring: comparePerceptual (now async) tries core (PNG/JPEG) first then falls back to an injected plugin decoder, scoring an otherwise-undecodable pair, preferring core when it can decode, and staying `undecodable` (no crash) when the decoder throws or returns null. image-codecs.test drives the REAL jSquash WebP+AVIF decoders (WASM read from the on-disk codec, the same bytes esbuild inlines into the bundle) end-to-end: decode fixtures to RGBA (lossless webp -> exact color; avif dims), fail-soft on garbage bytes, and — installed via the registry — make an otherwise-undecodable WebP pair scorable through comparePerceptual (identical->0, different->>0). The bundled self-contained plugin was additionally verified live decoding the fixtures. The launch path (cli.ts ground-truth branch) initializes plugins before scoring."
     },
     "FR-29.20": {
-      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/readiness.test.ts", "tests/unit/plugins/available.test.ts", "tests/unit/plugins/install-action.test.ts", "tests/integration/api/plugins-install-bundled.test.ts"],
+      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/readiness.test.ts", "tests/unit/plugins/available.test.ts", "tests/unit/plugins/install-action.test.ts", "tests/integration/api/plugins-install-bundled.test.ts", "tests/e2e/plugin-manage.test.ts"],
       "stateful": true,
       "transitions": [
         "manifest: install descriptor parses (requirements + fetch/npm-install provision variants); unknown provision kind / empty packages -> null; no descriptor -> self-contained",
@@ -1890,7 +1892,8 @@
         "install fetch failure / checksum mismatch -> step not-ok, needs-setup, dest not written",
         "install unknown id -> status 'error', not installed",
         "re-install preserves already-provisioned assets (non-destructive copy)",
-        "route GET /plugins/available lists opt-in fixture (schema-valid); POST /plugins/:id/install-bundled self-contained -> ready + moves installed<->available + on disk; unknown id -> error result"
+        "route GET /plugins/available lists opt-in fixture (schema-valid); POST /plugins/:id/install-bundled self-contained -> ready + moves installed<->available + on disk; unknown id -> error result",
+        "e2e: the Available-to-install section lists a self-contained opt-in fixture; clicking Install -> ready toast + moves to the installed list; uninstalling returns it to Available"
       ],
       "note": "Opt-in install from the UI with readiness checks + guided setup (GB-1069): the manifest `install` descriptor (requirements + fetch/npm-install provision), readiness probing (injectable), the available-to-install list, and the install action (copy + check + auto-provision what it can, else return specific instructions). Every external effect (spawn/fetch/fs dirs) is injected so the flow is fully unit-tested; the route wiring + response shapes are integration-tested against a self-contained fixture in isolated temp dirs (stubEnv GLASSBOX_CONFIG_DIR + GLASSBOX_BUNDLED_PLUGINS_DIR). Verified live against the REAL built dist/plugins: image-codecs (self-contained) installs to 'ready'; PlantUML/Mermaid list with their java/npm readiness + provision notes. The Settings-tab CLIENT rendering + Install-button click is manual (docs/manual-test-plan.md), reusing the GB-1043 fixture-plugin e2e harness in the GB-1070 follow-up."
     },
@@ -1917,15 +1920,16 @@
       "note": "Predefined locations (header / diff-toolbar / sidebar-footer): the element's `location` rides through registerUI -> GET /plugins/ui. The server-rendered slots exist in reviewShell.tsx; the client PLACEMENT into each slot is manual (docs/manual-test-plan.md), gated on GB-1043."
     },
     "FR-30.3": {
-      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/segmentSelection.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/segmentSelection.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts"],
       "stateful": true,
       "transitions": [
         "button/link render (graphviz button; wire schema + GET /plugins/ui carry them)",
         "stateful toggle: value unset -> off; POST value -> persisted to stateKey; GET /plugins/ui resolves value -> on (integration)",
         "segmented selection math: exactly-one / zero-or-one / zero-or-more / one-or-more transitions + parse/encode round-trip (segmentSelection)",
-        "graphviz toggle registered with stateKey; onAction(toggle_grid, value) reports the new state"
+        "graphviz toggle registered with stateKey; onAction(toggle_grid, value) reports the new state",
+        "e2e: a fixture diff-toolbar button renders in #plugin-ui-diff-toolbar and click -> toast; disabling the plugin removes it, re-enabling restores it"
       ],
-      "note": "All five element types (GB-1058 button/link, GB-1068 toggle/switch/segmented-control). Stateful state persists to stateKey (host reflects) + resolves in the list; selection math is pure + unit-tested. The client RENDER + click wiring is manual (docs/manual-test-plan.md), gated on GB-1043 (verified live via a headed browser check)."
+      "note": "All five element types (GB-1058 button/link, GB-1068 toggle/switch/segmented-control). Stateful state persists to stateKey (host reflects) + resolves in the list; selection math is pure + unit-tested. The **button** render + click -> toast + the enable/disable show/hide is now e2e-covered (chromium-plugin, GB-1070); the stateful toggle/switch/segmented-control client render stays manual (docs/manual-test-plan.md)."
     },
     "FR-30.4": {
       "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],
@@ -1939,8 +1943,8 @@
       "note": "Registration + list endpoint (GB-1058): registerUI -> loader map (cleared on reload so disabled plugins drop out) -> listPluginUIElements -> GET /api/plugins/ui."
     },
     "FR-30.5": {
-      "tests": ["tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts"],
-      "note": "Action round-trip (GB-1058/GB-1068): onAction(actionId, ctx, value?) may return a UIActionResult; runPluginAction passes value + returns the result; POST /api/plugins/:id/action carries `value` for stateful controls (threaded to onAction, asserted in plugins-routes) and returns `result` alongside the refreshed list. The client toast on `result.message` is manual (docs/manual-test-plan.md), gated on GB-1043."
+      "tests": ["tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "note": "Action round-trip (GB-1058/GB-1068): onAction(actionId, ctx, value?) may return a UIActionResult; runPluginAction passes value + returns the result; POST /api/plugins/:id/action carries `value` for stateful controls (threaded to onAction, asserted in plugins-routes) and returns `result` alongside the refreshed list. The client toast on `result.message` is now e2e-covered (chromium-plugin, GB-1070: the fixture UI-button click toasts its message)."
     },
     "FR-30.6": {
       "waived": "Design-only (doc 30): declarative/inert UI elements (the plugin ships icon+label+action id, never DOM; the icon SVG is trusted plugin data per the opt-in-install boundary, doc 29 §29.6) is a design-justification requirement, same class as NFR-29.2. The wire schema (PluginUIElementSchema) carries no code/handler field, structurally enforcing the declarative contract."

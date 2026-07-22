@@ -43,79 +43,55 @@ Automated Coverage Summary below.
 
 ## Content plugins — management tab (doc 29, GB-1040)
 
-The enablement model + API are unit-tested (`plugins/enablement.test.ts`,
-`plugins/loader.test.ts`) and verified live; a committed e2e that drives the tab
-with a real installed plugin is gated on the fixture-plugin harness (GB-1043).
-Until then, the tab's UI wiring is manual:
+**Most of this is now automated** by the committed `chromium-plugin` e2e
+(`tests/e2e/plugin-manage.test.ts`, GB-1070) — see the Automated Coverage Summary.
+It drives, against a real installed fixture plugin: the installed list + status
+dot, the global enable/disable toggle (removing/restoring the plugin's UI
+element), a `select` preference (render + save + persist-across-reload), the
+config-layout group + Test-button → status-label round-trip, a diff-toolbar UI
+element (render + click → toast), and the Available-to-install → Install → ready →
+uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
 
-- **Plugins tab lists installed plugins** — Open Settings → Plugins with a plugin
-  installed (e.g. the bundled Graphviz). The list shows its name, version,
-  handled extensions, and a status dot (green = active, gray = disabled, red =
-  failed load with the error).
-- **Per-project + global disable toggles** — Unchecking "Enabled (this project)"
-  disables the plugin for the current repo (its diagrams stop rendering, falling
-  back to the code block / text diff); re-checking restores it. Unchecking
-  "Enabled (all projects)" disables it everywhere and greys out the per-project
-  toggle (global precedence).
-- **Install-from-a-folder / uninstall** — Typing a plugin folder path + Install
-  adds it to the list (the field clears on success); Uninstall removes it (and a
-  bundled plugin stays gone via the dismiss-list). Installing a folder with no
-  `manifest.json` shows a clean "not a Glassbox plugin" error, not a crash.
+- **Per-project disable toggle + graying** — Unchecking "Enabled (this project)"
+  disables the plugin for the current repo only (its diagrams stop rendering,
+  falling back to the code block / text diff); re-checking restores it. Unchecking
+  "Enabled (all projects)" greys out the per-project toggle (global precedence).
+  *(The **global** enable/disable toggle is e2e-covered, GB-1070; the per-project
+  scope + graying is the manual remainder.)*
+- **Install-from-a-folder** — Typing a plugin folder path + Install adds it to the
+  list (the field clears on success). Installing a folder with no `manifest.json`
+  shows a clean "not a Glassbox plugin" error, not a crash. *(Bundled-plugin
+  uninstall is e2e-covered, GB-1070; install-from-an-arbitrary-folder + the error
+  case is the manual remainder.)*
 - **Browse… native folder picker (GB-1048, desktop only)** — Under Tauri, a
   **Browse…** button next to the install field opens a native folder dialog and
   **fills the field** with the chosen path (it does not auto-install — the user
   then clicks **Install**). The dialog must not freeze the app.
-- **Available to install — opt-in plugins with readiness + guided setup (GB-1069)**
-  — Open Settings → Plugins with the opt-in plugins **not** installed. An
-  **Available to install** section lists **image-codecs**, **PlantUML**, and
-  **Mermaid**, each showing its system requirements (a check when satisfied, a
-  warning + hint when not) and what installing will provision. Clicking **Install**:
-  - **image-codecs** (self-contained) → installs immediately, a "Installed" toast,
-    and the row moves to the installed list.
-  - **PlantUML** with a JRE present → installs and fetches `plantuml.jar`
-    automatically → ready. With **no JRE**, it still installs + fetches the jar but
-    shows an instruction to install Java, then click Install again.
-  - **Mermaid** with `npm` present → installs and runs `npm install` (downloading a
+- **Available to install — real system-dependency provisioning (GB-1069)** — The
+  Available-to-install list + the **self-contained** install → ready → uninstall
+  flow is e2e-covered (GB-1070). What stays manual is the **real** provisioning
+  that needs a system dependency / network, against the actual built plugins:
+  - **PlantUML** with a JRE present → Install fetches `plantuml.jar` from Maven
+    automatically → ready (review a `.puml` in Rendered mode). With **no JRE**, it
+    still fetches the jar but shows an instruction to install Java, then Install again.
+  - **Mermaid** with `npm` present → Install runs `npm install` (downloading a
     Chromium — slow) → ready. With **no `npm`**, it installs the plugin but shows an
     instruction to install Node.js (or run the CLI `setup.mjs`), then Install again.
-  In each case the row reflects the outcome (ready vs. the remaining steps), and a
-  re-install after satisfying a requirement completes it. *(The readiness checks,
-  the available list, and the install action — copy + auto-provision + instruction
-  assembly — are unit/integration-tested and verified live against the real built
-  plugins; this item is the Settings-tab rendering + Install-button flow, which
-  needs the real UI — a committed e2e reuses the GB-1043 harness in GB-1070.)*
-- **Manifest preferences (GB-1047)** — With the Graphviz plugin enabled, its row
-  shows a **Layout engine** select (dot / neato / fdp / circo / twopi). Changing
-  it auto-saves; re-open a `.dot` diagram in Rendered mode and the layout changes
-  to the selected engine. *(The store + getSetting/setSetting + engine-applied
-  render are unit-tested and verified live; this item is the tab's control
-  rendering + auto-save, which needs the real UI.)*
-- **Config layout — groups / labels / action buttons (GB-1059, FR-29.18)** — With
-  the Graphviz plugin enabled, its preferences render inside a collapsible
-  **Rendering** group (chevron toggles it; the engine select sits inside). Below
-  it a **status label** reads "Not tested" and a **Test renderer** button, when
-  clicked, runs the plugin's action and the label updates to "Renderer OK (dot)"
-  in green (or an error in red). Changing the engine and re-testing reflects the
-  new engine in the label. *(The manifest layout parse, the `onAction`/
-  `updateConfigLabel` round-trip, and the label-resolution in the list response
-  are unit/integration-tested — `plugins/manifest.test.ts`,
-  `plugins/loader.test.ts`, `plugins/configLayout.test.ts`, `plugins/graphviz.test.ts`,
-  and `api/plugins-routes.test.ts`; this item is the tab's layout rendering +
-  button wiring, which needs the real UI — a committed e2e is gated on the
-  fixture-plugin harness, GB-1043.)*
-- **Plugin UI extensions — header / diff-toolbar / sidebar-footer (GB-1058, doc 30)**
-  — With the Graphviz plugin enabled, a **Graphviz** button appears in the bottom
-  diff toolbar (the `diff-toolbar` location). Clicking it runs the plugin's action
-  and shows a toast ("Graphviz renderer OK (dot)"). Disabling the plugin removes
-  the button; re-enabling restores it (the slots re-render without a page reload).
-  A plugin registering a `header` or `sidebar-footer` element shows it in the
-  main-content top bar / below the Complete–Reopen controls respectively. A `link`
-  element opens its URL in a new tab. **Stateful controls (GB-1068):** the Graphviz
-  plugin also shows a **Grid** toggle in the sidebar footer — clicking it flips
-  "Grid: off"↔"Grid: on" (highlighted when on), toasts the new state, and the state
-  **persists** across a settings reopen / plugin re-render (host-persisted per
-  `stateKey`). A `switch` behaves the same with its on/off labels; a
-  `segmented-control` highlights the selected segment(s) per its selection mode
+  - **image-codecs** self-contained install is fully e2e-covered.
+- **Graphviz engine preference applies at render** — With Graphviz enabled, its row
+  shows a **Layout engine** select; changing it and re-opening a `.dot` diagram in
+  Rendered mode renders with the new engine. *(The **select preference render +
+  auto-save + persist** is now e2e-covered, GB-1070; the engine-applied-**render**
+  is separately unit-tested — this item is the end-to-end visual confirmation.)*
+- **Plugin UI extensions — header / sidebar-footer / link + stateful controls (GB-1058/1068, doc 30)**
+  — The **diff-toolbar button** render + click → toast + enable/disable show/hide is
+  e2e-covered (GB-1070). What stays manual: a plugin registering a **`header`** or
+  **`sidebar-footer`** element shows it in the main-content top bar / below the
+  Complete–Reopen controls; a **`link`** element opens its URL in a new tab; and the
+  **stateful controls (GB-1068)** — a Grid **toggle** flips "Grid: off"↔"Grid: on"
+  (highlighted when on), toasts the new state, and **persists** across a settings
+  reopen (host-persisted per `stateKey`); a **`switch`** behaves the same; a
+  **`segmented-control`** highlights the selected segment(s) per its selection mode
   (`exactly-one` keeps one selected, `zero-or-more` toggles each independently).
   *(The registration, `GET /api/plugins/ui`,
   and the `onAction`→`result.message` round-trip are unit/integration-tested —
@@ -190,3 +166,15 @@ Until then, the tab's UI wiring is manual:
   Code|Rendered toggle; Rendered serves the plugin's SVG as `image/svg+xml`) and
   the **artifact path** (a review-note `.fdiag` artifact renders as an inline
   `data:image/svg+xml` `<img>`). Previously verified only by hand.
+- **Content-plugin management tab (doc 29 FR-29.12/16/18/20, doc 30 FR-30.3/5, GB-1070)**
+  — `tests/e2e/plugin-manage.test.ts` (same `chromium-plugin` server) drives the
+  Settings → Plugins tab against a real installed fixture plugin: the installed
+  list + active status dot; the **global enable/disable** toggle (removing +
+  restoring the plugin's diff-toolbar UI element); a **`select` preference** (render
+  + auto-save + persist across a full reload); the **config-layout** group +
+  **Test-button → status-label** round-trip; a **diff-toolbar UI element** (render +
+  click → toast); and the **Available-to-install → Install → ready → uninstall**
+  flow (a self-contained opt-in fixture in `GLASSBOX_BUNDLED_PLUGINS_DIR`). This
+  e2e caught + drove the fix for a real bug: the preference-change delegate's
+  `asInput` threw on a `<select>`, so **no** select preference (including graphviz's
+  `engine`) actually saved from the UI. Previously all manual.

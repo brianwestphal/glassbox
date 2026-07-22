@@ -152,13 +152,19 @@ export default defineConfig({
       port: 4187,
       reuseExistingServer: false,
       timeout: 15000,
-      env: { GLASSBOX_CONFIG_DIR: PLUGIN_CONFIG_DIR },
+      // GLASSBOX_BUNDLED_PLUGINS_DIR points the "available to install" list (GB-1069)
+      // at a fixture bundle holding one self-contained opt-in plugin, so the
+      // management-tab e2e (GB-1070) can drive the install flow deterministically.
+      env: {
+        GLASSBOX_CONFIG_DIR: PLUGIN_CONFIG_DIR,
+        GLASSBOX_BUNDLED_PLUGINS_DIR: join(process.cwd(), 'tests/fixtures/plugin-bundle'),
+      },
     },
   ],
   projects: [
     {
       name: 'chromium',
-      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/, /plugin-render\.test\.ts$/],
+      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/, /plugin-render\.test\.ts$/, /plugin-manage\.test\.ts$/],
       use: { browserName: 'chromium' },
     },
     {
@@ -173,7 +179,7 @@ export default defineConfig({
     },
     {
       name: 'chromium-plugin',
-      testMatch: /plugin-render\.test\.ts$/,
+      testMatch: /plugin-(render|manage)\.test\.ts$/,
       use: { browserName: 'chromium', baseURL: 'http://localhost:4187' },
     },
   ],
