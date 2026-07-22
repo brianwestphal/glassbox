@@ -43,6 +43,16 @@ describe('fetchAvailableModels — Anthropic', () => {
     expect(defaults[0].id).toBe('claude-sonnet-4-6'); // the static default
   });
 
+  it('flags the FIRST entry as default when the live list lacks the static default (GB-1089)', async () => {
+    mockFetch({ data: [
+      { id: 'claude-future-1', display_name: 'Future 1' },
+      { id: 'claude-future-2', display_name: 'Future 2' },
+    ] });
+    const models = await fetchAvailableModels('anthropic', 'sk-test');
+    // Exactly one default, and it's the first entry — the dropdown contract.
+    expect(models!.filter(m => m.isDefault).map(m => m.id)).toEqual(['claude-future-1']);
+  });
+
   it('returns null on a non-ok response (caller falls back to static)', async () => {
     mockFetch({}, false);
     expect(await fetchAvailableModels('anthropic', 'sk-test')).toBeNull();

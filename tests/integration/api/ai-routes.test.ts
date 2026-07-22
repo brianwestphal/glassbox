@@ -228,6 +228,71 @@ describe('GET /api/ai/models', () => {
   });
 });
 
+describe('GET /api/ai/models — live-replacement branch (GB-1089)', () => {
+  // The suite default mocks fetchAvailableModels to null (static fallback), so
+  // the `live !== null && live.length > 0` replacement path was never driven.
+  const LIVE = [{ id: 'claude-live-1', name: 'Live 1', contextWindow: 1000000, isDefault: true }];
+
+  it('a live list replaces the static one for its platform while others keep the fallback', async () => {
+    const { fetchAvailableModels } = await import('../../../src/ai/list-models.js');
+    const { resolveAPIKey } = await import('../../../src/ai/config.js');
+    // Key present for anthropic + openai; live succeeds only for anthropic.
+    vi.mocked(resolveAPIKey).mockImplementation((platform: string) =>
+      platform === 'anthropic' || platform === 'openai' ? { key: 'k', source: 'config' } : { key: null, source: null });
+    vi.mocked(fetchAvailableModels).mockImplementation(async (platform: string) =>
+      platform === 'anthropic' ? LIVE : null);
+    try {
+      const res = await app.request('/api/ai/models');
+      const body = await res.json();
+      expect(body.models.anthropic.map((m: { id: string }) => m.id)).toEqual(['claude-live-1']);
+      // openai's live fetch returned null → static list retained (non-empty,
+      // and not the live id).
+      expect(body.models.openai.length).toBeGreaterThan(0);
+      expect(body.models.openai.map((m: { id: string }) => m.id)).not.toContain('claude-live-1');
+    } finally {
+      vi.mocked(fetchAvailableModels).mockImplementation(async () => null);
+      vi.mocked(resolveAPIKey).mockImplementation(() => ({ key: null, source: null }));
+    }
+  });
+
+  it('a live EMPTY array retains the static list (the length > 0 guard)', async () => {
+    const { fetchAvailableModels } = await import('../../../src/ai/list-models.js');
+    const { resolveAPIKey } = await import('../../../src/ai/config.js');
+    vi.mocked(resolveAPIKey).mockImplementation((platform: string) =>
+      platform === 'anthropic' ? { key: 'k', source: 'config' } : { key: null, source: null });
+    vi.mocked(fetchAvailableModels).mockResolvedValue([]);
+    try {
+      const res = await app.request('/api/ai/models');
+      const body = await res.json();
+      expect(body.models.anthropic.length).toBeGreaterThan(0);
+    } finally {
+      vi.mocked(fetchAvailableModels).mockImplementation(async () => null);
+      vi.mocked(resolveAPIKey).mockImplementation(() => ({ key: null, source: null }));
+    }
+  });
+
+  it('recovers: a failed request serves static, the next (live) request serves live', async () => {
+    const { fetchAvailableModels } = await import('../../../src/ai/list-models.js');
+    const { resolveAPIKey } = await import('../../../src/ai/config.js');
+    vi.mocked(resolveAPIKey).mockImplementation((platform: string) =>
+      platform === 'anthropic' ? { key: 'k', source: 'config' } : { key: null, source: null });
+    vi.mocked(fetchAvailableModels).mockResolvedValue(null);
+    try {
+      let body = await (await app.request('/api/ai/models')).json();
+      expect(body.models.anthropic.map((m: { id: string }) => m.id)).not.toContain('claude-live-1');
+
+      vi.mocked(fetchAvailableModels).mockImplementation(async (platform: string) =>
+        platform === 'anthropic' ? LIVE : null);
+      body = await (await app.request('/api/ai/models')).json();
+      // No stale pinning — the fresh request reflects the now-live list.
+      expect(body.models.anthropic.map((m: { id: string }) => m.id)).toEqual(['claude-live-1']);
+    } finally {
+      vi.mocked(fetchAvailableModels).mockImplementation(async () => null);
+      vi.mocked(resolveAPIKey).mockImplementation(() => ({ key: null, source: null }));
+    }
+  });
+});
+
 describe('GET /api/ai/key-status', () => {
   it('returns key status for all platforms', async () => {
     const res = await app.request('/api/ai/key-status');
