@@ -92,9 +92,13 @@ id — never DOM or event handlers. The host builds every node and owns all wiri
   `message` the host surfaces as a transient toast; returning nothing means "no
   client feedback". The result rides back in the action response alongside the
   refreshed plugin list (no separate endpoint). Errors (unknown plugin/action)
-  return a clean message the client toasts. The `graphviz` plugin's diff-toolbar
-  **Graphviz** button (renderer self-test → toast) and its sidebar-footer
-  **Grid** toggle (persisted on/off state → toast) are the worked examples.
+  return a clean message the client toasts. The e2e fixture plugin
+  (`tests/fixtures/plugin/fixture-diagram/`) carries the worked examples — a
+  diff-toolbar button (click → toast) exercised by `tests/e2e/plugin-manage.test.ts`.
+  Shipped first-party plugins deliberately register **no** UI elements: the
+  location slots are global chrome (visible on every review regardless of file
+  type), so a content plugin must not occupy one without a genuinely
+  always-relevant action (enforced by a conventions test).
 
 ## 30.6 Trust and inertness
 
@@ -121,13 +125,16 @@ Shipped (GB-1058): the contract (`PluginUIElement` union + `registerUI` +
 `onAction` result), the loader registry + clear-on-reload, `GET /api/plugins/ui`,
 the action-result passthrough on `POST /api/plugins/:id/action`, the three host
 slots + client rendering (`src/client/plugins/uiExtensions.tsx`) for **button**
-and **link**, and the `graphviz` reference element.
+and **link**, with the e2e fixture plugin carrying the reference element.
 
 Shipped (GB-1068): the **stateful controls** — `toggle` / `switch` /
 `segmented-control` — with host-persisted `stateKey` state, the `{ actionId, value }`
 round-trip, resolved-state attachment in `GET /api/plugins/ui`, and the pure
-selection math (`src/client/plugins/segmentSelection.ts`). The `graphviz` plugin's
-sidebar-footer **Grid** toggle is the reference. All five element types now render.
+selection math (`src/client/plugins/segmentSelection.ts`). All five element types
+now render. (The `graphviz` plugin briefly shipped a demo diff-toolbar button +
+sidebar-footer Grid toggle as worked examples; they were removed because doc-30
+slots are global chrome and the demo controls showed on every review whenever the
+plugin was installed. The reference elements live in the e2e fixture plugin.)
 
 The client rendering + click wiring is manual-tested (`docs/manual-test-plan.md`),
 gated on the fixture-plugin e2e harness (GB-1043) like the rest of the plugin UI.

@@ -1920,16 +1920,15 @@
       "note": "Predefined locations (header / diff-toolbar / sidebar-footer): the element's `location` rides through registerUI -> GET /plugins/ui. The server-rendered slots exist in reviewShell.tsx; the client PLACEMENT into each slot is manual (docs/manual-test-plan.md), gated on GB-1043."
     },
     "FR-30.3": {
-      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/segmentSelection.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "tests": ["tests/unit/plugins/segmentSelection.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts", "tests/unit/conventions.test.ts"],
       "stateful": true,
       "transitions": [
-        "button/link render (graphviz button; wire schema + GET /plugins/ui carry them)",
-        "stateful toggle: value unset -> off; POST value -> persisted to stateKey; GET /plugins/ui resolves value -> on (integration)",
+        "button/link render (fixture-plugin button; wire schema + GET /plugins/ui carry them)",
+        "stateful toggle: value unset -> off; POST value -> persisted to stateKey + threaded to onAction; GET /plugins/ui resolves value -> on (integration)",
         "segmented selection math: exactly-one / zero-or-one / zero-or-more / one-or-more transitions + parse/encode round-trip (segmentSelection)",
-        "graphviz toggle registered with stateKey; onAction(toggle_grid, value) reports the new state",
         "e2e: a fixture diff-toolbar button renders in #plugin-ui-diff-toolbar and click -> toast; disabling the plugin removes it, re-enabling restores it"
       ],
-      "note": "All five element types (GB-1058 button/link, GB-1068 toggle/switch/segmented-control). Stateful state persists to stateKey (host reflects) + resolves in the list; selection math is pure + unit-tested. The **button** render + click -> toast + the enable/disable show/hide is now e2e-covered (chromium-plugin, GB-1070); the stateful toggle/switch/segmented-control client render stays manual (docs/manual-test-plan.md)."
+      "note": "All five element types (GB-1058 button/link, GB-1068 toggle/switch/segmented-control). Stateful state persists to stateKey (host reflects) + resolves in the list; selection math is pure + unit-tested. The **button** render + click -> toast + the enable/disable show/hide is now e2e-covered (chromium-plugin, GB-1070); the stateful toggle/switch/segmented-control client render stays manual (docs/manual-test-plan.md). Reference elements live ONLY in the e2e fixture plugin: shipped first-party plugins register no UI elements — the slots are global chrome, shown on every review regardless of file type (the graphviz demo button + Grid toggle were removed for this, GB-1074) — enforced by conventions.test.ts + a graphviz.test.ts no-registerUI regression guard."
     },
     "FR-30.4": {
       "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],

@@ -232,6 +232,13 @@ the matching `label` (colors: `default` / `success` / `error` / `warning` /
 `transient`). The `plugins/graphviz/` reference plugin uses exactly this — a
 "Test renderer" button that renders a trivial graph and reports OK/failure.
 
+A note on `context.registerUI` (main-app UI extensions, doc 30): the host
+locations are **global chrome** — an element you register shows on every review,
+all the time, regardless of whether the current file is one your plugin handles.
+Only register an element whose action is genuinely always relevant. Self-tests,
+demos, and per-format controls belong in your config layout (shown only in your
+plugin's Settings row), not the main app.
+
 ### Review lifecycle hooks (optional, doc 31)
 
 A plugin can react to the **review lifecycle** — independent of file type — by

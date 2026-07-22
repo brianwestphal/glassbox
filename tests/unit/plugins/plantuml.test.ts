@@ -78,7 +78,9 @@ const jarPath = [process.env.PLANTUML_JAR, join(homedir(), '.glassbox', 'plugins
   .find((p): p is string => typeof p === 'string' && p !== '' && existsSync(p));
 
 describe.skipIf(!hasJava || jarPath === undefined)('plantuml live render (JRE + jar present)', () => {
-  it('renders real PlantUML source to an SVG containing the diagram content', async () => {
+  // JVM cold start + a real render can exceed vitest's 5s default under
+  // full-suite CPU contention (flaked at ~5s while passing in ~3s isolated).
+  it('renders real PlantUML source to an SVG containing the diagram content', { timeout: 30_000 }, async () => {
     const svg = await renderPuml('@startuml\nAlice -> Bob: Hello\n@enduml', jarPath);
     expect(svg).not.toBeNull();
     expect(svg?.startsWith('<svg')).toBe(true);

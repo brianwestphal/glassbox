@@ -84,36 +84,22 @@ describe('graphviz plugin (doc 29 FR-29.17)', () => {
     expect(result).toEqual({ message: 'Graphviz renderer OK (neato)' });
   });
 
-  it('registers a diff-toolbar UI element on activate (doc 30)', async () => {
-    const registered: unknown[] = [];
-    const ctx = ctxWith();
-    ctx.registerUI = (els) => { registered.push(...els); };
-    await plugin.activate(ctx);
-    expect(registered).toContainEqual({
-      type: 'button', id: 'graphviz-test', location: 'diff-toolbar',
-      label: 'Graphviz', title: 'Test the Graphviz renderer', action: 'test_renderer',
-    });
-  });
-
   it('onAction ignores an unknown action id (no label set)', async () => {
     const ctx = ctxWith();
     await plugin.onAction?.('nope', ctx);
     expect(ctx.labels['engine-status']).toBeUndefined();
   });
 
-  // Stateful reference control (doc 30 FR-30.3).
-  it('registers a sidebar-footer toggle bound to a stateKey', async () => {
-    const registered: { type?: string; stateKey?: string }[] = [];
+  // Regression guard: a shipped content plugin must not register main-app UI
+  // elements (doc 30) — those slots are global chrome, visible on every review
+  // regardless of file type. The demo Graphviz button + Grid toggle once lived
+  // here and showed permanently whenever the plugin was installed; keep the
+  // demo elements confined to the e2e fixture plugin.
+  it('registers no main-app UI elements on activate (doc 30 demo UI stays out of shipped plugins)', async () => {
+    const registered: unknown[] = [];
     const ctx = ctxWith();
     ctx.registerUI = (els) => { registered.push(...els); };
     await plugin.activate(ctx);
-    const toggle = registered.find((e) => e.type === 'toggle');
-    expect(toggle).toMatchObject({ type: 'toggle', id: 'graphviz-grid', location: 'sidebar-footer', stateKey: 'grid_demo', action: 'toggle_grid' });
-  });
-
-  it('onAction(toggle_grid) reports the new state from the passed value', async () => {
-    const ctx = ctxWith();
-    expect(await plugin.onAction?.('toggle_grid', ctx, 'true')).toEqual({ message: 'Graphviz grid enabled' });
-    expect(await plugin.onAction?.('toggle_grid', ctx, 'false')).toEqual({ message: 'Graphviz grid disabled' });
+    expect(registered).toEqual([]);
   });
 });

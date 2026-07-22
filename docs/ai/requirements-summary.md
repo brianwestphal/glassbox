@@ -1026,9 +1026,12 @@ plugins' elements flattened with `pluginId`. A click round-trips to `onAction` v
 `src/client/toast.tsx`). Client render: `src/client/plugins/uiExtensions.tsx`
 (`initPluginUi`/`refreshPluginUi`, a single `document.body` delegate). Trust:
 declarative elements only; the icon is inert plugin-supplied SVG trusted via
-opt-in install (doc 29 §29.6). Worked example: the `graphviz` plugin's
-diff-toolbar **Graphviz** button (renderer self-test → toast). Modeled on Hot
-Sheet `docs/18-plugins.md` §18.12. The **button** client render + click → toast +
+opt-in install (doc 29 §29.6). Worked example: the e2e fixture plugin's
+diff-toolbar button (`tests/fixtures/plugin/fixture-diagram/`). Shipped
+first-party plugins register **no** UI elements — the slots are global chrome
+(visible on every review regardless of file type), so the graphviz demo button +
+Grid toggle were removed (GB-1074) and a conventions test enforces the rule.
+Modeled on Hot Sheet `docs/18-plugins.md` §18.12. The **button** client render + click → toast +
 the enable/disable show/hide is now e2e-covered (GB-1070, `plugin-manage.test.ts`);
 the stateful toggle/switch/segmented client render stays manual; everything else carries
 unit/integration tests.
@@ -1077,7 +1080,7 @@ plugin system); the file-diff-viewer integration (GB-1042), desktop delivery
 diagram-source first reference plugin (GB-910) remain. Doc **30** (plugin main-app
 UI extensions) is **Shipped** for button/link (GB-1058) — `registerUI`,
 `GET /api/plugins/ui`, the `onAction` result→toast round-trip, three host slots,
-and the graphviz reference button; the stateful controls (toggle/switch/
+and the fixture-plugin reference button; the stateful controls (toggle/switch/
 segmented-control) shipped in GB-1068 (host-persisted `stateKey` + `{actionId,
 value}` round-trip + pure selection math). Doc **31** (plugin review lifecycle
 hooks) is **Shipped** (GB-1065) — `reviewHooks` (`onReviewCreated` /

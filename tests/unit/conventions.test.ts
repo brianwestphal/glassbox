@@ -116,6 +116,26 @@ describe('forbidden imports', () => {
     }
     expect(offenders, `react import(s) found: ${offenders.join(', ')}`).toEqual([]);
   });
+
+  it('shipped first-party plugins register no main-app UI elements (doc 30)', () => {
+    // Doc-30 slots (header / diff-toolbar / sidebar-footer) are global chrome:
+    // an element registered there shows on every review, regardless of whether
+    // the current file is one the plugin handles. The graphviz plugin once
+    // shipped a demo "Graphviz" button + "Grid" toggle this way — permanently
+    // visible once the plugin was installed. Demo/worked-example UI elements
+    // belong in the e2e fixture plugin (tests/fixtures/plugin/fixture-diagram/),
+    // not in shipped plugins. If a shipped plugin someday needs a genuinely
+    // always-relevant control, update this test deliberately alongside it.
+    const offenders: string[] = [];
+    for (const file of walk(join(ROOT, 'plugins'))) {
+      if (file.includes('node_modules')) continue;
+      const src = readFileSync(file, 'utf8');
+      // Match calls (`context.registerUI(...)`), not the interface declaration
+      // in each plugin's standalone types.ts copy.
+      if (/\.registerUI\s*\(/.test(src)) offenders.push(file);
+    }
+    expect(offenders, `registerUI call(s) in shipped plugins: ${offenders.join(', ')}`).toEqual([]);
+  });
 });
 
 describe('Tauri launcher ↔ CLI stdout contract', () => {

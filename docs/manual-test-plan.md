@@ -88,14 +88,18 @@ uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
   e2e-covered (GB-1070). What stays manual: a plugin registering a **`header`** or
   **`sidebar-footer`** element shows it in the main-content top bar / below the
   Complete–Reopen controls; a **`link`** element opens its URL in a new tab; and the
-  **stateful controls (GB-1068)** — a Grid **toggle** flips "Grid: off"↔"Grid: on"
+  **stateful controls (GB-1068)** — a **toggle** flips its off↔on face
   (highlighted when on), toasts the new state, and **persists** across a settings
   reopen (host-persisted per `stateKey`); a **`switch`** behaves the same; a
   **`segmented-control`** highlights the selected segment(s) per its selection mode
   (`exactly-one` keeps one selected, `zero-or-more` toggles each independently).
+  Exercise these with a scratch plugin (e.g. a copy of
+  `tests/fixtures/plugin/fixture-diagram/` with the element type under test) —
+  shipped first-party plugins deliberately register no UI elements (the slots are
+  global chrome; the graphviz demo button + Grid toggle were removed for this).
   *(The registration, `GET /api/plugins/ui`,
   and the `onAction`→`result.message` round-trip are unit/integration-tested —
-  `plugins/loader.test.ts`, `plugins/configLayout.test.ts`, `plugins/graphviz.test.ts`,
+  `plugins/loader.test.ts`, `plugins/configLayout.test.ts`,
   `api/plugins-routes.test.ts`; this item is the client slot rendering + click →
   toast, which needs the real UI — a committed e2e is gated on the fixture-plugin
   harness, GB-1043.)*

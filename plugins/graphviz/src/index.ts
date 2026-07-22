@@ -58,29 +58,11 @@ const plugin: ContentPlugin = {
     // activation (a change re-activates the plugin via reloadContentPlugins).
     const engine = await resolveEngine(context);
     context.log('info', `graphviz plugin activated (.dot / .gv), engine=${engine}`);
-    // Reference UI extension (doc 30): a diff-toolbar button that runs the same
-    // renderer self-test as the config-layout button and toasts the result.
-    context.registerUI([
-      {
-        type: 'button',
-        id: 'graphviz-test',
-        location: 'diff-toolbar',
-        label: 'Graphviz',
-        title: 'Test the Graphviz renderer',
-        action: 'test_renderer',
-      },
-      // Reference stateful control (doc 30 FR-30.3): a toggle whose on/off state
-      // the host persists to `stateKey`; onAction reports the new state.
-      {
-        type: 'toggle',
-        id: 'graphviz-grid',
-        location: 'sidebar-footer',
-        stateKey: 'grid_demo',
-        action: 'toggle_grid',
-        on: { label: 'Grid: on' },
-        off: { label: 'Grid: off' },
-      },
-    ]);
+    // Deliberately NO main-app UI elements (doc 30 registerUI). Doc-30 slots are
+    // global chrome — an element shows on every review regardless of file type —
+    // so a content plugin must not register one without a real always-relevant
+    // action. The demo button/toggle that once lived here now live only in the
+    // e2e fixture plugin (tests/fixtures/plugin/fixture-diagram/).
     return {
       renderers: [
         {
@@ -92,16 +74,10 @@ const plugin: ContentPlugin = {
     };
   },
 
-  // "Test renderer" action, shared by the config-layout button (doc 29 FR-29.18)
-  // and the diff-toolbar UI element (doc 30): render a trivial graph with the
-  // current engine, report the result as a config-layout status label, and
-  // return a `message` so the UI element surfaces a toast.
-  async onAction(actionId, context, value) {
-    // Stateful toggle (doc 30 FR-30.3): the host has already persisted `value`
-    // to the `grid_demo` setting; just acknowledge the new state.
-    if (actionId === 'toggle_grid') {
-      return { message: `Graphviz grid ${value === 'true' ? 'enabled' : 'disabled'}` };
-    }
+  // "Test renderer" action for the config-layout button (doc 29 FR-29.18):
+  // render a trivial graph with the current engine, report the result as a
+  // config-layout status label, and return a `message` for the toast.
+  async onAction(actionId, context) {
     if (actionId !== 'test_renderer') return;
     const engine = await resolveEngine(context);
     try {
