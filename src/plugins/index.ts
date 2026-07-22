@@ -16,6 +16,7 @@ import { clearAllPluginUIElements, type EnablementCheck, getConfigLabelOverride,
 import type { ConfigLayoutItem, PluginManifest, PluginPreference } from './manifest.js';
 import { ContentPluginRegistry } from './registry.js';
 import { readPluginPreferenceDisplay, readPluginSetting, writePluginSetting } from './settings.js';
+import { ensureIntrinsicSvgSize } from './svgSize.js';
 import type { AnnotationHookInfo, ConfigLabelColor, DecodedImage, DiffInput, PluginUIElement, RenderedView, RenderInput, ReviewHookInfo, UIActionResult } from './types.js';
 
 let registry = new ContentPluginRegistry();
@@ -311,7 +312,14 @@ export async function renderContent(input: RenderInput): Promise<RenderedView | 
   const renderer = registry.findRenderer(input);
   if (renderer === undefined) return null;
   try {
-    return usableView(await renderer.render(input));
+    const view = usableView(await renderer.render(input));
+    // Both render paths show plugin SVG through an <img>, where an SVG with no
+    // absolute width/height (e.g. Mermaid's width="100%") has no intrinsic
+    // size and collapses to ~0×0 — normalize once here for every plugin.
+    if (view?.svg !== undefined && view.svg !== '') {
+      return { ...view, svg: ensureIntrinsicSvgSize(view.svg) };
+    }
+    return view;
   } catch {
     return null;
   }

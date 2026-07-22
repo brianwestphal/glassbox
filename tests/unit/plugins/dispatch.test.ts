@@ -52,6 +52,21 @@ describe('renderContent dispatch (doc 29 FR-29.9/29.13/29.14)', () => {
     __resetContentPluginsForTest();
     expect(await renderContent({ bytes: new Uint8Array(), path: 'd.mmd' })).toBeNull();
   });
+
+  // Both render paths show plugin SVG through an <img>, where a viewBox-only
+  // root (e.g. Mermaid's width="100%") has no intrinsic size and collapses to
+  // ~0×0 — renderContent must normalize every plugin's SVG output.
+  it('injects intrinsic dimensions into a viewBox-only SVG (the Mermaid width="100%" case)', async () => {
+    const pct: ContentRenderer = {
+      name: 'pct', match: { extensions: ['.mmd'] },
+      render: () => ({ svg: '<svg width="100%" viewBox="0 0 640 480"><g/></svg>' }),
+    };
+    __setContentRegistryForTest(registryWith(pct));
+    const view = await renderContent({ bytes: new Uint8Array(), path: 'd.mmd' });
+    expect(view?.svg).toContain('width="640"');
+    expect(view?.svg).toContain('height="480"');
+    expect(view?.svg).not.toContain('100%');
+  });
 });
 
 describe('diffContent dispatch (doc 29 FR-29.10)', () => {
