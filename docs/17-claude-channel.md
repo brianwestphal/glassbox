@@ -11,11 +11,20 @@ Requirements for integrating with Claude Code via MCP channels so users can send
   - Run as a subprocess spawned by Claude Code via `.mcp.json` configuration.
   - Communicate with Claude Code over stdio using the MCP protocol.
   - Expose a local HTTP API for the Glassbox UI to trigger channel events.
-  - Write its HTTP port to `.glassbox/channel-port` on startup.
-  - Clean up the port file on exit.
+  - Write its HTTP port to `.glassbox/channel-port` on startup, and a
+    per-process random **shared secret** to `.glassbox/channel-secret` (0600).
+  - Clean up the port and secret files on exit.
 - The channel server shall support:
   - `POST /trigger` — Send a channel event to Claude Code with arbitrary content.
-  - `GET /health` — Health check endpoint.
+    **Requires the shared secret** in the `X-Glassbox-Secret` header (403
+    without it). The trigger body is injected into a Claude session that is
+    pre-instructed to execute without confirmation, and loopback binding alone
+    does not stop a malicious browser page from firing a no-preflight "simple
+    request" POST at the port — the secret (unreadable from a page, and a
+    custom header that forces a failing CORS preflight) closes that. The
+    server sends **no CORS headers** (doc 14; the only legitimate caller is
+    the Glassbox Node server, server-to-server via `triggerChannel`).
+  - `GET /health` — Health check endpoint (open; answers `{ok:true}` only).
 
 ### 17.2 Channel Configuration
 

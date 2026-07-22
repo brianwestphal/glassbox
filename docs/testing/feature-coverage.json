@@ -980,9 +980,10 @@
     "17.1": {
       "tests": [
         "tests/unit/channel-config.test.ts",
+        "tests/unit/channel-server.test.ts",
         "tests/integration/api/channel-routes.test.ts"
       ],
-      "note": "getChannelPort read; /trigger surface. (MCP subprocess lifecycle/health/port-file is a sub-gap)."
+      "note": "getChannelPort/getChannelSecret reads; the /trigger surface incl. the GB-1080 shared-secret gate (channel-server.test.ts: no/wrong secret 403 + notify not called, correct secret 200 + forwarded body, empty-body default, 413 oversize, 500 on notify failure, no CORS headers, OPTIONS 404; channel-config.test.ts: triggerChannel refuses without a secret file + sends X-Glassbox-Secret, verified against a live capture server). (MCP subprocess lifecycle is a sub-gap; the handler itself is now extracted + unit-tested.)"
     },
     "17.2": {
       "tests": [

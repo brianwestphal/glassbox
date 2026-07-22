@@ -111,13 +111,27 @@ export async function isChannelAlive(dataDir: string): Promise<boolean> {
   }
 }
 
-/** Send a trigger to the channel server */
+/** Read the channel shared secret written next to the port file (doc 17 §17.4). */
+export function getChannelSecret(dataDir: string): string | null {
+  try {
+    const secret = readFileSync(join(dataDir, 'channel-secret'), 'utf-8').trim();
+    return secret === '' ? null : secret;
+  } catch {
+    return null;
+  }
+}
+
+/** Send a trigger to the channel server. Requires the shared secret the
+ *  channel server wrote at startup — POST /trigger rejects without it (the
+ *  guard against browser-page "simple request" POSTs; see channel-server.ts). */
 export async function triggerChannel(dataDir: string, message: string): Promise<boolean> {
   const port = getChannelPort(dataDir);
-  if (port === null) return false;
+  const secret = getChannelSecret(dataDir);
+  if (port === null || secret === null) return false;
   try {
     const res = await fetch(`http://127.0.0.1:${port}/trigger`, {
       method: 'POST',
+      headers: { 'X-Glassbox-Secret': secret },
       body: message,
     });
     return res.ok;
