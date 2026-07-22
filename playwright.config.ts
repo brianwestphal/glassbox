@@ -103,8 +103,13 @@ export default defineConfig({
     // `playwright-report/` + `test-results/` on failure.
     trace: 'on-first-retry',
   },
-  webServer: process.env.SKIP_WEBSERVER ? undefined : [
-    {
+  webServer: [
+    // Under SKIP_WEBSERVER (set by scripts/test-e2e-coverage.sh, which starts
+    // the MAIN 4183 server itself so it can collect the server's V8 coverage on
+    // clean exit), only this first entry is dropped — the auxiliary per-project
+    // servers below must still start or every chromium-diff / chromium-ground-
+    // truth / chromium-plugin test fails with ERR_CONNECTION_REFUSED.
+    ...(process.env.SKIP_WEBSERVER ? [] : [{
       // `--ai-service-test` makes AI analysis use mock responses and bypass the
       // API-key check, so the suite is hermetic. Without it, any test that
       // triggers a real risk/narrative analysis (e.g. the sort-mode stability
@@ -121,7 +126,7 @@ export default defineConfig({
       // the developer's real global config (GB-923). Playwright merges this over
       // the inherited process.env, so only the override is needed here.
       env: { GLASSBOX_CONFIG_DIR: DEMO_CONFIG_DIR },
-    },
+    }]),
     {
       // Direct-comparison E2E server (doc 18). Boots `--diff` against the
       // checked-in fixture folders under `tests/fixtures/diff/{old,new}` and

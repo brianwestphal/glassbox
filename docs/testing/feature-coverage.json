@@ -189,7 +189,7 @@
       "tests": [
         "tests/unit/db/queries.test.ts"
       ],
-      "note": "moveAnnotation changes line + side and clears stale (the persistence of drag-and-drop). The DnD UI gesture itself is covered by e2e, not here."
+      "note": "moveAnnotation changes line + side and clears stale (the persistence of drag-and-drop). The DnD UI gesture itself is NOT yet e2e-covered — annotations.test.ts only asserts the drag handle is visible; a real drag e2e (drag->drop, drag->cancel, cross-side, mid-edit) is tracked as follow-up work from the 2026-07 transition audit."
     },
     "5.5": {
       "stateful": true,
