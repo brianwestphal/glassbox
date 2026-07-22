@@ -1,0 +1,10 @@
+digraph deploy {
+  rankdir=LR;
+  node [shape=box, style=rounded, fontname="Helvetica"];
+
+  build   [label="Build"];
+  test    [label="Test"];
+  deploy  [label="Deploy"];
+
+  build -> test -> deploy;
+}

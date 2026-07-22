@@ -46,15 +46,26 @@ npm run demo:capture-stills
 ```
 
 Regenerates all of the *still* screenshots referenced from `README.md`. For
-each `--demo:N` scenario (1–6) the script boots a real server, runs the
-in-app navigation that puts the UI in the showcased state, then captures
-both a **PNG** (Playwright `page.screenshot`) and a stand-alone **SVG**
-(`captureElementTree` + `elementTreeToSvg`). Outputs land in `assets/` as
-`demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
-`demo-annotations`, `demo-settings`, and `demo-direct-comparison` (each
-in both formats). Lives in `capture-stills.ts` and is intentionally
-independent of the animated hero pipeline above — no overlays, no
-composition, no chrome.
+each scenario (a `--demo:N` launch, or a real mode like `--diff` /
+`--ground-truth`) the script boots a real server, runs the in-app navigation
+that puts the UI in the showcased state, then captures both a **PNG**
+(Playwright `page.screenshot`) and a stand-alone **SVG** (`captureElementTree`
++ `elementTreeToSvg`; image-heavy scenes are PNG-only). Outputs land in
+`assets/` as `demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
+`demo-annotations`, `demo-settings`, `demo-direct-comparison`,
+`demo-review-notes`, `demo-image-comparison`, `demo-ground-truth`,
+`demo-plugin-rendered`, and `demo-plugin-mermaid-note`. Pass
+`--only slug1,slug2` to iterate on a subset. Lives in `capture-stills.ts` and
+is intentionally independent of the animated hero pipeline above — no
+overlays, no composition, no chrome.
+
+Two scenes showcase content plugins: `plugin-rendered` diffs a Graphviz
+`.dot` fixture (`fixtures/diagram-diff/`) in Rendered mode (graphviz
+auto-installs from `dist/plugins`, so run `npm run build` first), and
+`plugin-mermaid-note` renders demo scenario 7's Mermaid proof artifact —
+that scene symlinks the machine's installed mermaid plugin
+(`~/.glassbox/plugins/mermaid`) into the capture config dir and is skipped
+with a warning when it isn't installed (`plugins/mermaid/setup.mjs`).
 
 Both pipelines also drop a **Playwright HAR** next to their other outputs
 (`assets/demo.har` for the animated capture, `assets/demo-<slug>.har` per

@@ -37,7 +37,14 @@ export function demoReviewNotes(filePath: string): ReviewNoteView[] {
   if (filePath !== 'src/auth/session.ts') return [];
   return [
     { guid: 'demo-note-rationale', line: 14, side: 'new', kind: 'rationale', body: '`createSession` is **async** now because session state moved from an in-process `Map` to Redis; callers must `await` it.', confidence: 0.9, producer: 'Claude Code' },
-    { guid: 'demo-note-proof', line: 23, side: 'new', kind: 'proof', body: 'The TTL is written atomically with the value via the EX option, so a session can never be stored without an expiry.', producer: 'Claude Code', artifacts: [{ uri: '.pr-notes/artifacts/session-ttl.test.txt', content: 'PASS  session.test.ts\n  ✓ createSession writes value and TTL atomically (4 ms)\n  ✓ a session always has an expiry (2 ms)\n\nTests: 2 passed, 2 total' }] },
+    // The proof note carries two artifacts: mocked test output (always a code
+    // block) and a Mermaid sequence diagram — with the mermaid content plugin
+    // installed it renders inline as a diagram (doc 29); without it, the
+    // fail-soft code block still tells the story.
+    { guid: 'demo-note-proof', line: 23, side: 'new', kind: 'proof', body: 'The TTL is written atomically with the value via the EX option, so a session can never be stored without an expiry.', producer: 'Claude Code', artifacts: [
+      { uri: '.pr-notes/artifacts/session-ttl.test.txt', content: 'PASS  session.test.ts\n  ✓ createSession writes value and TTL atomically (4 ms)\n  ✓ a session always has an expiry (2 ms)\n\nTests: 2 passed, 2 total' },
+      { uri: '.pr-notes/artifacts/session-flow.mmd', content: 'sequenceDiagram\n    participant C as Caller\n    participant S as createSession\n    participant R as Redis\n    C->>S: createSession(userId)\n    S->>S: id = randomUUID()\n    S->>R: SET session:id {userId} EX 3600\n    Note over R: value + TTL written atomically\n    R-->>S: OK\n    S-->>C: id' },
+    ] },
     { guid: 'demo-note-risk', line: 31, side: 'new', kind: 'risk', body: 'expiresAt round-trips through JSON as a string and is re-wrapped in Date() — verify the comparison holds in your runtime.', confidence: 0.6, producer: 'Claude Code', artifacts: [{ uri: 'assets/demo-annotations.png', isImage: true }] },
     // Re-anchoring showcase (P3): authored against a 16-byte id, but the code
     // now uses 32 bytes, so the note no longer matches and renders as stale.

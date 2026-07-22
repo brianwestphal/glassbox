@@ -31,8 +31,8 @@
  */
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
@@ -63,6 +63,24 @@ mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 
 const VIEWPORT = { width: 1280, height: 800 };
 
+/** Link an opt-in (not auto-installed) plugin from the machine's real
+ *  `~/.glassbox/plugins/` into the capture config dir. Plugin discovery is
+ *  symlink-aware, so a link is enough — and avoids copying e.g. mermaid's
+ *  Chromium-backed node_modules. Returns false (skip the scenario, with a
+ *  warning) when the plugin isn't installed on this machine. */
+function linkOptInPlugin(id: string): boolean {
+  const source = join(homedir(), '.glassbox', 'plugins', id);
+  if (!existsSync(join(source, 'manifest.json'))) {
+    console.warn(`⚠ skipping: the '${id}' plugin is not installed on this machine (expected ${source}; run plugins/${id}/setup.mjs)`);
+    return false;
+  }
+  const linkDir = join(DEMO_CONFIG_DIR, 'plugins');
+  mkdirSync(linkDir, { recursive: true });
+  const link = join(linkDir, id);
+  if (!existsSync(link)) symlinkSync(source, link);
+  return true;
+}
+
 interface Scenario {
   /** Mode-defining CLI args for the Glassbox launch — usually `['--demo:N']`
    *  (see `src/demo.ts` DEMO_SCENARIOS), but also e.g. `['--ground-truth', …]`.
@@ -77,6 +95,9 @@ interface Scenario {
   /** Skip the stand-alone SVG capture (PNG only). Set for image/canvas-heavy
    *  scenes whose live `<img>`/canvas content doesn't serialize cleanly to SVG. */
   pngOnly?: boolean;
+  /** Pre-boot hook (e.g. link an opt-in plugin into the capture config dir).
+   *  Return false to skip the scenario with a warning instead of failing. */
+  prepare?: () => boolean;
 }
 
 const TARGET_FILE = 'src/auth/session.ts';
@@ -189,6 +210,43 @@ const SCENARIOS: Scenario[] = [
       await page.waitForSelector('.image-diff', { timeout: 15000 });
       await page.click('[data-image-mode="difference"]');
       await page.waitForTimeout(900);
+    },
+  },
+  {
+    launchArgs: ["--diff", "scripts/demo/fixtures/diagram-diff/old", "scripts/demo/fixtures/diagram-diff/new"],
+    slug: 'plugin-rendered',
+    label: 'Diagram source diffed as an image (graphviz plugin, Code | Rendered)',
+    pngOnly: true,
+    async setup(page) {
+      // The graphviz plugin (auto-installed from dist/plugins) handles .dot, so
+      // the file gets the Code | Rendered toggle (doc 29 FR-29.2). Flip to
+      // Rendered: both sides render to SVG and the image viewer opens in the
+      // doc-24 side-by-side layout — the old and new pipeline diagrams.
+      await openFile(page, 'deploy-pipeline.dot');
+      await page.click('[data-svg-mode="rendered"]');
+      await page.waitForSelector('.image-diff', { timeout: 15000 });
+      // Wait for both plugin-rendered sides to actually decode.
+      await page.waitForFunction(() => {
+        const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('.image-diff img'));
+        return imgs.length >= 2 && imgs.every((img) => img.complete && img.naturalWidth > 0);
+      }, null, { timeout: 15000 });
+      await page.waitForTimeout(500);
+    },
+  },
+  {
+    launchArgs: ["--demo:7"],
+    slug: 'plugin-mermaid-note',
+    label: 'Mermaid proof artifact rendered inline (mermaid plugin)',
+    pngOnly: true,
+    prepare: () => linkOptInPlugin('mermaid'),
+    async setup(page) {
+      // Scenario 7's proof note carries a .mmd sequence-diagram artifact; with
+      // the mermaid plugin present it renders inline as a diagram (doc 29).
+      await openFile(page, TARGET_FILE);
+      await page.waitForSelector('.ai-note-artifact-img', { timeout: 30000 });
+      // Scroll the proof note into view so the still centers on the diagram.
+      await page.locator('.ai-note-row[data-kind="proof"]').scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
     },
   },
   {
@@ -322,15 +380,18 @@ async function main(): Promise<void> {
   // the rest of the set.
   let port = 4191;
   const failed: string[] = [];
+  const skipped: string[] = [];
   for (const scenario of scenarios) {
     try {
+      if (scenario.prepare?.() === false) { skipped.push(scenario.slug); continue; }
       await captureOne(scenario, port++);
     } catch (err) {
       console.error(`\n✗ ${scenario.slug} FAILED: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
       failed.push(scenario.slug);
     }
   }
-  console.log(`\n✓ Captured ${String(scenarios.length - failed.length)}/${String(scenarios.length)} scenarios. Outputs in ${OUT_DIR}`);
+  console.log(`\n✓ Captured ${String(scenarios.length - failed.length - skipped.length)}/${String(scenarios.length)} scenarios. Outputs in ${OUT_DIR}`);
+  if (skipped.length > 0) console.log(`⚠ Skipped (missing prerequisites): ${skipped.join(', ')}`);
   if (failed.length > 0) { console.log(`✗ Failed: ${failed.join(', ')}`); process.exit(1); }
 }
 

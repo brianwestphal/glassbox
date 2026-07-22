@@ -1,0 +1,14 @@
+digraph deploy {
+  rankdir=LR;
+  node [shape=box, style=rounded, fontname="Helvetica"];
+
+  build    [label="Build"];
+  test     [label="Test"];
+  canary   [label="Canary", color=orange];
+  deploy   [label="Deploy"];
+  rollback [label="Rollback", color=red, style="rounded,dashed"];
+
+  build -> test -> canary -> deploy;
+  canary -> rollback [label="errors", style=dashed, color=red];
+  rollback -> build [style=dashed, color=red];
+}

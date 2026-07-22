@@ -105,6 +105,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
 - **Review history** — browse, reopen, or delete past reviews
 - **Structured export** — markdown output with file paths, line numbers, categories, and instructions for AI consumption
+- **Content plugins** — opt-in renderers turn diagram source (Graphviz, PlantUML, Mermaid) into pictures: diagram files diff like images, and diagram artifacts on AI review notes render inline
 - **Automatic .gitignore** — keeps `.glassbox/` out of version control for you at launch, while leaving the per-project `.glassbox/settings.json` tracked
 - **Auto port selection** — if the default port is busy, it finds an open one
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
@@ -122,6 +123,18 @@ Diffs aren't only text. Glassbox reviews **images** as a first-class diff: a sid
 And when "correct" means "matches the design," **ground-truth comparison** (`glassbox --ground-truth <manifest>`) puts each **actual** render next to its **expected** one — a design spec, a reference render, or a previous baseline, even outside the repo. Glassbox scores the perceptual difference, hides identical pairs, sorts the rest most-changed-first, and lets you **promote** a new actual to the baseline once a change is intentional. Multi-step flows render as ordered, named sets.
 
 <img src="assets/demo-ground-truth.png" alt="Ground-truth comparison: expected vs actual with a perceptual difference score" width="720">
+
+### Diagrams too, via content plugins
+
+Reviewing a diagram's source text tells you what changed; seeing the diagram tells you what it _means_. **Content plugins** render specialized formats server-side — install one and a `.dot`, `.puml`, or `.mmd` file gets a **Code | Rendered** toggle: _Code_ is the ordinary text diff, _Rendered_ treats the diagram **like an image**, with the full image-review toolkit — side-by-side, difference overlay, slice, synced zoom.
+
+<img src="assets/demo-plugin-rendered.png" alt="A Graphviz .dot file diffed as an image: old and new pipeline diagrams side by side" width="720">
+
+The same plugins render diagram-source **proof artifacts** attached to [AI review notes](#ai-review-notes) — so an AI's sequence-diagram evidence shows up as an actual diagram, inline with the diff:
+
+<img src="assets/demo-plugin-mermaid-note.png" alt="A Mermaid sequence-diagram proof artifact rendered inline in an AI review note" width="720">
+
+Graphviz ships built-in (WASM, no dependencies). PlantUML and Mermaid are one click away in **Settings → Plugins** (they use a local Java / headless-Chromium render, so they're opt-in), alongside an image-codecs plugin that adds WebP/AVIF support to ground-truth scoring. Everything stays local, and everything fails soft — without a plugin you simply see the source text. Want to render your own format? See the [plugin development guide](docs/plugin-development-guide.md).
 
 ---
 
@@ -192,7 +205,7 @@ When an AI writes or modifies code, it knows _why_ each non-obvious change is th
 **AI Review Notes** give the generating AI a structured, line-anchored channel to record that reasoning. The AI emits notes with the `glassbox note` command; they're stored as committed SARIF under `.pr-notes/` — tool-neutral and travelling with the repo — and Glassbox renders them review-comment-style at the exact line they apply to:
 
 - **Rationale** — why this change, and what alternatives were rejected
-- **Proof** — the test that passed, a measurement, or a before/after screenshot (notes can carry text and image artifacts)
+- **Proof** — the test that passed, a measurement, or a before/after screenshot (notes can carry text, image, and diagram-source artifacts — diagrams render inline via [content plugins](#diagrams-too-via-content-plugins))
 - **Risk / assumption** — what a reviewer should double-check
 
 <img src="assets/demo-review-notes.png" alt="AI-authored review notes rendered inline with the diff, with a threaded reply" width="720">
