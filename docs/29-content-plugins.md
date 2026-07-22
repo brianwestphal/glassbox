@@ -185,7 +185,14 @@ content `renderer` / `differ`. Everything else transfers.
   (path, MIME, and which side it is — old/new/single), and `view` is **safe,
   inert HTML or SVG** (see NFR-29.2). This is the single-file/blob → view path
   used for an added/deleted file, a single-image-style view, and a review-note
-  artifact.
+  artifact. The host **normalizes SVG output to have an intrinsic size**
+  (`src/plugins/svgSize.ts` `ensureIntrinsicSvgSize`, applied at the
+  `renderContent` choke point): both render paths present plugin SVG through an
+  `<img>`, where a root with only a `viewBox` and a missing or percentage
+  `width`/`height` (e.g. Mermaid's `width="100%"` output) has no intrinsic
+  dimensions and collapses to ~0×0 — the host injects absolute dimensions from
+  the viewBox so every plugin, first- or third-party, renders visibly without
+  each one reimplementing the fix.
 - **FR-29.10 — Differ contract.** A differ shall be a function
   `diff(old, new) → view`, where `old` and `new` are each the side's bytes/text
   plus metadata, and `view` is a safe diff view. This is the old-vs-new path used

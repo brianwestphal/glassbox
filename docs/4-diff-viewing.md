@@ -81,7 +81,7 @@ The user's Code/Rendered choice is remembered across file selections.
 
 ### 4.7 Find in Diff
 
-- **Find bar** — `Cmd/Ctrl+F` shall open a find bar within the diff view for searching the currently displayed diff content.
+- **Find bar** — In the Tauri desktop app, `Cmd/Ctrl+F` shall open a find bar within the diff view for searching the currently displayed diff content. (In a regular browser the shortcut is left to the browser's native find — see doc 8 §8.6.)
 - **Match highlighting** — Search matches shall be highlighted in the diff.
 - **Match navigation** — Users shall be able to navigate between matches using up/down arrows or `Enter`/`Shift+Enter`.
 - **Dismiss** — The find bar shall be closeable via `Escape`.

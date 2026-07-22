@@ -70,6 +70,9 @@ export interface PluginUIToggle {
   action: string;
   stateKey?: string;
 }
+// Partial copy of the host's PluginUIElement union (doc 30) — enough to type
+// `registerUI`. The host also supports `switch` and `segmented-control`; add
+// them here if this plugin ever registers one.
 export type PluginUIElement = PluginUIButton | PluginUILink | PluginUIToggle;
 export interface UIActionResult { message?: string }
 export interface PluginContext {

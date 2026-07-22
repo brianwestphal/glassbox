@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { Hono } from 'hono';
-import { resolve } from 'path';
+import { relative, resolve } from 'path';
 
 import { DiffView } from '../components/diffView.js';
 import { ImageDiff } from '../components/imageDiff.js';
@@ -180,9 +180,15 @@ pageRoutes.get('/file-raw', (c) => {
   if (filePath === undefined || filePath === '') return c.text('Missing path', 400);
   const repoRoot = c.get('repoRoot');
 
+  // Path containment (doc 14): the query path must stay inside the repo root —
+  // same idiom as the review-notes artifact route.
+  const abs = resolve(repoRoot, filePath);
+  const rel = relative(repoRoot, abs);
+  if (rel === '' || rel.startsWith('..') || rel.startsWith('/')) return c.text('Forbidden', 403);
+
   let content: string;
   try {
-    content = readFileSync(resolve(repoRoot, filePath), 'utf-8');
+    content = readFileSync(abs, 'utf-8');
   } catch {
     return c.text('File not found', 404);
   }

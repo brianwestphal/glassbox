@@ -41,9 +41,10 @@ Requirements for the browser-based UI and user interaction patterns.
 - The dialog shall be closeable at any time via the close button, clicking outside, or pressing Escape.
 - All settings shall save automatically when changed (no Save/Cancel buttons).
 - The settings dialog shall use a tabbed interface with icon-and-label tabs:
-  - **General** — Theme selection, app name (Tauri desktop app only)
+  - **General** — Theme selection, app name (Tauri desktop app only), git-difftool register/unregister (doc 19)
   - **Profile** — Experience level and language familiarity (for AI-tailored explanations)
   - **Experimental** — AI configuration and guided review toggle
+  - **Plugins** — Content-plugin management (doc 29): installed list, enable/disable, preferences, opt-in installs
   - **Updates** — Software update checks (Tauri desktop app only; tab hidden in browser)
 - The General tab shall include:
   - Theme selection dropdown and "Manage Themes" button (see `15-themes.md`)
@@ -71,8 +72,9 @@ Requirements for the browser-based UI and user interaction patterns.
 
 ### 8.7 Completion Modal
 
-- Clicking "Complete Review" shall show a confirmation modal.
-- After completion, the modal shall offer to add `.glassbox/` to `.gitignore` (if not already ignored).
+- Clicking "Complete Review" shall complete the review immediately — no confirmation step — **unless stale annotations exist**, in which case a gating prompt offers Cancel / Discard All Stale / Keep All & Complete first (doc 1 §1.3).
+- After completion, the modal shall show the export summary: the export path, the copyable AI-tool command hint, and — when the Claude channel is connected (doc 17) — a "Send to Claude" action. A Reopen control replaces Complete in the toolbar.
+- (The earlier post-completion offer to add `.glassbox/` to `.gitignore` was replaced by automatic management at launch — doc 27.)
 
 ## Non-Functional Requirements
 

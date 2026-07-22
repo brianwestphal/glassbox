@@ -29,7 +29,7 @@ Requirements for the core review lifecycle — creating, conducting, resuming, a
 
 ### 1.3 Review Completion
 
-- **Complete button** — The user shall be able to mark a review as completed via the "Complete Review" button. No confirmation dialog is shown — completion is immediate.
+- **Complete button** — The user shall be able to mark a review as completed via the "Complete Review" button. No confirmation dialog is shown — completion is immediate — **unless stale annotations exist**: then a gating prompt offers Cancel / Discard All Stale / Keep All & Complete before the review completes (stale annotations are ones whose anchor text no longer matches, doc 5).
 - **Continuous export** — The system shall automatically export `latest-review.md` as annotations change, debounced with a 2-second delay. Users do not need to formally complete a review to share feedback with AI tools.
 - **Completion export** — On explicit completion, the system shall immediately generate the structured markdown export (see doc 6) and display the copy-command hint.
 - **Gitignore management** — `.glassbox/` is kept out of version control automatically at launch (keeping `.glassbox/settings.json` tracked); see [doc 27](27-gitignore.md). (This replaced the earlier completion-time prompt + 30-day-dismiss cooldown.)
@@ -46,7 +46,7 @@ Requirements for the core review lifecycle — creating, conducting, resuming, a
 
 ### 1.5 Instance Management
 
-- **Single instance** — Only one instance of the application shall run at a time per user (enforced via PID-based lock file in `~/.glassbox/`).
+- **Single instance** — Only one instance of the application shall run at a time **per data directory** (enforced via a PID-based lock file at `<repo>/.glassbox/glassbox.lock`, guarding the embedded database — see doc 9 §9.6). Instances in different repositories run concurrently.
 - **Stale lock cleanup** — Stale lock files (from crashed processes) shall be detected and removed automatically.
 - **Demo mode bypass** — Demo mode shall bypass instance locking to allow multiple simultaneous demos.
 

@@ -300,7 +300,3 @@ For each per-file invocation, `glassbox-difftool` shall:
 - **Multiple simultaneous sessions** — per FR-19.6, concurrent unrelated
   `git difftool` runs intentionally merge into one review. A future enhancement
   could key sessions and isolate them if a real need emerges.
-- **README/help sync** — the README "Use as `git difftool`" section currently
-  describes per-file mode as "waits for each review window to close before
-  opening the next." That description shall be updated to the accumulating model
-  when this lands.

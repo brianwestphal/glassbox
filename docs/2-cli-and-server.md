@@ -36,6 +36,8 @@ The CLI shall accept the following options:
 | `--no-open` | Don't open browser automatically |
 | `--strict-port` | Fail if the requested port is in use |
 | `--project-dir <dir>` | Run as if invoked from `<dir>` (used by Tauri desktop app) |
+| `--data-dir <dir>` | Override the per-project data directory (default `<repo>/.glassbox` — doc 9) |
+| `--ground-truth <manifest>` | Ground-truth image comparison mode (no git repo required — see doc 26) |
 | `--on-complete <cmd>` | Run `<cmd>` when a review is **explicitly completed** (doc [6](6-export.md), GB-974) |
 | `--check-for-updates` | Check for a newer version on npm |
 | `--debug` | Show build timestamp and debug info |
@@ -83,25 +85,30 @@ The CLI shall accept the following options:
 
 ### 2.5 Context Middleware
 
-- **Injected variables** — The server shall inject three context variables into every request via middleware:
+- **Injected variables** — The server shall inject four context variables into every request via middleware:
   - `reviewId` — the current review session ID
   - `currentReviewId` — same as `reviewId` (used for distinguishing when viewing past reviews)
   - `repoRoot` — the repository root path
+  - `onCompleteCommand` — the `--on-complete` command to run at explicit completion (empty when unset; doc 6)
 - **Type safety** — These variables shall be typed via the `AppEnv` interface and accessible in all route handlers.
 
 ### 2.6 Static Asset Serving
 
 - **CSS route** — The server shall serve client CSS at `GET /static/styles.css`.
-- **JS route** — The server shall serve client JavaScript at `GET /static/app.js`.
+- **JS routes** — The server shall serve client JavaScript at `GET /static/app.js` and the history page's bundle at `GET /static/history.js`.
+- **Favicon** — The server shall serve `GET /favicon.svg` and answer `GET /favicon.ico` with a 204 (no icon churn in logs).
 - **Cache control** — Static assets shall be served with `Cache-Control: no-cache` to ensure fresh content during development.
 - **Asset resolution** — Asset resolution shall check both the co-located `client/` directory (production) and the `../dist/client/` directory (development).
 
 ### 2.7 API Routes
 
-The server shall expose three route groups:
+The server shall expose these route groups:
 
-- **Review and file APIs** — `/api/*` — Review management, file operations, annotation CRUD, project settings, gitignore handling, and context expansion.
+- **Review and file APIs** — `/api/*` — Review management, file operations, annotation CRUD, project settings, plugins, attachments, review notes, and context expansion.
 - **AI APIs** — `/api/ai/*` — AI configuration, analysis triggering, model listing, API key management, and user preferences.
+- **Theme APIs** — `/api/themes/*` — see doc [15](15-themes.md).
+- **Channel APIs** — `/api/channel/*` — see doc [17](17-claude-channel.md).
+- **Difftool APIs** — `/api/difftool/*` — see doc [19](19-difftool-integration.md).
 - **Pages** — `/*` — Server-rendered HTML pages (main review, file view, past review view, review history).
 
 **FR-2.7a Typed API layer.** Every endpoint shall be backed by a typed module under `src/api/<resource>.ts` that defines the request and response shapes (`XReq` / `XResp` interfaces) **and** the client-side caller function that wraps the underlying HTTP call (e.g. `createAnnotation({...})`, `getContextLines({...})`). The same module's types shall be imported by the corresponding server route handler via `import type { XReq, XResp }` and used to constrain `c.req.json<XReq>()` and `c.json<XResp>(...)`. The intent is that adding or changing an endpoint requires editing one resource module and one route handler — drift between the two then fails to compile.
@@ -165,6 +172,10 @@ The server shall expose three route groups:
 | POST | `/api/ai/key` | Save an API key |
 | DELETE | `/api/ai/key` | Delete an API key |
 | POST | `/api/ai/analyze` | Trigger risk, narrative, or guided analysis |
+| GET | `/api/ai/analysis/:type` | Fetch a completed analysis result (risk / narrative / guided) |
+| GET | `/api/ai/analysis/:type/status` | Poll an in-flight analysis's progress (drives the §7.5 progress display) |
+| GET | `/api/ai/debug-status` | AI debug-logging status (diagnostics) |
+| POST | `/api/ai/debug-log` | Append a client-side AI debug log entry (diagnostics) |
 | GET | `/api/ai/preferences` | Get user sort/display preferences |
 | POST | `/api/ai/preferences` | Save user sort/display preferences |
 
@@ -189,6 +200,7 @@ Reviewer file attachments on annotations (doc 25) and AI-authored review notes (
 |------|-------------|
 | `/` | Main review page (sidebar + diff viewer) |
 | `/file/:fileId` | File diff fragment (loaded into main content area) |
+| `/file-raw` | Read-only view of a repo file not in the diff (go-to-definition target, doc 13). Path-contained to the repo root — a traversal/absolute path returns 403 |
 | `/review/:reviewId` | View a past review (read-only or reopenable) |
 | `/history` | Review history listing |
 

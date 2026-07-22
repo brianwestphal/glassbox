@@ -292,7 +292,7 @@ Glassbox — **without Glassbox running any capturer itself**.
   `review_files.difference_score`. PNG/JPEG only — other formats show with no
   score. Implementation notes below.
 - **P3 — Sets / multi-step flows + capture-pipeline guidance + baseline
-  rotation** *(designed above; implementation in phased follow-ups)*. Resolved
+  rotation** *(shipped — see P3a–P3d below)*. Resolved
   design: a `version: 2` additive manifest with ordered `sets`/`steps` (§26.2);
   source-list **set groups** with per-step rows, per-step + max-aggregate
   perceptual scoring, and a **per-step Prev/Next** navigator (§26.3); a

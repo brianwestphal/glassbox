@@ -55,7 +55,14 @@ new table:
 - An **image-level annotation** is identified by `line_number = 0` (line
   annotations use the real 1-based line number).
 - The `region_data` column holds the JSON-encoded `{x, y, w, h}` region for a
-  region comment, or `NULL` for a general image comment.
+  region comment, or `NULL` for a general image comment. For a **review-note
+  reply marking regions on an AI-note image artifact** (doc 25 / doc 20), the
+  same column instead holds a JSON **array** of regions — a reply can carry
+  several — each optionally tagged with an `artifact` uri identifying which
+  artifact the region marks (decode/group helpers in
+  `src/utils/artifactRegions.ts`; a single object is still read for
+  back-compat). `POST /annotations` accepts the singular `region` for image
+  feedback and a `regions[]` array for the multi-region reply shape.
 - Image-level annotations carry the same `category` as line annotations
   (default `note`, reviewer-selectable — see §23.10) and count toward the file's
   annotation badge.

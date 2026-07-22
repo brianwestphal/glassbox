@@ -123,6 +123,22 @@ describe('pageRoutes', () => {
       const res = await app.request('/file-raw?path=nonexistent.ts');
       expect(res.status).toBe(404);
     });
+
+    // Path containment (doc 14): the query path must not escape the repo root.
+    it('returns 403 for a traversal path escaping the repo root', async () => {
+      const res = await app.request('/file-raw?path=../../etc/passwd');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 for an absolute path outside the repo root', async () => {
+      const res = await app.request(`/file-raw?path=${encodeURIComponent('/etc/passwd')}`);
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 for the repo root itself (empty relative path)', async () => {
+      const res = await app.request('/file-raw?path=.');
+      expect(res.status).toBe(403);
+    });
   });
 
   describe('GET /review/:reviewId', () => {

@@ -32,6 +32,7 @@ The desktop app shall support three launch flows:
   - macOS: `/usr/local/bin/glassbox` (symlink, requires admin prompt)
   - Linux: `~/.local/bin/glassbox` (symlink)
   - Windows: `%LOCALAPPDATA%\Programs\glassbox\glassbox.cmd` (copy, adds to user PATH)
+- Installation shall also install the `glassbox-difftool` companion binary alongside `glassbox` (doc 19).
 - The welcome screen shall display the manual installation command if automatic installation fails.
 
 ### 10.5 Software Updates

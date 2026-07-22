@@ -12,10 +12,11 @@ commit message.
 > the producer-side `glassbox note` CLI (P1), the diff-anchored reader/render
 > with threading and markdown bodies (P2), load-time re-anchoring of stale notes
 > (P3), artifact attachment with inline text/image rendering (P4), and folding
-> notes into AI analysis + export (P5) are all built. The one remaining
-> follow-up is **live *diagram* rendering** of diagram-source artifacts
-> (Mermaid/Graphviz/PlantUML) into actual images (§20.11 P4). Per-phase status is
-> in §20.11.
+> notes into AI analysis + export (P5) are all built. Live *diagram* rendering
+> of diagram-source artifacts (Mermaid/Graphviz/PlantUML) into actual images
+> shipped via the content-plugin system (doc 29) — with the matching plugin
+> installed the artifact renders inline as a diagram; without it, the source
+> falls soft to a code block. Per-phase status is in §20.11.
 
 ## Motivation
 
@@ -232,8 +233,12 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   `src/utils/artifactRegions.ts`, and the marked thumbnail in
   `src/components/reviewNoteRegionThumb.tsx` (doc 25 / GB-953, GB-959). The reader is
   path-contained + size-capped throughout. **Live
-  diagram rendering** of diagram-source (Mermaid/Graphviz/PlantUML) into actual
-  diagrams is the remaining follow-up (§20.11 P4).
+  diagram rendering** of diagram-source artifacts *(shipped via doc 29)*: the
+  reader offers each text artifact to the content-plugin dispatcher
+  (`src/plugins/artifacts.ts` `renderNoteArtifacts`), and a matching renderer
+  (Mermaid/Graphviz/PlantUML) attaches inert SVG the diff view shows inline as
+  an actual diagram — falling soft to the source code block when no plugin is
+  installed.
 - **Threading** *(shipped)* — A reviewer can reply to an AI note with their own
   annotation, turning a note into a line-anchored conversation. The note row
   carries its SARIF `guid` (`data-note-id`) and a **Reply** button; the reply is
@@ -300,9 +305,10 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   `DiffView`, which renders them **server-side, full-width below their line**
   (breaking the split-column flow like human annotations do, so columns stay
   aligned), styled distinctly as AI-authored (the `ai-note-*` precedent) with a
-  per-kind badge. Demo mode serves illustrative notes. Note bodies render as
-  plain text for now (markdown rendering is a later polish); **threading**
-  (reviewer replies) is a separate follow-up.
+  per-kind badge. Demo mode serves illustrative notes. (Both of P2's own
+  follow-ups have since shipped: note bodies render as **markdown** via the
+  escape-first `src/utils/noteMarkdown.ts`, and **threading** is in — see
+  §20.6.)
 - **P3** *(shipped)* — Anchor durability: `reanchorReviewNotes`
   (`src/review-notes/reanchor.ts`) re-matches each note's authored text against
   the current diff at load time (the same content-near-the-line approach the
@@ -311,12 +317,14 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   The note's authored snippet is carried on the view. A reviewer can **Keep** a
   stale note (dismiss the flag) or **Discard** it (`DELETE
   /api/review-notes/:guid` → `removeNote`, deleting it from `.pr-notes/`).
-- **P4** *(mostly shipped)* — Artifact attachment (`--artifact` → SARIF
+- **P4** *(shipped)* — Artifact attachment (`--artifact` → SARIF
   `result.attachments`), inline code-block rendering of text/diagram-source
   artifacts, `<img>` rendering of image artifacts via a path-contained serving
-  route, sha-256 hashes, and Git LFS `.gitattributes` wiring. **Remaining
-  follow-up:** live *diagram* rendering (Mermaid/Graphviz/PlantUML) into actual
-  diagrams rather than showing the source.
+  route, sha-256 hashes, and Git LFS `.gitattributes` wiring. Live *diagram*
+  rendering shipped via the content-plugin system (doc 29): with a matching
+  renderer installed (Mermaid/Graphviz/PlantUML), a diagram-source artifact
+  renders inline as an actual diagram, falling soft to the source code block
+  otherwise.
 - **P5** *(shipped)* — Feed notes into analysis and the export
   (`src/review-notes/format.ts`). `runAnalysisBatch` (shared by risk / narrative
   / guided) appends an "Author review notes" section to the prompt, so all three

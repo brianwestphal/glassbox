@@ -4,9 +4,10 @@
  * round-trip clicks to the plugin's `onAction` via `POST /api/plugins/:id/action`.
  *
  * Elements are declarative (icon + label + action id — the plugin ships no DOM);
- * the host builds every node and owns the click wiring. Only `button` and `link`
- * render today; stateful controls (toggle / switch / segmented-control) are
- * declared in the contract but not yet rendered (a follow-up).
+ * the host builds every node and owns the click wiring. All five element types
+ * render: `button` + `link`, and the stateful `toggle` / `switch` /
+ * `segmented-control`, whose state the host persists to the element's
+ * `stateKey` and resolves back into `value` on each list fetch.
  */
 import { delegate, raw } from 'kerfjs';
 

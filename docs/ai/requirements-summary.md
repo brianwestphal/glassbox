@@ -11,7 +11,7 @@ entry is 3–5 sentences and carries a status marker:
 
 > **Maintenance rule.** Update this file in the same pass whenever a
 > requirements doc is added, renumbered, re-scoped, or a feature's status
-> changes. See §19 for the trigger list.
+> changes. See §20 for the trigger list.
 
 ## 1. Product vision and foundations
 
@@ -47,8 +47,11 @@ refresh its diffs, fuzzy-migrate annotations. `--resume` across HEADs
 reopens the latest in-progress as-is. `--resume` with none found starts
 a new review. Completed reviews are reopenable; history is browsable
 with individual or bulk delete. On completion the export is immediate
-and a gitignore prompt (30-day cooldown) appears. Instance locking is
-PID-based in `~/.glassbox/`; demo mode bypasses the lock.
+(a gating stale-annotation prompt runs first when stale annotations
+exist); `.gitignore` is managed automatically at launch (doc 27 —
+replaced the old completion-time prompt). Instance locking is PID-based
+per data directory (`<repo>/.glassbox/glassbox.lock`); demo mode
+bypasses the lock.
 
 ## 3. CLI and server (`2-cli-and-server.md`) — **Shipped**
 
@@ -79,8 +82,8 @@ readiness.
 
 Route groups: `/api/*` (reviews/files/annotations/context/settings),
 `/api/ai/*` (config/keys/analysis/prefs), `/api/themes/*`,
-`/api/channel/*`, plus page routes `/`, `/file/:fileId`,
-`/review/:reviewId`, `/history`. Browser launch uses
+`/api/channel/*`, `/api/difftool/*`, plus page routes `/`, `/file/:fileId`,
+`/file-raw`, `/review/:reviewId`, `/history`. Browser launch uses
 `open` (macOS) / `start` (Windows) / `xdg-open` (Linux); suppressed by
 `--no-open`. Error handling returns HTTP 4xx with descriptive bodies.
 
@@ -368,7 +371,9 @@ Keyboard shortcuts: `Cmd/Ctrl+Enter` saves annotation form; `Escape`
 closes modals/forms; `j`/`k` navigates files; `Cmd/Ctrl+F` opens find;
 `Cmd/Ctrl+Click` on a symbol goes to its definition.
 
-Completion modal confirms Complete Review and offers gitignore add.
+Completion is immediate (a stale-annotation prompt gates when needed);
+the post-completion modal shows the export summary + copy hint (gitignore
+is automatic at launch, doc 27).
 
 Rendering NFRs: server-rendered HTML + client JS; kerfjs JSX runtime for
 all HTML generation (server and client); client DOM via `toElement()`,
@@ -700,7 +705,7 @@ from `src/git/repo.ts`) so Glassbox's
 own `git diff`/`git show` can't recurse into the difftool helper (NFR-19.12,
 GB-869). Covers FR-19.1–19.13.
 
-## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Partially built (P1–P5; only live diagram rendering pending)**
+## 18c. AI-authored review notes (`20-ai-review-notes.md`) — **Shipped (P1–P5; diagram artifacts render live via doc-29 plugins)**
 
 A line-anchored "review companion" the *generating* AI emits as it writes code:
 structured notes explaining why each non-obvious change is the way it is and what
@@ -767,9 +772,11 @@ shipped as **producer-side guidance** in the inbound instructions contract
 (a "Final consolidation pass" the generating AI runs after `coalesce`,
 merging near-duplicates via `update`/`remove` and linking related notes via
 shared `--ticket` + inline "see also" body references) — no Glassbox link
-primitive is built until a driver emits structured links. Remaining: the
-one P4 follow-up — **live diagram rendering** (Mermaid/Graphviz/PlantUML)
-into actual diagrams.
+primitive is built until a driver emits structured links. The former P4
+follow-up — **live diagram rendering** (Mermaid/Graphviz/PlantUML) — shipped
+via the doc-29 content plugins: `renderNoteArtifacts` dispatches diagram-source
+artifacts to an installed renderer and the diff shows the resulting inert SVG
+inline, falling soft to the code block without one.
 
 ## 18d. Sidebar context menu (`21-sidebar-context-menu.md`) — **Shipped**
 
@@ -790,7 +797,7 @@ no-op — GB-892). All server actions are best-effort (failures swallowed,
 `--debug`-logged). The menu dismisses on item-select, Escape, outside
 click/right-click, scroll, or blur.
 
-## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Built (local + Apple FM with secondary fallback)**
+## 18e. Local & on-device AI models (`22-local-and-on-device-models.md`) — **Shipped (local + Apple FM with secondary fallback)**
 
 Extends AI analysis beyond the three cloud providers to **`local`**
 (OpenAI-compatible servers — Ollama default `http://localhost:11434/v1`, LM
@@ -1005,7 +1012,7 @@ install-from-arbitrary-folder, per-project enablement scope, and the stateful UI
 controls (toggle/switch/segmented). Implemented FR/NFR units carry real tests in
 `feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
-## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
+## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (all five element types)**
 
 A plugin's second UI surface beyond content rendering (doc 29): it contributes
 **declarative interactive elements** to predefined main-app locations via
@@ -1064,21 +1071,23 @@ navigation, security, themes, share prompt, Claude channel, direct path
 comparison. Doc **19** (git difftool integration) is **Shipped** — the
 accumulating per-file model works for both browser and desktop, plus in-session
 image/SVG comparison (GB-863). Doc **20** (AI-authored review notes) is
-**Partially built** — P1–P5 plus threading / stale keep-discard / markdown
-bodies / artifact foundation (P4) shipped; only live diagram rendering remains.
+**Shipped** — P1–P5 plus threading / stale keep-discard / markdown
+bodies / artifacts, with live diagram rendering via the doc-29 plugins.
 Doc **21** (sidebar context menu) is **Shipped** — right-click a file to reveal
 it in the OS file manager. Doc **22** (local & on-device AI models) is **Shipped**
 — `local` (OpenAI-compatible) + Apple Foundation Models (on-device, with a
 secondary fallback model). Docs **23** (image feedback), **24** (image comparison
 layouts), **25** (attachments), and **26** (ground-truth comparison, P1–P3) are
 all **Shipped**. Docs **27** (automatic .gitignore) and **28** (single-side image
-focus) are **Shipped**. Doc **29** (content plugins) is **Partially built** — the
+focus) are **Shipped**. Doc **29** (content plugins) is **Shipped** — the
 P1 core (renderer/differ contract, loader, dispatcher, kill-switch, review-note
-artifact integration) shipped in GB-1038 (`src/plugins/`, modeled on Hot Sheet's
-plugin system); the file-diff-viewer integration (GB-1042), desktop delivery
-(GB-1039), management UI (GB-1040), developer guide (GB-1041), and the
-diagram-source first reference plugin (GB-910) remain. Doc **30** (plugin main-app
-UI extensions) is **Shipped** for button/link (GB-1058) — `registerUI`,
+artifact integration, GB-1038, modeled on Hot Sheet's plugin system), the
+file-diff-viewer integration (GB-1052), desktop delivery (GB-1039), management
+UI (GB-1040) with opt-in installs (GB-1069), the developer guide (GB-1041), the
+reference plugins (graphviz GB-1044, plantuml GB-1046, mermaid GB-1045,
+image-codecs GB-1064), image decoders (GB-1063), and the fixture-plugin e2es
+(GB-1043/GB-1070) are all in. Doc **30** (plugin main-app
+UI extensions) is **Shipped** — button/link (GB-1058) with `registerUI`,
 `GET /api/plugins/ui`, the `onAction` result→toast round-trip, three host slots,
 and the fixture-plugin reference button; the stateful controls (toggle/switch/
 segmented-control) shipped in GB-1068 (host-persisted `stateKey` + `{actionId,
@@ -1149,6 +1158,9 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/26-ground-truth-comparison.md` → §18i (and §5)
 - `docs/27-gitignore.md` → §18j
 - `docs/28-image-side-focus.md` → §18k (and §5)
+- `docs/29-content-plugins.md` → §18l
+- `docs/30-plugin-ui-extensions.md` → §18m
+- `docs/31-plugin-lifecycle-hooks.md` → §18n
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

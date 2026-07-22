@@ -208,10 +208,9 @@ export interface PluginUILink extends PluginUIBase {
 }
 
 /**
- * A two-state toggle button (doc 30). **Declared but not yet rendered** by the
- * host client — tracked as a follow-up (stateful controls need client-side
- * selection state + `stateKey` persistence). Kept in the contract so plugins can
- * author against the full surface.
+ * A two-state toggle button (doc 30). Rendered by the host client with
+ * host-persisted state: the new value is written to `stateKey` (plugin-settings
+ * store) and resolved back into the element's `value` in `GET /api/plugins/ui`.
  */
 export interface PluginUIToggle extends PluginUIBase {
   type: 'toggle';
@@ -222,7 +221,7 @@ export interface PluginUIToggle extends PluginUIBase {
   stateKey?: string;
 }
 
-/** A labeled switch (doc 30). Declared but not yet rendered (see `PluginUIToggle`). */
+/** A labeled switch (doc 30). Rendered with host-persisted state (see `PluginUIToggle`). */
 export interface PluginUISwitch extends PluginUIBase {
   type: 'switch';
   onLabel: string;
@@ -231,7 +230,7 @@ export interface PluginUISwitch extends PluginUIBase {
   stateKey?: string;
 }
 
-/** A segmented control (doc 30). Declared but not yet rendered (see `PluginUIToggle`). */
+/** A segmented control (doc 30). Rendered with host-persisted selection (see `PluginUIToggle`). */
 export interface PluginUISegmentedControl extends PluginUIBase {
   type: 'segmented-control';
   segments: { id: string; label?: string; icon?: string; title?: string }[];

@@ -73,8 +73,10 @@ common developer setups; Apple Foundation Models ship with macOS for free.
 - **Model discovery** — The model list shall come from `GET {baseUrl}/models`
   (the OpenAI list shape `{ data: [{ id }] }`), reusing the live-discovery
   machinery added for the cloud providers. Availability = endpoint reachable AND
-  ≥ 1 model returned. Probe result cached with a **short TTL** (a local server
-  can start/stop mid-session), unlike the cloud lists.
+  ≥ 1 model returned. The probe is **fetched live on each request** (no cache) —
+  a local server can start/stop mid-session, and the settings dialog is the only
+  caller, so freshness beats caching here. (An earlier draft specified a
+  short-TTL cache; the uncached implementation is intentional.)
 - **Context window** — Unknown for arbitrary local models; batch planning shall
   use a conservative default.
 
@@ -113,9 +115,13 @@ common developer setups; Apple Foundation Models ship with macOS for free.
 
 ### 22.4 Settings UX
 
-- The Experimental tab's platform picker shall include **Local** and **Apple**,
-  each shown **only when available** (local endpoint reachable; Apple helper
-  present and the model available).
+- The Experimental tab's platform picker shall include **Local** and **Apple**.
+  **Apple** is shown only when available (helper present and the on-device model
+  usable) — an unavailable on-device platform is not actionable. **Local** is
+  always shown: the user must be able to select it *before* the endpoint is
+  reachable (picking Local is how you reveal the base-URL field to point at a
+  server you're about to start), so gating it on reachability would be a
+  chicken-and-egg. Reachability problems surface in the model dropdown instead.
 - Selecting **Local** reveals a **base-URL input** (default
   `http://localhost:11434/v1`) and a **model dropdown** populated from
   discovery; the API-key field is hidden (or shown as optional). A

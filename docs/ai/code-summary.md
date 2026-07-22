@@ -26,10 +26,12 @@ specific files only when you need detail beyond what is here.
 glassbox/
 ├── src/                    # TypeScript source (server + client)
 ├── src-tauri/              # Rust desktop shell (Tauri v2)
-├── docs/                   # Requirements (numbered) + ARCHITECTURE, tauri-*, ai-integration.md, proof-export-guidance.md, skills/, ai/ (these summaries)
+├── plugins/                # First-party content plugins (doc 29): graphviz/, plantuml/, mermaid/, image-codecs/ (source under src/, built to dist/plugins/)
+├── docs/                   # Requirements (numbered) + ARCHITECTURE, tauri-*, ai-integration.md, proof-export-guidance.md, plugin-development-guide.md, manual-test-plan.md, ground-truth-screenshots.md, technical-changelog/, testing/, skills/, ai/ (these summaries)
 ├── tests/                  # unit/, integration/, e2e/, smoke/, fixtures/
-├── scripts/                # build-sidecar.sh, release.sh, test-*.sh, demo/ (README hero capture), release/ (GH release download summary + asset renaming SSOT)
-├── dist/                   # Build output (cli.js, client/app.global.js, styles.css)
+├── scripts/                # build-sidecar.sh, ensure-sidecar-stub.sh, release.sh, release-beta-auto.sh, tauri-dev.sh, test-*.sh, verify-linux-difftool.sh, demo/ (README hero + stills capture), ground-truth/ (UI screenshot baselines), release/ (GH release download summary + asset renaming SSOT)
+├── ground-truth-screenshots/ # Tracked UI screenshot baselines (consumed via scripts/ground-truth/)
+├── dist/                   # Build output (cli.js, client/app.global.js, styles.css, plugins/<id>/)
 ├── assets/                 # Static assets shipped with the app
 ├── CLAUDE.md               # Project rules for AI sessions (working ON Glassbox)
 ├── AGENTS.md               # AI-agent router: contributors → CLAUDE.md/docs/ai; integrators → docs/ai-integration.md
@@ -100,7 +102,8 @@ How the layer is used:
 
 | File | Purpose |
 |------|---------|
-| `pages.tsx` | Server-rendered HTML routes (`/`, `/file/:fileId`, `/review/:reviewId`, `/history`). Returns `SafeHtml` via JSX. |
+| `pages.tsx` | Server-rendered HTML routes (`/`, `/file/:fileId`, `/file-raw` (path-contained; 403 on traversal), `/review/:reviewId`, `/history`). Returns `SafeHtml` via JSX. |
+| `difftool-api.ts` | `/api/difftool/*` (doc 19): session append / hold / end endpoints for the `glassbox-difftool` bridge + the settings-dialog register/unregister/status routes. |
 | `api.ts` | Aggregator that mounts the per-concern sub-routers under `/api/*`. |
 | `api/reviews.ts` | Review CRUD + completion / reopen / refresh / delete-completed / delete-all. The `POST /review/complete` route, after `generateReviewExport` + the `--on-complete` hook, fires plugin **`notifyReviewCompleted`** (doc 31 lifecycle hooks) with the review + annotations + export path (fail-soft). |
 | `api/files.ts` | Files list, file detail, file status, file reveal in OS file manager, file path (relative+absolute), open-in-default-editor. |
@@ -334,14 +337,14 @@ Makes WebP/AVIF ground-truth pairs perceptually scorable; `@jsquash/*` are
 | Folder | Files | Purpose |
 |--------|-------|---------|
 | `diff/` | `index.tsx`, `selection.ts`, `toolbar.tsx`, `highlight.ts`, `highlightLimits.ts`, `hunkExpander.tsx`, `splitSync.ts`, `navStack.ts`, `find.tsx`, `goToDefinition.tsx`, `outline.tsx`, `aiNotes.tsx`, `noteArtifactRegions.tsx`, `imageDiff/` (`index.ts`, `zoom.ts`, `sliceTool.ts`, `sliceGeometry.ts`, `metadata.tsx`, `imageFeedback.tsx`, `regionGeometry.ts`) | Diff pane orchestration. `noteArtifactRegions.tsx` is the inline drag-to-draw on an AI review-note image-artifact thumbnail (or click → lightbox), doc 25 / GB-953/GB-959. `imageDiff/imageFeedback.tsx` (`initImageFeedback`, called from `bindImageDiff`) is the doc-23 image-feedback layer — general comments + drawn rectangle regions, persisted as image-level annotations (`line_number 0` + `region_data`); it renders region boxes into the `[data-region-overlay]`s and the composer/lists into `[data-image-feedback]`, imperatively under `data-morph-skip` like the slice tool. It also supports a reviewer-selectable **category** per comment/region (via the shared `showCategoryPicker` extracted from `annotations/reclassifyPopup.tsx`), scoping a region to **A-only / B-only / both** (an optional `side` inside `region_data`, shown as an `A+B`/`A`/`B` badge + box tint), **hover-linking** a list row to its box, and **move/resize** of a box (drag interior to move, edges/corners to resize), persisted via `PATCH /annotations/:id/region` → `updateAnnotationRegion`. The overlay container stays pointer-transparent so empty space still pans; only the boxes are interactive (and step aside while drawing). `imageDiff/regionGeometry.ts` is its DOM-free coordinate math (client↔normalized-fraction, rect-from-drag, `parseRegion`, plus `hitTestRegion` / `cursorForHandle` / `resizeRegion` / `moveRegion` for editing), unit-tested. `imageDiff/sliceGeometry.ts` is the DOM-free slice math (edge detection, `snapToEdge`, `edgeHandleTransform` keeping handles inside the canvas, clip-path perimeter helpers) extracted so it can be unit-tested; `sliceTool.ts` is the imperative wiring. **Zoom has two models (`zoom.ts`):** raster images zoom via CSS `transform: scale()` on the wrap (cheap; magnifies the bitmap), while SVG rendered views (GB-941) zoom by growing the wrap's *layout* size (`width/height = base × zoom`, `translate()` for pan) so the browser re-rasterizes the vector crisply at any zoom. `bindImageDiff` flags the wrap `data-vector-zoom` when the `.diff-view` ancestor has `data-is-svg`; `applyZoom`/`clampPan`/`zoomAt` and `sliceTool`'s clip-path fractions branch on it. Vector panning needs `.image-zoom-wrap { flex-shrink: 0 }` (so a zoomed wrapper overflows the canvas instead of being shrunk to fit) and a clamp/zoom that read the wrapper's real `offsetLeft/Top` (not an assumed flex-center), and `bindImageDiff` sets a `grab`/`grabbing` cursor while zoomed. The canvas `wheel` handler splits macOS trackpad gestures (GB-942): `ctrlKey` (pinch / Ctrl+wheel) zooms, a plain wheel (two-finger swipe) pans when zoomed. The image canvas fills its slot via a `:has(.image-diff)` flex chain (`#diff-container` is set to `display:flex` in `runPostRender`) so the slice handles pinned to the bottom edge aren't hidden under the toolbar (GB-823). `highlight.ts` runs highlight.js per `.code` cell but skips any line longer than `MAX_HIGHLIGHT_LINE_LENGTH` (in the dependency-free `highlightLimits.ts`) and any cell carrying a `.line-truncated` marker. The primary GB-821 guard, though, is server-side **truncation**: `DiffView` (`components/diffView.tsx`, via `utils/lineTruncate.ts`) renders only a bounded prefix of a pathologically long line, so the giant content never reaches the DOM. Skipping highlighting alone was insufficient — the plain giant text node still froze the browser laying it out and painting it (worst in the desktop WKWebView; headless browsers skip the real paint, so the freeze didn't reproduce in headless timing tests). `index.tsx` is the entry: kerf `mount()` onto `#diff-container` renders a single `data-morph-skip` wrapper around the server-rendered diff HTML, with a generation-counter `data-key` that bumps on every fetch so file/mode/whitespace switches replace the subtree. An async effect refetches `/file/:id` when relevant state changes; a post-render effect runs highlight + outline + annotation binding. Inline AI notes (risk / narrative / guided) render from a **separate reactive effect** (`setupAINotesEffect`) subscribed to the AI store, not from the post-render step — the sort mode and guided toggle change without bumping the diff generation, so a sort-mode flip must redraw the notes on its own (GB-913). The effect clears the prior client-injected notes (`.ai-note-overview`, `.ai-note-row` that aren't the server `.ai-note-review`) before drawing the current set, so a stale mode's notes can't linger. `delegate()` handles diff-line clicks → annotation form, hunk-separator expansion, drag-and-drop, and split-column scroll sync (the latter via `addEventListener` in capture phase because of the `target.scrollLeft` semantics). `toolbar.tsx` delegates split/unified, wrap, whitespace, image mode, svg mode, and language picker; a small `effect()` mirrors store state back onto the persistent toolbar buttons. Image diff (zoom/pan/slice) stays imperative inside the morph-skipped subtree. |
-| `sidebar/` | `index.tsx`, `fileListView.tsx`, `folderTree.ts`, `groundTruthGroups.ts`, `sortControl.tsx`, `sortMode.tsx`, `riskPopover.tsx`, `contextMenu.tsx`, `contextMenuLabels.ts`, `actions.ts`, `fileTree.tsx` | `initSidebar()` mounts two reactive trees (sort control + file list) via kerf `mount()` and wires every interaction through `delegate(sidebar, …)` — no per-element `addEventListener` left in this dir. `fileListView.tsx` renders folder/risk/narrative JSX (keyed with `data-key`) plus the ground-truth named-comparison list with `version: 2` **set groups** (collapsible header + ordered step rows, doc 26 §26.3 P3b); `groundTruthGroups.ts` is the pure `buildGroundTruthSourceList(files, metaOf)` (singles + set groups sorted most-different-first, sets by max-aggregate) + `groundTruthFileOrder` (flatten to keyboard-nav order, steps consecutive), shared with `stores/index.ts`, `sortControl.tsx` renders the segmented control + risk dimension select, `sortMode.tsx` owns analysis polling (`switchSortMode`, `triggerAnalysis`, `invalidateAnalysisCache`, `loadAnalysisResults`), `riskPopover.tsx` renders the per-file risk dimension breakdown, `contextMenu.tsx` is the right-click file menu (doc 21; `bindFileContextMenu` — reveal / copy path (Alt-toggles relative↔absolute) / mark reviewed-pending / open in editor) with pure label helpers split into `contextMenuLabels.ts`, `fileTree.tsx` is the `loadFiles()` API call. `folderTree.ts` builds the collapsible folder hierarchy; `actions.ts` holds shared sidebar action handlers. Auto-scroll-to-selected runs as a `kerfjs` `effect()` watching `currentFileId`. |
+| `sidebar/` | `index.tsx`, `fileListView.tsx`, `folderTree.ts`, `groundTruthGroups.ts`, `riskScore.ts`, `sortControl.tsx`, `sortMode.tsx`, `riskPopover.tsx`, `contextMenu.tsx`, `contextMenuLabels.ts`, `actions.ts`, `fileTree.tsx` | `initSidebar()` mounts two reactive trees (sort control + file list) via kerf `mount()` and wires every interaction through `delegate(sidebar, …)` — no per-element `addEventListener` left in this dir. `fileListView.tsx` renders folder/risk/narrative JSX (keyed with `data-key`) plus the ground-truth named-comparison list with `version: 2` **set groups** (collapsible header + ordered step rows, doc 26 §26.3 P3b); `groundTruthGroups.ts` is the pure `buildGroundTruthSourceList(files, metaOf)` (singles + set groups sorted most-different-first, sets by max-aggregate) + `groundTruthFileOrder` (flatten to keyboard-nav order, steps consecutive), shared with `stores/index.ts`, `sortControl.tsx` renders the segmented control + risk dimension select, `sortMode.tsx` owns analysis polling (`switchSortMode`, `triggerAnalysis`, `invalidateAnalysisCache`, `loadAnalysisResults`), `riskPopover.tsx` renders the per-file risk dimension breakdown, `contextMenu.tsx` is the right-click file menu (doc 21; `bindFileContextMenu` — reveal / copy path (Alt-toggles relative↔absolute) / mark reviewed-pending / open in editor) with pure label helpers split into `contextMenuLabels.ts`, `fileTree.tsx` is the `loadFiles()` API call. `folderTree.ts` builds the collapsible folder hierarchy; `actions.ts` holds shared sidebar action handlers. Auto-scroll-to-selected runs as a `kerfjs` `effect()` watching `currentFileId`. |
 | `annotations/` | `events.tsx`, `form.tsx`, `render.tsx`, `reclassifyPopup.tsx`, `categories.tsx`, `attachments.tsx` | `attachments.tsx` is the reviewer file-attachment UI (chips / upload / drag-drop / paste / preview, doc 25). `bindAnnotationEvents(diffContainer)` + `bindCreateFormEvents(diffContainer)` register `delegate()` handlers for every annotation interaction (delete / edit / dblclick-to-edit / reclassify / keep / dragstart / textarea input / Ctrl+Enter save / Escape cancel). Server-rendered annotation rows carry `data-key={id}`; mid-edit form state lives in `editFormSignal` and picker open state in `categoryPickerSignal` (both in `stores/index.ts`) so a sibling update doesn't clobber an open form. The popup itself is a transient `document.body` overlay with a single `document.addEventListener` for outside-click dismiss (popups outside any `mount()` tree use direct listeners; inside a mount tree we'd use `delegate()` to survive re-renders). |
 | `review/` | `modal.tsx`, `progress.tsx` | Completion modal (with optional "Send to Claude" when channel is on), progress bar. |
 | `difftool/` | `session.tsx` | The accumulating-session client UI for a `git difftool` per-file review (doc 19) — renders the live, growing file list as files arrive over the append/poll API. |
 | `plugins/` | `uiExtensions.tsx`, `segmentSelection.ts` | Plugin main-app UI extensions (doc 30, GB-1058/GB-1068): `initPluginUi`/`refreshPluginUi` fetch `GET /api/plugins/ui` and render each plugin's registered element into the `#plugin-ui-header` / `#plugin-ui-diff-toolbar` / `#plugin-ui-sidebar-footer` slots (reviewShell.tsx). **All five types render**: **button**/**link** via one `document.body` `delegate` → `POST /api/plugins/:id/action` → toast on `result.message`; **stateful** toggle/switch/segmented-control via direct listeners that compute the new value, post `{ actionId, value }`, then repaint (the host persists to `stateKey` + resolves the current `value` into the list). `segmentSelection.ts` is the pure, unit-tested selection math (`parseSelection`/`nextSelection`/`encodeSelection` for the 4 selection modes). Re-renders after a plugin is enabled/disabled/installed/uninstalled (from `settings/pluginsTab.tsx`). |
 | `toast.tsx` | Shared `showToast(message)` — transient bottom toast (`.app-toast`, auto-dismiss ~2s). Used by go-to-definition and plugin UI-element actions (doc 30). |
 | `settings/` | `dialog.tsx`, `tabContext.ts`, `generalTab.tsx`, `profileTab.tsx`, `experimentalTab.tsx`, `pluginsTab.tsx`, `updatesTab.tsx`, `themeEditor.tsx`, `themeManager.tsx` | Tabbed settings modal. Each tab is a `Tab` registry entry (`{ id, label, icon, enabled?, render, bind }`) sharing a single `TabContext` defined in `tabContext.ts`. Dialog iterates the registry — adding a new tab is a one-line change. Auto-save on change; no Save/Cancel. AI config lives under Experimental. **`pluginsTab.tsx`** (doc 29, GB-1040) is the content-plugin manager — a self-contained tab (module `signal` for the list) that lists installed plugins with status, per-plugin global + per-project disable toggles, **manifest-declared preferences** (GB-1047, auto-save via `POST /api/plugins/:id/preferences`), install-from-a-folder (path), and uninstall, over `GET/POST/DELETE /api/plugins`. A manifest **`configLayout`** (GB-1059, FR-29.18) arranges the preferences into collapsible `<details>` groups / dividers / spacers / dynamic **status labels** / **action buttons**; a button click runs the plugin's `onAction` via `POST /api/plugins/:id/action` and the refreshed list carries any `updateConfigLabel` status the action set (folded into `configLabels`, no polling). Also renders an **Available to install** section (FR-29.20/GB-1069): opt-in bundled plugins not yet installed, each with its readiness (a check/warning per requirement) + provision notes + an **Install** button → `doInstallBundled` → `POST /api/plugins/:id/install-bundled`; a `ready` result toasts + moves the row to installed, a `needs-setup` result renders the remaining instructions inline for the user to finish + Install again. |
-| `styles/` | `_variables.scss`, `_base.scss`, `_sidebar.scss`, `_diff.scss`, `_annotations.scss`, `_buttons.scss`, `_modal.scss`, `_scrollbar.scss`, `_highlight.scss`, `_history.scss`, `_ai-sort.scss`, `_image-diff.scss`, `_lightbox.scss`, `_settings.scss`, `_update-banner.scss` | SCSS partials imported by `styles.scss`. |
+| `styles/` | `_variables.scss`, `_base.scss`, `_sidebar.scss`, `_diff.scss`, `_annotations.scss`, `_buttons.scss`, `_modal.scss`, `_scrollbar.scss`, `_highlight.scss`, `_history.scss`, `_ai-sort.scss`, `_image-diff.scss`, `_lightbox.scss`, `_plugin-ui.scss`, `_settings.scss`, `_update-banner.scss` | SCSS partials imported by `styles.scss`. |
 
 ### `src-tauri/src/` — Rust desktop shell
 
@@ -372,7 +375,7 @@ server.ts: startServer()
   → Hono<AppEnv>
   → middleware: inject reviewId / currentReviewId / repoRoot
   → /static/{app.js, history.js, styles.css}  (cache: no-cache)
-  → mount route groups: /api, /api/ai, /api/themes, /api/channel, /
+  → mount route groups: /api, /api/ai, /api/themes, /api/channel, /api/difftool, /
   → tryServe() with 20-port fallback (unless --strict-port)
   → stdout: "Glassbox running at http://localhost:{port}"  ← Tauri reads this
   → open browser (unless --no-open)
@@ -391,6 +394,7 @@ Graceful shutdown: Tauri's `RunEvent::Exit` kills the sidecar process group
 |------|---------|---------|
 | `GET /` | `routes/pages.tsx` | Main review UI (sidebar + diff viewer) |
 | `GET /file/:fileId` | `routes/pages.tsx` | File fragment (loaded into content pane) |
+| `GET /file-raw` | `routes/pages.tsx` | Read-only raw repo file view (go-to-definition target, doc 13); path-contained to the repo root (403 on traversal) |
 | `GET /review/:reviewId` | `routes/pages.tsx` | View a past review (read-only or reopenable) |
 | `GET /history` | `routes/pages.tsx` | Review history listing |
 | `GET /static/styles.css` | `server.ts` | Built CSS |
@@ -402,7 +406,7 @@ Graceful shutdown: Tauri's `RunEvent::Exit` kills the sidecar process group
 ### `/api/*` (core — `routes/api.ts`)
 
 Reviews: `GET /reviews`, `GET /review`, `POST /review/complete`,
-`POST /review/reopen`, `DELETE /review/:id`,
+`POST /review/reopen`, `POST /review/refresh`, `DELETE /review/:id`,
 `POST /reviews/delete-completed`, `POST /reviews/delete-all`.
 
 Files: `GET /files`, `GET /files/:fileId`, `PATCH /files/:fileId/status`, `POST /files/:fileId/reveal`, `GET /files/:fileId/path`, `POST /files/:fileId/open`.
@@ -421,21 +425,35 @@ Review notes (doc 20): `GET /review-notes/artifact`,
 `DELETE /review-notes/:guid`.
 
 Context/outline/project: `GET /context/:fileId`, `GET /outline/:fileId`,
-`GET /project-settings`, `PATCH /project-settings`,
+`GET /symbol-definition`, `GET /project-settings`, `PATCH /project-settings`.
 (`.gitignore` is now managed automatically at launch — see src/git/gitignore.ts + doc 27 — not via an API route.)
+
+Image (doc 4/24/26): `GET /image/:fileId/metadata`, `GET /image/:fileId/:side`.
+
+Plugins (doc 29/30): `GET /plugins`, `GET /plugins/ui`, `GET /plugins/available`,
+`POST /plugins/:id/install-bundled`, `POST /plugins/:id/disabled`,
+`POST /plugins/install`, `POST /plugins/:id/preferences`,
+`POST /plugins/:id/action`, `DELETE /plugins/:id`.
+
+Share prompt (doc 16): `GET /share-prompt/state`, `POST /share-prompt/dismiss`,
+`POST /share-prompt/tick`.
+
+System: `POST /open-external`.
 
 ### `/api/ai/*` (`routes/ai-api.ts` → `ai-analysis.ts`, `ai-config.ts`)
 
-`GET /config`, `POST /config`, `GET /models`, `GET /key-status`,
-`POST /key`, `DELETE /key`,
-`POST /analyze`, `GET /analyze/status`, `POST /analyze/cancel`,
+`GET /config`, `POST /config` (guided-review config folds into these), `GET /models`,
+`GET /key-status`, `POST /key`, `DELETE /key`,
+`POST /analyze`, `GET /analysis/:type`, `GET /analysis/:type/status`,
 `GET /preferences`, `POST /preferences`,
-plus internal debug endpoints (`/debug-status`, `/debug-log`) and
-guided-review config endpoints.
+plus internal debug endpoints (`GET /debug-status`, `POST /debug-log`).
+(No cancel route — cancellation is implicit via cache invalidation / mode switch
+inside `POST /analyze`.)
 
 ### `/api/themes/*` (`routes/theme-api.ts`)
 
-`GET /themes`, `POST /themes`, `PATCH /themes/:id`, `DELETE /themes/:id`,
+`GET /themes`, `POST /themes`, `PATCH /themes/:id`, `POST /themes/:id/edit`
+(auto-copy a built-in before editing), `DELETE /themes/:id`,
 `GET /themes/active`, `POST /themes/active`.
 
 ### `/api/channel/*` (`routes/channel-api.ts`)
@@ -861,7 +879,7 @@ two documents intentionally overlap.
 | Add a new API endpoint | **Two-sided change.** 1) Define `XReq`/`XResp` types + a typed caller (`createX`, `getX`, …) in the matching `src/api/<resource>.ts`. 2) Pick the right sub-router under `src/routes/api/` (or `routes/ai-*.ts`, `theme-api.ts`, `channel-api.ts`) and use `c.req.json<XReq>()` / `c.json<XResp>(...)`. Caller names must be globally unique across modules (flat `apis` namespace). Client call sites use `await getX({ ... })` from `../api/index.js` — never the raw `api<T>()` helper. |
 | Add a new page/route | `src/routes/pages.tsx`; register in `src/server.ts`. |
 | Change the DB schema | `src/db/ddl.ts` (tables/indexes) + a migration in `src/db/connection.ts` (`addColumnIfMissing` pattern). Query code in `src/db/queries.ts` or `ai-queries.ts`. |
-| Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/routes/api/annotations.ts` (`VALID_CATEGORIES`), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
+| Add an annotation category | `src/client/state.ts` (CATEGORIES), `src/client/annotations/categories.tsx` (UI), `src/api/annotations.ts` (`AnnotationCategorySchema` zod enum — the wire validation), `src/export/generate.ts` (export semantics). Update `docs/5-annotations.md` + `docs/6-export.md`. |
 | Work on feedback attachments | `src/client/annotations/attachments.tsx` (chips/upload/drag-drop/paste/preview), `src/routes/api/attachments.ts` + `src/api/attachments.ts` (API), `src/db/attachment-queries.ts` + `src/attachments/store.ts` (storage), `src/utils/openOS.ts` (`'quicklook'`), `src/export/generate.ts` (export paths). Doc 25. |
 | Work on the image lightbox / note-artifact regions | `src/client/lightbox.tsx` (shared full-screen lightbox + zoom/pan + region draw; zoom/pan math in the pure `src/client/lightboxZoom.ts`, GB-963), `src/client/diff/noteArtifactRegions.tsx` (inline drag-to-draw on the thumbnail **or** click → lightbox; accumulates pending regions per note), `src/utils/artifactRegions.ts` (pure decode/group of `region_data` arrays), `src/components/reviewNoteRegionThumb.tsx` (the marked-region thumbnail(s) on a reply). Regions carried into the reply via `createAnnotation`'s `regions` array (→ `region_data` JSON array with `artifact` uris; single object still read for back-compat). Doc 25 / GB-953, GB-959. |
 | Add a CLI option | `src/cli.ts` `parseArgs()` switch; document in `docs/2-cli-and-server.md`. |
@@ -870,7 +888,7 @@ two documents intentionally overlap.
 | Add a theme | `src/themes/built-in.ts` (built-in), or create `~/.glassbox/themes/*.json` (custom). All vars from `ThemeColors` must be present. |
 | Change export format | `src/export/generate.ts`. Update `docs/6-export.md`. |
 | Add a diff mode/view | `src/client/diff/` (new module), wire into `src/client/diff/index.tsx` (mount + delegates) and `toolbar.tsx`. Server rendering lives in `src/components/diffView.tsx`. |
-| Add a new image diff mode | `src/components/imageDiff.tsx` + `src/client/diff/imageDiff/` (`index.ts` orchestration, `zoom.ts`, `sliceTool.ts`, `metadata.ts`). |
+| Add a new image diff mode | `src/components/imageDiff.tsx` + `src/client/diff/imageDiff/` (`index.ts` orchestration, `zoom.ts`, `sliceTool.ts`, `metadata.tsx`). |
 | Tweak go-to-definition | `src/outline/parser.ts` (regex rules) and `src/client/diff/goToDefinition.tsx` (wiring). |
 | Add a SCSS partial | Create `src/client/styles/_thing.scss`, `@use` it from `src/client/styles.scss`. |
 | Add client state | `src/client/stores/index.ts` — pick the matching store (`reviewStore` / `diffViewStore` / `aiStore` / `dragStore`) or add a new one. Types in `state.ts`. |
@@ -886,5 +904,5 @@ two documents intentionally overlap.
 - `docs/ARCHITECTURE.md` — higher-level architecture narrative.
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive.
 - `docs/tauri-setup.md` — certificates, signing keys, GitHub secrets.
-- `docs/1-review-workflow.md` … `docs/26-ground-truth-comparison.md` — numbered
+- `docs/1-review-workflow.md` … `docs/31-plugin-lifecycle-hooks.md` — numbered
   functional / non-functional requirements.
