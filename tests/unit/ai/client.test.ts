@@ -162,7 +162,11 @@ describe('sendAIRequest', () => {
 
       const call = fetchSpy.mock.calls[0];
       expect((call[0] as string)).toContain('generativelanguage.googleapis.com');
-      expect((call[0] as string)).toContain('key=test-key');
+      // GB-1085: the key must travel in the x-goog-api-key header, never the
+      // URL, where it would leak into logs/proxies/error text.
+      expect((call[0] as string)).not.toContain('test-key');
+      const init = call[1] as RequestInit;
+      expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('test-key');
     });
 
     it('handles missing usageMetadata', async () => {

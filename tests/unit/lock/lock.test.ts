@@ -92,6 +92,33 @@ describe('acquireLock', () => {
     mockStderr.mockRestore();
   });
 
+  // GB-1085: EPERM from kill(pid, 0) means the process EXISTS (another user's)
+  // — it must be treated as "held", not "stale" (the old code removed the lock).
+  it('exits (does not steal the lock) when kill(pid, 0) throws EPERM', async () => {
+    const lockPath = join(testDir, 'glassbox.lock');
+    writeFileSync(lockPath, JSON.stringify({ pid: 99999, startedAt: new Date().toISOString() }));
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const mockStderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const mockKill = vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('EPERM') as NodeJS.ErrnoException;
+      err.code = 'EPERM';
+      throw err;
+    });
+
+    vi.resetModules();
+    const { acquireLock } = await import('../../../src/lock.js');
+    acquireLock(testDir);
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+    // The other instance's lock survives.
+    expect(JSON.parse(readFileSync(lockPath, 'utf-8'))).toMatchObject({ pid: 99999 });
+
+    mockKill.mockRestore();
+    mockExit.mockRestore();
+    mockStderr.mockRestore();
+  });
+
   it('prints error messages when lock held by live process', async () => {
     const lockPath = join(testDir, 'glassbox.lock');
     writeFileSync(lockPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));

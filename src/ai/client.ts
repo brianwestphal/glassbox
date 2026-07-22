@@ -256,11 +256,14 @@ async function sendGoogleRequest(
     parts: [{ text: m.content }],
   }));
 
+  // The key travels in the x-goog-api-key header, NOT a `?key=` query param —
+  // URLs leak into logs/proxies and into thrown error text (throwIfNotOk
+  // includes response bodies, and fetch errors often echo the URL).
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,

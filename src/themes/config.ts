@@ -5,6 +5,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { z } from 'zod';
 
 import { StoredCustomThemeSchema } from '../api/themes.js';
 import { GLOBAL_CONFIG_DIR, readGlobalConfig, updateGlobalConfig } from '../global-config.js';
@@ -13,19 +14,24 @@ import { BUILT_IN_THEMES, DEFAULT_THEME_ID, getBuiltInTheme } from './built-in.j
 
 const THEMES_DIR = join(GLOBAL_CONFIG_DIR, 'themes');
 
+/** The `theme` slice of `~/.glassbox/config.json`, validated rather than
+ *  asserted — a hand-edited `"theme": "dark"` (string, not object) previously
+ *  threw a TypeError on the property write in `setActiveThemeId`. */
+const ThemeConfigSliceSchema = z.object({ active: z.string().optional() }).loose();
+
 /** Get the active theme ID from config. */
 export function getActiveThemeId(): string {
   const config = readGlobalConfig();
-  const theme = config.theme as Record<string, unknown> | undefined;
-  const active = theme?.active as string | undefined;
-  return active ?? DEFAULT_THEME_ID;
+  const parsed = ThemeConfigSliceSchema.safeParse(config.theme);
+  return parsed.success ? (parsed.data.active ?? DEFAULT_THEME_ID) : DEFAULT_THEME_ID;
 }
 
 /** Set the active theme ID in config. */
 export function setActiveThemeId(id: string): void {
   updateGlobalConfig((config) => {
-    if (config.theme === undefined) config.theme = {};
-    (config.theme as Record<string, unknown>).active = id;
+    const parsed = ThemeConfigSliceSchema.safeParse(config.theme);
+    // Replace a malformed slice wholesale instead of writing into it.
+    config.theme = { ...(parsed.success ? parsed.data : {}), active: id };
   });
 }
 

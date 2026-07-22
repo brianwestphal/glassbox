@@ -96,11 +96,19 @@ attachmentsRoutes.get('/attachments/:id/raw', async (c) => {
     if (!stat.isFile()) return c.text('Not found', 404);
     const bytes = readFileSync(attachment.stored_path);
     // `inline` so images/PDFs preview in-tab; the filename rides along for
-    // a "save as".
+    // a "save as". The plain `filename=` is restricted to a safe ASCII subset
+    // (control chars / non-ASCII / quotes / backslashes made undici reject the
+    // whole header — a request-time 500); the RFC 5987 `filename*` carries the
+    // full original name UTF-8-encoded for capable browsers (GB-1085).
+    const asciiName = attachment.original_filename
+       
+      .replace(/[^\x20-\x7E]/g, '_')
+      .replace(/["\\]/g, '_');
+    const utf8Name = encodeURIComponent(attachment.original_filename);
     return new Response(new Uint8Array(bytes), {
       headers: {
         'Content-Type': attachment.mime_type,
-        'Content-Disposition': `inline; filename="${attachment.original_filename.replace(/"/g, '')}"`,
+        'Content-Disposition': `inline; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`,
         'Cache-Control': 'no-cache',
       },
     });
