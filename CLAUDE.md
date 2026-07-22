@@ -181,7 +181,7 @@ Client-side CSS and JavaScript are built as separate resources, organized into m
 - `app.tsx` — Entry point, init
 - `state.ts` — Shared types, default factories, and `CATEGORIES` constants (no runtime state — see `stores/`)
 - `stores/index.ts` — Reactive state via kerfjs `defineStore`: `reviewStore`, `diffViewStore`, `aiStore`, `dragStore`. Reads use `store.state.value.X`; writes use `store.actions.update({ X: y })` plus named actions for collection mutations (`pushFileOrder`, `setAnnotationCount`, `setStaleCount`, `addCollapsedFolder`, `removeCollapsedFolder`, `setFileNote`, `setGuidedNote`, `setAnalysisState`). `getAnalysisModeState(mode)` resolves a mode's analysis sub-state. Computed: `filteredFiles`, `aiEnabled`. New per-concern state goes here; pick the matching store or split a new one off when it's clearly a separate domain.
-- `api.ts` — API helper, HTML escaping utility
+- `api.ts` — client-side debug logging (`initDebug` / `clientLog`); all real API traffic goes through the typed callers in `src/api/*` (the legacy untyped `api()` helper was removed)
 - `sidebar/index.tsx` — `initSidebar()` orchestrator: two kerf `mount()` trees (sort control + file list), `delegate()` handlers for every sidebar interaction, `effect()`-driven auto-scroll-to-selected
 - `sidebar/fileListView.tsx` — JSX for folder / risk / narrative file lists (keyed with `data-key`)
 - `sidebar/sortControl.tsx` — JSX for the sort-mode segmented control and risk dimension select

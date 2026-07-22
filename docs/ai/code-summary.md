@@ -73,7 +73,7 @@ glassbox/
 
 | File | Purpose |
 |------|---------|
-| `_runner.ts` | Client-only runtime helper: re-exports `api()` from `client/api.ts` and a tiny `qs()` query-string builder. Per-resource caller functions go through this. |
+| `_runner.ts` | Client-only runtime helper: `apiCall(RespSchema, path, …)` (fetch + zod response validation) and a tiny `qs()` query-string builder. Per-resource caller functions go through this; it deliberately avoids `client/api.ts` so server-side schema imports stay DOM-free. |
 | `index.ts` | Aggregator. Re-exports every per-resource module (`export *`) so callers can `import { createAnnotation } from '../api/index.js'` AND get a flat `apis` namespace (`apis.createAnnotation({...})`) for discoverability. |
 | `annotations.ts` | Req/Resp types + callers for `/annotations/*` (create / update / delete / move / keep / stale-delete-all / stale-keep-all / list-all). |
 | `context.ts` | `GetContextLinesReq/Resp` + `getContextLines()` for hunk expansion. |
@@ -580,9 +580,7 @@ reactively) → init diff view (mounts the diff pane with an async fetch
 effect) → toolbar / find / go-to-definition / completion / progress
 (reactive) → drag-end / nav buttons / scroll tracking.
 
-All server communication goes through `api()` in `src/client/api.ts`, which
-injects the `reviewId` query param and serializes request bodies. **Never
-pre-stringify** the body — `api()` already does it.
+All server communication goes through the typed callers in `src/api/*` (backed by `apiCall()` in `src/api/_runner.ts`, which zod-validates every response). `src/client/api.ts` now carries only the client debug logging (`initDebug`/`clientLog`).
 
 ## 9. AI subsystem
 
