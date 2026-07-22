@@ -715,7 +715,8 @@ pub fn run() {
                                     } else if line_str.contains(NO_CHANGES_MARKER) {
                                         // Empty-diff mode: the server won't start (GB-1057).
                                         no_changes = true;
-                                        let _ = window.eval("window.showNoChanges && window.showNoChanges()");
+                                        let _ = window
+                                            .eval("window.showNoChanges && window.showNoChanges()");
                                     }
                                 }
                             }
