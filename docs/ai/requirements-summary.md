@@ -975,9 +975,13 @@ into a self-contained bundle (a new `.wasm` `binary` loader in
 `build-plugins.mjs`; codec bytes injected through a `WasmLoader` so the decoders
 unit-test in plain Node). No system dep but separately installable
 (`autoInstall: false`, ~1.8 MB WASM) to keep the codecs out of the default install;
-contributes no renderer (browsers show WebP/AVIF natively), only the decode. Still
-open: a committed fixture-plugin e2e (GB-1043) — the tab's layout rendering + button
-wiring is manual until then. Implemented FR/NFR units carry real tests in
+contributes no renderer (browsers show WebP/AVIF natively), only the decode. A
+committed **fixture-plugin e2e** (GB-1043) now drives both render paths (file-diff
++ review-note artifact) end-to-end with a real installed plugin (the
+`chromium-plugin` Playwright project boots a `--diff` server with a fixture plugin
+in an isolated config dir + a `.pr-notes/` note). Still open: a management-tab UI
+e2e reusing that harness (GB-1070) — the tab's layout rendering + button wiring is
+manual until then. Implemented FR/NFR units carry real tests in
 `feature-coverage.json`; the rest stay `waived` until their follow-up lands.
 
 ## 18m. Plugin UI extensions (`30-plugin-ui-extensions.md`) — **Shipped (button/link)**
@@ -1004,8 +1008,9 @@ declarative elements only; the icon is inert plugin-supplied SVG trusted via
 opt-in install (doc 29 §29.6). Worked example: the `graphviz` plugin's
 diff-toolbar **Graphviz** button (renderer self-test → toast). Modeled on Hot
 Sheet `docs/18-plugins.md` §18.12. The client rendering + click wiring is
-manual-tested (gated on the fixture-plugin e2e harness GB-1043) like the rest of
-the plugin UI; everything else carries unit/integration tests.
+manual-tested (a management-tab UI e2e reusing the GB-1043 fixture-plugin harness
+is the follow-up, GB-1070) like the rest of the plugin UI; everything else carries
+unit/integration tests.
 
 ## 18n. Plugin review lifecycle hooks (`31-plugin-lifecycle-hooks.md`) — **Shipped**
 

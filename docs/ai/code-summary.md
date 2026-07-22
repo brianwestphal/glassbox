@@ -242,7 +242,11 @@ integration points (artifacts + file diff viewer), desktop delivery (GB-1039),
 the Settings **Plugins** management tab + `/api/plugins` (GB-1040), manifest
 preferences (GB-1047/1054), and a native folder picker (GB-1048 — the
 `pick_plugin_folder` Tauri command + a **Browse…** button in the Plugins tab)
-are wired. **Not yet wired:** a committed fixture-plugin e2e (GB-1043).
+are wired. A committed **fixture-plugin e2e** (GB-1043) drives both render paths
+(file-diff + review-note artifact) end-to-end via the `chromium-plugin` Playwright
+project (`tests/e2e/plugin-render.test.ts` + `tests/fixtures/plugin/`,
+`tests/fixtures/plugin-diff*/`); the Plugins-tab management UI e2e is the remaining
+follow-up (GB-1070).
 
 **First-party plugins** live at repo-root `plugins/<id>/` (source under `src/`,
 a `manifest.json`, a plugin-local `tsconfig.json`), built by

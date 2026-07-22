@@ -23,8 +23,10 @@
 > FR-29.19, GB-1063) lets a plugin decode bytes → RGBA so the perceptual diff
 > ([doc 26](26-ground-truth-comparison.md) P2) can score formats core can't; its
 > first reference plugin, **image-codecs** (WebP/AVIF via jSquash WASM,
-> `plugins/image-codecs/`, GB-1064), has shipped too. Still open: a committed
-> fixture-plugin **e2e** (GB-1043). See [§29.8](#298-status-and-follow-ups).
+> `plugins/image-codecs/`, GB-1064), has shipped too. A committed **fixture-plugin
+> e2e** (GB-1043) now drives both render paths (file-diff + review-note artifact)
+> end-to-end with a real installed plugin. Still open: a management-tab UI e2e
+> (GB-1070). See [§29.8](#298-status-and-follow-ups).
 
 Glassbox stays lean and local-first by keeping heavy, format-specific code out of
 the base install and desktop bundle. But some content types are worth rendering
@@ -427,6 +429,17 @@ The build is decomposed into follow-up tickets:
   renderer — browsers display WebP/AVIF natively; it only adds the decode-to-RGBA
   the perceptual diff needs. `@jsquash/*` are **devDependencies bundled into the
   plugin**, NOT core external deps (like graphviz's `@viz-js/viz`).
+- **Committed fixture-plugin e2e** (GB-1043, **shipped**) — a Playwright project
+  (`chromium-plugin`, `tests/e2e/plugin-render.test.ts`) boots a `--diff` server
+  with a real fixture content plugin (`tests/fixtures/plugin/fixture-diagram/`,
+  handling `.fdiag`) copied into an isolated `GLASSBOX_CONFIG_DIR` before startup,
+  plus a committed `.pr-notes/` note (`tests/fixtures/plugin-diff-notes/`). It
+  drives **both** FR-29.2 integration points end-to-end: the file-diff path (the
+  Code|Rendered toggle → the plugin's SVG served `image/svg+xml`) and the artifact
+  path (a review-note `.fdiag` artifact → an inline `data:image/svg+xml` `<img>`).
+  The Plugins-tab management UI (enable/disable/install/uninstall/config) still
+  relies on the manual plan; a committed e2e for it, reusing this harness, is a
+  follow-up (GB-1070).
 
 ## Implementation pointers
 

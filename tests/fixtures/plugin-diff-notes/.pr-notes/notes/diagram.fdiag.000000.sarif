@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "unknown-ai-tool",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mrvda95rfutn6oyf",
+          "message": {
+            "text": "The flow diagram proves the pipeline order.",
+            "markdown": "The flow diagram proves the pipeline order."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "diagram.fdiag"
+                },
+                "region": {
+                  "startLine": 1,
+                  "endLine": 2,
+                  "snippet": {
+                    "text": "graph\n  a -> b"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "proof"
+            ]
+          },
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "63fd12dd77c5c66c19035b967a24577c"
+          },
+          "attachments": [
+            {
+              "artifactLocation": {
+                "uri": "proof.fdiag",
+                "properties": {
+                  "ext-sha256": "0ea80baf8978ee97d812ec8fd00bfc948d13025b8dfbf9d3ea3741fb0b9fa012"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "revisionId": "d3d47753f71e062f12cbac94eb36b6dcc926950b",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

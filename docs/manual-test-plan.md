@@ -150,17 +150,24 @@ Until then, the tab's UI wiring is manual:
   fixtures — `plugins/image-codecs.test.ts` — and the built self-contained bundle
   was verified live decoding them; this manual item is the full in-app ground-truth
   scoring experience with the plugin toggled.)*
-- **Plugin-rendered file uses the image viewer (GB-1052)** — Review a diff
-  containing a `.dot`/`.gv` file with the Graphviz plugin enabled. The file shows
-  a **Code | Rendered** toggle (like an SVG). *Code* is the normal text diff of
-  the source; *Rendered* shows the diagram in the image viewer — **zoom** works,
-  and for a modified file the image-mode segmented control (Metadata · A · B ·
-  Side by Side · Difference · Slice) compares the two rendered diagrams. Disabling
-  the plugin removes the toggle and the file falls back to a plain text diff.
-  *(The rendering + image-route serving are unit/integration-tested; this item is
-  the client toggle + zoom/mode wiring, which needs the real UI — a committed e2e
-  is gated on the fixture-plugin harness, GB-1043.)*
+- **Plugin-rendered file — zoom + comparison modes (GB-1052)** — Review a diff
+  containing a `.dot`/`.gv` file with the Graphviz plugin enabled and open the
+  **Rendered** view. Confirm the image viewer's **zoom** (in/out/fit/actual +
+  pointer) works and, for a modified file, the image-mode segmented control
+  (Metadata · A · B · Side by Side · Difference · Slice) compares the two rendered
+  diagrams. *(The core render path — the Code|Rendered toggle, the Rendered SVG
+  served as `image/svg+xml`, and the artifact-path inline SVG — is now covered by
+  the committed `chromium-plugin` e2e, GB-1043. What remains manual is the
+  zoom/comparison-mode pointer interaction on a plugin-rendered file, which reuses
+  the shared image-viewer gestures already in the manual plan above.)*
 
 ## Automated Coverage Summary
 
-- _(none yet — items move here as they gain automated coverage)_
+- **Content-plugin render paths (doc 29 FR-29.2 / FR-29.13, GB-1043)** — the
+  committed `chromium-plugin` Playwright project (`tests/e2e/plugin-render.test.ts`)
+  boots a `--diff` server with a real fixture content plugin installed in an
+  isolated `GLASSBOX_CONFIG_DIR` and a committed `.pr-notes/` note, asserting both
+  integration points end-to-end: the **file-diff path** (a `.fdiag` file gets the
+  Code|Rendered toggle; Rendered serves the plugin's SVG as `image/svg+xml`) and
+  the **artifact path** (a review-note `.fdiag` artifact renders as an inline
+  `data:image/svg+xml` `<img>`). Previously verified only by hand.

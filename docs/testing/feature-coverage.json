@@ -1769,8 +1769,8 @@
       "waived": "Design-only (doc 29 content-plugin system): the plugin boundary is a spec only; no code yet. Implementation tracked in GB-1038 (core loader/contract). Flip to a test when the loader ships."
     },
     "FR-29.2": {
-      "tests": ["tests/unit/plugins/fileView.test.ts", "tests/unit/plugins/artifacts.test.ts", "tests/integration/api/image-plugin-routes.test.ts"],
-      "note": "One API, two integration points: renderNoteArtifacts (review-note artifacts) + the file diff viewer. GB-1052: a plugin-rendered file is treated like an SVG file — renderPluginSvgSide renders a side, the image route serves it as image/svg+xml (integration test), and the file gets a Code|Rendered toggle routing Rendered through the image viewer (zoom + all comparison modes)."
+      "tests": ["tests/unit/plugins/fileView.test.ts", "tests/unit/plugins/artifacts.test.ts", "tests/integration/api/image-plugin-routes.test.ts", "tests/e2e/plugin-render.test.ts"],
+      "note": "One API, two integration points: renderNoteArtifacts (review-note artifacts) + the file diff viewer. GB-1052: a plugin-rendered file is treated like an SVG file — renderPluginSvgSide renders a side, the image route serves it as image/svg+xml (integration test), and the file gets a Code|Rendered toggle routing Rendered through the image viewer (zoom + all comparison modes). GB-1043: a committed Playwright e2e (chromium-plugin project) boots a --diff server with a REAL fixture plugin installed in an isolated GLASSBOX_CONFIG_DIR + a .pr-notes/ note, driving BOTH paths end-to-end: the file-diff path (.fdiag file -> Code|Rendered toggle -> Rendered SVG served image/svg+xml with the plugin's marker) and the artifact path (a review-note .fdiag artifact rendered as an inline data:image/svg+xml <img>)."
     },
     "FR-29.3": {
       "tests": ["tests/unit/plugins/loader.test.ts"],
@@ -1833,8 +1833,8 @@
       "note": "Manifest-declared preferences (GB-1047): the settings store persists per-plugin values (global config / project settings per scope, default fallback), PluginContext.getSetting/setSetting are wired to it, and the graphviz `engine` preference is applied at render (verified live). SECRET prefs (GB-1054) are stored in the OS keychain (account plugin-<id>-<key>) and the display reader masks them (only reports `configured`) — settings.test.ts covers routing/masking/clear against a mocked keychain; the real darwin keychain round-trip was verified live."
     },
     "FR-29.13": {
-      "tests": ["tests/unit/plugins/artifacts.test.ts"],
-      "note": "Server-side render pass (renderNoteArtifacts) offers a text/diagram-source artifact to the dispatcher and attaches inert rendered SVG (shown via an <img> data URI in DiffView) in place of the code block."
+      "tests": ["tests/unit/plugins/artifacts.test.ts", "tests/e2e/plugin-render.test.ts"],
+      "note": "Server-side render pass (renderNoteArtifacts) offers a text/diagram-source artifact to the dispatcher and attaches inert rendered SVG (shown via an <img> data URI in DiffView) in place of the code block. The chromium-plugin e2e (GB-1043) asserts this live: a committed .pr-notes/ note's .fdiag artifact renders as an inline data:image/svg+xml <img> via the installed fixture plugin."
     },
     "FR-29.14": {
       "tests": ["tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/artifacts.test.ts"],

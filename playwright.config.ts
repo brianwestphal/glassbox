@@ -1,4 +1,4 @@
-import { mkdirSync } from 'fs';
+import { cpSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -23,6 +23,14 @@ const GT_WORK_DIR = join(tmpdir(), `glassbox-e2e-gt-${process.pid}`);
 // deterministic default platform (`anthropic`).
 const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-config-${process.pid}`);
 
+// The content-plugin E2E project (doc 29, GB-1043) boots its own `--diff` server
+// against a `.fdiag` pair with a fixture content plugin pre-installed in an
+// isolated GLASSBOX_CONFIG_DIR — so the file-diff render path (a plugin-rendered
+// file → the Code|Rendered toggle → an SVG in the image viewer) is exercised
+// end-to-end with a real installed plugin, not just unit-tested.
+const PLUGIN_WORK_DIR = join(tmpdir(), `glassbox-e2e-plugin-${process.pid}`);
+const PLUGIN_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-plugin-config-${process.pid}`);
+
 // Create the work dirs here (config eval runs before the webServers) rather than
 // via a shell `mkdir -p` in the webServer command — the CLI chdirs into
 // `--project-dir` before creating anything itself, so the dir must exist first.
@@ -31,6 +39,23 @@ const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-config-${process.pid}`);
 mkdirSync(DIFF_WORK_DIR, { recursive: true });
 mkdirSync(GT_WORK_DIR, { recursive: true });
 mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
+mkdirSync(PLUGIN_WORK_DIR, { recursive: true });
+
+// Seed the plugin server's project dir with a committed `.pr-notes/` review note
+// anchored to `diagram.fdiag` plus its `.fdiag` proof artifact, so the review-note
+// **artifact** render path (doc 29 FR-29.2, the other integration point) is also
+// exercised: the fixture plugin renders the artifact to an inline inert SVG.
+cpSync(join(process.cwd(), 'tests/fixtures/plugin-diff-notes'), PLUGIN_WORK_DIR, { recursive: true });
+
+// Pre-install the fixture content plugin into the plugin server's isolated
+// GLASSBOX_CONFIG_DIR before it boots. Discovery loads it from `<config>/plugins/`
+// exactly like a real installed plugin (GB-1043).
+mkdirSync(join(PLUGIN_CONFIG_DIR, 'plugins'), { recursive: true });
+cpSync(
+  join(process.cwd(), 'tests/fixtures/plugin/fixture-diagram'),
+  join(PLUGIN_CONFIG_DIR, 'plugins', 'fixture-diagram'),
+  { recursive: true },
+);
 
 // Optionally launch a branded, system-installed browser instead of Playwright's
 // bundled Chromium. Unset by default (CI/dev use the bundled build); set
@@ -117,11 +142,23 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 15000,
     },
+    {
+      // Content-plugin E2E server (doc 29, GB-1043). Boots `--diff` against the
+      // checked-in `.fdiag` pair with the fixture content plugin pre-installed in
+      // PLUGIN_CONFIG_DIR (copied above), so the file-diff render path renders the
+      // plugin's SVG. Isolated `--data-dir`/`--project-dir` + its own config dir.
+      command: `npx tsx src/cli.ts --diff tests/fixtures/plugin-diff/old tests/fixtures/plugin-diff/new --no-open --strict-port --port 4187 --data-dir ${JSON.stringify(join(PLUGIN_WORK_DIR, '.glassbox'))} --project-dir ${JSON.stringify(PLUGIN_WORK_DIR)}`,
+      // Port 4187: 4186 is taken by the difftool test's own spawned server.
+      port: 4187,
+      reuseExistingServer: false,
+      timeout: 15000,
+      env: { GLASSBOX_CONFIG_DIR: PLUGIN_CONFIG_DIR },
+    },
   ],
   projects: [
     {
       name: 'chromium',
-      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/],
+      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/, /plugin-render\.test\.ts$/],
       use: { browserName: 'chromium' },
     },
     {
@@ -133,6 +170,11 @@ export default defineConfig({
       name: 'chromium-ground-truth',
       testMatch: /ground-truth\.test\.ts$/,
       use: { browserName: 'chromium', baseURL: 'http://localhost:4185' },
+    },
+    {
+      name: 'chromium-plugin',
+      testMatch: /plugin-render\.test\.ts$/,
+      use: { browserName: 'chromium', baseURL: 'http://localhost:4187' },
     },
   ],
 });
