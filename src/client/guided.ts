@@ -1,117 +1,22 @@
-import { getAnalysis, getAnalysisStatus, startAnalysis } from '../api/index.js';
-import { friendlyError } from './aiError.js';
+/**
+ * Guided-review analysis orchestration. The trigger/poll machinery lives in
+ * the shared `analysisEngine` (GB-1083) — this module supplies the guided
+ * hooks (note loading into `aiStore`) and the enabled/configured gating.
+ */
+import { getAnalysis } from '../api/index.js';
+import type { AnalysisHooks } from './analysisEngine.js';
+import { stopPolling, triggerAnalysisFor } from './analysisEngine.js';
 import { clientLog } from './api.js';
 import { aiStore } from './stores/index.js';
-import { ANALYSIS_POLL_INTERVAL_MS } from './timing.js';
 
-let pollGeneration = 0;
+const guidedHooks: AnalysisHooks = {
+  loadResults: loadGuidedResults,
+};
 
 export function triggerGuidedAnalysis(invalidateCache: boolean = false) {
   const ai = aiStore.state.value;
   if (!ai.guidedReviewEnabled || !ai.aiConfigured) return;
-
-  if (ai.guidedAnalysis.status === 'running') {
-    clientLog('triggerGuidedAnalysis: already running, skipping');
-    return;
-  }
-
-  clientLog(`triggerGuidedAnalysis: starting${invalidateCache ? ' (cache invalidated)' : ''}`);
-  aiStore.actions.setAnalysisState('guided', {
-    status: 'running',
-    error: null,
-    progressCompleted: 0,
-    progressTotal: 0,
-  });
-  pollGeneration++;
-  const gen = pollGeneration;
-
-  void (async () => {
-    try {
-      const result = await startAnalysis({ type: 'guided', invalidateCache });
-      if (gen !== pollGeneration) return;
-      // `startAnalysis` resolves to a success-or-error union (a 4xx/5xx returns
-      // `{ error }` rather than throwing). Surface the rejection instead of
-      // polling a run that never started — otherwise it sits on "running"
-      // forever (GB-927).
-      if ('error' in result) {
-        console.error('Guided analysis error:', result.error);
-        clientLog(`triggerGuidedAnalysis: server rejected — ${result.error}`);
-        aiStore.actions.setAnalysisState('guided', {
-          status: 'failed',
-          error: friendlyError(result.error),
-          progressCompleted: 0,
-          progressTotal: 0,
-        });
-        return;
-      }
-      clientLog(`triggerGuidedAnalysis: server accepted, starting poll (gen=${String(gen)})`);
-      pollGuidedStatus(gen);
-    } catch (err: unknown) {
-      if (gen !== pollGeneration) return;
-      const raw = err instanceof Error ? err.message : 'Failed to start guided analysis';
-      console.error('Guided analysis error:', raw);
-      clientLog(`triggerGuidedAnalysis: failed — ${raw}`);
-      aiStore.actions.setAnalysisState('guided', {
-        status: 'failed',
-        error: friendlyError(raw),
-      });
-    }
-  })();
-}
-
-function pollGuidedStatus(gen: number) {
-  const poll = () => {
-    if (gen !== pollGeneration) {
-      clientLog(`pollGuided: stale gen=${String(gen)}, stopping`);
-      return;
-    }
-
-    void (async () => {
-      const result = await getAnalysisStatus({ type: 'guided' });
-      if (gen !== pollGeneration) return;
-
-      if (result.status === 'running') {
-        const completed = result.progressCompleted ?? 0;
-        aiStore.actions.setAnalysisState('guided', {
-          status: 'running',
-          progressCompleted: completed,
-          progressTotal: result.progressTotal ?? 0,
-        });
-
-        if (completed > 0) {
-          await loadGuidedResults(true);
-        }
-
-        setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
-        return;
-      }
-
-      if (result.status === 'completed') {
-        clientLog('pollGuided: completed, loading final results');
-        await loadGuidedResults(false);
-        aiStore.actions.setAnalysisState('guided', {
-          status: 'completed',
-          progressCompleted: 0,
-          progressTotal: 0,
-        });
-        return;
-      }
-
-      if (result.status === 'failed') {
-        const raw = result.error ?? 'Guided analysis failed';
-        clientLog(`pollGuided: failed — ${raw}`);
-        console.error('Guided analysis error:', raw);
-        aiStore.actions.setAnalysisState('guided', {
-          status: 'failed',
-          error: friendlyError(raw),
-          progressCompleted: 0,
-          progressTotal: 0,
-        });
-      }
-    })();
-  };
-
-  setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
+  triggerAnalysisFor('guided', guidedHooks, invalidateCache);
 }
 
 async function loadGuidedResults(partial: boolean) {
@@ -134,7 +39,7 @@ export function invalidateGuidedAnalysis() {
     progressCompleted: 0,
     progressTotal: 0,
   });
-  pollGeneration++;
+  stopPolling('guided');
   clientLog('invalidateGuidedAnalysis: cleared guided notes and stopped polls');
 
   const ai = aiStore.state.value;

@@ -46,7 +46,9 @@ describe('GB-927: analysis trigger surfaces a rejected start', () => {
   it('finds the known trigger call sites', () => {
     // Sanity check the scan actually matches something, so a refactor that
     // renamed the call doesn't silently make this suite vacuously pass.
-    expect(callSites.length).toBeGreaterThanOrEqual(2);
+    // Since GB-1083 there is exactly one call site: the shared analysisEngine
+    // (behaviorally covered in analysisEngine.test.ts).
+    expect(callSites.length).toBeGreaterThanOrEqual(1);
   });
 
   it('every startAnalysis() caller discriminates the success-or-error union', () => {

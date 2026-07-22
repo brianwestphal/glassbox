@@ -37,7 +37,10 @@ type ModalStage =
       result: CompleteResult;
       aiCommand: string;
       channelConnected: boolean;
-    };
+    }
+  // A failed API call (complete / stale resolution) — previously the modal sat
+  // on "Completing..." forever with no exit (GB-1082).
+  | { kind: 'failed'; message: string };
 
 export function bindCompleteButton(): void {
   const root = document.querySelector<HTMLElement>('.review-app') ?? document.body;
@@ -90,7 +93,12 @@ function showCompleteModal(): void {
 
   void delegate(overlay, 'click', ACTIONS.discardStale.selector, () => {
     void (async () => {
-      await deleteStaleAnnotations();
+      try {
+        await deleteStaleAnnotations();
+      } catch (err: unknown) {
+        stage.value = { kind: 'failed', message: failureMessage('Discarding stale annotations failed', err) };
+        return;
+      }
       reviewStore.actions.update({ staleCounts: {} });
       stage.value = { kind: 'completing' };
       void completeReview(stage);
@@ -98,7 +106,12 @@ function showCompleteModal(): void {
   });
   void delegate(overlay, 'click', ACTIONS.keepStale.selector, () => {
     void (async () => {
-      await keepAllStaleAnnotations();
+      try {
+        await keepAllStaleAnnotations();
+      } catch (err: unknown) {
+        stage.value = { kind: 'failed', message: failureMessage('Keeping stale annotations failed', err) };
+        return;
+      }
       reviewStore.actions.update({ staleCounts: {} });
       stage.value = { kind: 'completing' };
       void completeReview(stage);
@@ -117,7 +130,12 @@ function showCompleteModal(): void {
     const aiCommand = stage.value.aiCommand;
     const sendBtn = asButton(btn);
     void (async () => {
-      await triggerChannel({ message: aiCommand });
+      try {
+        await triggerChannel({ message: aiCommand });
+      } catch {
+        sendBtn.textContent = 'Send failed — retry';
+        return;
+      }
       sendBtn.textContent = 'Sent!';
       sendBtn.setAttribute('disabled', 'true');
       setTimeout(() => { close(); }, 1000);
@@ -133,8 +151,21 @@ function showCompleteModal(): void {
   if (stage.value.kind === 'completing') void completeReview(stage);
 }
 
+function failureMessage(prefix: string, err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  return `${prefix}: ${raw}`;
+}
+
 async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Promise<void> {
-  const result = await apiCompleteReview();
+  let result: CompleteResult;
+  try {
+    result = await apiCompleteReview();
+  } catch (err: unknown) {
+    // Without this the modal showed "Completing..." forever after a failed
+    // request, with clicking outside as the only escape (GB-1082).
+    stage.value = { kind: 'failed', message: failureMessage('Completing the review failed', err) };
+    return;
+  }
   const aiCommand = result.isCurrent
     ? 'Read .glassbox/latest-review.md and apply the feedback.'
     : 'Read .glassbox/review-' + result.reviewId + '.md and apply the feedback.';
@@ -172,7 +203,21 @@ async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Pro
 function renderStage(s: ModalStage): SafeHtml {
   if (s.kind === 'stale-prompt') return renderStalePrompt(s.totalStale);
   if (s.kind === 'completing') return <h3>Completing...</h3>;
+  if (s.kind === 'failed') return renderFailed(s.message);
   return renderDone(s.result, s.aiCommand, s.channelConnected);
+}
+
+function renderFailed(message: string): SafeHtml {
+  return (
+    <>
+      <h3>Completion Failed</h3>
+      <p className="modal-label" style="color:var(--red)">{message}</p>
+      <p className="modal-label">The review is unchanged — close this dialog and try again.</p>
+      <div className="modal-actions">
+        <button className="btn btn-sm btn-primary" {...ACTIONS.modalDone.attrs}>Close</button>
+      </div>
+    </>
+  );
 }
 
 function renderStalePrompt(totalStale: number): SafeHtml {

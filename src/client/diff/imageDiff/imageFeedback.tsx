@@ -15,6 +15,7 @@ import { showCategoryPicker } from '../../annotations/categories.js';
 import { toElement } from '../../dom.js';
 import { CATEGORIES } from '../../state.js';
 import { reviewStore } from '../../stores/index.js';
+import { showToast } from '../../toast.js';
 import {
   clientToFraction,
   cursorForHandle,
@@ -293,7 +294,7 @@ export function initImageFeedback(container: HTMLElement): void {
       document.removeEventListener('mouseup', onUp);
       dragging = false;
       overlay.style.cursor = '';
-      void saveGeometry(id, item.region);
+      saveGeometry(id, item.region).catch(() => { showToast('Saving the moved region failed'); });
       renderAll();
     };
     document.addEventListener('mousemove', onMove);
@@ -391,7 +392,15 @@ export function initImageFeedback(container: HTMLElement): void {
       if (text === '') return;
       const category = generalCategory;
       generalCategory = DEFAULT_CATEGORY;
-      void addComment(text, category).then(renderAll);
+      // On failure, restore the composer so the typed comment isn't silently
+      // lost (GB-1082): re-render, then put the text and category back.
+      void addComment(text, category).then(renderAll).catch(() => {
+        showToast('Saving the comment failed — your text was kept');
+        generalCategory = category;
+        renderAll();
+        const restored = panel.querySelector<HTMLTextAreaElement>('[data-role="general-input"]');
+        if (restored !== null) restored.value = text;
+      });
     } else if (action === 'save-pending') {
       const input = panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]');
       const text = input?.value.trim() ?? '';
@@ -400,7 +409,14 @@ export function initImageFeedback(container: HTMLElement): void {
       const category = pendingCategory;
       pending = null;
       pendingCategory = DEFAULT_CATEGORY;
-      void addComment(text, category, region).then(renderAll);
+      void addComment(text, category, region).then(renderAll).catch(() => {
+        showToast('Saving the region comment failed — your text was kept');
+        pending = region;
+        pendingCategory = category;
+        renderAll();
+        const restored = panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]');
+        if (restored !== null) restored.value = text;
+      });
     } else if (action === 'cancel-pending') {
       pending = null;
       pendingCategory = DEFAULT_CATEGORY;
@@ -415,19 +431,23 @@ export function initImageFeedback(container: HTMLElement): void {
     } else if (action === 'pick-category' && id !== undefined) {
       const current = regions.find((r) => r.id === id)?.category
         ?? comments.find((c) => c.id === id)?.category ?? DEFAULT_CATEGORY;
-      showCategoryPicker(actionEl, current, (value) => { void saveCategory(id, value); });
+      showCategoryPicker(actionEl, current, (value) => {
+        saveCategory(id, value).catch(() => { showToast('Saving the category failed'); renderAll(); });
+      });
     } else if (action === 'cycle-side' && id !== undefined) {
       const region = regions.find((r) => r.id === id);
-      if (region !== undefined) void saveScope(id, cycleScope(region.region.side));
+      if (region !== undefined) {
+        saveScope(id, cycleScope(region.region.side)).catch(() => { showToast('Saving the region scope failed'); renderAll(); });
+      }
     } else if (action === 'delete' && id !== undefined) {
-      void removeItem(id);
+      removeItem(id).catch(() => { showToast('Deleting the comment failed'); renderAll(); });
     } else if (action === 'edit' && itemEl !== null && id !== undefined) {
       beginInlineEdit(itemEl, id);
     } else if (action === 'save-edit' && itemEl !== null && id !== undefined) {
       const input = itemEl.querySelector<HTMLTextAreaElement>('[data-role="edit-input"]');
       const text = input?.value.trim() ?? '';
       if (text === '') return;
-      void saveEdit(id, text);
+      saveEdit(id, text).catch(() => { showToast('Saving the edit failed'); renderAll(); });
     } else if (action === 'cancel-edit') {
       renderAll();
     }
