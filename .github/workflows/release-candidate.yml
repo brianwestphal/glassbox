@@ -441,9 +441,11 @@ jobs:
       # `NODE_AUTH_TOKEN` is unset (empty string), the registry rejects
       # empty auth, and npm helpfully reports the rejection as a 404 to
       # obscure package existence. Upgrading to npm 11+ here makes the OIDC
-      # handshake actually happen.
+      # handshake actually happen. Pinned to the npm 11 line: npm 12 dropped
+      # Node 20 support (requires Node >=22.22.2), so `npm@latest` fails
+      # EBADENGINE on this job's Node 20 runner.
       - name: Upgrade npm for OIDC trusted publishing (>=11.5.1)
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Set version and publish beta
         run: |
@@ -664,9 +666,10 @@ jobs:
       - run: npm ci
 
       # See `publish-beta` for why this matters — npm 10.x can't do OIDC
-      # trusted publishing for the PUT itself.
+      # trusted publishing for the PUT itself, and npm 12 needs Node >=22
+      # (hence the pin to the npm 11 line).
       - name: Upgrade npm for OIDC trusted publishing (>=11.5.1)
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Publish clean release version to npm
         run: |
