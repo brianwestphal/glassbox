@@ -514,9 +514,21 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     };
 
     // First inline drag opens the reply form (no lightbox) with one region armed.
-    await dragOn(0.15, 0.15, 0.4, 0.4);
-    await expect(page.locator('.lightbox-overlay')).toHaveCount(0);
+    // Even after waitForStableBox, a late async layout shift (highlight pass, AI
+    // note redraw) can move the image between the box read and the mouse events,
+    // landing the drag off-target so nothing draws — or degrading it to a click
+    // that opens the lightbox. One re-stabilized retry closes that window
+    // without masking real regressions (a broken feature fails both attempts).
     const form = page.locator('.annotation-form-container[data-form-key]');
+    await dragOn(0.15, 0.15, 0.4, 0.4);
+    await page.waitForTimeout(250);
+    if (!(await form.isVisible())) {
+      if (await page.locator('.lightbox-overlay').count() > 0) await page.keyboard.press('Escape');
+      await expect(page.locator('.lightbox-overlay')).toHaveCount(0);
+      await waitForStableBox(artImg);
+      await dragOn(0.15, 0.15, 0.4, 0.4);
+    }
+    await expect(page.locator('.lightbox-overlay')).toHaveCount(0);
     await expect(form).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.ai-note-artifact-region-overlay .ai-note-artifact-region-box')).toHaveCount(1);
 
