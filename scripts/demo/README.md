@@ -52,7 +52,7 @@ that puts the UI in the showcased state, then captures both a **PNG**
 (Playwright `page.screenshot`) and a stand-alone **SVG** (`captureElementTree`
 + `elementTreeToSvg`; image-heavy scenes are PNG-only). Outputs land in
 `assets/` as `demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
-`demo-annotations`, `demo-settings`, `demo-direct-comparison`,
+`demo-annotations`, `demo-settings`,
 `demo-review-notes`, `demo-image-comparison`, `demo-ground-truth`,
 `demo-plugin-rendered`, and `demo-plugin-mermaid-note`. Pass
 `--only slug1,slug2` to iterate on a subset. Lives in `capture-stills.ts` and

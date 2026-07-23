@@ -16,7 +16,7 @@
  *
  * Outputs land under `assets/`, named to match the README references
  * (`demo-guided-review`, `demo-risk-mode`, `demo-narrative-mode`,
- * `demo-annotations`, `demo-settings`, `demo-direct-comparison`,
+ * `demo-annotations`, `demo-settings`,
  * `demo-review-notes`, `demo-image-comparison`, `demo-ground-truth`). Scenes
  * marked `pngOnly` (the image / ground-truth ones, whose live canvas/`<img>`
  * content doesn't serialize cleanly) skip the stand-alone SVG.
@@ -176,16 +176,9 @@ const SCENARIOS: Scenario[] = [
       await page.waitForTimeout(300);
     },
   },
-  {
-    launchArgs: ["--demo:6"],
-    slug: 'direct-comparison',
-    label: 'Direct comparison (--diff) of two folders',
-    async setup(page) {
-      // The visible difference is the `compare: A ↔ B` sidebar label; open a
-      // file so the screenshot shows both the label and a relative-path diff.
-      await openFile(page, TARGET_FILE);
-    },
-  },
+  // (No still for `--diff` / demo scenario 6: its only visible difference is
+  // the `compare: A ↔ B` sidebar label, which never earned a README reference.
+  // The scenario itself stays for hands-on demoing.)
   {
     launchArgs: ["--demo:7"],
     slug: 'review-notes',

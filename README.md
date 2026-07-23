@@ -87,7 +87,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 
 - **Split and unified diffs** with syntax-colored add/remove/context lines
 - **Line-level annotations** — click any line to add feedback with a category
-- **Image and SVG diffs** — binary images and SVGs render in a **side-by-side** layout (with a left/right or over/under toggle), a **difference overlay**, a **swipeable slice tool**, and pixel-precision synced zoom/pan. SVGs offer a *Code* / *Rendered* toggle so you can review either the source or the rasterized output.
+- **Image and SVG diffs** — binary images and SVGs render in a **side-by-side** layout (with a left/right or over/under toggle), a **difference overlay**, a **swipeable slice tool**, single-side **A / B focus** modes, and pixel-precision synced zoom/pan. SVGs offer a *Code* / *Rendered* toggle so you can review either the source or the live-rendered output.
 - **Comment on images** — leave a general comment on any image, or **draw a rectangle region** to anchor feedback to a specific spot (per A/B side), just like a line annotation.
 - **Ground-truth image comparison** — `glassbox --ground-truth <manifest>` compares an **actual** render against an **expected** one (a design spec, a reference, or a previous baseline — even outside the repo), scores the perceptual difference, sorts most-changed-first, and lets you **promote** a new actual to the baseline. Great for catching visual regressions.
 - **Attach files to any comment** — drag, paste, or browse to attach screenshots, logs, or any file to a line comment, image comment, or note reply. Image attachments show a thumbnail and open in a lightbox; the export lists each file's path so your AI tool can read it.
@@ -99,7 +99,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Resizable sidebar** and word wrap toggle
 - **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
 - **Go-to-definition and a nav stack** — click any symbol to jump to its definition, with back/forward through your trail
-- **Themes** — ten built-in themes (Dark, Light, High Contrast Dark/Light, Dracula, Tokyo Night, One Dark Pro, Solarized Dark/Light, Monokai), plus a custom theme editor with live preview
+- **Themes** — thirteen built-in themes (Dark, Light, High Contrast Dark/Light, Dracula, Tokyo Night, One Dark Pro, Solarized Dark/Light, Monokai, Nord, Gruvbox Dark/Light), plus a custom theme editor with live preview
 - **Session persistence** — reviews survive restarts, pick up where you left off
 - **Smart review reuse** — re-running `glassbox` on the same commit updates diffs in place and migrates annotations to their new line positions
 - **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
@@ -306,8 +306,10 @@ glassbox --resume
 | `--diff <a> <b>`       | Compare two arbitrary files or folders by path — no git repo required |
 | `--ground-truth <m>`   | Compare actual vs expected images from a manifest — no git repo required |
 | `--port <number>`      | Port to run on (default: 4183)                     |
+| `--data-dir <path>`    | Store review data somewhere other than `.glassbox/` |
 | `--resume`             | Resume the latest in-progress review for this mode |
-| `--browser`            | Open in browser instead of desktop window          |
+| `--no-open`            | Don't open the browser automatically               |
+| `--on-complete <cmd>`  | Run a local command when a review is completed     |
 | `--check-for-updates`  | Check for a newer version on npm                   |
 | `--debug`              | Show build timestamp and debug info                |
 | `--help`               | Show help                                          |
