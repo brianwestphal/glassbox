@@ -149,5 +149,6 @@
       "lazy": false,
       "name": "Claude"
     }
-  ]
+  ],
+  "aiReviewNotes": true
 }
