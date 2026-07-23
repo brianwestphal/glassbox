@@ -186,21 +186,31 @@
       "note": "updateAnnotation changes content and category."
     },
     "5.4": {
+      "stateful": true,
       "tests": [
-        "tests/unit/db/queries.test.ts"
+        "tests/unit/db/queries.test.ts",
+        "tests/e2e/annotations.test.ts"
       ],
-      "note": "moveAnnotation changes line + side and clears stale (the persistence of drag-and-drop). The DnD UI gesture itself is NOT yet e2e-covered — annotations.test.ts only asserts the drag handle is visible; a real drag e2e (drag->drop, drag->cancel, cross-side, mid-edit) is tracked as follow-up work from the 2026-07 transition audit."
+      "transitions": [
+        "drag->drop->drag again (repeat gesture, split AND unified modes)",
+        "drag->cancel (dragend without drop) -> next line click opens create form, not a move",
+        "drop on a removed line -> annotation moves to the old side",
+        "drag canceled while an edit form is open -> form + typed content survive"
+      ],
+      "note": "moveAnnotation changes line + side and clears stale (unit); the DnD gesture itself is e2e-covered in annotations.test.ts 'Annotation drag-and-drop' via the dispatched HTML5 event sequence (dragstart/dragover/drop/dragend), asserting the move API payload and the post-refetch re-anchoring."
     },
     "5.5": {
       "stateful": true,
       "tests": [
         "tests/unit/db/queries.test.ts",
-        "tests/unit/review/review-update.test.ts"
+        "tests/unit/review/review-update.test.ts",
+        "tests/e2e/review-completion.test.ts"
       ],
       "transitions": [
         "markAnnotationStale -> markAnnotationCurrent cycle",
         "deleteStaleAnnotations removes only stale rows, leaves current",
-        "migration: exact match stays; shifted line follows content; moved outside radius -> stale; content reappears -> unmarked current"
+        "migration: exact match stays; shifted line follows content; moved outside radius -> stale; content reappears -> unmarked current",
+        "stale-prompt UI (e2e): cancel keeps the review open; discard-all fires delete-all then completes; keep-all fires keep-all, completes, and preserves annotations"
       ]
     },
     "5.7": {
@@ -510,9 +520,10 @@
       "transitions": [
         "in_progress -> completed (POST /api/review/complete)",
         "completed -> in_progress (POST /api/review/reopen)",
-        "reopen-then-complete and complete-then-reopen cycles"
+        "reopen-then-complete and complete-then-reopen cycles",
+        "modal stage machine (e2e): complete->done->reopen->complete-again; stale-prompt cancel->fresh prompt; discard-all->done->reopen with no re-prompt; keep-all->done with annotations preserved; failed (500) -> close -> retry succeeds"
       ],
-      "note": "complete/reopen lifecycle + export path; debounced auto-export; gitignore-at-launch; Complete button flow."
+      "note": "complete/reopen lifecycle + export path; debounced auto-export; gitignore-at-launch; Complete button flow; completion-modal stage sequences in review-completion.test.ts 'Completion modal stage machine'."
     },
     "1.4": {
       "tests": [
@@ -973,9 +984,17 @@
         "tests/unit/ai/analyze-risk.test.ts",
         "tests/unit/ai/shared.test.ts",
         "tests/integration/api/ai-routes.test.ts",
-        "tests/unit/client/analysis-trigger-error.test.ts"
+        "tests/unit/client/analysis-trigger-error.test.ts",
+        "tests/unit/client/analysisEngine.test.ts"
       ],
-      "note": "per-batch failure isolation; malformed-JSON/schema handling; failure surfaced with error status; trigger-error union guard."
+      "note": "per-batch failure isolation; malformed-JSON/schema handling; failure surfaced with error status; trigger-error union guard; client poll-engine transition sequences in analysisEngine.test.ts.",
+      "stateful": true,
+      "transitions": [
+        "failed -> retrigger -> completed (a rejected start does not poison the next run)",
+        "poll status 'none' mid-run -> exits running as failed (run vanished; the GB-927 hang shape)",
+        "transient poll failure -> re-schedules; N consecutive failures -> failed",
+        "two modes polling concurrently stay isolated; stopPolling one does not kill the other"
+      ]
     },
     "17.1": {
       "tests": [
@@ -1770,22 +1789,35 @@
       "waived": "Design-only (doc 29 content-plugin system): the plugin boundary is a spec only; no code yet. Implementation tracked in GB-1038 (core loader/contract). Flip to a test when the loader ships."
     },
     "FR-29.2": {
-      "tests": ["tests/unit/plugins/fileView.test.ts", "tests/unit/plugins/artifacts.test.ts", "tests/unit/plugins/svgSize.test.ts", "tests/integration/api/image-plugin-routes.test.ts", "tests/e2e/plugin-render.test.ts"],
+      "tests": [
+        "tests/unit/plugins/fileView.test.ts",
+        "tests/unit/plugins/artifacts.test.ts",
+        "tests/unit/plugins/svgSize.test.ts",
+        "tests/integration/api/image-plugin-routes.test.ts",
+        "tests/e2e/plugin-render.test.ts"
+      ],
       "note": "One API, two integration points: renderNoteArtifacts (review-note artifacts) + the file diff viewer. GB-1052: a plugin-rendered file is treated like an SVG file — renderPluginSvgSide renders a side, the image route serves it as image/svg+xml (integration test), and the file gets a Code|Rendered toggle routing Rendered through the image viewer (zoom + all comparison modes). GB-1043: a committed Playwright e2e (chromium-plugin project) boots a --diff server with a REAL fixture plugin installed in an isolated GLASSBOX_CONFIG_DIR + a .pr-notes/ note, driving BOTH paths end-to-end: the file-diff path (.fdiag file -> Code|Rendered toggle -> Rendered SVG served image/svg+xml with the plugin's marker) and the artifact path (a review-note .fdiag artifact rendered as an inline data:image/svg+xml <img>)."
     },
     "FR-29.3": {
-      "tests": ["tests/unit/plugins/loader.test.ts"],
+      "tests": [
+        "tests/unit/plugins/loader.test.ts"
+      ],
       "note": "Discovery of ~/.glassbox/plugins/ subdirs: missing-dir -> [], skips dotfiles, sorted, symlink-to-dir followed."
     },
     "FR-29.4": {
-      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts"],
+      "tests": [
+        "tests/unit/plugins/manifest.test.ts",
+        "tests/unit/plugins/loader.test.ts"
+      ],
       "note": "Zod manifest validation (the trust boundary): minimal valid, loose extra keys, contentTypes, null on invalid; manifest.json + package.json#glassbox fallback."
     },
     "FR-29.5": {
       "waived": "Self-contained esbuild-bundled plugin loading is a build+integration property (a single ESM bundle with deps inlined loads via import(file://) against the frozen sidecar). The unit layer proves the dynamic-import/activate path (loader.test.ts) and a real plugin's source (graphviz.test.ts); the end-to-end 'built bundle auto-installs + loads + renders' is verified live (GB-1044/GB-1039) and gets a committed e2e in GB-1043."
     },
     "FR-29.6": {
-      "tests": ["tests/unit/plugins/loader.test.ts"],
+      "tests": [
+        "tests/unit/plugins/loader.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "valid plugin -> loaded + registered",
@@ -1799,7 +1831,9 @@
       "note": "Fail-soft activation: a bad plugin records an error and is skipped, never crashing startup or disabling others."
     },
     "FR-29.7": {
-      "tests": ["tests/unit/plugins/install.test.ts"],
+      "tests": [
+        "tests/unit/plugins/install.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "bundled + user-dir empty -> installed",
@@ -1814,38 +1848,62 @@
       "note": "Desktop delivery (GB-1039): installBundledPlugins freshness (version + content-hash), dismiss-list persistence, install-from-disk symlink + un-dismiss, and the autoInstall:false opt-out (GB-1046 — a system-requirement plugin like PlantUML isn't force-installed). Verified live: build:plugins -> dist/plugins -> auto-install into a fresh config dir -> loaded + rendered."
     },
     "FR-29.8": {
-      "tests": ["tests/unit/plugins/registry.test.ts"],
+      "tests": [
+        "tests/unit/plugins/registry.test.ts"
+      ],
       "note": "Content matching by ext (case-insensitive) / MIME / sniff, specificity sniff>mime>ext, priority tie-break, throwing-sniff never matches."
     },
     "FR-29.9": {
-      "tests": ["tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/registry.test.ts"],
+      "tests": [
+        "tests/unit/plugins/dispatch.test.ts",
+        "tests/unit/plugins/registry.test.ts"
+      ],
       "note": "ContentRenderer contract via renderContent: matching plugin renders, empty view -> null, renderer throw -> null."
     },
     "FR-29.10": {
-      "tests": ["tests/unit/plugins/dispatch.test.ts"],
+      "tests": [
+        "tests/unit/plugins/dispatch.test.ts"
+      ],
       "note": "ContentDiffer contract via diffContent: matching differ diffs, keyed off the new side."
     },
     "FR-29.11": {
-      "tests": ["tests/unit/plugins/registry.test.ts", "tests/unit/plugins/loader.test.ts"],
+      "tests": [
+        "tests/unit/plugins/registry.test.ts",
+        "tests/unit/plugins/loader.test.ts"
+      ],
       "note": "activate() -> { renderers?, differs? } additive registration into the registry; counts."
     },
     "FR-29.12": {
-      "tests": ["tests/unit/plugins/settings.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "tests": [
+        "tests/unit/plugins/settings.test.ts",
+        "tests/unit/plugins/graphviz.test.ts",
+        "tests/e2e/plugin-manage.test.ts"
+      ],
       "note": "Manifest-declared preferences (GB-1047): the settings store persists per-plugin values (global config / project settings per scope, default fallback), PluginContext.getSetting/setSetting are wired to it, and the graphviz `engine` preference is applied at render (verified live). SECRET prefs (GB-1054) are stored in the OS keychain (account plugin-<id>-<key>) and the display reader masks them (only reports `configured`) — settings.test.ts covers routing/masking/clear against a mocked keychain; the real darwin keychain round-trip was verified live. The Settings-tab SELECT preference render + auto-save + persist-across-reload is now e2e-covered (chromium-plugin, GB-1070) — that e2e caught + drove the fix for a real bug where the change delegate's `asInput` threw on a `<select>`, so no select preference (incl. graphviz `engine`) actually saved from the UI."
     },
     "FR-29.13": {
-      "tests": ["tests/unit/plugins/artifacts.test.ts", "tests/e2e/plugin-render.test.ts"],
+      "tests": [
+        "tests/unit/plugins/artifacts.test.ts",
+        "tests/e2e/plugin-render.test.ts"
+      ],
       "note": "Server-side render pass (renderNoteArtifacts) offers a text/diagram-source artifact to the dispatcher and attaches inert rendered SVG (shown via an <img> data URI in DiffView) in place of the code block. The chromium-plugin e2e (GB-1043) asserts this live: a committed .pr-notes/ note's .fdiag artifact renders as an inline data:image/svg+xml <img> via the installed fixture plugin."
     },
     "FR-29.14": {
-      "tests": ["tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/artifacts.test.ts"],
+      "tests": [
+        "tests/unit/plugins/dispatch.test.ts",
+        "tests/unit/plugins/artifacts.test.ts"
+      ],
       "note": "Graceful fallback: no-match -> null from renderContent/diffContent; a non-matching artifact is left untouched (code-block fallback unchanged)."
     },
     "FR-29.15": {
       "waived": "Design-only (doc 29): the opt-in-install / no-sandbox trust model is a design-justification requirement resting on doc 14's threat model; there is no plugin code to test yet. Tracked in GB-1038. Revisit when loading lands."
     },
     "FR-29.16": {
-      "tests": ["tests/unit/plugins/enablement.test.ts", "tests/unit/plugins/loader.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "tests": [
+        "tests/unit/plugins/enablement.test.ts",
+        "tests/unit/plugins/loader.test.ts",
+        "tests/e2e/plugin-manage.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "in neither list -> enabled (default)",
@@ -1859,11 +1917,22 @@
       "note": "Enablement (GB-1040): enabled-by-default, two independent disable lists (global + per-project), global precedence; loader gating; verified live end-to-end (disable a plugin -> its .dot stops rendering -> falls back). The Settings-tab global disable/enable toggle is now e2e-covered (chromium-plugin, GB-1070: disabling removes the plugin's diff-toolbar UI element, re-enabling restores it)."
     },
     "FR-29.17": {
-      "tests": ["tests/unit/plugins/graphviz.test.ts", "tests/unit/plugins/plantuml.test.ts", "tests/unit/plugins/mermaid.test.ts"],
+      "tests": [
+        "tests/unit/plugins/graphviz.test.ts",
+        "tests/unit/plugins/plantuml.test.ts",
+        "tests/unit/plugins/mermaid.test.ts"
+      ],
       "note": "Reference diagram plugins: Graphviz (GB-1044, .dot/.gv -> inert SVG via @viz-js/viz WASM). PlantUML (GB-1046, .puml/.plantuml/.pu/.iuml) ships as a separately-installable, opt-in plugin that renders via a local `java -jar plantuml.jar -pipe -tsvg` subprocess — plantuml.test covers the pure SVG extraction, every fail-soft path (empty/missing-jar/spawn-error -> empty view -> code-block fallback), AND a Java-gated LIVE render (renders real source -> inert SVG containing the diagram content) that runs whenever a JRE + jar are present (Java is provisionable in CI; point PLANTUML_JAR at a jar) and skips otherwise. NOT a hardware gate like Apple FM — kept out of the default suite only because the ~22 MB GPL jar isn't committed; verified live (OpenJDK 11). Mermaid (GB-1045, .mmd/.mermaid) also ships as a separately-installable, opt-in plugin following the PlantUML model — Mermaid is a browser library (measures text via DOM getBBox), no pure-JS/WASM engine, so it renders via a local `mmdc` (@mermaid-js/mermaid-cli over puppeteer/Chromium) subprocess. mermaid.test covers the SVG extractor, the mmdcCli path resolver (MERMAID_MMDC override + default), every fail-soft path (empty/missing-cli/non-zero-exit -> empty view -> code-block fallback), AND a browser-gated LIVE render (describe.skipIf(!mmdc): renders real source -> inert SVG) that runs whenever mmdc is present (a headless browser is provisionable in CI; point MERMAID_MMDC at mermaid-cli's src/cli.js or install via setup.mjs) and skips otherwise. Kept out of the default suite only because the ~hundreds-of-MB Chromium isn't committed; verified live (headless Chromium via puppeteer 24)."
     },
     "FR-29.18": {
-      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "tests": [
+        "tests/unit/plugins/manifest.test.ts",
+        "tests/unit/plugins/loader.test.ts",
+        "tests/unit/plugins/configLayout.test.ts",
+        "tests/unit/plugins/graphviz.test.ts",
+        "tests/integration/api/plugins-routes.test.ts",
+        "tests/e2e/plugin-manage.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "manifest: nested configLayout (group/divider/spacer/label/button) parses; bad color / unknown item type -> null",
@@ -1877,11 +1946,24 @@
       "note": "Config layout + dynamic labels + actions (GB-1059): manifest configLayout union parse; the updateConfigLabel override map + onAction round-trip through the real loader + POST /plugins/:id/action; label resolution folded into the plugin list (no polling endpoint). The tab's layout RENDERING (group + preference + label + button) + the button-click -> status-label round-trip is now e2e-covered (chromium-plugin, GB-1070)."
     },
     "FR-29.19": {
-      "tests": ["tests/unit/plugins/registry.test.ts", "tests/unit/plugins/dispatch.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/ground-truth/perceptual-diff.test.ts", "tests/unit/plugins/image-codecs.test.ts"],
+      "tests": [
+        "tests/unit/plugins/registry.test.ts",
+        "tests/unit/plugins/dispatch.test.ts",
+        "tests/unit/plugins/loader.test.ts",
+        "tests/unit/ground-truth/perceptual-diff.test.ts",
+        "tests/unit/plugins/image-codecs.test.ts"
+      ],
       "note": "Image-decoder capability (GB-1063) + its reference plugin image-codecs (GB-1064). registry.test covers addImageDecoders/findImageDecoder dispatch + (priority, specificity) tie-break + independence from renderers/differs; loader.test covers a plugin's imageDecoders being registered on activate; dispatch.test covers decodeImageWithPlugin (match -> decode; no-match/null/throw/disabled -> null, fail-soft); perceptual-diff.test covers the ground-truth wiring: comparePerceptual (now async) tries core (PNG/JPEG) first then falls back to an injected plugin decoder, scoring an otherwise-undecodable pair, preferring core when it can decode, and staying `undecodable` (no crash) when the decoder throws or returns null. image-codecs.test drives the REAL jSquash WebP+AVIF decoders (WASM read from the on-disk codec, the same bytes esbuild inlines into the bundle) end-to-end: decode fixtures to RGBA (lossless webp -> exact color; avif dims), fail-soft on garbage bytes, and — installed via the registry — make an otherwise-undecodable WebP pair scorable through comparePerceptual (identical->0, different->>0). The bundled self-contained plugin was additionally verified live decoding the fixtures. The launch path (cli.ts ground-truth branch) initializes plugins before scoring."
     },
     "FR-29.20": {
-      "tests": ["tests/unit/plugins/manifest.test.ts", "tests/unit/plugins/readiness.test.ts", "tests/unit/plugins/available.test.ts", "tests/unit/plugins/install-action.test.ts", "tests/integration/api/plugins-install-bundled.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "tests": [
+        "tests/unit/plugins/manifest.test.ts",
+        "tests/unit/plugins/readiness.test.ts",
+        "tests/unit/plugins/available.test.ts",
+        "tests/unit/plugins/install-action.test.ts",
+        "tests/integration/api/plugins-install-bundled.test.ts",
+        "tests/e2e/plugin-manage.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "manifest: install descriptor parses (requirements + fetch/npm-install provision variants); unknown provision kind / empty packages -> null; no descriptor -> self-contained",
@@ -1905,23 +1987,37 @@
       "waived": "Design-only (doc 29): safe/inert plugin output is a spec only; no plugin output path to test yet. Tracked in GB-1038. Flip to a test when the first renderer's output path lands."
     },
     "NFR-29.3": {
-      "tests": ["tests/unit/plugins/artifacts.test.ts"],
+      "tests": [
+        "tests/unit/plugins/artifacts.test.ts"
+      ],
       "note": "Zero-plugin no-op: with no plugins installed, the render pass leaves artifacts untouched (content preserved), so behavior is unchanged."
     },
     "NFR-29.4": {
-      "tests": ["tests/unit/plugins/dispatch.test.ts"],
+      "tests": [
+        "tests/unit/plugins/dispatch.test.ts"
+      ],
       "note": "PLUGINS_ENABLED kill-switch honors GLASSBOX_PLUGINS_DISABLED (off -> subsystem skipped; loadAllPlugins returns empty)."
     },
     "FR-30.1": {
-      "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "tests": [
+        "tests/unit/plugins/loader.test.ts",
+        "tests/integration/api/plugins-routes.test.ts"
+      ],
       "note": "Plugin UI-extension capability (GB-1058): a content-less plugin registers UI elements via registerUI and they surface through GET /api/plugins/ui; gated by the same enablement/kill-switch as the rest of the subsystem."
     },
     "FR-30.2": {
-      "tests": ["tests/integration/api/plugins-routes.test.ts"],
+      "tests": [
+        "tests/integration/api/plugins-routes.test.ts"
+      ],
       "note": "Predefined locations (header / diff-toolbar / sidebar-footer): the element's `location` rides through registerUI -> GET /plugins/ui. The server-rendered slots exist in reviewShell.tsx; the client PLACEMENT into each slot is manual (docs/manual-test-plan.md), gated on GB-1043."
     },
     "FR-30.3": {
-      "tests": ["tests/unit/plugins/segmentSelection.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts", "tests/unit/conventions.test.ts"],
+      "tests": [
+        "tests/unit/plugins/segmentSelection.test.ts",
+        "tests/integration/api/plugins-routes.test.ts",
+        "tests/e2e/plugin-manage.test.ts",
+        "tests/unit/conventions.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "button/link render (fixture-plugin button; wire schema + GET /plugins/ui carry them)",
@@ -1932,7 +2028,10 @@
       "note": "All five element types (GB-1058 button/link, GB-1068 toggle/switch/segmented-control). Stateful state persists to stateKey (host reflects) + resolves in the list; selection math is pure + unit-tested. The **button** render + click -> toast + the enable/disable show/hide is now e2e-covered (chromium-plugin, GB-1070); the stateful toggle/switch/segmented-control client render stays manual (docs/manual-test-plan.md). Reference elements live ONLY in the e2e fixture plugin: shipped first-party plugins register no UI elements — the slots are global chrome, shown on every review regardless of file type (the graphviz demo button + Grid toggle were removed for this, GB-1074) — enforced by conventions.test.ts + a graphviz.test.ts no-registerUI regression guard."
     },
     "FR-30.4": {
-      "tests": ["tests/unit/plugins/loader.test.ts", "tests/integration/api/plugins-routes.test.ts"],
+      "tests": [
+        "tests/unit/plugins/loader.test.ts",
+        "tests/integration/api/plugins-routes.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "registerUI stores the plugin's element set; re-activation replaces (not appends)",
@@ -1943,26 +2042,40 @@
       "note": "Registration + list endpoint (GB-1058): registerUI -> loader map (cleared on reload so disabled plugins drop out) -> listPluginUIElements -> GET /api/plugins/ui."
     },
     "FR-30.5": {
-      "tests": ["tests/unit/plugins/configLayout.test.ts", "tests/unit/plugins/loader.test.ts", "tests/unit/plugins/graphviz.test.ts", "tests/integration/api/plugins-routes.test.ts", "tests/e2e/plugin-manage.test.ts"],
+      "tests": [
+        "tests/unit/plugins/configLayout.test.ts",
+        "tests/unit/plugins/loader.test.ts",
+        "tests/unit/plugins/graphviz.test.ts",
+        "tests/integration/api/plugins-routes.test.ts",
+        "tests/e2e/plugin-manage.test.ts"
+      ],
       "note": "Action round-trip (GB-1058/GB-1068): onAction(actionId, ctx, value?) may return a UIActionResult; runPluginAction passes value + returns the result; POST /api/plugins/:id/action carries `value` for stateful controls (threaded to onAction, asserted in plugins-routes) and returns `result` alongside the refreshed list. The client toast on `result.message` is now e2e-covered (chromium-plugin, GB-1070: the fixture UI-button click toasts its message)."
     },
     "FR-30.6": {
       "waived": "Design-only (doc 30): declarative/inert UI elements (the plugin ships icon+label+action id, never DOM; the icon SVG is trusted plugin data per the opt-in-install boundary, doc 29 §29.6) is a design-justification requirement, same class as NFR-29.2. The wire schema (PluginUIElementSchema) carries no code/handler field, structurally enforcing the declarative contract."
     },
     "NFR-30.1": {
-      "tests": ["tests/integration/api/plugins-routes.test.ts"],
+      "tests": [
+        "tests/integration/api/plugins-routes.test.ts"
+      ],
       "note": "Zero-plugin no-op: with no plugin loaded, GET /api/plugins/ui returns an empty element list, so the location slots stay empty (client no-op is manual, gated on GB-1043)."
     },
     "FR-31.1": {
-      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "tests": [
+        "tests/unit/plugins/reviewHooks.test.ts"
+      ],
       "note": "Review lifecycle hooks capability (GB-1065): a content-less registration carrying only reviewHooks loads and its hooks fire; gated by the same enablement/kill-switch as the subsystem (notify* return early when disabled)."
     },
     "FR-31.2": {
-      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "tests": [
+        "tests/unit/plugins/reviewHooks.test.ts"
+      ],
       "note": "Stable plugin-facing shapes: notifyReviewCreated/Completed map the DB Review row + AnnotationWithFilePath to ReviewHookInfo/AnnotationHookInfo (asserted field-by-field), not raw rows; the plugin context is passed through."
     },
     "FR-31.3": {
-      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "tests": [
+        "tests/unit/plugins/reviewHooks.test.ts"
+      ],
       "stateful": true,
       "transitions": [
         "loaded plugin with onReviewCreated -> fires with mapped review + context",
@@ -1977,7 +2090,9 @@
       "waived": "Design-only (doc 31): 'hooks are not a new trust grant; outbound network shifts the local-first posture and is documented' is a design-justification requirement (same class as doc 29 FR-29.15 / NFR-29.2). The host initiates no network I/O for a hook; there is no host code path to assert. The doc 29 §29.6 note records the posture."
     },
     "NFR-31.1": {
-      "tests": ["tests/unit/plugins/reviewHooks.test.ts"],
+      "tests": [
+        "tests/unit/plugins/reviewHooks.test.ts"
+      ],
       "note": "Zero-hook no-op: a plugin without the hook is a no-op (notifyReviewCreated resolves undefined); the PLUGINS_ENABLED guard makes the whole path a no-op when disabled."
     }
   }

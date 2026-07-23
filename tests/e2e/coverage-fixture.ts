@@ -16,16 +16,23 @@ const urlToFile: Record<string, string> = {
 // fire-and-forget `void loadOutline(...)`, which surfaced only as
 // `unhandledrejection` on `window`; tests previously had no error listeners,
 // so every diff-switch test was silently green while production was broken.
-const collectPageErrors = base.extend<{ failOnPageError: void }>({
-  failOnPageError: [async ({ page }, use, testInfo) => {
+//
+// `allowedPageErrors` (a `test.use()` option) lets a test that DELIBERATELY
+// provokes a failure — e.g. fulfilling an API route with a 500 to drive the
+// completion modal's failed stage — allowlist the expected browser noise
+// (matched errors are dropped; anything else still fails the test).
+const collectPageErrors = base.extend<{ failOnPageError: void; allowedPageErrors: RegExp[] }>({
+  allowedPageErrors: [[], { option: true }],
+  failOnPageError: [async ({ page, allowedPageErrors }, use, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', err => { errors.push(`pageerror: ${err.message}`); });
     page.on('console', msg => {
       if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`);
     });
     await use();
-    if (errors.length > 0 && testInfo.errors.length === 0) {
-      throw new Error(`Browser surfaced ${errors.length} error(s) during this test:\n  - ${errors.join('\n  - ')}`);
+    const unexpected = errors.filter(e => !allowedPageErrors.some(re => re.test(e)));
+    if (unexpected.length > 0 && testInfo.errors.length === 0) {
+      throw new Error(`Browser surfaced ${unexpected.length} error(s) during this test:\n  - ${unexpected.join('\n  - ')}`);
     }
   }, { auto: true }],
 });

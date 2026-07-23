@@ -193,7 +193,21 @@ function pollStatus(type: AnalysisType, gen: number, hooks: AnalysisHooks): void
           progressCompleted: 0,
           progressTotal: 0,
         });
+        return;
       }
+
+      // Any other status — notably 'none', meaning the run vanished mid-poll
+      // (server restarted, or the analysis row was invalidated elsewhere).
+      // Falling through silently here ended the poll chain with the mode stuck
+      // on "running" forever, the same hang shape as GB-927. Exit the running
+      // state loudly instead.
+      clientLog(`poll(${type}): unexpected status '${result.status}' mid-run — exiting running state`);
+      aiStore.actions.setAnalysisState(type, {
+        status: 'failed',
+        error: 'The analysis run disappeared (was the server restarted?) — try again.',
+        progressCompleted: 0,
+        progressTotal: 0,
+      });
     })();
   };
 

@@ -148,4 +148,73 @@ describe('analysisEngine (GB-1083 / GB-1082 / GB-927)', () => {
     await tick();
     expect(getAnalysisModeState('risk').status).toBe('failed');
   });
+
+  // --- Transition sequences (GB-1088) ---
+
+  it('failed → retrigger → completed: a failure does not poison the next run', async () => {
+    // First run: server rejects the start.
+    mockStart.mockResolvedValueOnce({ error: 'No API key configured' });
+    triggerAnalysisFor('risk', { loadResults: () => Promise.resolve() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getAnalysisModeState('risk').status).toBe('failed');
+
+    // Retrigger: accepted and completes. The stale error must clear.
+    mockStart.mockResolvedValueOnce({ started: true } as never);
+    mockStatus.mockResolvedValueOnce({ status: 'completed' });
+    triggerAnalysisFor('risk', { loadResults: () => Promise.resolve() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getAnalysisModeState('risk').status).toBe('running');
+    expect(getAnalysisModeState('risk').error).toBeNull();
+    await tick();
+    expect(getAnalysisModeState('risk').status).toBe('completed');
+  });
+
+  it('poll returning status "none" mid-run exits the running state (GB-927 hang shape)', async () => {
+    mockStart.mockResolvedValue({ started: true } as never);
+    mockStatus
+      .mockResolvedValueOnce({ status: 'running', progressCompleted: 1, progressTotal: 3 })
+      // The run vanishes (server restarted / row invalidated elsewhere).
+      .mockResolvedValueOnce({ status: 'none' });
+    triggerAnalysisFor('risk', { loadResults: () => Promise.resolve() });
+    await vi.advanceTimersByTimeAsync(0);
+    await tick();
+    expect(getAnalysisModeState('risk').status).toBe('running');
+    await tick();
+    // Previously this fell through every status branch: the chain ended with
+    // no re-schedule and the mode sat on "running" forever.
+    expect(getAnalysisModeState('risk').status).toBe('failed');
+    expect(getAnalysisModeState('risk').error).toBeTruthy();
+    // The chain is over — no further polls.
+    const calls = mockStatus.mock.calls.length;
+    await tick();
+    expect(mockStatus.mock.calls.length).toBe(calls);
+  });
+
+  it('two modes run concurrently without cross-talk (mode-switch mid-run isolation)', async () => {
+    mockStart.mockResolvedValue({ started: true } as never);
+    // risk stays running forever; guided completes on its first tick.
+    mockStatus.mockImplementation((req: { type: string }) =>
+      req.type === 'risk'
+        ? Promise.resolve({ status: 'running', progressCompleted: 1, progressTotal: 5 })
+        : Promise.resolve({ status: 'completed' }),
+    );
+
+    triggerAnalysisFor('risk', { loadResults: () => Promise.resolve() });
+    await vi.advanceTimersByTimeAsync(0);
+    triggerAnalysisFor('guided', { loadResults: () => Promise.resolve() });
+    await vi.advanceTimersByTimeAsync(0);
+    await tick();
+
+    expect(getAnalysisModeState('guided').status).toBe('completed');
+    expect(getAnalysisModeState('risk').status).toBe('running');
+
+    // Stopping guided's (already finished) polling must not kill risk's chain.
+    stopPolling('guided');
+    const riskCalls = mockStatus.mock.calls.filter(c => (c[0] as { type: string }).type === 'risk').length;
+    await tick();
+    const riskCallsAfter = mockStatus.mock.calls.filter(c => (c[0] as { type: string }).type === 'risk').length;
+    expect(riskCallsAfter).toBeGreaterThan(riskCalls);
+    expect(getAnalysisModeState('risk').status).toBe('running');
+    expect(getAnalysisModeState('risk').progressCompleted).toBe(1);
+  });
 });
