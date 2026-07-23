@@ -2,6 +2,44 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.0] - 2026-07-23
+
+
+
+- New opt-in content plugin system: install renderers and differs that display specialized file formats (diagrams, custom content) as live visuals instead of raw text diffs
+- First-party plugins: **Graphviz** (`.dot`/`.gv`), **PlantUML** (`.puml`, requires local Java), and **Mermaid** (`.mmd`, requires local Chromium) — all render offline via local engines, falling back to a code block when unavailable
+- Plugin-rendered files get a **Code | Rendered** toggle: the rendered diagram goes through the full image viewer with zoom, A/B, side-by-side, difference, and slice comparison modes
+- New **image-codecs** plugin adds WebP and AVIF decoding so ground-truth comparisons in those formats get perceptual difference scores
+- New **Settings → Plugins** tab to view, enable/disable (globally or per project), install, and uninstall plugins — with an "Available to install" section that checks system readiness, auto-provisions what it can, and gives specific setup instructions for the rest
+- Plugins can declare user preferences (auto-saved from Settings, with secrets stored in the OS keychain), grouped config layouts with action buttons, interactive UI elements in the app chrome, and review lifecycle hooks
+- Desktop: native folder picker for installing a plugin from disk
+- AI review notes can carry diagram artifacts rendered inline (e.g. a Mermaid sequence diagram as proof), and `glassbox note instructions` now asks generating AIs to attach them
+
+
+- Desktop: launching in a repo with no pending changes shows "No changes to review" instead of hanging on the loading screen forever
+- Desktop: `glassbox note` and `glassbox ground-truth` subcommands now work from the installed CLI (they previously failed with "Unknown option")
+- `--files` now includes brand-new untracked files instead of showing an empty diff
+- Fixed AI analysis getting permanently stuck on "running" after a transient failure or server restart; failures now surface with a message and can be retried
+- The completion modal no longer freezes on "Completing…" when a request fails — it shows a failure state with retry, and Send to Claude reports failures too
+- Deleting a review now also removes its attachment files from disk (previously they were leaked)
+- Diagrams rendered from viewBox-only SVGs (e.g. Mermaid output) no longer collapse to an invisible 0×0 image
+- The "Draw region" button is hidden in image Metadata mode, where there is nothing to draw on
+- A failed image-feedback save now restores your typed text and category instead of silently discarding them
+- Form inputs (checkboxes, text fields, selects) keep their state across UI re-renders
+- Attachments with non-ASCII filenames download correctly instead of failing
+- A hand-edited or malformed theme setting in config.json no longer crashes at startup
+
+
+- The Claude Code channel trigger endpoint now requires a per-process shared secret and no longer sends permissive CORS headers, blocking malicious browser pages from firing triggers at the local port
+- Plugin and theme delete/install routes validate ids against path traversal before touching the filesystem
+- Raw file requests are rejected if the path escapes the repository root
+- The Google AI API key is sent via header instead of the URL query string, keeping it out of logs and proxies
+- Dependency updates clear a high-severity URL-parsing advisory in the server stack
+
+
+- Refreshed app icon, and the browser tab now shows a favicon
+- Consistent toasts and popup menus across the app
+
 ## [0.19.0] - 2026-07-02
 
 
