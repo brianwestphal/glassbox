@@ -436,8 +436,14 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                   <details className="ai-note-artifact" open>
                     <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
                     <div className="ai-note-artifact-imgwrap">
+                      {/* kerf 1.0+ screens `data:image/svg+xml` out of src (an SVG *document* can
+                          script; an SVG in an <img> cannot — no script execution, no external
+                          loads, the GB-932 rationale). The SVG is plugin-rendered from trusted
+                          opt-in-installed code (doc 29 §29.6) and encodeURIComponent leaves no
+                          quote to break out of the attribute, so raw() is the documented opt-out. */}
                       <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable={false}
-                        src={`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`} />
+                        // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- trusted plugin SVG, inert in <img> context (NFR-29.2)
+                        src={raw(`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`)} />
                     </div>
                   </details>
                 ) : a.renderedHtml !== undefined ? (

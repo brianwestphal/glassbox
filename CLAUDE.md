@@ -331,6 +331,14 @@ The client uses **kerfjs** for state, render, and event delegation. Follow these
 
 When a feature touches DOM state that should survive re-renders (input focus + value, contenteditable cursor, `<details open>` state), kerf preserves these automatically during morph — you don't need to manage them imperatively. See kerfjs §4.4.
 
+**kerf 2.0 specifics** (upgraded from 0.16):
+
+- **Fine-grained signal bindings are available**: passing a signal/`computed` *itself* into a JSX attribute or text hole (`class={sig}`, `<span>{count}</span>`) inside a `mount()` updates just that node with no render re-run — "values bind, structure re-renders." Opt-in per hole; bind a STABLE signal/computed instance (never `cond ? sigA : sigB`). The existing `.value`-read-in-render pattern still works; prefer bindings for hot spots (see the adoption-audit follow-up ticket).
+- **`delegateCapture()` now walk-up matches like `delegate()`** — pass `{ match: 'direct' }` where exact-element semantics matter (the split-scroll sync in `diff/index.tsx` does).
+- **URL-bearing attributes are screened**: `javascript:`/`vbscript:` and script-executing `data:` types (including `data:image/svg+xml`) are dropped from `href`/`src`/`xlink:href`/`formaction`/`action`/`data` — and **throw in dev**. For a trusted URL (e.g. the plugin-rendered note-artifact `<img>` in `diffView.tsx`), `raw(url)` is the documented opt-out; pair it with a `kerfjs/no-raw-with-dynamic-arg` disable comment stating why the value is trusted.
+- **Inline `on*` attributes and malformed attribute names throw** (string- or function-valued, any case) — the `delegate()` convention above is now runtime-enforced.
+- The `data-kfb`/`data-kfbrow` attributes and `kfb:`/`kfbr:`/`kf-list:` comment prefixes are kerf-reserved marker names — never emit them from our markup or `raw()`.
+
 <!-- hotsheet:begin section=ticket-driven-work v=1 -->
 ## Ticket-Driven Work
 

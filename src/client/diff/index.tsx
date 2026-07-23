@@ -564,8 +564,9 @@ function delegateCaptureScroll(container: HTMLElement): void {
   let rafId: number | null = null;
   let syncing = false;
   // Scroll doesn't bubble, but `delegateCapture` registers the listener in the
-  // capture phase. `target.matches('.code')` is the right semantics here —
-  // we only want to react to scroll on a `.code` cell, not its container.
+  // capture phase. `match: 'direct'` keeps the exact-element semantics we want
+  // (kerf 2.0 switched delegateCapture's default to closest()-style walk-up):
+  // only a scroll ON a `.code` cell counts, not one on a container above it.
   void delegateCapture(container, 'scroll', '.code', (_e, target) => {
     const dv = diffViewStore.state.value;
     if (syncing || dv.wrapLines || dv.diffMode !== 'split') return;
@@ -584,7 +585,7 @@ function delegateCaptureScroll(container: HTMLElement): void {
       });
       syncing = false;
     });
-  });
+  }, { match: 'direct' });
 }
 
 export function updateToolbarLanguage(): void {
