@@ -262,8 +262,11 @@ export function parseArgs(
  * appends files. It deliberately does NOT take the single-instance lock — it
  * coexists with a normal `glassbox` run and manages its own lifetime via the
  * session hold + discovery lockfile.
+ *
+ * Exported for unit tests (never invoked by other modules — `main()` is the
+ * only production caller).
  */
-async function runDifftoolServe(
+export async function runDifftoolServe(
   dataDir: string,
   port: number,
   opts: { noOpen: boolean; strictPort: boolean; onComplete: string | null },
@@ -305,8 +308,11 @@ async function runDifftoolServe(
  * difference score per comparison (doc 26 P2) — with content plugins loaded
  * first so an installed image-decoder plugin (doc 29 imageDecoders) can score
  * formats core can't decode (WebP/AVIF). Like --diff, needs no git repository.
+ *
+ * Exported for unit tests (never invoked by other modules — `main()` is the
+ * only production caller).
  */
-async function resolveGroundTruthLaunch(
+export async function resolveGroundTruthLaunch(
   mode: Extract<ReviewMode, { type: "ground-truth" }>,
   cwd: string,
 ): Promise<{ mode: Extract<ReviewMode, { type: "ground-truth" }>; scores: Map<string, number | null> }> {
@@ -348,7 +354,12 @@ async function resolveGroundTruthLaunch(
   return { mode: { ...mode, comparisons }, scores };
 }
 
-async function main() {
+/**
+ * Full CLI entry: subcommand dispatch, mode validation, then one of the
+ * launchers above. Exported for unit tests; only the direct-run guard at the
+ * bottom of this file invokes it in production.
+ */
+export async function main() {
   // Standalone subcommands (doc 20 / doc 26 / doc 19) handle their work and exit
   // without booting the server or touching the review DB — see cli-subcommands.ts.
   const rawArgs = process.argv.slice(2);
@@ -509,8 +520,11 @@ async function main() {
  * The reuse/resume/create tail of a normal launch: update an existing
  * in-progress review at the same HEAD, resume one at a different HEAD, or
  * scan the diffs and create a fresh review — then start the server.
+ *
+ * Exported for unit tests (never invoked by other modules — `main()` is the
+ * only production caller).
  */
-async function launchReview(args: {
+export async function launchReview(args: {
   mode: ReviewMode;
   cwd: string;
   repoRoot: string;

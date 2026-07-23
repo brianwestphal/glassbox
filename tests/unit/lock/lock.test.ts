@@ -138,4 +138,146 @@ describe('acquireLock', () => {
       expect.stringContaining(testDir),
     );
   });
+
+  // GB-1085 TOCTOU fix: the `wx` exclusive-create means that when two launches
+  // race past the exists-check, the loser gets EEXIST and exits instead of
+  // silently overwriting the winner's lock. Simulated by making existsSync say
+  // "no lock" while a live-pid lock file actually sits on disk.
+  it('exits when another instance wins the exclusive-create race (EEXIST)', async () => {
+    const lockPath = join(testDir, 'glassbox.lock');
+    writeFileSync(lockPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+
+    const realFs = await vi.importActual<typeof import('fs')>('fs');
+    vi.doMock('fs', () => ({ ...realFs, existsSync: () => false }));
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const mockStderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.resetModules();
+    const { acquireLock } = await import('../../../src/lock.js');
+    acquireLock(testDir);
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockStderr).toHaveBeenCalledWith(expect.stringContaining('grabbed the lock first'));
+    // The winner's lock survives untouched.
+    expect(JSON.parse(readFileSync(lockPath, 'utf-8'))).toMatchObject({ pid: process.pid });
+
+    vi.doUnmock('fs');
+  });
+
+  it('rethrows a non-EEXIST write failure instead of exiting quietly', async () => {
+    const realFs = await vi.importActual<typeof import('fs')>('fs');
+    vi.doMock('fs', () => ({
+      ...realFs,
+      existsSync: () => false,
+      writeFileSync: () => {
+        const err = new Error('EACCES: permission denied') as NodeJS.ErrnoException;
+        err.code = 'EACCES';
+        throw err;
+      },
+    }));
+
+    vi.resetModules();
+    const { acquireLock } = await import('../../../src/lock.js');
+    expect(() => { acquireLock(testDir); }).toThrow('EACCES');
+
+    vi.doUnmock('fs');
+  });
+});
+
+describe('lock cleanup handlers', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `glassbox-test-lock-cleanup-${Date.now()}`);
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  /** Acquire the lock and return the listeners this acquisition registered,
+   *  plus a disposer that removes them (they live on the process object). */
+  async function acquireAndCapture() {
+    const before = {
+      exit: process.listeners('exit'),
+      SIGINT: process.listeners('SIGINT'),
+      SIGTERM: process.listeners('SIGTERM'),
+    };
+    vi.resetModules();
+    const { acquireLock } = await import('../../../src/lock.js');
+    acquireLock(testDir);
+    const added = {
+      exit: process.listeners('exit').filter((l) => !before.exit.includes(l)),
+      SIGINT: process.listeners('SIGINT').filter((l) => !before.SIGINT.includes(l)),
+      SIGTERM: process.listeners('SIGTERM').filter((l) => !before.SIGTERM.includes(l)),
+    };
+    const dispose = () => {
+      for (const l of added.exit) process.removeListener('exit', l);
+      for (const l of added.SIGINT) process.removeListener('SIGINT', l);
+      for (const l of added.SIGTERM) process.removeListener('SIGTERM', l);
+    };
+    return { added, dispose };
+  }
+
+  it('registers exit, SIGINT, and SIGTERM cleanup handlers', async () => {
+    const { added, dispose } = await acquireAndCapture();
+    expect(added.exit).toHaveLength(1);
+    expect(added.SIGINT).toHaveLength(1);
+    expect(added.SIGTERM).toHaveLength(1);
+    dispose();
+  });
+
+  it('exit handler removes the lock file and is idempotent on a second call', async () => {
+    const lockPath = join(testDir, 'glassbox.lock');
+    const { added, dispose } = await acquireAndCapture();
+    expect(existsSync(lockPath)).toBe(true);
+
+    (added.exit[0] as () => void)();
+    expect(existsSync(lockPath)).toBe(false);
+
+    // Second invocation (e.g. exit after SIGINT already cleaned up) is a no-op.
+    expect(() => { (added.exit[0] as () => void)(); }).not.toThrow();
+    dispose();
+  });
+
+  it('SIGINT handler releases the lock then exits 0', async () => {
+    const lockPath = join(testDir, 'glassbox.lock');
+    const { added, dispose } = await acquireAndCapture();
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+
+    (added.SIGINT[0] as () => void)();
+    expect(existsSync(lockPath)).toBe(false);
+    expect(mockExit).toHaveBeenCalledWith(0);
+    dispose();
+  });
+
+  it('SIGTERM handler releases the lock then exits 0', async () => {
+    const lockPath = join(testDir, 'glassbox.lock');
+    const { added, dispose } = await acquireAndCapture();
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+
+    (added.SIGTERM[0] as () => void)();
+    expect(existsSync(lockPath)).toBe(false);
+    expect(mockExit).toHaveBeenCalledWith(0);
+    dispose();
+  });
+
+  // Transition sequence: acquire → release (via handler) → re-acquire must
+  // succeed like a fresh start, not trip over its own previous lock.
+  it('can re-acquire after a released lock', async () => {
+    const lockPath = join(testDir, 'glassbox.lock');
+    const first = await acquireAndCapture();
+    (first.added.exit[0] as () => void)();
+    first.dispose();
+    expect(existsSync(lockPath)).toBe(false);
+
+    const second = await acquireAndCapture();
+    expect(existsSync(lockPath)).toBe(true);
+    expect(JSON.parse(readFileSync(lockPath, 'utf-8')).pid).toBe(process.pid);
+    (second.added.exit[0] as () => void)();
+    second.dispose();
+  });
 });
