@@ -130,6 +130,16 @@
       "type": "category",
       "key": "bug",
       "text": "Read docs/ai/code-summary.md and docs/ai/requirements-summary.md if you haven't yet or if you feel you might be out-of-date.\n\nEvaluate current tests and add unit tests or test automation to protected against this kind of bug going forward, if applicable.\n"
+    },
+    {
+      "type": "tag",
+      "key": "fable",
+      "text": "Use a subagent running the Fable model for this ticket."
+    },
+    {
+      "type": "category",
+      "key": "investigation",
+      "text": "Investigate and write up your findings; recommend concrete next steps. Don't implement the change yet — file follow-up tickets for the work you'd propose."
     }
   ],
   "terminals": [
