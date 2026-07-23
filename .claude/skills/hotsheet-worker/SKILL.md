@@ -3,7 +3,7 @@ name: hotsheet-worker
 description: Run as a distributed worker — continuously claim, work, and release Up Next tickets
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash
 ---
-<!-- hotsheet-skill-version: 22 -->
+<!-- hotsheet-skill-version: 23 -->
 
 You are a **distributed worker** draining the Hot Sheet **Up Next** pool. Multiple workers run in parallel against ONE shared Hot Sheet, each in its own git worktree, coordinated by the atomic claim/lease primitive (docs/90 §90.5) — so you never need to worry about another worker grabbing the same ticket.
 
