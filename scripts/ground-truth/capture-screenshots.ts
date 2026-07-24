@@ -20,6 +20,7 @@
  */
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -101,6 +102,25 @@ async function killServer(server: ChildProcessByStdio<null, Readable, Readable>)
   });
 }
 
+/** Whether a local TCP port can be bound right now. */
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const probe = createServer();
+    probe.once('error', () => { resolve(false); });
+    probe.once('listening', () => { probe.close(() => { resolve(true); }); });
+    probe.listen(port, '127.0.0.1');
+  });
+}
+
+/** The first free port at or above `from`, so an unrelated process squatting
+ *  inside the scan range costs a port rather than a scene. */
+async function nextFreePort(from: number): Promise<number> {
+  for (let port = from; port < from + 100; port++) {
+    if (await isPortFree(port)) return port;
+  }
+  throw new Error(`no free port found in ${String(from)}..${String(from + 99)}`);
+}
+
 async function captureScene(scene: Scene, port: number, outDir: string): Promise<void> {
   const base = `http://localhost:${String(port)}`;
   const pngPath = join(outDir, `${scene.slug}.png`);
@@ -120,7 +140,16 @@ async function captureScene(scene: Scene, port: number, outDir: string): Promise
     // otherwise makes the first `.file-name` click in a scene flakily time out.
     await page.waitForSelector('.file-item, .image-diff, .gt-step-nav', { timeout: 20000 }).catch(() => undefined);
     await scene.setup(page, base);
-    await page.screenshot({ path: pngPath, fullPage: false });
+    // `animations: 'disabled'` is a determinism control, not a cosmetic one:
+    // it rewinds infinite CSS animations to their first frame and fast-forwards
+    // finite ones, so an element that happens to be animating when the shot is
+    // taken lands on the same pixels every run. Without it the sidebar's
+    // "Guided review…" analysis spinner was caught at a different rotation
+    // angle each capture, giving several scenes a permanent few-pixel delta
+    // that no baseline rotation could ever settle — and a noise floor that
+    // would hide a genuine sub-pixel regression. Same motivation as the fixed
+    // viewport + device scale factor above.
+    await page.screenshot({ path: pngPath, fullPage: false, animations: 'disabled' });
     await ctx.close();
   } finally {
     if (browser) await browser.close().catch(() => undefined);
@@ -166,13 +195,19 @@ async function main(): Promise<void> {
   mkdirSync(CONFIG_DIR, { recursive: true });
   console.log(`Capturing ${String(scenes.length)} scene(s) into ${baseline ? 'baseline/' : 'actuals/'}`);
 
-  // One server at a time on a known free port starting above the dev/e2e range.
-  // A scene failure is collected and reported, not fatal — one flaky scene must
-  // not block the rest of the (large) capture run.
+  // One server at a time, walking up from just above the dev/e2e range. The
+  // scan skips ports already in use: the range is wide enough (one port per
+  // scene) that an unrelated local process squatting inside it is a real
+  // possibility, and because the server is launched with --strict-port that
+  // used to fail exactly one scene with a bare EADDRINUSE — easy to miss in a
+  // 47-scene run, and it silently leaves a stale actual behind to be compared.
+  // A scene failure is otherwise collected and reported, not fatal — one flaky
+  // scene must not block the rest of the (large) capture run.
   let port = 4196;
   const failed: { slug: string; error: string }[] = [];
   for (const scene of scenes) {
     try {
+      port = await nextFreePort(port);
       await captureScene(scene, port++, outDir);
     } catch (err) {
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);

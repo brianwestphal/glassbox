@@ -121,6 +121,16 @@ A given **app version + pinned content** must produce a stable image, so:
 - **Config is isolated** (`GLASSBOX_CONFIG_DIR` + per-scene `--data-dir` tmp
   dirs) so no machine-specific settings or prior reviews leak in.
 - **Fixed viewport** (1280×800, deviceScaleFactor 1).
+- **Animations are frozen for the shot** (`page.screenshot({ animations:
+  'disabled' })`), which rewinds infinite CSS animations to their first frame
+  and fast-forwards finite ones. Without it any element still animating when the
+  shot is taken lands on different pixels every run: the sidebar's "Guided
+  review…" analysis spinner did exactly that, giving eight scenes a permanent
+  few-pixel delta that no baseline rotation could settle. That is worse than
+  churn — it sets a noise floor in those scenes that a genuine sub-pixel
+  regression could hide under. A conventions test pins the flag
+  (`tests/unit/conventions.test.ts`), since proving real determinism needs two
+  full capture runs.
 
 **Cross-platform caveat:** PNGs still differ across OSes by font rendering and
 sub-pixel anti-aliasing. The doc-26 perceptual diff is AA-tolerant, but for

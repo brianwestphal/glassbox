@@ -138,6 +138,29 @@ describe('forbidden imports', () => {
   });
 });
 
+describe('ground-truth capture determinism', () => {
+  // The screenshot regression suite only works if two captures of an unchanged
+  // UI are byte-identical. A running CSS animation breaks that: the sidebar's
+  // "Guided review…" spinner was caught at a different rotation angle each run,
+  // giving several scenes a permanent few-pixel delta no baseline rotation
+  // could settle — and a noise floor that would hide a genuine sub-pixel
+  // regression. `animations: 'disabled'` rewinds infinite animations to their
+  // first frame, which is what makes the pixels repeatable.
+  //
+  // Proving actual determinism needs two full capture runs (a server + Chromium
+  // per scene), far too slow for a unit test. This pins the one-line control
+  // that delivers it, so removing it fails here rather than silently in a
+  // baseline rotation weeks later.
+  it('the capture harness freezes animations when screenshotting', () => {
+    const src = readFileSync(join(ROOT, 'scripts/ground-truth/capture-screenshots.ts'), 'utf8');
+    const calls = [...src.matchAll(/\.screenshot\(([^)]*)\)/g)].map(m => m[1]);
+    expect(calls.length, 'expected a page.screenshot(...) call in the capture harness').toBeGreaterThan(0);
+    for (const args of calls) {
+      expect(args, `screenshot call without animations: 'disabled': ${args}`).toContain("animations: 'disabled'");
+    }
+  });
+});
+
 describe('Tauri launcher ↔ CLI stdout contract', () => {
   // The desktop launcher (src-tauri/src/lib.rs) reads the server's stdout to
   // decide what to show: it navigates on "running at " and shows a "no changes"

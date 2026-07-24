@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry9zajwg48rx4ar",
+          "message": {
+            "text": "Freezing animations is a determinism control, not a cosmetic one.\n\nThe screenshot regression suite only works if two captures of an unchanged UI agree. A running CSS animation breaks that outright: the sidebar's \"Guided review…\" spinner was caught at a different rotation angle every run, so eight scenes carried a permanent few-pixel delta no baseline rotation could ever settle.\n\nThe churn is the lesser problem. The real cost is a noise floor — once a scene always differs by a handful of pixels, a genuine sub-pixel regression there is indistinguishable from the spinner, and the reviewer is trained to wave small scores through. docs/ground-truth-screenshots.md already warns that \"a small perceptual score is not proof of noise\"; this removes the thing that was manufacturing that noise.\n\nanimations: 'disabled' rewinds infinite animations to their first frame and fast-forwards finite ones, so the spinner lands on identical pixels every time. Same motivation as the fixed viewport and device scale factor a few lines up.\n\nMeasured: before, two consecutive captures of settings-general and notes-guided differed; after, two full 47-scene runs are 47/47 perceptually identical (46 byte-identical — Chromium's PNG encoder is not byte-deterministic, which is why the suite compares perceptually rather than by hash).\n\nProving that property needs two full capture runs, far too slow for a unit test, so a conventions test (0) pins the flag itself.",
+            "markdown": "Freezing animations is a determinism control, not a cosmetic one.\n\nThe screenshot regression suite only works if two captures of an unchanged UI agree. A running CSS animation breaks that outright: the sidebar's \"Guided review…\" spinner was caught at a different rotation angle every run, so eight scenes carried a permanent few-pixel delta no baseline rotation could ever settle.\n\nThe churn is the lesser problem. The real cost is a **noise floor** — once a scene always differs by a handful of pixels, a genuine sub-pixel regression there is indistinguishable from the spinner, and the reviewer is trained to wave small scores through. `docs/ground-truth-screenshots.md` already warns that \"a small perceptual score is not proof of noise\"; this removes the thing that was manufacturing that noise.\n\n`animations: 'disabled'` rewinds infinite animations to their first frame and fast-forwards finite ones, so the spinner lands on identical pixels every time. Same motivation as the fixed viewport and device scale factor a few lines up.\n\nMeasured: before, two consecutive captures of `settings-general` and `notes-guided` differed; after, two full 47-scene runs are 47/47 perceptually identical (46 byte-identical — Chromium's PNG encoder is not byte-deterministic, which is why the suite compares perceptually rather than by hash).\n\nProving that property needs two full capture runs, far too slow for a unit test, so [a conventions test](0) pins the flag itself."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/ground-truth/capture-screenshots.ts"
+                },
+                "region": {
+                  "startLine": 124,
+                  "endLine": 134,
+                  "snippet": {
+                    "text": "async function captureScene(scene: Scene, port: number, outDir: string): Promise<void> {\n  const base = `http://localhost:${String(port)}`;\n  const pngPath = join(outDir, `${scene.slug}.png`);\n  console.log(`\\n▸ ${scene.label}  (${scene.featureArea})  →  ${pngPath}`);\n\n  const dataDir = mkdtempSync(join(tmpdir(), `glassbox-gt-data-${scene.slug}-`));\n  const server = spawnGlassbox(scene, port, dataDir);\n  let browser: Browser | null = null;\n  try {\n    await waitForServer(base);\n    browser = await launchChromium();"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/unit/conventions.test.ts"
+                },
+                "region": {
+                  "startLine": 141
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1101"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "4dd24621f0227425bbc3ac938bbbce70"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry9zi54z64vz63f",
+          "message": {
+            "text": "The port scan skips busy ports because the range is shared with the rest of the machine.\n\nThe harness walks one port per scene upward from 4196, and the server is launched with --strict-port, so an unrelated local process sitting anywhere in that ~47-port window used to fail exactly one scene with a bare EADDRINUSE. That is easy to miss in a 47-scene run, and the failure is quiet in the worst way: the scene keeps its stale actual from a previous capture, so the comparison silently comes from old bytes rather than the current UI.\n\nHit for real: a server from an unrelated project on this machine was holding 4209 mid-run.\n\nAn OS-assigned ephemeral port would avoid the scan entirely, but the port has to be known before the server starts (it is passed in on the command line), so probing is the option that fits. The 100-port ceiling just bounds the search rather than spinning forever.",
+            "markdown": "The port scan skips busy ports because the range is shared with the rest of the machine.\n\nThe harness walks one port per scene upward from 4196, and the server is launched with `--strict-port`, so an unrelated local process sitting anywhere in that ~47-port window used to fail exactly one scene with a bare EADDRINUSE. That is easy to miss in a 47-scene run, and the failure is quiet in the worst way: the scene keeps its **stale** actual from a previous capture, so the comparison silently comes from old bytes rather than the current UI.\n\nHit for real: a server from an unrelated project on this machine was holding 4209 mid-run.\n\nAn OS-assigned ephemeral port would avoid the scan entirely, but the port has to be known *before* the server starts (it is passed in on the command line), so probing is the option that fits. The 100-port ceiling just bounds the search rather than spinning forever."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/ground-truth/capture-screenshots.ts"
+                },
+                "region": {
+                  "startLine": 105,
+                  "endLine": 122,
+                  "snippet": {
+                    "text": "/** Whether a local TCP port can be bound right now. */\nfunction isPortFree(port: number): Promise<boolean> {\n  return new Promise(resolve => {\n    const probe = createServer();\n    probe.once('error', () => { resolve(false); });\n    probe.once('listening', () => { probe.close(() => { resolve(true); }); });\n    probe.listen(port, '127.0.0.1');\n  });\n}\n\n/** The first free port at or above `from`, so an unrelated process squatting\n *  inside the scan range costs a port rather than a scene. */\nasync function nextFreePort(from: number): Promise<number> {\n  for (let port = from; port < from + 100; port++) {\n    if (await isPortFree(port)) return port;\n  }\n  throw new Error(`no free port found in ${String(from)}..${String(from + 99)}`);\n}"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1101"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "6b431142b9b31c703f9d4515785ae56c"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "ae70ce8955a262ec05371ccbed804b327e12bbb0",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}
