@@ -49,7 +49,7 @@ function renderOverviewNote(container: HTMLElement, overview: string, noteType: 
           {NOTE_LABELS[noteType] ?? noteType}
         </span>
         {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
-        <span className="ai-note-text">{raw(renderNoteMarkdown(overview))}</span>
+        <div className="ai-note-text">{raw(renderNoteMarkdown(overview))}</div>
       </div>
     </div>
   );
@@ -87,7 +87,7 @@ function renderLineNotes(container: HTMLElement, lines: FileNotes['lines'], note
             {NOTE_LABELS[noteType] ?? noteType}
           </span>
           {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
-          <span className="ai-note-text">{raw(renderNoteMarkdown(note.content))}</span>
+          <div className="ai-note-text">{raw(renderNoteMarkdown(note.content))}</div>
         </div>
       </div>
     );

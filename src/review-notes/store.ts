@@ -20,8 +20,8 @@ import { dirname, join } from 'path';
 
 import { generateId } from '../db/ids.js';
 import type { SarifLog, SarifRun } from './sarif.js';
-import { buildResult, emptyLog, newRun, SarifLogShapeSchema } from './sarif.js';
-import type { NoteKind, ReviewNoteInput } from './types.js';
+import { buildResult, emptyLog, newRun, noteMessage, SarifLogShapeSchema } from './sarif.js';
+import type { NoteKind, RelatedLocation, ReviewNoteInput } from './types.js';
 import { CONFIDENCE_PROPERTY_KEY, DEFAULT_PRODUCER, DEFAULT_SHARD_CAP, isNoteKind } from './types.js';
 import type { ReviewNoteArtifact, ReviewNoteView } from './view.js';
 import { IMAGE_ARTIFACT_RE } from './view.js';
@@ -185,12 +185,25 @@ interface NoteResult {
   guid?: string;
   message?: { text?: string; markdown?: string };
   locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number; endLine?: number; snippet?: { text?: string } } } }[];
+  relatedLocations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number } } }[];
   attachments?: { artifactLocation?: { uri?: string } }[];
   properties?: { tags?: string[]; [k: string]: unknown };
   rank?: number;
   level?: string;
   workItemUris?: string[];
   [k: string]: unknown;
+}
+
+/**
+ * The displayed body of a note. SARIF carries a message in two forms: `markdown`
+ * (GitHub-Flavored, the formatted form) and `text` (the plain-text fallback that
+ * must accompany it). Per SARIF 2.1.0 §3.11.9 only a consumer that *cannot*
+ * render formatted text is required to fall back to `text` — Glassbox renders
+ * markdown (`renderNoteMarkdown`), so it prefers `markdown` and a producer that
+ * writes a spec-correct plain/rich pair keeps its formatting.
+ */
+function noteBody(r: NoteResult): string {
+  return r.message?.markdown ?? r.message?.text ?? '';
 }
 
 /** Patch for `updateNote`. Anchor (file/lines) is immutable — that's a new note. */
@@ -287,7 +300,7 @@ export function updateNote(repoRoot: string, guid: string, patch: NotePatch, fil
     for (const run of log.runs) {
       const result = run.results.find(r => (r as NoteResult).guid === guid) as NoteResult | undefined;
       if (result !== undefined) {
-        if (patch.body !== undefined) result.message = { text: patch.body, markdown: patch.body };
+        if (patch.body !== undefined) result.message = noteMessage(patch.body);
         if (patch.kind !== undefined) {
           result.properties = { ...result.properties, tags: [patch.kind] };
           result.level = patch.kind === 'risk' ? 'warning' : 'none';
@@ -313,7 +326,7 @@ function noteKey(r: NoteResult): string {
     loc?.region?.startLine,
     loc?.region?.endLine,
     r.properties?.tags,
-    r.message?.text,
+    noteBody(r),
   ]);
 }
 
@@ -404,6 +417,24 @@ function readArtifactText(repoRoot: string, uri: string): string | undefined {
   }
 }
 
+/**
+ * `result.relatedLocations` → the flat targets an embedded link resolves
+ * against (docs/20 §20.6). **Index-preserving**: a body's `[text](N)` names the
+ * Nth entry, so an unusable entry becomes a placeholder rather than shifting
+ * every later link onto the wrong target. The renderer drops placeholders back
+ * to literal text.
+ */
+function readRelated(result: NoteResult): RelatedLocation[] | undefined {
+  const raw = result.relatedLocations;
+  if (raw === undefined || raw.length === 0) return undefined;
+  return raw.map(entry => {
+    const uri = entry.physicalLocation?.artifactLocation?.uri;
+    const line = entry.physicalLocation?.region?.startLine;
+    if (typeof uri !== 'string' || uri === '' || typeof line !== 'number') return { uri: '', line: 0 };
+    return { uri, line };
+  });
+}
+
 function readArtifacts(repoRoot: string, result: NoteResult): ReviewNoteArtifact[] | undefined {
   const out: ReviewNoteArtifact[] = [];
   for (const att of result.attachments ?? []) {
@@ -442,10 +473,11 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
           line: startLine,
           side: 'new',
           kind,
-          body: r.message?.text ?? '',
+          body: noteBody(r),
           confidence: typeof confidence === 'number' ? confidence : undefined,
           producer: producer === '' ? undefined : producer,
           snippet: region?.snippet?.text,
+          related: readRelated(r),
           artifacts: readArtifacts(repoRoot, r),
         });
       }

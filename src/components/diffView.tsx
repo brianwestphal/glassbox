@@ -418,8 +418,9 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
           <div className="ai-note-item">
             <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
             {n.stale === true ? <span className="ai-note-stale-tag" title="The code this note referred to has changed">outdated</span> : null}
+            {/* A div, not a span: the body renders block-level markdown (doc 20 §20.6). */}
             {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
-            <span className="ai-note-text">{raw(renderNoteMarkdown(n.body))}</span>
+            <div className="ai-note-text">{raw(renderNoteMarkdown(n.body, n.related))}</div>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
             {n.guid !== undefined ? <button className="ai-note-reply-btn" data-line={String(n.line)}>Reply</button> : null}
             {n.stale === true && n.guid !== undefined ? (

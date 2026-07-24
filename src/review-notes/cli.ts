@@ -12,7 +12,7 @@ import { relative, resolve } from 'path';
 import { reviewNoteInstructions } from './instructions.js';
 import type { NotePatch } from './store.js';
 import { coalesceAll, coalesceFile, removeNote, updateNote, warnIfPrNotesIgnored, writeReviewNote } from './store.js';
-import type { NoteKind, ReviewNoteInput } from './types.js';
+import type { NoteKind, RelatedLocation, ReviewNoteInput } from './types.js';
 import { isNoteKind, NOTE_KINDS } from './types.js';
 
 /** Parse `--flag value` pairs into a map. Throws on a flag with no value. */
@@ -41,6 +41,7 @@ interface ParsedAdd {
   producer?: string;
   producerVersion?: string;
   artifacts: string[];
+  related: RelatedLocation[];
   body?: string;
   bodyStdin: boolean;
 }
@@ -81,10 +82,23 @@ add — options:
   --producer-version <v>
   --artifact <path>     Attach a committed proof artifact (test output, log,
                         diagram source); repeatable, repo-relative path
+  --related <file:line> A code location the body links to; repeatable. Reference
+                        the Nth one from the body as [text](N), 0-based — SARIF's
+                        embedded-link syntax, rendered as a jump-to-line link
 
 update/remove use the guid returned by 'add' (--file scopes the search; omit to search all notes).
 coalesce drops redundant notes (identical anchor + kind + body), keeping the most recent.
 `;
+}
+
+/** `--related <file:line>` → a `relatedLocations` entry the body links to by
+ *  index. The line is required: an embedded link exists to jump somewhere. */
+function parseRelated(value: string): RelatedLocation {
+  const match = /^(.+):(\d+)$/.exec(value);
+  if (match === null) throw new Error(`--related must be <file:line> (e.g. src/a.ts:42), got "${value}"`);
+  const line = parseInteger('--related line', match[2]);
+  if (line < 1) throw new Error('--related line must be 1-based');
+  return { uri: match[1], line };
 }
 
 function parseInteger(label: string, value: string): number {
@@ -131,7 +145,12 @@ export function parseNoteAdd(args: string[]): ParsedAdd {
   const endLine = endRaw !== undefined ? parseInteger('--lines end', endRaw) : startLine;
   if (startLine < 1 || endLine < startLine) throw new Error('--lines must be 1-based with start <= end');
 
-  const parsed: ParsedAdd = { file, startLine, endLine, kind: kindRaw, artifacts: collectRepeatable(args, 'artifact'), bodyStdin: false };
+  const parsed: ParsedAdd = {
+    file, startLine, endLine, kind: kindRaw,
+    artifacts: collectRepeatable(args, 'artifact'),
+    related: collectRepeatable(args, 'related').map(parseRelated),
+    bodyStdin: false,
+  };
 
   Object.assign(parsed, parseConfidenceRank(flags));
   if (flags.has('ticket')) parsed.ticket = flags.get('ticket');
@@ -197,6 +216,7 @@ async function runAdd(args: string[], cwd: string): Promise<void> {
     producer: parsed.producer,
     producerVersion: parsed.producerVersion,
     artifacts: parsed.artifacts.length > 0 ? parsed.artifacts : undefined,
+    related: parsed.related.length > 0 ? parsed.related : undefined,
   };
   warnIfPrNotesIgnored(repoRoot);
   const { path, guid } = writeReviewNote(repoRoot, input);

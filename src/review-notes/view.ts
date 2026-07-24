@@ -5,7 +5,9 @@
  * (no Node deps) so both the server reader and the `DiffView` component import
  * it.
  */
-import type { NoteKind } from './types.js';
+import type { NoteKind, RelatedLocation } from './types.js';
+
+export type { RelatedLocation };
 
 /** Short display label per note kind (the badge text). */
 export const REVIEW_NOTE_LABELS: Record<string, string> = {
@@ -33,6 +35,10 @@ export interface ReviewNoteView {
   /** Set by re-anchoring when the authored text can no longer be found at or
    *  near the note's line — the note is shown but flagged as possibly outdated. */
   stale?: boolean;
+  /** Code locations the body links to by index via SARIF's embedded-link
+   *  syntax — `[the caller](0)` (docs/20 §20.6). Order is significant: the
+   *  link's destination integer is an index into this array. */
+  related?: RelatedLocation[];
   /** Proof artifacts attached to the note (docs/20 §20.5). `content` is the
    *  text body when the artifact is text/diagram-source and readable; absent for
    *  binary, missing, or oversized artifacts (rendered as a reference instead). */

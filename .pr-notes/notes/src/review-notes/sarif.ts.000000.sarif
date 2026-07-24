@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry77qf403lhftsb",
+          "message": {
+            "text": "`text` and `markdown` are no longer the same string.\n\nSARIF §3.11.9 requires `text` whenever `markdown` is present, and its NOTE gives the reason: the message must stay viewable where formatting isn't rendered. §3.11.3 adds that a plain text message \"SHALL NOT contain formatting information\". Writing the markdown source into both fields satisfied the letter and defeated the purpose — a third-party SARIF viewer showed literal `###` and `**`.\n\n`flattenMarkdown` (in `src/utils/flattenMarkdown.ts`) produces the fallback. It keeps list, blockquote, and thematic-break markers, which read as intended unrendered, and drops only what is noise in plain text.\n\n**Ordering mattered:** this had to land *after* the reader started preferring `message.markdown` (see the note on `noteBody` in `src/review-notes/store.ts`). Shipped in the other order, Glassbox's own reader — which took `text` — would have started displaying the flattened version of every note.\n\nVerified end-to-end by writing a note with the working-tree CLI and reading the shard back: `markdown` byte-identical to the input, `text` flattened.",
+            "markdown": "`text` and `markdown` are no longer the same string.\n\nSARIF §3.11.9 requires `text` whenever `markdown` is present, and its NOTE gives the reason: the message must stay viewable where formatting isn't rendered. §3.11.3 adds that a plain text message \"SHALL NOT contain formatting information\". Writing the markdown source into both fields satisfied the letter and defeated the purpose — a third-party SARIF viewer showed literal `###` and `**`.\n\n`flattenMarkdown` (in `src/utils/flattenMarkdown.ts`) produces the fallback. It keeps list, blockquote, and thematic-break markers, which read as intended unrendered, and drops only what is noise in plain text.\n\n**Ordering mattered:** this had to land *after* the reader started preferring `message.markdown` (see the note on `noteBody` in `src/review-notes/store.ts`). Shipped in the other order, Glassbox's own reader — which took `text` — would have started displaying the flattened version of every note.\n\nVerified end-to-end by writing a note with the working-tree CLI and reading the shard back: `markdown` byte-identical to the input, `text` flattened."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/sarif.ts"
+                },
+                "region": {
+                  "startLine": 88,
+                  "endLine": 99,
+                  "snippet": {
+                    "text": " * so both write sites stay in step.\n */\nexport function noteMessage(body: string): { text: string; markdown: string } {\n  const flat = flattenMarkdown(body);\n  // `text` must be non-empty when present; fall back to the source in the\n  // pathological case where flattening leaves nothing.\n  return { text: flat === '' ? body : flat, markdown: body };\n}\n\n/**\n * Map a note to a SARIF `result`. Standard fields carry everything except\n * `confidence`, which has no SARIF home and goes in the namespaced"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1096"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "d8446c74fc2dd9bd79951ae92ce20d96"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f2600ca29387158da19fc3268ae28ff40ea19291",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

@@ -417,8 +417,70 @@
   background: rgba(166, 227, 161, 0.15);
 }
 
+// Note bodies render block-level markdown (doc 20 §20.6), so this is a block
+// container inside the flex `.ai-note-item` row. Blocks are tightened to sit in
+// a diff row: no outer margins, small headings, compact lists.
 .ai-note-text {
   color: var(--text-dim);
+  flex: 1;
+  min-width: 0;
+
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+
+  p { margin: 0 0 6px; }
+
+  h4, h5, h6 {
+    margin: 8px 0 4px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  h4 { font-size: 1.05em; }
+  h5 { font-size: 1em; }
+  h6 { font-size: 0.95em; }
+
+  ul, ol {
+    margin: 0 0 6px;
+    padding-left: 18px;
+  }
+  li { margin: 1px 0; }
+  // Nested lists sit tight against their parent item.
+  li > ul, li > ol { margin-bottom: 0; }
+
+  pre {
+    margin: 0 0 6px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.25);
+
+    code { background: none; padding: 0; }
+  }
+
+  blockquote {
+    margin: 0 0 6px;
+    padding-left: 8px;
+    border-left: 2px solid var(--border, rgba(255, 255, 255, 0.15));
+    color: var(--text-dim);
+  }
+
+  hr {
+    margin: 8px 0;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+// A SARIF embedded link resolved to a code location (doc 20 §20.6). It carries
+// no href — the click delegate navigates — so the affordance has to be explicit.
+.ai-note-loclink {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+
+  &:hover { text-decoration-style: solid; }
 }
 
 .ai-note-row {

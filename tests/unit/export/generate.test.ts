@@ -140,7 +140,9 @@ describe('generateReviewExport', () => {
     const content = readFileSync(result, 'utf-8');
     expect(content).toContain('## AI Review Notes');
     expect(content).toContain('### src/app.ts');
-    expect(content).toContain('**Line 2** [proof]: why this is safe');
+    // Producer attribution rides on the label so the inline and block folding
+    // shapes match (GB-1095).
+    expect(content).toContain('**Line 2** [proof] _(Claude Code)_: why this is safe');
   });
 
   it('includes per-file annotations', async () => {

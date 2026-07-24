@@ -380,6 +380,40 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.ai-note-stale-tag')).toHaveText('outdated');
   });
 
+  // A note body is markdown and may carry block structure (doc 20 §20.6,
+  // GB-1094). Before the block pass existed these rendered as literal `- `
+  // characters on a <br>-joined line.
+  test('a note body with block markdown renders real block elements', async ({ page }) => {
+    await openModifiedFile(page);
+    const proof = page.locator('.ai-note-row.ai-note-review[data-kind="proof"] .ai-note-text');
+    await expect(proof).toBeVisible({ timeout: 5000 });
+
+    // The lead paragraph and the list are distinct blocks, not one run of text.
+    await expect(proof.locator('p').first()).toContainText('written atomically');
+    await expect(proof.locator('ul li')).toHaveCount(2);
+    await expect(proof.locator('ul li').first()).toContainText('single round trip');
+    // Inline formatting still applies inside a list item.
+    await expect(proof.locator('ul li code').first()).toHaveText('SET');
+    // The literal marker is gone from the rendered text.
+    await expect(proof).not.toContainText('- `SET`');
+  });
+
+  // SARIF §3.11.6 embedded link: the body writes `[text](0)`, the reader
+  // resolves index 0 against `relatedLocations`, and clicking navigates
+  // (doc 20 §20.6, GB-1097).
+  test('an embedded link in a note body navigates to the referenced file', async ({ page }) => {
+    await openModifiedFile(page);
+    const link = page.locator('.ai-note-loclink').first();
+    await expect(link).toBeVisible({ timeout: 5000 });
+    await expect(link).toHaveText('the Redis client');
+    await expect(link).toHaveAttribute('data-loc-file', 'src/db/redis.ts');
+    // No href — the delegate navigates, so a stray click can't leave the app.
+    await expect(link).not.toHaveAttribute('href', /./);
+
+    await link.click();
+    await expect(page.locator('.diff-view')).toHaveAttribute('data-file-path', /redis\.ts/, { timeout: 5000 });
+  });
+
   test('review notes also render in unified mode', async ({ page }) => {
     await openModifiedFile(page);
     await page.locator('[data-diff-mode="unified"]').click();

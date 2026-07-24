@@ -102,18 +102,33 @@ async function navigateToDefinition(symbolName: string) {
   }
 
   const def = data.definitions[0];
+  await goToTarget(def.fileId, def.filePath, def.line, currentFileId);
+}
 
-  if (def.fileId !== null && def.fileId === currentFileId) {
-    // Same file — scroll to the definition line
-    scrollToLine(def.line);
-  } else if (def.fileId !== null) {
-    // Different file in the review — switch to it and scroll after load
-    await selectFile(def.fileId);
-    requestAnimationFrame(() => { scrollToLine(def.line); });
+/**
+ * Navigate to a code location: scroll if it's the open file, switch files if
+ * it's elsewhere in the review, else open it read-only.
+ */
+async function goToTarget(fileId: string | null, filePath: string, line: number, currentFileId: string) {
+  if (fileId !== null && fileId === currentFileId) {
+    scrollToLine(line);
+  } else if (fileId !== null) {
+    await selectFile(fileId);
+    requestAnimationFrame(() => { scrollToLine(line); });
   } else {
-    // File not in the review — load it as a read-only view
-    await loadRawFile(def.filePath, def.line);
+    await loadRawFile(filePath, line);
   }
+}
+
+/**
+ * Navigate to a repo-relative path + line, resolving the file against the
+ * review's own file list. Backs the review-note embedded links (docs/20 §20.6),
+ * which name a location by path rather than by symbol.
+ */
+export async function navigateToLocation(filePath: string, line: number) {
+  const { currentFileId, files } = reviewStore.state.value;
+  const match = files.find(f => f.file_path === filePath);
+  await goToTarget(match?.id ?? null, filePath, line, currentFileId ?? '');
 }
 
 async function loadRawFile(filePath: string, targetLine: number) {

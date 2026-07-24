@@ -75,7 +75,22 @@ another AI) an optimized way to consume it.
   - **Durable re-anchoring** → `result.partialFingerprints` (see §20.3).
   - **Baseline commit** → `run.versionControlProvenance[]` (`repositoryUri`,
     `revisionId`, `branch`).
-  - **Body** → `result.message.text` + `result.message.markdown`.
+  - **Body** → `result.message.markdown` (the GitHub-Flavored Markdown form,
+    SARIF §3.11.4) with `result.message.text` as the plain-text fallback SARIF
+    §3.11.9 requires alongside it. **Reading precedence:** the reader takes
+    `markdown ?? text`. Only a consumer that *cannot* render formatted
+    text is required to fall back to `text`; Glassbox renders markdown (§20.6),
+    so a producer that writes a spec-correct plain/rich pair keeps its
+    formatting instead of having it silently discarded. The same precedence
+    governs the `coalesce` redundancy check, so two notes that render
+    differently are never collapsed into one. **Writing:** the reference writer
+    emits the body verbatim as `markdown` and a *flattened* plain-text rendering
+    as `text` (`src/utils/flattenMarkdown.ts` — heading markers and inline
+    emphasis dropped, code fences removed while their contents survive, links
+    reduced to `text (url)`; list, blockquote, and thematic-break markers are
+    kept because they read as intended unrendered). Duplicating the markdown
+    source into both fields would defeat §3.11.9's stated purpose for `text`, so
+    a third-party SARIF viewer sees prose rather than raw `###` and `**`.
   - **Importance / risk** → `result.rank` (0–100) and `result.level` (`warning`
     for the `risk` kind, `none` otherwise).
   - **Producer identity** → `run.tool.driver.name` / `.version` — Claude Code,
@@ -84,6 +99,12 @@ another AI) an optimized way to consume it.
   - **Linked ticket** → `result.workItemUris` (standard SARIF work-item link).
   - **Attachments** → `result.attachments[]` (artifact URIs, each with an
     `ext-sha256` property for verification).
+  - **Linked code locations** → `result.relatedLocations[]` (each an
+    `artifactLocation.uri` + `region.startLine`, with `id` set to its index).
+    The body references one by index using SARIF's **embedded link** syntax
+    (§3.11.6) — `[the caller](0)` — which renders as a jump-to-line link
+    (§20.6). Written by `glassbox note add --related <file:line>` (repeatable);
+    order is significant, since the link's destination integer is the index.
 - **Future / intended SARIF fields (not currently emitted).** The following are
   reserved by this design for later phases — the reader tolerates them but
   `buildResult` does **not** write them today: column/offset region precision
@@ -201,9 +222,42 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
 
 - **Rendered like review comments** — Notes shall be presented primarily the way
   existing line-level review comments are, anchored in the diff at their line,
-  not in a separate side pane. Bodies render as **markdown** (inline code, bold,
-  italic, and http(s)/mailto links — via a safe, escape-first renderer
-  `src/utils/noteMarkdown.ts`, shared with the risk/narrative/guided AI notes).
+  not in a separate side pane. Bodies render as **markdown** via a safe,
+  escape-first renderer (`src/utils/noteMarkdown.ts`, shared with the
+  risk/narrative/guided AI notes).
+- **Rendered markdown subset** — The renderer supports **blocks** — paragraphs,
+  ATX headings, unordered/ordered lists (nested), fenced code blocks (``` and
+  `~~~`), blockquotes, thematic breaks — and **inline** code spans, bold,
+  italic, and http(s)/mailto links. This is the contract producers are told they
+  can rely on (`glassbox note instructions`). Deliberately outside it: tables,
+  indented (non-fenced) code blocks — indented text in a note is far more often
+  a continuation than a code block — reference-style links, and raw HTML, which
+  can never render (see the security bullet below). Two deviations from GFM are
+  intentional: a single newline inside a paragraph stays a visible break rather
+  than collapsing to a space, because note bodies are line-oriented prose whose
+  authors mean the breaks they type; and headings render as `h4`–`h6` (relative
+  depth preserved, clamped at `h6`) so an embedded note can never outrank the
+  page's own heading chrome.
+- **Embedded links jump to code** — A link whose destination is a non-negative
+  integer is a SARIF **embedded link** (§3.11.6): the integer indexes the note's
+  `relatedLocations` (§20.2), and it renders as a click-to-navigate link to that
+  file and line, reusing the doc-13 navigation (the file if it's in the review,
+  otherwise the read-only raw view, with the jump pushed onto the back/forward
+  stack). It carries **no `href`** — the client's delegate navigates — so a
+  stray click can never leave the app. **Fail-soft:** an index that is out of
+  range, or names an entry missing a uri or line, stays literal text rather than
+  becoming a dead link. The reader keeps an unusable `relatedLocations` entry as
+  a placeholder rather than dropping it, so later indices still line up.
+- **Safe by construction, not by sanitizer** — The body is HTML-escaped *first*,
+  then the block and inline passes run over the escaped text and emit only a
+  fixed tag allowlist; the sole dynamic attribute, a link `href`, is scheme-
+  gated. So no markup in a note body can reach the DOM, and the output is safe
+  to pass to `raw()`. This is what SARIF §3.11.4 requires of a consumer that
+  renders formatted messages ("disable HTML processing … or run the resulting
+  HTML through an HTML sanitizer") — met by construction, which is why a full
+  markdown library plus a sanitizer is deliberately **not** used. Recursion
+  (nested lists, blockquotes) is depth-capped for the same section's warning
+  about deeply nested markup overflowing a processor's stack.
 - **Visually distinct as AI-authored** — Notes shall be styled distinctly so it
   is immediately apparent they are AI-authored review companions rather than the
   reviewer's own annotations — following the precedent of the guided-review
@@ -269,6 +323,16 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   folds note content into the `.glassbox/latest-review.md` export (an "AI Review
   Notes" section). The notes thus serve as both an input to review and a
   byproduct the next AI session can read.
+- **Multi-line bodies fold without corrupting either surface** — A body is
+  markdown and may span lines. A single-line body stays inline after its list
+  label (the common case); a multi-line body moves to its own block, indented to
+  the list item's content column, so a continuation line can never land at
+  column 0 and terminate the list. In the export the body's headings are also
+  demoted so the shallowest sits one level below the per-file `### <file>`
+  heading — preserving their relative structure while keeping the document
+  outline a reader (or the next AI session) sees intact. Headings inside fenced
+  code are left alone. The analysis prompt indents identically but does not
+  demote, since it delimits sections with `=== … ===` rather than headings.
 
 ## Non-Functional Requirements
 

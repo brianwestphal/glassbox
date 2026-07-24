@@ -14,6 +14,12 @@ Requirements for code navigation features — go-to-definition and navigation hi
 - **Unrecognized symbols** — When no definition is found, a toast notification shall inform the user.
 - **Keyword filtering** — Common language keywords (if, for, return, function, class, etc.) shall not trigger definition lookups.
 - **Visual feedback** — The cursor shall change to a pointer when Cmd/Ctrl is held over code spans.
+- **Shared destination handling** — The same-file / review-file / repo-file
+  navigation above is also what an **AI review note's embedded link** uses
+  ([doc 20](20-ai-review-notes.md) §20.6): such a link names a location by path
+  and line rather than by symbol, so it skips symbol resolution and goes
+  straight to the destination handling, and the jump lands on the navigation
+  stack like any other.
 
 ### 13.2 Navigation Stack
 

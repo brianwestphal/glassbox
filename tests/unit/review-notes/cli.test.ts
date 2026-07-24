@@ -62,6 +62,30 @@ describe('parseNoteAdd', () => {
     expect(p.artifacts).toEqual([]);
   });
 
+  it('collects repeatable --related <file:line> flags (GB-1097)', () => {
+    const p = parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--related', 'src/a.ts:42', '--related', 'src/b.ts:7', '--body', 'x']);
+    expect(p.related).toEqual([{ uri: 'src/a.ts', line: 42 }, { uri: 'src/b.ts', line: 7 }]);
+  });
+
+  it('defaults related to an empty array', () => {
+    expect(parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--body', 'x']).related).toEqual([]);
+  });
+
+  it('rejects a --related value without a line', () => {
+    expect(() => parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--related', 'src/a.ts', '--body', 'x']))
+      .toThrow(/--related must be <file:line>/);
+  });
+
+  it('rejects a 0 or negative --related line', () => {
+    expect(() => parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--related', 'src/a.ts:0', '--body', 'x']))
+      .toThrow(/1-based/);
+  });
+
+  it('keeps a Windows-style drive path intact when splitting off the line', () => {
+    const p = parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--related', 'C:/src/a.ts:42', '--body', 'x']);
+    expect(p.related).toEqual([{ uri: 'C:/src/a.ts', line: 42 }]);
+  });
+
   it('accepts a single line and marks stdin body', () => {
     const p = parseNoteAdd(['--file', 'a.ts', '--lines', '5', '--kind', 'proof', '--body', '-']);
     expect(p.startLine).toBe(5);

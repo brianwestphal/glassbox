@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 
+import { flattenMarkdown } from '../utils/flattenMarkdown.js';
 import type { ReviewNoteInput } from './types.js';
 import { ANCHOR_FINGERPRINT_KEY, CONFIDENCE_PROPERTY_KEY } from './types.js';
 
@@ -81,6 +82,19 @@ export function newRun(producer: string, opts: {
 }
 
 /**
+ * A note body as a SARIF message: the markdown source plus the plain-text
+ * rendering §3.11.9 requires beside it, so a viewer that doesn't render
+ * markdown shows prose rather than raw `###` and `**`. Shared with `updateNote`
+ * so both write sites stay in step.
+ */
+export function noteMessage(body: string): { text: string; markdown: string } {
+  const flat = flattenMarkdown(body);
+  // `text` must be non-empty when present; fall back to the source in the
+  // pathological case where flattening leaves nothing.
+  return { text: flat === '' ? body : flat, markdown: body };
+}
+
+/**
  * Map a note to a SARIF `result`. Standard fields carry everything except
  * `confidence`, which has no SARIF home and goes in the namespaced
  * `ext-ai-tool-confidence` property.
@@ -104,7 +118,7 @@ export function buildResult(input: ReviewNoteInput, meta: {
     kind: 'informational',
     level: input.kind === 'risk' ? 'warning' : 'none',
     guid: meta.guid,
-    message: { text: input.body, markdown: input.body },
+    message: noteMessage(input.body),
     locations: [{
       physicalLocation: {
         artifactLocation: { uri: input.file },
@@ -113,6 +127,17 @@ export function buildResult(input: ReviewNoteInput, meta: {
     }],
     properties,
   };
+  // SARIF §3.11.6 embedded links: a body writes `[text](N)` where N indexes
+  // this array, and the viewer resolves it to a real file+line.
+  if (input.related !== undefined && input.related.length > 0) {
+    result.relatedLocations = input.related.map((loc, index) => ({
+      id: index,
+      physicalLocation: {
+        artifactLocation: { uri: loc.uri },
+        region: { startLine: loc.line },
+      },
+    }));
+  }
   if (input.rank !== undefined) result.rank = input.rank;
   if (input.ticket !== undefined && input.ticket !== '') result.workItemUris = [input.ticket];
   if (meta.fingerprint !== undefined) result.partialFingerprints = { [ANCHOR_FINGERPRINT_KEY]: meta.fingerprint };

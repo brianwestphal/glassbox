@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry73clyxv8qvr97",
+          "message": {
+            "text": "Why a hand-rolled renderer instead of `marked` + a sanitizer.\n\nThe escape-first model is the whole security argument: the body is HTML-escaped **before** any parsing, then the block and inline passes run over already-escaped text and emit only a fixed tag allowlist. The single dynamic attribute — a link `href` — is scheme-gated. So no markup in a note body can reach the DOM **by construction**, which is what makes the output safe to hand to `raw()`.\n\nA markdown library inverts that: it parses raw source and emits HTML, so safety becomes a property of a sanitizer running afterwards and staying correctly configured. SARIF §3.11.4 asks a rendering consumer to either disable HTML processing or sanitize; we satisfy it structurally, and avoid the bundle weight, which matters for a local-first app.\n\nThe cost is a deliberately small subset — no tables, no indented code blocks, no reference links — documented for producers in `src/review-notes/instructions.ts` and `docs/20-ai-review-notes.md` §20.6.",
+            "markdown": "Why a hand-rolled renderer instead of `marked` + a sanitizer.\n\nThe escape-first model is the whole security argument: the body is HTML-escaped **before** any parsing, then the block and inline passes run over already-escaped text and emit only a fixed tag allowlist. The single dynamic attribute — a link `href` — is scheme-gated. So no markup in a note body can reach the DOM **by construction**, which is what makes the output safe to hand to `raw()`.\n\nA markdown library inverts that: it parses raw source and emits HTML, so safety becomes a property of a sanitizer running afterwards and staying correctly configured. SARIF §3.11.4 asks a rendering consumer to either disable HTML processing or sanitize; we satisfy it structurally, and avoid the bundle weight, which matters for a local-first app.\n\nThe cost is a deliberately small subset — no tables, no indented code blocks, no reference links — documented for producers in `src/review-notes/instructions.ts` and `docs/20-ai-review-notes.md` §20.6."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/utils/noteMarkdown.ts"
+                },
+                "region": {
+                  "startLine": 1,
+                  "endLine": 22,
+                  "snippet": {
+                    "text": "/**\n * A deliberately tiny, **safe** markdown renderer for AI note bodies (doc 20\n * §20.6) — the `.pr-notes/` review notes and the risk/narrative/guided analysis\n * notes. Pure (no DOM/Node deps) so both the server component (`diffView.tsx`)\n * and the client (`aiNotes.tsx`) can use it.\n *\n * Security model: the input is **HTML-escaped first**, so no markup in the note\n * body can ever reach the DOM. The block and inline passes then run over the\n * escaped text and only ever emit a fixed set of tags (`p`, `h4`–`h6`, `ul`,\n * `ol`, `li`, `pre`, `code`, `blockquote`, `hr`, `strong`, `em`, `a`, `br`) —\n * the one dynamic attribute, a link `href`, is gated to http(s)/mailto URLs, so\n * `javascript:`/`data:` links degrade to plain text. The result is therefore\n * safe to pass to `raw()`.\n *\n * This is also what SARIF §3.11.4 asks of a consumer that renders formatted\n * messages (\"disable HTML processing … or run the resulting HTML through an\n * HTML sanitizer\") — satisfied here by construction rather than by a sanitizer\n * pass, which is why a full markdown library is deliberately not used.\n *\n * The supported subset is documented for producers in\n * `src/review-notes/instructions.ts`; see that text before adding to it.\n */"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1094"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "44c51c2ad31ccff85498caac1eddca44"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mry73kuk9nk4lw5j",
+          "message": {
+            "text": "Block patterns must match **escaped** text — this one is the trap.\n\nEvery block regex here runs after `escapeHtml`, so `>` has already become `&gt;`. Matching the raw `>` character reads correctly and silently never fires: blockquotes just render as paragraphs starting with `&gt;`. That is exactly how it was first written, and the unit test caught it.\n\nThe other markers (`#`, `-`, `*`, backtick, `~`, `_`) are untouched by `escapeHtml`, so this is the only pattern affected today. Anyone adding a construct whose marker is `&`, `<`, `>` or `\"` must escape it the same way — or move the pattern before the escape, which would break the security model.\n\nSee also the rationale note at the top of this file.",
+            "markdown": "Block patterns must match **escaped** text — this one is the trap.\n\nEvery block regex here runs after `escapeHtml`, so `>` has already become `&gt;`. Matching the raw `>` character reads correctly and silently never fires: blockquotes just render as paragraphs starting with `&gt;`. That is exactly how it was first written, and the unit test caught it.\n\nThe other markers (`#`, `-`, `*`, backtick, `~`, `_`) are untouched by `escapeHtml`, so this is the only pattern affected today. Anyone adding a construct whose marker is `&`, `<`, `>` or `\"` must escape it the same way — or move the pattern before the escape, which would break the security model.\n\nSee also the rationale note at the top of this file."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/utils/noteMarkdown.ts"
+                },
+                "region": {
+                  "startLine": 68,
+                  "endLine": 71,
+                  "snippet": {
+                    "text": "// The block pass runs over *escaped* text, so a blockquote's `>` marker has\n// already become `&gt;`. Matching the raw character here would silently never\n// fire — this is the one place escape-first leaks into a block pattern.\nconst QUOTE_RE = /^ {0,3}&gt;[ \\t]?(.*)$/;"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ],
+            "ext-ai-tool-confidence": 0.95
+          },
+          "workItemUris": [
+            "GB-1094"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "f8955c72250211ceba93fb2786a9b78d"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry7pay5u51zd51j",
+          "message": {
+            "text": "The anchor deliberately carries no href.\n\nA SARIF embedded link resolves to a file+line inside the app, not a URL. Emitting href=\"#\" would make a stray or middle click mutate the address bar, and emitting a path would produce a link that 404s if the delegate ever fails to bind. Instead the target rides on data-loc-* and the click delegate (0) navigates via the shared destination handling (1).\n\nCost: the anchor isn't keyboard-focusable. Accepted for now because the surrounding note UI (Reply, Keep, Discard) is likewise mouse-driven; a focusable variant belongs in a broader keyboard-accessibility pass rather than a one-off here.\n\nThe related values are attribute-escaped at this boundary because — unlike everything else the renderer emits — they arrive from SARIF rather than from the escape-first body pass.\n\n(This note is itself written with --related, so it doubles as a live example.)",
+            "markdown": "The anchor deliberately carries no `href`.\n\nA SARIF embedded link resolves to a file+line inside the app, not a URL. Emitting `href=\"#\"` would make a stray or middle click mutate the address bar, and emitting a path would produce a link that 404s if the delegate ever fails to bind. Instead the target rides on `data-loc-*` and [the click delegate](0) navigates via [the shared destination handling](1).\n\nCost: the anchor isn't keyboard-focusable. Accepted for now because the surrounding note UI (Reply, Keep, Discard) is likewise mouse-driven; a focusable variant belongs in a broader keyboard-accessibility pass rather than a one-off here.\n\nThe `related` values are attribute-escaped at this boundary because — unlike everything else the renderer emits — they arrive from SARIF rather than from the escape-first body pass.\n\n(This note is itself written with `--related`, so it doubles as a live example.)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/utils/noteMarkdown.ts"
+                },
+                "region": {
+                  "startLine": 44,
+                  "endLine": 60,
+                  "snippet": {
+                    "text": "}\n\n/**\n * SARIF §3.11.6 \"embedded link\": a link whose destination is a non-negative\n * integer indexing `result.relatedLocations`. Resolve it to a jump-to-line\n * anchor the client's delegate picks up; an index with no usable target falls\n * back to literal text, so a malformed note degrades rather than producing a\n * dead link.\n */\nfunction renderEmbeddedLink(text: string, destination: string, ctx: RenderContext): string | null {\n  // `\\d+` only, so `.at()` can never be handed a negative (wrapping) index.\n  if (!/^\\d+$/.test(destination)) return null;\n  const target = ctx.related.at(Number(destination));\n  if (target === undefined || target.uri === '' || target.line < 1) return null;\n  // `related` arrives from SARIF and is NOT part of the escaped body, so its\n  // values must be attribute-escaped here.\n  return `<a class=\"ai-note-loclink\" data-loc-file=\"${escapeAttr(target.uri)}\" data-loc-line=\"${String(target.line)}\" title=\"${escapeAttr(`${target.uri}:${String(target.line)}`)}\">${text}</a>`;"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/diff/index.tsx"
+                },
+                "region": {
+                  "startLine": 503
+                }
+              }
+            },
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/diff/goToDefinition.tsx"
+                },
+                "region": {
+                  "startLine": 117
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1097"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "2b123fc850639b3b4644039f641219a5"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f2600ca29387158da19fc3268ae28ff40ea19291",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

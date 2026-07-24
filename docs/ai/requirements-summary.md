@@ -760,9 +760,21 @@ note offers Keep (dismiss the flag) / Discard (`DELETE
 /api/review-notes/:guid` → `removeNote`). **Reply nesting shipped**:
 replies render nested directly beneath their note (orphans fall back to
 line rendering). **Markdown bodies shipped**: note bodies (review notes +
-the risk/narrative/guided AI notes) render via a safe, escape-first inline
-renderer (`src/utils/noteMarkdown.ts` — code/bold/italic/links, scheme-
-gated). **P4 foundation shipped**: notes attach artifacts (`glassbox note
+the risk/narrative/guided AI notes) render via a safe, escape-first
+renderer (`src/utils/noteMarkdown.ts`) covering **blocks** — paragraphs,
+headings (as `h4`-`h6`), nested lists, fenced code, blockquotes, rules —
+and inline code/bold/italic/scheme-gated links. Escape-first + a fixed tag
+allowlist + depth-capped recursion make the output safe for `raw()` by
+construction, which is also what SARIF §3.11.4 asks of a consumer that
+renders formatted messages; tables, indented code blocks, and raw HTML are
+deliberately outside the subset. Bodies round-trip as
+`message.markdown` (source) + `message.text` (a plain-text flattening,
+`src/utils/flattenMarkdown.ts`), with the reader taking `markdown ?? text`
+so a third-party producer's formatting survives. **Embedded links
+shipped**: `--related <file:line>` writes standard `result.relatedLocations`
+and a body's `[text](N)` renders as a click-to-jump link into the diff,
+reusing the doc-13 destination handling; every unresolvable case falls soft
+to literal text. **P4 foundation shipped**: notes attach artifacts (`glassbox note
 add --artifact` → SARIF `result.attachments`) and text/diagram-source
 artifacts render as inline collapsible code blocks, **image artifacts as
 `<img>`** served by a path-contained `GET /api/review-notes/artifact`

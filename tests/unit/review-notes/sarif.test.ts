@@ -52,6 +52,20 @@ describe('buildResult', () => {
     expect((r.properties as Record<string, unknown>)[CONFIDENCE_PROPERTY_KEY]).toBeUndefined();
   });
 
+  it('maps related locations to standard SARIF result.relatedLocations (GB-1097)', () => {
+    const r = buildResult({ ...base, related: [{ uri: 'src/a.ts', line: 42 }, { uri: 'src/b.ts', line: 7 }] }, { guid: 'g' }) as Record<string, unknown>;
+    // `id` is the index, which is what a body's embedded link `[text](N)` names.
+    expect(r.relatedLocations).toEqual([
+      { id: 0, physicalLocation: { artifactLocation: { uri: 'src/a.ts' }, region: { startLine: 42 } } },
+      { id: 1, physicalLocation: { artifactLocation: { uri: 'src/b.ts' }, region: { startLine: 7 } } },
+    ]);
+  });
+
+  it('omits relatedLocations when a note declares none', () => {
+    expect((buildResult(base, { guid: 'g' }) as Record<string, unknown>).relatedLocations).toBeUndefined();
+    expect((buildResult({ ...base, related: [] }, { guid: 'g' }) as Record<string, unknown>).relatedLocations).toBeUndefined();
+  });
+
   it('maps artifacts to standard SARIF result.attachments (GB-898)', () => {
     const r = buildResult({ ...base, artifacts: ['.pr-notes/artifacts/out.txt', 'docs/diagram.mmd'] }, { guid: 'g' }) as Record<string, unknown>;
     expect(r.attachments).toEqual([

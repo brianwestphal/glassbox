@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry6aitps6t7d8ph",
+          "message": {
+            "text": "Reader precedence is `markdown ?? text`, not the other way round.\n\nSARIF carries a message in two forms. §3.11.9 requires `text` whenever `markdown` is present, but only so the message stays viewable in a consumer that cannot render formatting — it explicitly says such a consumer \"SHALL ignore the markdown property and use the text property instead\". Glassbox *can* render it (`renderNoteMarkdown`, §20.6), so the inverse applies: prefer `markdown`.\n\nBefore this, the reader took `message.text` only, so a third-party producer writing the spec-correct pair (plain prose in `text`, rich formatting in `markdown`) had its formatting silently discarded.\n\nThe helper exists so `coalesceFile`'s redundancy key uses the same precedence as display — keying on `text` alone would collapse two notes that render differently but share a plain-text fallback.",
+            "markdown": "Reader precedence is `markdown ?? text`, not the other way round.\n\nSARIF carries a message in two forms. §3.11.9 requires `text` whenever `markdown` is present, but only so the message stays viewable in a consumer that cannot render formatting — it explicitly says such a consumer \"SHALL ignore the markdown property and use the text property instead\". Glassbox *can* render it (`renderNoteMarkdown`, §20.6), so the inverse applies: prefer `markdown`.\n\nBefore this, the reader took `message.text` only, so a third-party producer writing the spec-correct pair (plain prose in `text`, rich formatting in `markdown`) had its formatting silently discarded.\n\nThe helper exists so `coalesceFile`'s redundancy key uses the same precedence as display — keying on `text` alone would collapse two notes that render differently but share a plain-text fallback."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/store.ts"
+                },
+                "region": {
+                  "startLine": 196,
+                  "endLine": 206,
+                  "snippet": {
+                    "text": "/**\n * The displayed body of a note. SARIF carries a message in two forms: `markdown`\n * (GitHub-Flavored, the formatted form) and `text` (the plain-text fallback that\n * must accompany it). Per SARIF 2.1.0 §3.11.9 only a consumer that *cannot*\n * render formatted text is required to fall back to `text` — Glassbox renders\n * markdown (`renderNoteMarkdown`), so it prefers `markdown` and a producer that\n * writes a spec-correct plain/rich pair keeps its formatting.\n */\nfunction noteBody(r: NoteResult): string {\n  return r.message?.markdown ?? r.message?.text ?? '';\n}"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1093"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "fae68e0d38d7e5439b4faf976ce8bd60"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f2600ca29387158da19fc3268ae28ff40ea19291",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import { asEl, asElement } from '../dom.js';
 import { openLightbox } from '../lightbox.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
 import { renderAINotes } from './aiNotes.js';
+import { navigateToLocation } from './goToDefinition.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
 import { handleHunkExpand } from './hunkExpander.js';
 import { bindImageDiff } from './imageDiff/index.js';
@@ -498,6 +499,18 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const line = parseInt(btnEl.dataset.line ?? '', 10);
     if (noteRow === null || guid === '' || isNaN(line)) return;
     showAnnotationForm(asEl(noteRow), line, 'new', guid);
+  });
+
+  // A SARIF embedded link in a note body (doc 20 §20.6): the renderer resolved
+  // the link's index against `relatedLocations`, so the target rides on the
+  // anchor. The anchor carries no href — nothing to preventDefault.
+  void delegate(container, 'click', '.ai-note-loclink', (e, link) => {
+    e.stopPropagation();
+    const el = asEl(link);
+    const filePath = el.dataset.locFile ?? '';
+    const line = parseInt(el.dataset.locLine ?? '', 10);
+    if (filePath === '' || isNaN(line)) return;
+    void navigateToLocation(filePath, line);
   });
 
   // Keep an outdated (stale) review note — dismiss its flag for this session

@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { coalesceAll, coalesceFile, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
+import { coalesceAll, coalesceFile, loadReviewNotesForFile, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
 import type { ReviewNoteInput } from '../../../src/review-notes/types.js';
 
 let repo: string;
@@ -62,6 +62,48 @@ describe('writeReviewNote — sharding', () => {
     expect(path).toBe(join(repo, '.pr-notes/notes/src/x.ts.000001.sarif'));
     expect(readShard('.pr-notes/notes/src/x.ts.000000.sarif').runs[0].results).toHaveLength(1);
     expect(readShard('.pr-notes/notes/src/x.ts.000001.sarif').runs[0].results).toHaveLength(1);
+  });
+});
+
+/**
+ * SARIF §3.11.9 requires `text` beside `markdown` so the message stays readable
+ * in a viewer that can't render formatting. The two fields must therefore differ
+ * for a formatted body — writing the source into both defeats the purpose
+ * (GB-1096).
+ */
+describe('message.text / message.markdown (GB-1096)', () => {
+  const BODY = '### Root cause\n\nThe guard was **missing**.';
+
+  function messageOf(rel = '.pr-notes/notes/src/x.ts.000000.sarif'): { text: string; markdown: string } {
+    const result = readShard(rel).runs[0].results[0] as { message: { text: string; markdown: string } };
+    return result.message;
+  }
+
+  it('writes the markdown source verbatim and a flattened plain-text fallback', () => {
+    writeReviewNote(repo, note({ body: BODY }));
+    const message = messageOf();
+    expect(message.markdown).toBe(BODY);
+    expect(message.text).toBe('Root cause\n\nThe guard was missing.');
+  });
+
+  it('keeps both fields in step when a note is updated', () => {
+    const { guid } = writeReviewNote(repo, note({ body: 'plain' }));
+    expect(updateNote(repo, guid, { body: BODY })).toBe(true);
+    const message = messageOf();
+    expect(message.markdown).toBe(BODY);
+    expect(message.text).toBe('Root cause\n\nThe guard was missing.');
+  });
+
+  it('falls back to the source rather than writing an empty text', () => {
+    // A body of only fence markers flattens to nothing; `text` must stay
+    // non-empty when present.
+    writeReviewNote(repo, note({ body: '```' }));
+    expect(messageOf().text).toBe('```');
+  });
+
+  it('round-trips the displayed body unchanged through the reader', () => {
+    writeReviewNote(repo, note({ body: BODY }));
+    expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].body).toBe(BODY);
   });
 });
 
@@ -146,6 +188,27 @@ describe('coalesce (GB-902)', () => {
     expect(results).toHaveLength(2);
     // The surviving 'dup' is the most recently written one.
     expect(results.find(r => r.message.text === 'dup')!.guid).toBe(lastDup);
+  });
+
+  /** Dedup must compare the body actually displayed — `markdown` when present
+   *  (GB-1093) — or two notes whose plain-text fallbacks happen to match would
+   *  collapse into one despite rendering differently. */
+  it('keeps notes whose markdown differs even when the plain-text fallback matches', () => {
+    mkdirSync(join(repo, '.pr-notes/notes/src'), { recursive: true });
+    const location = { physicalLocation: { artifactLocation: { uri: 'src/x.ts' }, region: { startLine: 1, endLine: 2 } } };
+    writeFileSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'), JSON.stringify({
+      version: '2.1.0',
+      runs: [{
+        tool: { driver: { name: 'Other Tool' } },
+        results: [
+          { guid: 'a', message: { text: 'same plain text', markdown: '**bold** version' }, locations: [location], properties: { tags: ['rationale'] } },
+          { guid: 'b', message: { text: 'same plain text', markdown: '- list version' }, locations: [location], properties: { tags: ['rationale'] } },
+        ],
+      }],
+    }), 'utf-8');
+
+    expect(coalesceFile(repo, 'src/x.ts')).toBe(0);
+    expect(readShard('.pr-notes/notes/src/x.ts.000000.sarif').runs[0].results).toHaveLength(2);
   });
 
   it('coalesceAll walks every file and is a no-op when nothing is redundant', () => {

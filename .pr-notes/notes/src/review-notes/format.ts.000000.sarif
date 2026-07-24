@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry6hbw662k0ssh2",
+          "message": {
+            "text": "Two shapes, chosen so the common case is unchanged.\n\nA note body is markdown and may span lines. Folded naively into `- label: body`, its second and later lines land at column 0 — which **terminates the surrounding list** in `.glassbox/latest-review.md`.\n\nIndenting every body unconditionally would have been simpler, but it would also move today's one-line bodies (the overwhelming majority) off the label line for no gain. So: single-line stays inline; multi-line moves to its own indented block. The label carries the producer attribution in both shapes, which is why the inline form now reads `[kind] _(producer)_: body` rather than trailing the attribution after the body.\n\nIndent is the item's content column (2 spaces for a `- ` marker) — the minimum that keeps a continuation inside the item. Blank lines are emitted genuinely blank rather than indent-only, so no trailing-whitespace noise reaches the export.\n\nSee also `demoteHeadings` just above: the other half of the same fix, and `docs/20-ai-review-notes.md` §20.8.",
+            "markdown": "Two shapes, chosen so the common case is unchanged.\n\nA note body is markdown and may span lines. Folded naively into `- label: body`, its second and later lines land at column 0 — which **terminates the surrounding list** in `.glassbox/latest-review.md`.\n\nIndenting every body unconditionally would have been simpler, but it would also move today's one-line bodies (the overwhelming majority) off the label line for no gain. So: single-line stays inline; multi-line moves to its own indented block. The label carries the producer attribution in both shapes, which is why the inline form now reads `[kind] _(producer)_: body` rather than trailing the attribution after the body.\n\nIndent is the item's content column (2 spaces for a `- ` marker) — the minimum that keeps a continuation inside the item. Blank lines are emitted genuinely blank rather than indent-only, so no trailing-whitespace noise reaches the export.\n\nSee also `demoteHeadings` just above: the other half of the same fix, and `docs/20-ai-review-notes.md` §20.8."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/format.ts"
+                },
+                "region": {
+                  "startLine": 63,
+                  "endLine": 79,
+                  "snippet": {
+                    "text": "    return line.replace(ATX_RE, (_m, pad: string, hashes: string, space: string) =>\n      `${pad}${'#'.repeat(Math.min(6, hashes.length + shift))}${space}`);\n  }).join('\\n');\n}\n\n/**\n * Fold one note into a markdown list item. A single-line body stays inline\n * after the label (the common case, unchanged); a multi-line body moves to its\n * own indented block beneath the label, because a continuation line emitted at\n * column 0 would terminate the surrounding list — and leaving a body that opens\n * with a heading or a bullet inline after `label:` would render it as literal\n * text rather than the block it is.\n */\nfunction noteListItem(label: string, body: string): string[] {\n  const trimmed = body.replace(/\\s+$/, '');\n  if (!trimmed.includes('\\n')) return [`- ${label}: ${trimmed}`];\n  return [`- ${label}`, '', ...indentLines(trimmed, ITEM_INDENT), ''];"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1095"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "5f85cfc14d68a8c3aa69d87917fa01a6"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry6hjd4ge6c54a3",
+          "message": {
+            "text": "Why demote headings rather than strip or indent them.\n\nThree options for a body heading inside the export:\n\n- **Leave it.** A `### Root cause` renders as an h3 sitting alongside the export's own `### <file>` headings, so the outline no longer reflects the file grouping.\n- **Strip the markers.** Loses the author's structure entirely — the opposite of the goal.\n- **Demote** (chosen). Shift so the shallowest heading lands one level below `### <file>`, preserving *relative* depth. An author's h2/h4 pair stays a two-level relationship.\n\nCapped at h6 because there is no h7; a body already using h5/h6 compresses rather than overflowing.\n\nFenced code is tracked and skipped — otherwise a `# comment` in a shell snippet would be rewritten as a heading, silently corrupting the snippet the note was proving something with. The prompt surface deliberately does **not** demote: it delimits sections with `=== … ===`, so there is no heading hierarchy to collide with.",
+            "markdown": "Why demote headings rather than strip or indent them.\n\nThree options for a body heading inside the export:\n\n- **Leave it.** A `### Root cause` renders as an h3 sitting alongside the export's own `### <file>` headings, so the outline no longer reflects the file grouping.\n- **Strip the markers.** Loses the author's structure entirely — the opposite of the goal.\n- **Demote** (chosen). Shift so the shallowest heading lands one level below `### <file>`, preserving *relative* depth. An author's h2/h4 pair stays a two-level relationship.\n\nCapped at h6 because there is no h7; a body already using h5/h6 compresses rather than overflowing.\n\nFenced code is tracked and skipped — otherwise a `# comment` in a shell snippet would be rewritten as a heading, silently corrupting the snippet the note was proving something with. The prompt surface deliberately does **not** demote: it delimits sections with `=== … ===`, so there is no heading hierarchy to collide with."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/format.ts"
+                },
+                "region": {
+                  "startLine": 32,
+                  "endLine": 40,
+                  "snippet": {
+                    "text": "/**\n * Shift a body's ATX headings so the shallowest sits at `minLevel`, preserving\n * relative structure and capping at h6. Without this, a body that opens with\n * `### Root cause` emits an `<h3>` that competes with the export's own\n * per-file `### <file>` headings, so the document outline the next AI session\n * reads no longer reflects the file grouping. Fenced code is skipped so a\n * `# comment` line in a\n * shell snippet isn't mistaken for a heading.\n */"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "alternative-considered"
+            ]
+          },
+          "workItemUris": [
+            "GB-1095"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "fb9638ce0fb012ef5a8502b9f5fa4904"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f2600ca29387158da19fc3268ae28ff40ea19291",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

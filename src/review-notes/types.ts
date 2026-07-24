@@ -48,6 +48,16 @@ export interface ReviewNoteInput {
    *  diagram source) → SARIF `result.attachments[].artifactLocation.uri`
    *  (docs/20 §20.5). */
   artifacts?: string[];
+  /** Other code locations the body links to → SARIF `result.relatedLocations`.
+   *  A body references one by its index: `[the caller](0)` — SARIF's "embedded
+   *  link" syntax (§3.11.6), rendered as a jump-to-line link (docs/20 §20.6). */
+  related?: RelatedLocation[];
+}
+
+/** One entry of `result.relatedLocations`: a repo-relative file and 1-based line. */
+export interface RelatedLocation {
+  uri: string;
+  line: number;
 }
 
 /** Property-bag key for the one non-standard datum. Namespaced (`ext-`,

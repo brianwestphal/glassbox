@@ -82,6 +82,90 @@ describe('loadReviewNotesForFile', () => {
     expect(note.artifacts![0].content).toBeUndefined();
   });
 
+  /**
+   * A third-party producer following SARIF 2.1.0 §3.11.9 writes the formatted
+   * body in `message.markdown` and a plain-text rendering in `message.text`
+   * (which is mandatory whenever `markdown` is present). Glassbox renders
+   * markdown, so it must display the `markdown` form — reading `text` would
+   * silently discard the formatting.
+   */
+  describe('message.text / message.markdown precedence (GB-1093)', () => {
+    /** Hand-authored shard, as a foreign producer would emit it. */
+    function writeForeignShard(message: Record<string, string>): void {
+      mkdirSync(join(repo, '.pr-notes/notes/src'), { recursive: true });
+      writeFileSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'), JSON.stringify({
+        version: '2.1.0',
+        runs: [{
+          tool: { driver: { name: 'Other Tool' } },
+          results: [{
+            message,
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'src/x.ts' }, region: { startLine: 1, endLine: 1 } } }],
+            properties: { tags: ['proof'] },
+          }],
+        }],
+      }), 'utf-8');
+    }
+
+    it('prefers markdown over the plain-text fallback', () => {
+      writeForeignShard({ text: 'Root cause: the guard was missing.', markdown: '### Root cause\n\n- the guard was missing' });
+      expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].body).toBe('### Root cause\n\n- the guard was missing');
+    });
+
+    it('falls back to text when only text is present', () => {
+      writeForeignShard({ text: 'plain only' });
+      expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].body).toBe('plain only');
+    });
+
+    it('yields an empty body when neither form is present', () => {
+      writeForeignShard({});
+      expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].body).toBe('');
+    });
+  });
+
+  /** SARIF §3.11.6 embedded links — the body references these by index
+   *  (GB-1097), so the array's order and length must survive the round-trip. */
+  describe('relatedLocations', () => {
+    it('round-trips related locations in order', () => {
+      writeReviewNote(repo, {
+        file: 'src/x.ts', startLine: 1, endLine: 1, body: 'see [it](1)', kind: 'rationale',
+        related: [{ uri: 'src/a.ts', line: 5 }, { uri: 'src/b.ts', line: 9 }],
+      });
+      expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].related).toEqual([
+        { uri: 'src/a.ts', line: 5 },
+        { uri: 'src/b.ts', line: 9 },
+      ]);
+    });
+
+    it('is undefined when a note declares none', () => {
+      writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'plain', kind: 'rationale' });
+      expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].related).toBeUndefined();
+    });
+
+    it('keeps an unusable entry as a placeholder so later indices still line up', () => {
+      mkdirSync(join(repo, '.pr-notes/notes/src'), { recursive: true });
+      writeFileSync(join(repo, '.pr-notes/notes/src/x.ts.000000.sarif'), JSON.stringify({
+        version: '2.1.0',
+        runs: [{
+          tool: { driver: { name: 'Other Tool' } },
+          results: [{
+            message: { text: 'see [it](1)' },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'src/x.ts' }, region: { startLine: 1 } } }],
+            properties: { tags: ['rationale'] },
+            relatedLocations: [
+              { physicalLocation: { artifactLocation: {} } },
+              { physicalLocation: { artifactLocation: { uri: 'src/b.ts' }, region: { startLine: 9 } } },
+            ],
+          }],
+        }],
+      }), 'utf-8');
+
+      expect(loadReviewNotesForFile(repo, 'src/x.ts')[0].related).toEqual([
+        { uri: '', line: 0 },
+        { uri: 'src/b.ts', line: 9 },
+      ]);
+    });
+  });
+
   it('skips a corrupt shard rather than throwing', () => {
     writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'good', kind: 'rationale' });
     // Drop a non-SARIF shard alongside the good one.
