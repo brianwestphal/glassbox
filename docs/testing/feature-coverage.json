@@ -1830,6 +1830,20 @@
       ],
       "note": "Fail-soft activation: a bad plugin records an error and is skipped, never crashing startup or disabling others."
     },
+    "FR-29.6a": {
+      "tests": [
+        "tests/unit/plugins/mermaid.test.ts",
+        "tests/unit/plugins/plantuml.test.ts"
+      ],
+      "stateful": true,
+      "transitions": [
+        "subprocess exits 0 with SVG -> rendered",
+        "subprocess exits non-zero -> null (code-block fallback)",
+        "subprocess never exits -> killed at the timeout -> null, promise settles",
+        "timeout cleared when the child closes first (no stray kill)"
+      ],
+      "note": "Subprocess-backed renders (Mermaid/PlantUML) are wall-clock bounded and kill the child on elapse. Without it a wedged headless browser or JVM leaves the render promise pending forever and hangs the awaiting request. The hang path is exercised in the Mermaid suite (the spawned command is injectable); the PlantUML suite pins that a sane ceiling is declared, since `java` is hardcoded there."
+    },
     "FR-29.7": {
       "tests": [
         "tests/unit/plugins/install.test.ts"

@@ -56,14 +56,22 @@ export function extractSvg(out: string): string | null {
  * block. `MERMAID_PUPPETEER_CONFIG` (a JSON file, e.g. `{"args":["--no-sandbox"]}`)
  * is passed through to `mmdc -p` for locked-down / rootless environments.
  */
-export function renderMermaid(source: string, cli: string = mmdcCli()): Promise<string | null> {
+/** Wall-clock ceiling on one render. A headless browser that never exits would
+ *  otherwise leave the promise pending forever, hanging the request that awaits
+ *  it — a worse failure than the code-block fallback this degrades to. Generous
+ *  enough for a cold Chromium start on a loaded machine. */
+export const RENDER_TIMEOUT_MS = 30_000;
+
+export function renderMermaid(source: string, cli: string = mmdcCli(), opts: { timeoutMs?: number } = {}): Promise<string | null> {
   if (source.trim() === '' || !existsSync(cli)) return Promise.resolve(null);
   return new Promise((resolve) => {
     let done = false;
     let workDir: string | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (v: string | null): void => {
       if (done) return;
       done = true;
+      if (timer !== undefined) clearTimeout(timer);
       if (workDir !== null) {
         try { rmSync(workDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
       }
@@ -84,6 +92,13 @@ export function renderMermaid(source: string, cli: string = mmdcCli()): Promise<
       finish(null);
       return;
     }
+    const spawned = child;
+    timer = setTimeout(() => {
+      try { spawned.kill('SIGKILL'); } catch { /* already gone */ }
+      finish(null);
+    }, opts.timeoutMs ?? RENDER_TIMEOUT_MS);
+    // Don't let a pending render timer hold the process open on its own.
+    timer.unref?.();
     child.on('error', () => finish(null)); // node/mmdc failed to launch
     child.on('close', (code) => {
       if (code !== 0 || !existsSync(outFile)) { finish(null); return; }

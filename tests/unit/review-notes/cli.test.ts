@@ -86,6 +86,73 @@ describe('parseNoteAdd', () => {
     expect(p.related).toEqual([{ uri: 'C:/src/a.ts', line: 42 }]);
   });
 
+  /**
+   * An unrecognized flag used to be accepted and silently dropped — each
+   * consumer read only the keys it knew. That hid ordinary typos, and it hid a
+   * flag passed to a build that predates it: `--related` against the older
+   * published binary reported success and wrote a note with no related
+   * locations (GB-1100).
+   */
+  describe('unknown flags (GB-1100)', () => {
+    it('rejects an unknown flag and names it', () => {
+      expect(() => parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--bogus', 'x', '--body', 'y']))
+        .toThrow(/unknown flag --bogus/);
+    });
+
+    it('rejects a near-miss of a real flag rather than ignoring it', () => {
+      // The plural is the plausible typo for the repeatable form.
+      expect(() => parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--artifacts', 'out.txt', '--body', 'y']))
+        .toThrow(/unknown flag --artifacts/);
+    });
+
+    it('lists the accepted flags so the caller can self-correct', () => {
+      expect(() => parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--nope', 'x', '--body', 'y']))
+        .toThrow(/accepted: .*--artifact.*--related/);
+    });
+
+    it('still accepts every documented add flag', () => {
+      expect(() => parseNoteAdd([
+        '--file', 'a.ts', '--lines', '1-2', '--kind', 'proof', '--body', 'b',
+        '--confidence', '0.5', '--rank', '10', '--ticket', 'GB-1', '--producer', 'P',
+        '--producer-version', '1.0', '--artifact', 'out.txt', '--related', 'src/a.ts:4',
+      ])).not.toThrow();
+    });
+
+    it('names the running version, since the flag may simply postdate this build', async () => {
+      await expect(runNoteCli(['add', '--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--related', 'a.ts:1', '--bogus', 'x', '--body', 'y']))
+        .rejects.toThrow(/This is glassbox \d+\.\d+\.\d+/);
+    });
+
+    /** Drift guard: the usage text and the accepted set are maintained in two
+     *  places, so a flag documented but not accepted (or the reverse) is a real
+     *  possibility. Probed through the public surface rather than by exporting
+     *  the internal table. */
+    it('accepts exactly the add flags its usage text documents', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      await runNoteCli([]);
+      const usage = log.mock.calls.map(c => String(c[0])).join('\n');
+      log.mockRestore();
+
+      const addSection = usage.slice(usage.indexOf('add — required:'), usage.indexOf('update/remove use'));
+      const documented = [...new Set([...addSection.matchAll(/--([a-z-]+)/g)].map(m => m[1]))];
+      expect(documented.length).toBeGreaterThan(5);
+
+      for (const flag of documented) {
+        expect(() => parseNoteAdd(['--file', 'a.ts', '--lines', '1', '--kind', 'proof', '--body', 'b', `--${flag}`, 'v']))
+          .not.toThrow(/unknown flag/);
+      }
+    });
+
+    it('scopes the accepted set per subcommand', async () => {
+      // `--related` is an `add` flag; `update` has no such patch field, so
+      // accepting it there would silently do nothing.
+      await expect(runNoteCli(['update', '--id', 'g', '--related', 'a.ts:1']))
+        .rejects.toThrow(/unknown flag --related for 'glassbox note update'/);
+      await expect(runNoteCli(['coalesce', '--id', 'g'])).rejects.toThrow(/unknown flag --id/);
+      await expect(runNoteCli(['remove', '--kind', 'proof'])).rejects.toThrow(/unknown flag --kind/);
+    });
+  });
+
   it('accepts a single line and marks stdin body', () => {
     const p = parseNoteAdd(['--file', 'a.ts', '--lines', '5', '--kind', 'proof', '--body', '-']);
     expect(p.startLine).toBe(5);

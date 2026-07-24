@@ -135,6 +135,13 @@ content `renderer` / `differ`. Everything else transfers.
   activation, is missing its entry, or fails manifest validation shall be recorded
   with an error status and skipped — it shall never crash server startup or
   disable other plugins.
+- **FR-29.6a — Subprocess renders shall be time-bounded.** A renderer backed by
+  a local subprocess (the Mermaid and PlantUML plugins) shall impose a wall-clock
+  ceiling on each render and fall back to the code block when it elapses,
+  killing the child. Fail-soft otherwise has a hole: a subprocess that starts but
+  never exits leaves the render promise pending forever and hangs the request
+  awaiting it — strictly worse than the fallback, and precisely the shape a
+  wedged headless browser or JVM takes in a restricted environment.
 - **FR-29.7 — Desktop delivery.** Plugins shall work in the packaged Tauri
   desktop app, not only CLI/npm installs. Because the sidecar's `node_modules` is
   frozen (an end user cannot `npm install` into a `.app`), the delivery model is:

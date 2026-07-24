@@ -38,11 +38,23 @@ export function extractSvg(out: string): string | null {
  * to the SVG string, or `null` on any failure (empty source, missing jar, `java`
  * not on PATH, non-zero exit, no SVG in the output) — the caller falls back.
  */
-export function renderPuml(source: string, jar: string = jarPath()): Promise<string | null> {
+/** Wall-clock ceiling on one render. A JVM that never exits would otherwise
+ *  leave the promise pending forever, hanging the request that awaits it —
+ *  a worse failure than the code-block fallback this degrades to. Generous
+ *  enough for a JVM cold start on a loaded machine. */
+export const RENDER_TIMEOUT_MS = 30_000;
+
+export function renderPuml(source: string, jar: string = jarPath(), opts: { timeoutMs?: number } = {}): Promise<string | null> {
   if (source.trim() === '' || !existsSync(jar)) return Promise.resolve(null);
   return new Promise((resolve) => {
     let done = false;
-    const finish = (v: string | null): void => { if (!done) { done = true; resolve(v); } };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (v: string | null): void => {
+      if (done) return;
+      done = true;
+      if (timer !== undefined) clearTimeout(timer);
+      resolve(v);
+    };
     let child;
     try {
       child = spawn('java', ['-jar', jar, '-pipe', '-tsvg', '-charset', 'UTF-8']);
@@ -50,6 +62,13 @@ export function renderPuml(source: string, jar: string = jarPath()): Promise<str
       finish(null);
       return;
     }
+    const spawned = child;
+    timer = setTimeout(() => {
+      try { spawned.kill('SIGKILL'); } catch { /* already gone */ }
+      finish(null);
+    }, opts.timeoutMs ?? RENDER_TIMEOUT_MS);
+    // Don't let a pending render timer hold the process open on its own.
+    timer.unref?.();
     let out = '';
     child.stdout.on('data', (d: Buffer) => { out += d.toString('utf-8'); });
     child.on('error', () => finish(null)); // `java` not found, etc.

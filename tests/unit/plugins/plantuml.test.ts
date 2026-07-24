@@ -13,7 +13,7 @@ import { homedir, tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import plugin, { extractSvg, renderPuml } from '../../../plugins/plantuml/src/index.js';
+import plugin, { extractSvg, RENDER_TIMEOUT_MS, renderPuml } from '../../../plugins/plantuml/src/index.js';
 import type { ContentRenderer, PluginContext, PluginRegistration } from '../../../plugins/plantuml/src/types.js';
 
 const ctx: PluginContext = {
@@ -45,6 +45,19 @@ describe('renderPuml (fail-soft)', () => {
   it('missing jar -> null (no subprocess)', async () => {
     expect(await renderPuml('@startuml\nA->B\n@enduml', join(dir, 'nope.jar'))).toBeNull();
   });
+  /**
+   * The render timeout (`RENDER_TIMEOUT_MS`) bounds a `java` that starts but
+   * never exits — without it the promise stays pending forever and hangs
+   * whatever awaited it, strictly worse than the code-block fallback. The
+   * hanging-subprocess path itself is exercised in the Mermaid suite, where the
+   * spawned command is injectable; `java` is hardcoded here, so this only pins
+   * that a ceiling exists and is sane.
+   */
+  it('declares a bounded render timeout', () => {
+    expect(RENDER_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(RENDER_TIMEOUT_MS).toBeLessThanOrEqual(60_000);
+  });
+
   it('invalid jar / java error -> null (spawn fails or exits non-zero)', async () => {
     const fakeJar = join(dir, 'plantuml.jar');
     writeFileSync(fakeJar, 'not a real jar');

@@ -163,6 +163,13 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   tools that can't shell out, the producer writes the SARIF directly per this
   spec (see the inbound AI-instructions contract below). An earlier
   `glassbox_attach_review_note` MCP-tool idea was dropped for this reason.
+- **Unknown flags are an error, never ignored** — Each subcommand accepts a
+  fixed flag set and rejects anything else, listing what it does accept. A
+  silently-dropped flag is the worst failure mode for a producer that shells
+  out: it exits 0 and writes a note missing exactly what was asked for. This
+  catches both an ordinary typo and — the case that motivated it — a flag added
+  in a *newer* release being passed to an older installed binary, so the error
+  also names the running version.
 - **Revision and correction** — The AI shall be able to update or remove its own
   earlier notes as the work evolves, so notes reflect the final state of the
   change rather than an obsolete intermediate step.

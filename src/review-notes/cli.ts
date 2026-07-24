@@ -9,19 +9,47 @@
 import { spawnSync } from 'child_process';
 import { relative, resolve } from 'path';
 
+import { getCurrentVersion } from '../app-version.js';
 import { reviewNoteInstructions } from './instructions.js';
 import type { NotePatch } from './store.js';
 import { coalesceAll, coalesceFile, removeNote, updateNote, warnIfPrNotesIgnored, writeReviewNote } from './store.js';
 import type { NoteKind, RelatedLocation, ReviewNoteInput } from './types.js';
 import { isNoteKind, NOTE_KINDS } from './types.js';
 
-/** Parse `--flag value` pairs into a map. Throws on a flag with no value. */
-function parseFlags(args: string[]): Map<string, string> {
+/**
+ * Thrown for a flag this build doesn't know. Distinguished from other parse
+ * errors so `runNoteCli` can append the running version — the failure mode that
+ * motivated this check was a producer passing a flag added *after* the
+ * installed binary was built, which used to be accepted and silently dropped.
+ */
+export class UnknownFlagError extends Error {}
+
+/** Accepted flags per subcommand. A producer shelling out to this CLI gets a
+ *  hard error rather than a silently-ignored flag, so a typo — or a flag from a
+ *  newer release — can't quietly produce a note missing what it asked for. */
+const KNOWN_FLAGS = {
+  add: ['file', 'lines', 'kind', 'body', 'confidence', 'rank', 'ticket', 'producer', 'producer-version', 'artifact', 'related'],
+  update: ['id', 'file', 'body', 'kind', 'confidence', 'rank', 'ticket'],
+  remove: ['id', 'file'],
+  coalesce: ['file'],
+} as const;
+
+type NoteSubcommand = keyof typeof KNOWN_FLAGS;
+
+/** Parse `--flag value` pairs into a map. Throws on a flag with no value, a
+ *  non-flag argument, or a flag `sub` doesn't accept. Repeatable flags land in
+ *  the map too (last wins); `collectRepeatable` reads them from `args`, but
+ *  validating here covers both paths from one place. */
+function parseFlags(args: string[], sub: NoteSubcommand): Map<string, string> {
+  const known: readonly string[] = KNOWN_FLAGS[sub];
   const flags = new Map<string, string>();
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (!a.startsWith('--')) throw new Error(`unexpected argument: ${a}`);
     const key = a.slice(2);
+    if (!known.includes(key)) {
+      throw new UnknownFlagError(`unknown flag --${key} for 'glassbox note ${sub}' (accepted: ${known.map(f => `--${f}`).join(', ')})`);
+    }
     const next = args.at(i + 1);
     if (next === undefined || next.startsWith('--')) throw new Error(`missing value for --${key}`);
     flags.set(key, next);
@@ -128,7 +156,7 @@ function parseConfidenceRank(flags: Map<string, string>): { confidence?: number;
 
 /** Parse `note add` flags. Pure (no I/O) so it can be unit-tested directly. */
 export function parseNoteAdd(args: string[]): ParsedAdd {
-  const flags = parseFlags(args);
+  const flags = parseFlags(args, 'add');
 
   const file = flags.get('file');
   const lines = flags.get('lines');
@@ -231,7 +259,7 @@ function scopedFile(flags: Map<string, string>, repoRoot: string, cwd: string): 
 }
 
 function runRemove(args: string[], cwd: string): void {
-  const flags = parseFlags(args);
+  const flags = parseFlags(args, 'remove');
   const id = flags.get('id');
   if (id === undefined) throw new Error('--id <guid> is required');
   const repoRoot = findRepoRoot(cwd);
@@ -241,7 +269,7 @@ function runRemove(args: string[], cwd: string): void {
 }
 
 async function runUpdate(args: string[], cwd: string): Promise<void> {
-  const flags = parseFlags(args);
+  const flags = parseFlags(args, 'update');
   const id = flags.get('id');
   if (id === undefined) throw new Error('--id <guid> is required');
 
@@ -265,7 +293,7 @@ async function runUpdate(args: string[], cwd: string): Promise<void> {
 }
 
 function runCoalesce(args: string[], cwd: string): void {
-  const flags = parseFlags(args);
+  const flags = parseFlags(args, 'coalesce');
   const repoRoot = findRepoRoot(cwd);
   const file = flags.get('file');
   const removed = file !== undefined
@@ -284,12 +312,22 @@ export async function runNoteCli(args: string[], ctx: { cwd?: string } = {}): Pr
     return;
   }
   const rest = args.slice(1);
-  switch (sub) {
-    case 'add': await runAdd(rest, cwd); return;
-    case 'remove': runRemove(rest, cwd); return;
-    case 'update': await runUpdate(rest, cwd); return;
-    case 'coalesce': runCoalesce(rest, cwd); return;
-    case 'instructions': console.log(reviewNoteInstructions()); return;
-    default: throw new Error(`unknown 'note' subcommand: ${sub} (expected add/update/remove/coalesce/instructions)`);
+  try {
+    switch (sub) {
+      case 'add': await runAdd(rest, cwd); return;
+      case 'remove': runRemove(rest, cwd); return;
+      case 'update': await runUpdate(rest, cwd); return;
+      case 'coalesce': runCoalesce(rest, cwd); return;
+      case 'instructions': console.log(reviewNoteInstructions()); return;
+      default: throw new Error(`unknown 'note' subcommand: ${sub} (expected add/update/remove/coalesce/instructions)`);
+    }
+  } catch (err) {
+    // Name the running version on an unknown flag: the flag may simply postdate
+    // this build, and a producer shelling out here has no other way to tell an
+    // old binary from a wrong flag.
+    if (err instanceof UnknownFlagError) {
+      throw new UnknownFlagError(`${err.message}\nThis is glassbox ${getCurrentVersion()} — a flag added in a newer release is not recognized here.`);
+    }
+    throw err;
   }
 }

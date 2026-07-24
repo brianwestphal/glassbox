@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mry8fj5iqe290lhq",
+          "message": {
+            "text": "Validation belongs in parseFlags, not in each consumer.\n\nEvery subcommand reads its own keys out of the flag map, so any flag no consumer happened to read was accepted and dropped in silence. Adding a check to each consumer would have left the same hole open for the next flag; putting the known-set at the single parse choke point closes it for all four subcommands at once, and covers collectRepeatable too — that scans args directly rather than the map, so a per-consumer check would have missed the repeatable flags entirely.\n\nUnknownFlagError exists only so runNoteCli can distinguish this from an ordinary parse error and append the running version (0). That matters because the motivating failure was not a typo: --related was passed to an older installed binary that predated the flag, and no amount of flag-listing tells an operator why a real flag is unrecognized.\n\nThe version is appended at the reporting boundary rather than inside the message so parseNoteAdd stays pure (no I/O), which is what lets it be unit-tested directly.",
+            "markdown": "Validation belongs in `parseFlags`, not in each consumer.\n\nEvery subcommand reads its own keys out of the flag map, so any flag no consumer happened to read was accepted and dropped in silence. Adding a check to each consumer would have left the same hole open for the next flag; putting the known-set at the single parse choke point closes it for all four subcommands at once, and covers `collectRepeatable` too — that scans `args` directly rather than the map, so a per-consumer check would have missed the repeatable flags entirely.\n\n`UnknownFlagError` exists only so `runNoteCli` can distinguish this from an ordinary parse error and append [the running version](0). That matters because the motivating failure was not a typo: `--related` was passed to an older installed binary that predated the flag, and no amount of flag-listing tells an operator *why* a real flag is unrecognized.\n\nThe version is appended at the reporting boundary rather than inside the message so `parseNoteAdd` stays pure (no I/O), which is what lets it be unit-tested directly."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/cli.ts"
+                },
+                "region": {
+                  "startLine": 18,
+                  "endLine": 58,
+                  "snippet": {
+                    "text": "\n/**\n * Thrown for a flag this build doesn't know. Distinguished from other parse\n * errors so `runNoteCli` can append the running version — the failure mode that\n * motivated this check was a producer passing a flag added *after* the\n * installed binary was built, which used to be accepted and silently dropped.\n */\nexport class UnknownFlagError extends Error {}\n\n/** Accepted flags per subcommand. A producer shelling out to this CLI gets a\n *  hard error rather than a silently-ignored flag, so a typo — or a flag from a\n *  newer release — can't quietly produce a note missing what it asked for. */\nconst KNOWN_FLAGS = {\n  add: ['file', 'lines', 'kind', 'body', 'confidence', 'rank', 'ticket', 'producer', 'producer-version', 'artifact', 'related'],\n  update: ['id', 'file', 'body', 'kind', 'confidence', 'rank', 'ticket'],\n  remove: ['id', 'file'],\n  coalesce: ['file'],\n} as const;\n\ntype NoteSubcommand = keyof typeof KNOWN_FLAGS;\n\n/** Parse `--flag value` pairs into a map. Throws on a flag with no value, a\n *  non-flag argument, or a flag `sub` doesn't accept. Repeatable flags land in\n *  the map too (last wins); `collectRepeatable` reads them from `args`, but\n *  validating here covers both paths from one place. */\nfunction parseFlags(args: string[], sub: NoteSubcommand): Map<string, string> {\n  const known: readonly string[] = KNOWN_FLAGS[sub];\n  const flags = new Map<string, string>();\n  for (let i = 0; i < args.length; i++) {\n    const a = args[i];\n    if (!a.startsWith('--')) throw new Error(`unexpected argument: ${a}`);\n    const key = a.slice(2);\n    if (!known.includes(key)) {\n      throw new UnknownFlagError(`unknown flag --${key} for 'glassbox note ${sub}' (accepted: ${known.map(f => `--${f}`).join(', ')})`);\n    }\n    const next = args.at(i + 1);\n    if (next === undefined || next.startsWith('--')) throw new Error(`missing value for --${key}`);\n    flags.set(key, next);\n    i++;\n  }\n  return flags;"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/app-version.ts"
+                },
+                "region": {
+                  "startLine": 16
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1100"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "ff1f461d2da4f3c188cfba144707b1c3"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "ccab9388da4b9d2983d1264b11f926c3cb869cb0",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

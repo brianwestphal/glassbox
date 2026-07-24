@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mry8pv8ikzh94td8",
+          "message": {
+            "text": "Fail-soft had a hole: a subprocess that starts but never exits.\n\nEvery error path here resolves null so a broken renderer degrades to the code block — except the one where the child neither errors nor closes. There the promise stayed pending forever, and whatever awaited it (the /file/:id render) hung with it. That is strictly worse than the fallback: a visible \"no diagram\" beats a request that never returns.\n\nFound by accident. A restricted environment blocked Chromium from launching in a way that wedged the child rather than failing it, and the unit test died on vitest's timeout instead of fail-softing — which is what a real user would have seen as a hung page.\n\nThe timer is unref()d so a pending render never keeps the process alive on its own, and cleared in finish so a normal close does not leave a stray kill armed. timeoutMs is injectable purely so the regression test can drive the path in 200 ms instead of 30 s; nothing in production passes it.\n\nThe same fix is in plugins/plantuml/src/index.ts — identical shape, java instead of a browser.",
+            "markdown": "Fail-soft had a hole: a subprocess that starts but never exits.\n\nEvery error path here resolves `null` so a broken renderer degrades to the code block — except the one where the child neither errors nor closes. There the promise stayed pending forever, and whatever awaited it (the `/file/:id` render) hung with it. That is strictly worse than the fallback: a visible \"no diagram\" beats a request that never returns.\n\nFound by accident. A restricted environment blocked Chromium from launching in a way that wedged the child rather than failing it, and the unit test died on vitest's timeout instead of fail-softing — which is what a real user would have seen as a hung page.\n\nThe timer is `unref()`d so a pending render never keeps the process alive on its own, and cleared in `finish` so a normal close does not leave a stray kill armed. `timeoutMs` is injectable purely so the regression test can drive the path in 200 ms instead of 30 s; nothing in production passes it.\n\nThe same fix is in `plugins/plantuml/src/index.ts` — identical shape, `java` instead of a browser."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "plugins/mermaid/src/index.ts"
+                },
+                "region": {
+                  "startLine": 59,
+                  "endLine": 70,
+                  "snippet": {
+                    "text": "/** Wall-clock ceiling on one render. A headless browser that never exits would\n *  otherwise leave the promise pending forever, hanging the request that awaits\n *  it — a worse failure than the code-block fallback this degrades to. Generous\n *  enough for a cold Chromium start on a loaded machine. */\nexport const RENDER_TIMEOUT_MS = 30_000;\n\nexport function renderMermaid(source: string, cli: string = mmdcCli(), opts: { timeoutMs?: number } = {}): Promise<string | null> {\n  if (source.trim() === '' || !existsSync(cli)) return Promise.resolve(null);\n  return new Promise((resolve) => {\n    let done = false;\n    let workDir: string | null = null;\n    let timer: ReturnType<typeof setTimeout> | undefined;"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ],
+            "ext-ai-tool-confidence": 0.9
+          },
+          "workItemUris": [
+            "GB-1098"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "276d879cf261fad544192684b69c5788"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "ccab9388da4b9d2983d1264b11f926c3cb869cb0",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

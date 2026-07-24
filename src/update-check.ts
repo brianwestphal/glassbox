@@ -1,10 +1,10 @@
 import { existsSync,mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { get } from 'https';
 import { homedir } from 'os';
-import { dirname,join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { z } from 'zod';
 
+import { getCurrentVersion } from './app-version.js';
 import { compareVersions } from './utils/compareVersions.js';
 
 const DATA_DIR = join(homedir(), '.glassbox');
@@ -12,17 +12,6 @@ const CHECK_FILE = join(DATA_DIR, 'last-update-check');
 const PACKAGE_NAME = 'glassbox';
 
 const VersionPayloadSchema = z.object({ version: z.string() });
-
-function getCurrentVersion(): string {
-  try {
-    // Works both in dev (src/) and built (dist/) — package.json is always one dir up
-    const dir = dirname(fileURLToPath(import.meta.url));
-    const raw: unknown = JSON.parse(readFileSync(join(dir, '..', 'package.json'), 'utf-8'));
-    return VersionPayloadSchema.parse(raw).version;
-  } catch {
-    return '0.0.0';
-  }
-}
 
 function getLastCheckDate(): string | null {
   try {
