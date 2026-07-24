@@ -246,6 +246,66 @@ describe('formatMetadataLines', () => {
   });
 });
 
+/**
+ * GB-1102 — `git show` reads the object database, which for an LFS-tracked file
+ * holds the three-line pointer rather than the image. The real bytes come from
+ * `git cat-file --filters`, which runs git's smudge filters.
+ */
+describe('getOldImage / getNewImage — Git LFS', () => {
+  const repoRoot = '/tmp/test-repo';
+  const pointer = Buffer.from(`version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 12\n`, 'utf-8');
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02]);
+
+  const result = (stdout: Buffer, status = 0) => ({ status, stdout, stderr: Buffer.alloc(0), pid: 1, output: [], signal: null });
+
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('smudges a pointer into the real bytes', () => {
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce(result(pointer))
+      .mockReturnValueOnce(result(png));
+
+    const got = getOldImage({ type: 'uncommitted' }, 'shot.png', null, repoRoot);
+
+    expect(spawnSync).toHaveBeenNthCalledWith(1, 'git', ['show', 'HEAD:shot.png'], expect.objectContaining({ cwd: repoRoot }));
+    expect(spawnSync).toHaveBeenNthCalledWith(2, 'git', ['cat-file', '--filters', 'HEAD:shot.png'], expect.objectContaining({ cwd: repoRoot }));
+    expect(got!.data).toBe(png);
+    expect(got!.size).toBe(png.length);
+  });
+
+  it('smudges on the new side too', () => {
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce(result(pointer))
+      .mockReturnValueOnce(result(png));
+
+    expect(getNewImage({ type: 'commit', sha: 'abc123' }, 'shot.png', repoRoot)!.data).toBe(png);
+    expect(spawnSync).toHaveBeenNthCalledWith(2, 'git', ['cat-file', '--filters', 'abc123:shot.png'], expect.objectContaining({ cwd: repoRoot }));
+  });
+
+  it('does not smudge a file that is not a pointer', () => {
+    vi.mocked(spawnSync).mockReturnValue(result(png));
+    expect(getOldImage({ type: 'uncommitted' }, 'shot.png', null, repoRoot)!.data).toBe(png);
+    expect(spawnSync).toHaveBeenCalledTimes(1);
+  });
+
+  /** Without the LFS object present (a partial clone, or LFS not installed) the
+   *  smudge is a no-op and hands the pointer straight back. Returning it would
+   *  render pointer text as an image; a missing image is the honest outcome. */
+  it('returns null when the smudge cannot produce real content', () => {
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce(result(pointer))
+      .mockReturnValueOnce(result(pointer));
+    expect(getOldImage({ type: 'uncommitted' }, 'shot.png', null, repoRoot)).toBeNull();
+  });
+
+  it('returns null when the smudge command fails', () => {
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce(result(pointer))
+      .mockReturnValueOnce(result(Buffer.alloc(0), 1));
+    expect(getOldImage({ type: 'uncommitted' }, 'shot.png', null, repoRoot)).toBeNull();
+  });
+});
+
 describe('getOldImage', () => {
   const repoRoot = '/tmp/test-repo';
   const imageData = Buffer.from('fake-png-data');

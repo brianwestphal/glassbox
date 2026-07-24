@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync,
 import { dirname, join } from 'path';
 
 import { generateId } from '../db/ids.js';
+import { isLfsPointer } from '../utils/lfs.js';
 import type { SarifLog, SarifRun } from './sarif.js';
 import { buildResult, emptyLog, newRun, noteMessage, SarifLogShapeSchema } from './sarif.js';
 import type { NoteKind, RelatedLocation, ReviewNoteInput } from './types.js';
@@ -411,6 +412,11 @@ function readArtifactText(repoRoot: string, uri: string): string | undefined {
     if (!stat.isFile() || stat.size > ARTIFACT_MAX_BYTES) return undefined;
     const buf = readFileSync(abs);
     if (buf.includes(0)) return undefined; // a NUL byte ⇒ treat as binary
+    // In a clone without Git LFS an artifact file is the pointer text, not the
+    // artifact (doc 20 §20.5 tracks binaries through LFS). Showing `oid
+    // sha256:…` in place of the proof it stands for is worse than showing the
+    // reference and letting the reader fetch it.
+    if (isLfsPointer(buf)) return undefined;
     return buf.toString('utf-8');
   } catch {
     return undefined;

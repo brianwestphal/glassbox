@@ -2,6 +2,7 @@ import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join,resolve } from 'path';
 
+import { isLfsPointer } from '../utils/lfs.js';
 import type { ReviewMode } from './diff.js';
 import { directComparisonRoots } from './diff.js';
 import { scrubbedGitEnv } from './repo.js';
@@ -54,13 +55,33 @@ function gitShowFile(ref: string, filePath: string, repoRoot: string): Buffer | 
   const spec = ref === ':' ? `:${filePath}` : `${ref}:${filePath}`;
   const result = spawnSync('git', ['show', spec], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024, env: scrubbedGitEnv() });
   if (result.status !== 0 || result.stdout.length === 0) return null;
+  // `git show` reads the object database, which for an LFS-tracked file holds
+  // the pointer, not the image. `git cat-file --filters` runs the same content
+  // through git's smudge filters, which is what materializes the real bytes.
+  // Only reached for an actual pointer, so a normal file keeps the cheaper path
+  // and is never put through a filter that might rewrite it.
+  if (isLfsPointer(result.stdout)) {
+    const smudged = spawnSync('git', ['cat-file', '--filters', spec], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024, env: scrubbedGitEnv() });
+    // Fail soft: without the LFS object available (a partial clone, or LFS not
+    // installed) the smudge is a no-op that hands back the pointer again. Better
+    // a missing image than a corrupt one.
+    if (smudged.status === 0 && smudged.stdout.length > 0 && !isLfsPointer(smudged.stdout)) {
+      return smudged.stdout;
+    }
+    return null;
+  }
   return result.stdout;
 }
 
 /** Read a file from the working directory. Returns null if not found. */
 function readWorkingFile(filePath: string, repoRoot: string): Buffer | null {
   try {
-    return readFileSync(resolve(repoRoot, filePath));
+    const data = readFileSync(resolve(repoRoot, filePath));
+    // A working-tree file is a pointer when the repo was cloned without LFS (or
+    // with smudging skipped). The real bytes simply aren't on this machine, so
+    // there is nothing to recover — return nothing rather than hand pointer
+    // text to an <img>, which renders as a corrupt image with no explanation.
+    return isLfsPointer(data) ? null : data;
   } catch {
     return null;
   }

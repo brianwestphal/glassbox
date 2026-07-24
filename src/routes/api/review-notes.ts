@@ -4,6 +4,7 @@ import { extname, relative, resolve } from 'path';
 
 import { removeNote } from '../../review-notes/store.js';
 import type { AppEnv } from '../../types.js';
+import { isLfsPointer } from '../../utils/lfs.js';
 import { requirePathParam } from '../../utils/parseBody.js';
 
 export const reviewNotesRoutes = new Hono<AppEnv>();
@@ -33,6 +34,10 @@ reviewNotesRoutes.get('/review-notes/artifact', (c) => {
     const stat = statSync(abs); // throws if absent → caught below
     if (!stat.isFile() || stat.size > ARTIFACT_SERVE_MAX_BYTES) return c.text('Not found', 404);
     const body = readFileSync(abs);
+    // Screenshot artifacts are deliberately routed through Git LFS (doc 20
+    // §20.5), so in a clone without LFS this file is the pointer text. Serving
+    // it as image/png would render a corrupt image; 404 is the honest answer.
+    if (isLfsPointer(body)) return c.text('Not found', 404);
     return c.body(body, 200, { 'Content-Type': contentType });
   } catch {
     return c.text('Not found', 404);

@@ -17,9 +17,11 @@
     "3.4": {
       "tests": [
         "tests/unit/git/diff.test.ts",
-        "tests/unit/git/diff-raw.test.ts"
+        "tests/unit/git/diff-raw.test.ts",
+        "tests/unit/utils/lfs.test.ts",
+        "tests/integration/git/lfs.test.ts"
       ],
-      "note": "Binary detection from git's diff header is asserted (parseDiff 'parses a binary file'; diffRawContent binary). GAP: the untracked-file first-8KB null-byte scan in createNewFileDiff is not separately tested (tied to the 3.3 gap)."
+      "note": "Binary detection from git's diff header is asserted (parseDiff 'parses a binary file'; diffRawContent binary). Git LFS pointers (GB-1102): isLfsPointer unit cases + parseDiff added/modified/deleted-pointer cases + a false-positive case (a text file quoting the version line), and an integration test driving a real git repo with a stand-in clean/smudge filter that asserts isBinary and that the pointer text is dropped from the hunks. GAP: the untracked-file first-8KB null-byte scan in createNewFileDiff is not separately tested (tied to the 3.3 gap)."
     },
     "6.1": {
       "stateful": true,
@@ -1625,9 +1627,13 @@
     },
     "3.5": {
       "tests": [
-        "tests/integration/git/diff.test.ts"
+        "tests/integration/git/diff.test.ts",
+        "tests/unit/git/image.test.ts",
+        "tests/integration/git/lfs.test.ts",
+        "tests/unit/review-notes/load.test.ts",
+        "tests/integration/api/routes.test.ts"
       ],
-      "note": "Working-directory file reads: getFileContent 'returns working-copy content when ref is working' + at HEAD / specific ref / missing."
+      "note": "Working-directory file reads: getFileContent 'returns working-copy content when ref is working' + at HEAD / specific ref / missing. Git LFS materialization (GB-1102): mocked unit tests pin the `git cat-file --filters` retry and both fail-soft branches (smudge returns a pointer / smudge fails); the integration test proves against a real repo that the filter actually materializes bytes a plain `git show` cannot. The same pointer guard is asserted on the working-tree read, the review-note artifact route (404), and inline artifact text (no content)."
     },
     "5.6": {
       "tests": [

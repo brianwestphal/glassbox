@@ -35,10 +35,30 @@ Requirements for interacting with git repositories.
 
 - **Detection** — For tracked files, binary status comes from git's own indicator (the `Binary files … differ` diff header). The first-8KB null-byte scan is **only** applied to **untracked/new** files (`createNewFileDiff` in `src/git/diff.ts`), which have no git diff header to read; tracked diffs rely solely on git's header rather than a universal second scan.
 - **List only** — Binary files shall be listed in the review but not rendered as text diffs.
+- **Git LFS pointers count as binary** — An LFS-tracked file is stored as a
+  three-line text pointer (`version https://git-lfs.github.com/spec/v1` / `oid
+  sha256:…` / `size …`), so git emits an ordinary **text** diff with no `Binary
+  files … differ` header. Detection therefore also inspects the parsed hunks: a
+  diff whose either side reconstructs to a valid pointer is flagged binary and
+  its hunks are dropped, since the pointer text is never reviewable content and
+  would otherwise flow into the stored `diff_data`, the AI analysis prompt, and
+  the export. Without this an LFS-tracked PNG rendered as a text diff of
+  `oid sha256:…` with no image comparison at all. Detection is
+  `src/utils/lfs.ts`.
 
 ### 3.5 File Content Access
 
 - **Working directory reads** — The system shall be able to read the current working directory version of any file (for context expansion and AI analysis).
+- **LFS content is materialized, never faked** — Image sides are read with `git
+  show <ref>:<path>`, which returns the *pointer* for an LFS-tracked file. When
+  the bytes are a pointer the read is retried through `git cat-file --filters`,
+  which runs git's smudge filters and yields the real content. If that still
+  returns a pointer — a partial clone, or LFS not installed, so the bytes are
+  simply not on this machine — the read fails soft to "no image" rather than
+  handing pointer text to an `<img>`, which would render as a corrupt image with
+  no explanation. The same guard covers working-tree reads and the review-note
+  artifact route, since doc 20 §20.5 routes screenshot artifacts through LFS by
+  design.
 
 ## Non-Functional Requirements
 

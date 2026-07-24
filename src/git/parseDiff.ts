@@ -8,6 +8,7 @@
  * Companion to `parseDiffData.ts`, which decodes the already-serialized
  * `review_files.diff_data` JSON column; this one parses git's textual output.
  */
+import { isLfsPointer } from '../utils/lfs.js';
 import type { DiffHunk, DiffLine, FileDiff } from './types.js';
 
 export function parseDiff(raw: string): FileDiff[] {
@@ -54,10 +55,36 @@ export function parseDiff(raw: string): FileDiff[] {
     }
 
     const hunks = parseHunks(chunk.slice(headerEnd));
+    // An LFS-tracked file diffs as a three-line *text* pointer, with no
+    // "Binary files … differ" header, so without this an LFS-tracked PNG would
+    // render as a text diff of `oid sha256:…` instead of an image comparison.
+    // Drop the hunks as well as flagging it: the pointer text is never
+    // reviewable content, and leaving it on a binary diff would carry it into
+    // everything downstream that reads hunks (the stored `diff_data`, the AI
+    // analysis prompt, the export).
+    if (hunksAreLfsPointer(hunks)) {
+      files.push({ filePath, oldPath, status, hunks: [], isBinary: true });
+      continue;
+    }
     files.push({ filePath, oldPath, status, hunks, isBinary: false });
   }
 
   return files;
+}
+
+/**
+ * Whether these hunks describe a Git LFS pointer file. Reconstructs each side's
+ * content from the hunk lines and tests it: a pointer is only three lines, so a
+ * genuine text file has to *be* a pointer to match. Either side counts — adding,
+ * deleting, or modifying an LFS-tracked file all mean the pointer text is the
+ * only thing git will show us.
+ */
+function hunksAreLfsPointer(hunks: DiffHunk[]): boolean {
+  if (hunks.length !== 1) return false;
+  const lines = hunks[0].lines;
+  const side = (types: DiffLine['type'][]): string =>
+    lines.filter(l => types.includes(l.type)).map(l => l.content).join('\n') + '\n';
+  return isLfsPointer(side(['context', 'add'])) || isLfsPointer(side(['context', 'remove']));
 }
 
 function parseHunks(raw: string): DiffHunk[] {

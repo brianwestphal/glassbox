@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mryazgsrgsqia6r1",
+          "message": {
+            "text": "Git LFS defeats binary detection, because the pointer really is text.\n\nisBinary came solely from git's Binary files … differ header. An LFS-tracked file is stored as a three-line pointer, which is a text file, so git emits an ordinary text diff and the header never appears. The result: an LFS-tracked PNG rendered as a text diff of oid sha256:… and the image comparison never appeared at all.\n\nDetection reconstructs each side's content from the hunk lines and runs the pointer check (0). Either side counts — add, delete, and modify all mean the pointer text is the only thing git will show. A pointer is exactly three lines, so a genuine text file has to be one to match; a file merely quoting the version line does not (pinned by a test).\n\nThe hunks are dropped, not just flagged. A binary FileDiff carrying hunks is an inconsistent shape, and leaving them would carry pointer text into everything downstream that reads hunks — the stored diff_data, the AI analysis prompt, the markdown export. That flaw was caught by the integration test, not by inspection.\n\nDetection is only half: see the retrieval side (1), where git show returns the pointer and git cat-file --filters materializes the real bytes.",
+            "markdown": "Git LFS defeats binary detection, because the pointer really is text.\n\n`isBinary` came solely from git's `Binary files … differ` header. An LFS-tracked file is stored as a three-line pointer, which *is* a text file, so git emits an ordinary text diff and the header never appears. The result: an LFS-tracked PNG rendered as a text diff of `oid sha256:…` and the image comparison never appeared at all.\n\nDetection reconstructs each side's content from the hunk lines and runs [the pointer check](0). Either side counts — add, delete, and modify all mean the pointer text is the only thing git will show. A pointer is exactly three lines, so a genuine text file has to *be* one to match; a file merely quoting the version line does not (pinned by a test).\n\nThe hunks are dropped, not just flagged. A binary FileDiff carrying hunks is an inconsistent shape, and leaving them would carry pointer text into everything downstream that reads hunks — the stored `diff_data`, the AI analysis prompt, the markdown export. That flaw was caught by the integration test, not by inspection.\n\nDetection is only half: see [the retrieval side](1), where `git show` returns the pointer and `git cat-file --filters` materializes the real bytes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/git/parseDiff.ts"
+                },
+                "region": {
+                  "startLine": 56,
+                  "endLine": 70,
+                  "snippet": {
+                    "text": "\n    const hunks = parseHunks(chunk.slice(headerEnd));\n    // An LFS-tracked file diffs as a three-line *text* pointer, with no\n    // \"Binary files … differ\" header, so without this an LFS-tracked PNG would\n    // render as a text diff of `oid sha256:…` instead of an image comparison.\n    // Drop the hunks as well as flagging it: the pointer text is never\n    // reviewable content, and leaving it on a binary diff would carry it into\n    // everything downstream that reads hunks (the stored `diff_data`, the AI\n    // analysis prompt, the export).\n    if (hunksAreLfsPointer(hunks)) {\n      files.push({ filePath, oldPath, status, hunks: [], isBinary: true });\n      continue;\n    }\n    files.push({ filePath, oldPath, status, hunks, isBinary: false });\n  }"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/utils/lfs.ts"
+                },
+                "region": {
+                  "startLine": 33
+                }
+              }
+            },
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/git/image.ts"
+                },
+                "region": {
+                  "startLine": 53
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1102"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "83064d5ba31943c37a91fc68245e0eb0"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "c0fbd254b82d28309b2ea7a10d9403935a5c3462",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

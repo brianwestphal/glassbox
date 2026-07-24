@@ -106,6 +106,78 @@ index 0000000..abc1234
     expect(hunk.lines[2].content).toBe('line three');
   });
 
+  /**
+   * GB-1102 — a Git LFS-tracked file is stored as a three-line text pointer, so
+   * git emits an ordinary text diff with no "Binary files … differ" header.
+   * Left as `isBinary: false`, an LFS-tracked PNG rendered as a text diff of
+   * `oid sha256:…` and the image comparison never appeared.
+   */
+  describe('Git LFS pointers', () => {
+    const oldOid = 'a'.repeat(64);
+    const newOid = 'b'.repeat(64);
+
+    const modified = `diff --git a/shot.png b/shot.png
+index edbb112..afd5bde 100644
+--- a/shot.png
++++ b/shot.png
+@@ -1,3 +1,3 @@
+ version https://git-lfs.github.com/spec/v1
+-oid sha256:${oldOid}
+-size 232395
++oid sha256:${newOid}
++size 232246
+`;
+
+    it('treats a modified LFS pointer as binary', () => {
+      const [file] = parseDiff(modified);
+      expect(file.filePath).toBe('shot.png');
+      expect(file.isBinary).toBe(true);
+    });
+
+    it('treats an added LFS pointer as binary', () => {
+      const raw = `diff --git a/shot.png b/shot.png
+new file mode 100644
+index 0000000..afd5bde
+--- /dev/null
++++ b/shot.png
+@@ -0,0 +1,3 @@
++version https://git-lfs.github.com/spec/v1
++oid sha256:${newOid}
++size 232246
+`;
+      expect(parseDiff(raw)[0].isBinary).toBe(true);
+    });
+
+    it('treats a deleted LFS pointer as binary', () => {
+      const raw = `diff --git a/shot.png b/shot.png
+deleted file mode 100644
+index afd5bde..0000000
+--- a/shot.png
++++ /dev/null
+@@ -1,3 +0,0 @@
+-version https://git-lfs.github.com/spec/v1
+-oid sha256:${oldOid}
+-size 232246
+`;
+      expect(parseDiff(raw)[0].isBinary).toBe(true);
+    });
+
+    it('leaves an ordinary text file alone', () => {
+      const raw = `diff --git a/notes.md b/notes.md
+index 111..222 100644
+--- a/notes.md
++++ b/notes.md
+@@ -1,3 +1,3 @@
+ version https://git-lfs.github.com/spec/v1 is the pointer header
+-we document it here
++we document it here, revised
+ and that is all
+`;
+      // Mentions the version string but is not a pointer — must stay a text diff.
+      expect(parseDiff(raw)[0].isBinary).toBe(false);
+    });
+  });
+
   it('parses a deleted file', () => {
     const raw = `diff --git a/old-file.ts b/old-file.ts
 deleted file mode 100644

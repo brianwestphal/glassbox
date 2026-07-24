@@ -1647,4 +1647,17 @@ describe('GET /api/review-notes/artifact (GB-911)', () => {
     const res = await app.request('/api/review-notes/artifact?file=.pr-notes/artifacts/missing.png');
     expect(res.status).toBe(404);
   });
+
+  /** Image artifacts are deliberately Git LFS-tracked (doc 20 §20.5), so in a
+   *  clone without LFS the file on disk is the pointer text. Serving it as
+   *  image/png would render a corrupt image with no explanation (GB-1102). */
+  it('404s a Git LFS pointer rather than serving it as an image', async () => {
+    mkdirSync(`${TEST_REPO_ROOT}/.pr-notes/artifacts`, { recursive: true });
+    writeFileSync(
+      `${TEST_REPO_ROOT}/.pr-notes/artifacts/pointer.png`,
+      `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 232246\n`,
+    );
+    const res = await app.request('/api/review-notes/artifact?file=.pr-notes/artifacts/pointer.png');
+    expect(res.status).toBe(404);
+  });
 });

@@ -166,6 +166,23 @@ describe('loadReviewNotesForFile', () => {
     });
   });
 
+  /** Screenshot artifacts are deliberately routed through Git LFS (doc 20
+   *  §20.5), so in a clone without LFS the file on disk is the pointer text.
+   *  Rendering `oid sha256:…` inline in place of the proof it stands for is
+   *  worse than showing the reference (GB-1102). */
+  it('does not inline a Git LFS pointer as artifact content', () => {
+    mkdirSync(join(repo, '.pr-notes/artifacts'), { recursive: true });
+    writeFileSync(
+      join(repo, '.pr-notes/artifacts/out.txt'),
+      `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 4096\n`,
+      'utf-8',
+    );
+    writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'p', kind: 'proof', artifacts: ['.pr-notes/artifacts/out.txt'] });
+
+    const note = loadReviewNotesForFile(repo, 'src/x.ts')[0];
+    expect(note.artifacts).toEqual([{ uri: '.pr-notes/artifacts/out.txt', content: undefined }]);
+  });
+
   it('skips a corrupt shard rather than throwing', () => {
     writeReviewNote(repo, { file: 'src/x.ts', startLine: 1, endLine: 1, body: 'good', kind: 'rationale' });
     // Drop a non-SARIF shard alongside the good one.
