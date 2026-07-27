@@ -1,0 +1,90 @@
+name: Live-render plugin tests (manual)
+
+# The PlantUML and Mermaid plugins render by spawning a real
+# `java -jar plantuml.jar` and a real headless-Chromium `mmdc`. Those two
+# live-render tests are gated on GLASSBOX_LIVE_RENDER_TESTS so they stay out of
+# `npm test`, where spawning a JVM and a browser alongside ~150 concurrently
+# running test files starved both (the JVM blew a 30s timeout; Chromium failed
+# to launch outright).
+#
+# That gate keeps the default suite deterministic, but on its own it would mean
+# nothing ever exercises the real render paths. The requirements docs justify
+# these tests specifically on the grounds that — unlike the Apple Foundation
+# Models path, which needs hardware CI cannot have — a JRE and a headless
+# browser ARE provisionable. This workflow is what makes that claim true: a
+# clean runner provisions both and runs them.
+#
+# Manual / branch-scoped and outside the release flow, matching
+# `windows-e2e.yml` and `difftool-smoke.yml`. The downloads (a JRE, an ~11 MB
+# jar, a Chromium) are far too heavy for every PR, and nothing here gates a
+# release. Trigger it from the Actions tab ("Run workflow") or by pushing a
+# branch under `ci-live-render/`.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'ci-live-render/**'
+
+jobs:
+  live-render:
+    name: live render (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+
+      # Both setup helpers copy the built bundle out of `dist/plugins/<id>/`, so
+      # the plugins have to be built before either can install.
+      - run: npm run build:plugins
+
+      # Installs into ~/.glassbox/plugins/plantuml/ and fetches plantuml.jar
+      # from Maven Central (the jar is GPL and deliberately not committed).
+      - name: Provision PlantUML (plugin + plantuml.jar)
+        run: node plugins/plantuml/setup.mjs
+
+      # Installs into ~/.glassbox/plugins/mermaid/ and npm-installs
+      # @mermaid-js/mermaid-cli + puppeteer there, which downloads a Chromium.
+      - name: Provision Mermaid (plugin + mermaid-cli + Chromium)
+        run: node plugins/mermaid/setup.mjs
+
+      # Chromium can't always use its own sandbox on a CI runner, and the
+      # default /dev/shm is small. The plugin accepts a puppeteer config file
+      # via MERMAID_PUPPETEER_CONFIG for exactly this case.
+      - name: Write a puppeteer config for the CI sandbox
+        run: echo '{"args":["--no-sandbox","--disable-dev-shm-usage"]}' > "$RUNNER_TEMP/puppeteer.json"
+
+      # Without this the job's whole point can evaporate silently: both tests
+      # are `describe.skipIf`-gated on their tooling, so a failed provision
+      # would SKIP them and the job would still report green — the exact
+      # false-negative the env-var gate was introduced to avoid. Assert the
+      # tooling is really there, so a provisioning failure is loud.
+      - name: Verify the tooling is present (so the tests cannot silently skip)
+        run: |
+          set -euo pipefail
+          jar="$HOME/.glassbox/plugins/plantuml/plantuml.jar"
+          mmdc="$HOME/.glassbox/plugins/mermaid/node_modules/@mermaid-js/mermaid-cli/src/cli.js"
+          java -version
+          test -f "$jar"  || { echo "::error::plantuml.jar missing at $jar — provisioning failed"; exit 1; }
+          test -f "$mmdc" || { echo "::error::mermaid-cli missing at $mmdc — provisioning failed"; exit 1; }
+          echo "jar:  $jar  ($(wc -c < "$jar") bytes)"
+          echo "mmdc: $mmdc"
+
+      # Point the tests at the provisioned tooling explicitly rather than
+      # relying on `~` resolving identically in every step. Exported in the
+      # shell because GitHub does not expand `$HOME` inside a step `env:` block.
+      - name: Run the live-render tests
+        run: |
+          set -euo pipefail
+          export PLANTUML_JAR="$HOME/.glassbox/plugins/plantuml/plantuml.jar"
+          export MERMAID_MMDC="$HOME/.glassbox/plugins/mermaid/node_modules/@mermaid-js/mermaid-cli/src/cli.js"
+          export MERMAID_PUPPETEER_CONFIG="$RUNNER_TEMP/puppeteer.json"
+          npm run test:live

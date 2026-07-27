@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms3u7vuir42lnm1o",
+          "message": {
+            "text": "The tooling-verification step exists because without it this job's whole point can evaporate while still reporting green.\n\nBoth live-render tests are describe.skipIf-gated on their tooling being present. If setup.mjs failed to fetch the jar or install Chromium, the tests would skip, vitest would report success, and the job would go green having verified nothing — the same false-negative class that made the gate necessary in the first place. setup.mjs does set a non-zero exit code on failure, so the provisioning step should already fail; this is the second lock, asserting the artifacts are actually on disk before anything claims to have tested them.\n\nWhat was verified locally, and what wasn't\n\nI can't run GitHub Actions without pushing, so the split matters:\n\nVerified locally — the env-var wiring this job depends on. Ran npm run test:live with PLANTUMLJAR, MERMAIDMMDC, and MERMAIDPUPPETEERCONFIG all pointed at non-default paths (symlinks under a temp dir), so the override branches were genuinely taken rather than falling through to the homedir() default: 23/23 passed. This also confirms mmdc accepts the -p config file the job writes for the CI sandbox — that flag could have been rejected outright and this proves it isn't. The verification step's shell logic was run locally too (wc -c rather than stat -c%s, which is GNU-only and would have failed on a non-Linux runner).\n\nNot verified — anything runner-specific: that actions/setup-java@v4 provisions Temurin 21, that Maven Central serves the jar from the runner, that puppeteer's Chromium download succeeds, and above all that Chromium launches on a GitHub runner. That last one is the real risk: it's the exact failure this test hit locally under contention, and --no-sandbox --disable-dev-shm-usage is the standard mitigation but not a guarantee. The first dispatch of this workflow is the real test of it.\n",
+            "markdown": "The tooling-verification step exists because without it this job's whole point can evaporate while still reporting green.\n\nBoth live-render tests are `describe.skipIf`-gated on their tooling being present. If `setup.mjs` failed to fetch the jar or install Chromium, the tests would **skip**, vitest would report success, and the job would go green having verified nothing — the same false-negative class that made the gate necessary in the first place. `setup.mjs` does set a non-zero exit code on failure, so the provisioning step should already fail; this is the second lock, asserting the artifacts are actually on disk before anything claims to have tested them.\n\n### What was verified locally, and what wasn't\n\nI can't run GitHub Actions without pushing, so the split matters:\n\n**Verified locally** — the env-var wiring this job depends on. Ran `npm run test:live` with `PLANTUML_JAR`, `MERMAID_MMDC`, and `MERMAID_PUPPETEER_CONFIG` all pointed at non-default paths (symlinks under a temp dir), so the override branches were genuinely taken rather than falling through to the `homedir()` default: **23/23 passed**. This also confirms `mmdc` accepts the `-p` config file the job writes for the CI sandbox — that flag could have been rejected outright and this proves it isn't. The verification step's shell logic was run locally too (`wc -c` rather than `stat -c%s`, which is GNU-only and would have failed on a non-Linux runner).\n\n**Not verified** — anything runner-specific: that `actions/setup-java@v4` provisions Temurin 21, that Maven Central serves the jar from the runner, that puppeteer's Chromium download succeeds, and above all that Chromium *launches* on a GitHub runner. That last one is the real risk: it's the exact failure this test hit locally under contention, and `--no-sandbox --disable-dev-shm-usage` is the standard mitigation but not a guarantee. The first dispatch of this workflow is the real test of it.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/live-render.yml"
+                },
+                "region": {
+                  "startLine": 62,
+                  "endLine": 77,
+                  "snippet": {
+                    "text": "      - name: Write a puppeteer config for the CI sandbox\n        run: echo '{\"args\":[\"--no-sandbox\",\"--disable-dev-shm-usage\"]}' > \"$RUNNER_TEMP/puppeteer.json\"\n\n      # Without this the job's whole point can evaporate silently: both tests\n      # are `describe.skipIf`-gated on their tooling, so a failed provision\n      # would SKIP them and the job would still report green — the exact\n      # false-negative the env-var gate was introduced to avoid. Assert the\n      # tooling is really there, so a provisioning failure is loud.\n      - name: Verify the tooling is present (so the tests cannot silently skip)\n        run: |\n          set -euo pipefail\n          jar=\"$HOME/.glassbox/plugins/plantuml/plantuml.jar\"\n          mmdc=\"$HOME/.glassbox/plugins/mermaid/node_modules/@mermaid-js/mermaid-cli/src/cli.js\"\n          java -version\n          test -f \"$jar\"  || { echo \"::error::plantuml.jar missing at $jar — provisioning failed\"; exit 1; }\n          test -f \"$mmdc\" || { echo \"::error::mermaid-cli missing at $mmdc — provisioning failed\"; exit 1; }"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1107"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "7682055cb0c36016b4a1daa0eb684534"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "56883fc820b8382f2ba2b4ad434792b969eec8bd",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

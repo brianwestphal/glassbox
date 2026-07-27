@@ -114,7 +114,8 @@ uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
   also has a **Java-gated live-render test** that runs the real `java -jar` path
   whenever a JRE + jar are present — set `PLANTUML_JAR`, or install via `setup.mjs`
   — and skips otherwise. Unlike the Apple FM path this is **not** a hardware gate
-  (Java + a downloadable jar are provisionable in CI). Run it with
+  (Java + a downloadable jar are provisionable in CI — and
+  `.github/workflows/live-render.yml` does exactly that on demand). Run it with
   **`npm run test:live`**: it is gated on `GLASSBOX_LIVE_RENDER_TESTS` on top of
   the jar check, because spawning a JVM alongside the default suite's ~150
   concurrent files lost the CPU race and blew a 30s timeout. This manual item is
@@ -133,8 +134,9 @@ uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
   also has a **browser-gated live-render test** that runs the real `mmdc` path
   whenever it's present — set `MERMAID_MMDC`, or install via `setup.mjs` — and
   skips otherwise. Like PlantUML and unlike the Apple FM path this is **not** a
-  hardware gate (a headless browser is provisionable in CI) — verified live via
-  headless Chromium. Run it with **`npm run test:live`**: it is gated on
+  hardware gate (a headless browser is provisionable in CI — and
+  `.github/workflows/live-render.yml` provisions one on demand) — verified live
+  via headless Chromium. Run it with **`npm run test:live`**: it is gated on
   `GLASSBOX_LIVE_RENDER_TESTS` on top of the `mmdc` check, because launching
   Chromium alongside the default suite's ~150 concurrent files failed at browser
   *launch* (not on time, so its 60s timeout never helped). This manual item is
