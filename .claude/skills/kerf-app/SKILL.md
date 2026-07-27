@@ -1,7 +1,7 @@
 ---
 name: kerf-app
 description: Build UIs in the kerf reactive framework (https://github.com/brianwestphal/kerf). Use this skill whenever the user is writing or modifying code that imports `kerfjs`, asks to add a feature to a kerf app, or asks "how do I do X in kerf?". Use it proactively the moment you spot a kerf import in the file you're editing.
-kerf-skill-version: 1.8.0
+kerf-skill-version: 1.12.0
 ---
 
 # Building apps with kerf
@@ -17,6 +17,9 @@ kerf is a ~11 KB reactive UI framework (~12 KB with `arraySignal`): signals + DO
 - Install: `npm install kerfjs`
 - `tsconfig.json`: `"jsx": "react-jsx"`, `"jsxImportSource": "kerfjs"`
 - Vite / esbuild need no extra config.
+- **Dev diagnostics are opt-in by import, and only an APP installs them.** kerf does not infer dev mode. In the app entry add `if (import.meta.env.DEV) await import('kerfjs/dev');` (Vite) or `if (process.env.NODE_ENV !== 'production') await import('kerfjs/dev');` (webpack/Node). That enables the read-only store `get()` snapshot, the throwing dangerous-URL screen, and makes the `KERF_DEV_WARN_*` family available; omitting it is production shape and sheds ~4.7 KB min+gzip because the condition folds away and the chunk is never emitted. Put it FIRST if relying on the untracked-signal warning — `signal()` picks its constructor at creation time.
+  - **Switch individual warnings on with `enableWarnings()`**, which is the only switch that works in a browser (no `process` object there, and a bundler `define` cannot reach the read): `const dev = await import('kerfjs/dev'); dev.enableWarnings({ staleBinding: true, narrowSet: true, invariants: 'throw' });`. The `KERF_DEV_WARN_*` env vars do the same for Node/SSR/CI; an explicit call wins either way.
+  - **A component package must NEVER import `kerfjs/dev`.** The hooks are process-global, so installing them is the consuming app's decision — a library that does it forces the diagnostics (and the chunk) on every consumer. Put the import in your demo page or test harness instead.
 - Recommended companion: `npm install --save-dev eslint-plugin-kerfjs` and add `kerfjs.configs.recommended` to the project's eslint config. Enforces five of the hard rules below (no inline JSX event handlers, require `data-key` in `each()`, capture `delegate()` disposers, no nested `mount()`, prefer module JSX augmentation) at edit time — useful as a self-correction signal when authoring kerf code.
 
 ## Public API — one import path
@@ -33,6 +36,9 @@ import {
 
 // Optional, only when you need granular collection updates:
 import { arraySignal } from 'kerfjs/array-signal';
+
+// Development diagnostics — gate with YOUR build's dev flag, in YOUR code.
+if (import.meta.env.DEV) await import('kerfjs/dev');
 ```
 
 | Export | Use |
@@ -46,6 +52,7 @@ import { arraySignal } from 'kerfjs/array-signal';
 | `mount(el, render)` | bind reactive render to a DOM element; returns disposer |
 | `morph(liveRoot, template)` | one-shot reconcile against a populated element (SSR hydration, page-refresh diffs). Template = `Element`, `SafeHtml`, or HTML string |
 | `each(items, render, cacheKey?)` | keyed list iteration; per-row memoization on identity (+ optional cacheKey — a passive comparator for external state). Distinct from `data-key` on the rendered element |
+| `each(items, render, { cacheKey, key })` | same, options form. **`key` gives the list a stable identity** — required whenever a *conditional* list can render before this one, else kerf rebuilds this list and its rows lose focus/scroll/IME. A keyed list takes no positional slot, so keying the conditional list usually fixes its siblings too |
 | `delegate(root, type, sel, h)` | one listener at the root; `closest(selector)` walk from target |
 | `delegateCapture(root, type, sel, h, opts?)` | capture-phase escape hatch; `closest()` walk-up by default (same as `delegate`); pass `{ match: 'direct' }` for strict `target.matches()` |
 | `attr(name, value)` | pre-computed `AttrSpec<N,V>` — `.selector` for `delegate()`, `.attrs` to spread into JSX (rename-safe) |
@@ -180,6 +187,9 @@ mount(rootEl, () => html`
 | Row-enter CSS animation no longer replays when only a row's *content* changed (kerf ≥ 0.15.0) | 0.15.0+ morphs a same-identity, same-position row *in place* instead of recreating its node, so a mount-keyed `@keyframes` never re-triggers on a content-only update (≤ 0.14.x recreated the node, so it fired). Intentional flip side: focus, scroll, IME, and in-progress transitions now survive | Key the animation on a state-class toggle, not element creation. To force a remount, churn the row's identity (new object ref / `data-key`) so the reconciler replaces the node |
 | Want a hot spot to update without re-running the whole render | Fine-grained binding: pass the signal/`computed` ITSELF into the attr/text hole (`class={computed(() => …)}`), not `.value`. Use `computed()` not a bare `() => …` (memoization keeps a shared-signal flip to ~O(changed nodes)). Opt-in per hole. Limit: a bound hole depending on the row's OWN mutated data goes stale on a granular in-place update — use plain interpolation there |
 | `` html`` ``: partial attribute values are not supported | In `kerfjs/html` templates a hole must be the COMPLETE attribute value | Build the full string first (`` class="${`a ${b}`}" ``), or bind `class="${computed(() => `a ${b.value}`)}"` for a reactive one |
+| An `each()` list's rows lose focus / scroll / typing state when an unrelated conditional list above them appears or disappears (kerf warns about this in dev) | Lists without a key are identified by their position among the render's `each()` calls, so adding/removing one above shifts this list's identity and kerf rebuilds it | Give the lists stable keys: `each(items, render, { key: 'results' })`. Keying just the conditional list is usually enough |
+| Keyed `each()` list suddenly renders zero rows — only its `<!--kf-list:N-->` marker — with no errors, and it never recovers (kerfjs ≤ 2.0.1) | A conditionally-rendered sibling BEFORE the list (possibly higher in the tree, e.g. an error banner) was removed that render; older kerfjs rebuilt the shifted list container from the template, permanently detaching the list's internal binding | Upgrade kerfjs (fixed after 2.0.1 — the morph now moves the shifted container up in place, keeping node identity). On older versions, keep the structure before the list stable: wrap the conditional in an always-present container (`<div class="banners">{cond ? <div/> : ''}</div>`) |
+| A numbered / zebra-striped / "N of M" `each()` list shows the wrong number on rows that MOVED (reorder, or non-tail insert/remove), while unmoved rows look right | The render fn's `index` argument is NOT part of the memo key (only item identity + `cacheKey` + content version are), so a row that keeps identity but changes position keeps the HTML it rendered at its old index | Fold the index into the memo key so displaced rows re-render: `each(items, (it, i) => …, { cacheKey: (_, i) => i })` (add `key` if used). Opt-in dev warn: `KERF_DEV_WARN_STALE_INDEX=1` |
 
 ## Workflow guidance
 
