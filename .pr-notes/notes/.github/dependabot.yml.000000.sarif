@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms3vvfwq75hsrd8c",
+          "message": {
+            "text": "Adding the github-actions ecosystem is the actual fix here; bumping the pins was just clearing the backlog it allowed to accumulate.\n\nDependabot watched package.json only, so nothing ever looked at uses: pins. They sat on @v4 until a run happened to emit a Node 20 deprecation warning — by which point checkout, setup-node and upload-artifact were each three majors behind and github-script two. Actions run with repository credentials in scope, so unattended staleness there is a supply-chain concern, not a cosmetic one. Without this block the same drift restarts tomorrow.\n\nWhy the bump went to current majors, not the minimum\n\nClearing Node 20 only needed v5 (v8 for github-script). Going to current instead was safe after reading every intervening major: checkout v6/v7 ship no breaking changes at all; upload-artifact v6 is the Node 24 switch and v7 adds an opt-in archive parameter; setup-node v6's lone breaking change — automatic cache detection narrowed to npm — cannot affect this repo because all nineteen call sites pass cache: npm explicitly and nothing here uses yarn or pnpm.\n\ngithub-script v9 — the one that needed real scrutiny\n\nTwo of its six uses are in release-desktop.yml, which is tag-triggered, so a mistake there surfaces at release time and nowhere earlier. v9's breaking changes are narrow and neither applies:\n\n1. require('@actions/github') fails (the package went ESM-only) — no script here calls it; they all use the injected github/context.\n2. getOctokit became an injected parameter, so a script declaring const/let getOctokit throws a SyntaxError — the identifier appears nowhere in this repo.\n\nWorth stating explicitly because it looks like a third hazard and isn't: the asset-upload script (0) calls require('node:url') and require('node:path'), and those keep working. v9 makes @actions/github ESM-only; it does not make the script context itself ESM.\n\nVerified\n\nPushed to ci-actions-bump/v5-plus and dispatched both dispatchable workflows against it: live-render green in 55s (23 passed (23) — the live tests genuinely ran rather than skipping) and Windows e2e green in 5m33s (201 passed). Zero annotations on either run, which is the actual goal — the deprecation warning is gone.\n\nThe two tag-triggered release workflows remain unexercised by construction; the reasoning above is what stands in for a run there.\n",
+            "markdown": "Adding the `github-actions` ecosystem is the actual fix here; bumping the pins was just clearing the backlog it allowed to accumulate.\n\nDependabot watched `package.json` only, so nothing ever looked at `uses:` pins. They sat on `@v4` until a run happened to emit a Node 20 deprecation warning — by which point `checkout`, `setup-node` and `upload-artifact` were each **three** majors behind and `github-script` two. Actions run with repository credentials in scope, so unattended staleness there is a supply-chain concern, not a cosmetic one. Without this block the same drift restarts tomorrow.\n\n### Why the bump went to current majors, not the minimum\n\nClearing Node 20 only needed v5 (v8 for github-script). Going to current instead was safe after reading every intervening major: checkout v6/v7 ship no breaking changes at all; upload-artifact v6 is the Node 24 switch and v7 adds an opt-in `archive` parameter; setup-node v6's lone breaking change — automatic cache detection narrowed to npm — cannot affect this repo because all nineteen call sites pass `cache: npm` explicitly and nothing here uses yarn or pnpm.\n\n### github-script v9 — the one that needed real scrutiny\n\nTwo of its six uses are in `release-desktop.yml`, which is tag-triggered, so a mistake there surfaces at release time and nowhere earlier. v9's breaking changes are narrow and neither applies:\n\n1. `require('@actions/github')` fails (the package went ESM-only) — no script here calls it; they all use the injected `github`/`context`.\n2. `getOctokit` became an injected parameter, so a script declaring `const`/`let getOctokit` throws a `SyntaxError` — the identifier appears nowhere in this repo.\n\nWorth stating explicitly because it looks like a third hazard and isn't: [the asset-upload script](0) calls `require('node:url')` and `require('node:path')`, and those keep working. v9 makes **`@actions/github`** ESM-only; it does not make the script context itself ESM.\n\n### Verified\n\nPushed to `ci-actions-bump/v5-plus` and dispatched both dispatchable workflows against it: live-render green in 55s (`23 passed (23)` — the live tests genuinely ran rather than skipping) and Windows e2e green in 5m33s (`201 passed`). **Zero annotations on either run**, which is the actual goal — the deprecation warning is gone.\n\nThe two tag-triggered release workflows remain unexercised by construction; the reasoning above is what stands in for a run there.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/dependabot.yml"
+                },
+                "region": {
+                  "startLine": 27,
+                  "endLine": 50,
+                  "snippet": {
+                    "text": "  # The npm block above is why workflow actions drifted unnoticed: it covers\n  # package.json only, so nothing watched `uses:` pins. They sat on `@v4` until\n  # a run started warning that Node 20 was deprecated — by which point checkout,\n  # setup-node and upload-artifact were each three majors behind and\n  # github-script two. Actions are a supply-chain surface with credentials in\n  # scope, so staleness here is not merely cosmetic.\n  #\n  # Grouped into one weekly PR rather than eight: these move together (the whole\n  # `actions/*` family bumps in lockstep whenever the runner's Node changes),\n  # and one PR touching every workflow is far easier to reason about than eight\n  # that each touch a few lines of the same files.\n  - package-ecosystem: github-actions\n    directory: \"/\"\n    schedule:\n      interval: weekly\n    open-pull-requests-limit: 5\n    groups:\n      github-actions:\n        patterns:\n          - \"*\"\n    commit-message:\n      prefix: \"ci\"\n"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/release-desktop.yml"
+                },
+                "region": {
+                  "startLine": 184
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1109"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "1295ae6bcad1a4a088d3088e97b59829"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "21a729ae305ddbb41ece108a49c6140520e0ff26",
+          "branch": "ci-actions-bump/v5-plus"
+        }
+      ]
+    }
+  ]
+}
