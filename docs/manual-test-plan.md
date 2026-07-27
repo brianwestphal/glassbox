@@ -114,9 +114,11 @@ uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
   also has a **Java-gated live-render test** that runs the real `java -jar` path
   whenever a JRE + jar are present — set `PLANTUML_JAR`, or install via `setup.mjs`
   — and skips otherwise. Unlike the Apple FM path this is **not** a hardware gate
-  (Java + a downloadable jar are provisionable in CI); it's out of the default
-  suite only because the ~22 MB GPL jar isn't committed. This manual item is the
-  full in-viewer Code|Rendered experience.)*
+  (Java + a downloadable jar are provisionable in CI). Run it with
+  **`npm run test:live`**: it is gated on `GLASSBOX_LIVE_RENDER_TESTS` on top of
+  the jar check, because spawning a JVM alongside the default suite's ~150
+  concurrent files lost the CPU race and blew a 30s timeout. This manual item is
+  the full in-viewer Code|Rendered experience.)*
 - **Mermaid plugin — local headless-browser render (GB-1045, needs Chromium)** —
   Install the opt-in Mermaid plugin: `npm run build:plugins` then
   `node plugins/mermaid/setup.mjs` (installs into `~/.glassbox/plugins/mermaid/`
@@ -131,10 +133,12 @@ uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
   also has a **browser-gated live-render test** that runs the real `mmdc` path
   whenever it's present — set `MERMAID_MMDC`, or install via `setup.mjs` — and
   skips otherwise. Like PlantUML and unlike the Apple FM path this is **not** a
-  hardware gate (a headless browser is provisionable in CI); it's out of the
-  default suite only because the ~hundreds-of-MB Chromium isn't committed —
-  verified live via headless Chromium. This manual item is the full in-viewer
-  Code|Rendered experience.)*
+  hardware gate (a headless browser is provisionable in CI) — verified live via
+  headless Chromium. Run it with **`npm run test:live`**: it is gated on
+  `GLASSBOX_LIVE_RENDER_TESTS` on top of the `mmdc` check, because launching
+  Chromium alongside the default suite's ~150 concurrent files failed at browser
+  *launch* (not on time, so its 60s timeout never helped). This manual item is
+  the full in-viewer Code|Rendered experience.)*
 - **Image-codecs plugin — WebP/AVIF ground-truth scoring (GB-1064)** — Install the
   opt-in image-codecs plugin: `npm run build:plugins` then
   `node plugins/image-codecs/setup.mjs` (copies the self-contained plugin into

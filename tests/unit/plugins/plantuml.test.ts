@@ -90,9 +90,17 @@ const hasJava = spawnSync('java', ['-version'], { stdio: 'ignore' }).status === 
 const jarPath = [process.env.PLANTUML_JAR, join(homedir(), '.glassbox', 'plugins', 'plantuml', 'plantuml.jar')]
   .find((p): p is string => typeof p === 'string' && p !== '' && existsSync(p));
 
-describe.skipIf(!hasJava || jarPath === undefined)('plantuml live render (JRE + jar present)', () => {
-  // JVM cold start + a real render can exceed vitest's 5s default under
-  // full-suite CPU contention (flaked at ~5s while passing in ~3s isolated).
+// …and only under `npm run test:live`. Spawning a JVM while ~150 other test
+// files run concurrently lost the CPU race often enough to make `npm test` red
+// on a clean tree: this render takes ~3s alone but blew a 30s timeout in the
+// full suite. Raising the timeout again would only move the threshold, so the
+// live render is opt-in instead — `vitest.config.live.ts` sets this variable and
+// runs the heavy tests without file parallelism.
+const live = process.env.GLASSBOX_LIVE_RENDER_TESTS === '1';
+
+describe.skipIf(!live || !hasJava || jarPath === undefined)('plantuml live render (JRE + jar present)', () => {
+  // Generous even on a quiet machine: this is a cold JVM start plus a real
+  // render, and the point of the opt-in run is that it never has to be retuned.
   it('renders real PlantUML source to an SVG containing the diagram content', { timeout: 30_000 }, async () => {
     const svg = await renderPuml('@startuml\nAlice -> Bob: Hello\n@enduml', jarPath);
     expect(svg).not.toBeNull();

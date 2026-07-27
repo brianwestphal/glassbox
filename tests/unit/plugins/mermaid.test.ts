@@ -159,7 +159,15 @@ function diagnoseMmdc(cli: string): Promise<string> {
   });
 }
 
-describe.skipIf(mmdcCandidate === undefined)('mermaid live render (mmdc present)', () => {
+// …and only under `npm run test:live`. Launching a headless Chromium while ~150
+// other test files run concurrently lost the CPU race often enough to make
+// `npm test` red on a clean tree — and it failed at browser *launch*, not on
+// time, so the existing 60s timeout below could never have saved it. The live
+// render is opt-in instead: `vitest.config.live.ts` sets this variable and runs
+// the heavy tests without file parallelism.
+const live = process.env.GLASSBOX_LIVE_RENDER_TESTS === '1';
+
+describe.skipIf(!live || mmdcCandidate === undefined)('mermaid live render (mmdc present)', () => {
   it('renders real Mermaid source to an SVG', async () => {
     const svg = await renderMermaid('graph TD; Alice-->Bob', mmdcCandidate);
     if (svg === null) {

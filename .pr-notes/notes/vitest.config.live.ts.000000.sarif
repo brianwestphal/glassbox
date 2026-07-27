@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms3t1xpbepykk0jt",
+          "message": {
+            "text": "The live-render tests are gated on an env var, not just on their tooling, because a tooling gate is what let this regress.\n\ndescribe.skipIf(!hasJava) / skipIf(mmdcCandidate === undefined) sounds like it keeps a heavyweight test out of the default suite, but it does the opposite: it runs the test on any machine that happens to have the tool installed. On the maintainer's machine both are installed, so npm test spawned a JVM and a headless Chromium while ~150 other test files ran concurrently. Both lost the CPU race and npm test was red on a clean tree.\n\nWhy not just raise the timeouts\n\nThat was already tried and is why this is worth writing down. The PlantUML test had been bumped to 30s once for exactly this reason and blew it anyway. More decisively, the Mermaid test (0) was already at 60s and still failed — not on time, but because puppeteer could not launch Chromium under the contention. A timeout cannot fix a launch failure, so raising it again would only have moved the threshold.\n\nWhat the config does\n\n- Sets GLASSBOXLIVERENDER_TESTS, which only this config does — so npm test skips both and stays deterministic.\n- Sets fileParallelism: false, so the JVM and the browser don't contend with each other either. This is why npm run test:live finishes both files in ~12s when running them isolated under the default config took ~25s.\n- Sets the variable via test.env rather than a shell prefix (FOO=1 vitest), which keeps the npm script working on Windows.\n\nVerification\n\nBoth directions were checked, because the dangerous failure mode here is a live suite that silently skips everything and reports green:\n\n- default config → 21 passed | 2 skipped (the 2 live tests skip)\n- npm run test:live → 23 passed (they genuinely run)\n\nThe conventions test (1) pins the gate, and was itself verified non-vacuous: removing !live from the Mermaid skipIf makes it fail with expected … to match /describe\\.skipIf\\(\\s*!live\\b/.\n",
+            "markdown": "The live-render tests are gated on an env var, not just on their tooling, because a tooling gate is what let this regress.\n\n`describe.skipIf(!hasJava)` / `skipIf(mmdcCandidate === undefined)` sounds like it keeps a heavyweight test out of the default suite, but it does the opposite: it runs the test on **any machine that happens to have the tool installed**. On the maintainer's machine both are installed, so `npm test` spawned a JVM and a headless Chromium while ~150 other test files ran concurrently. Both lost the CPU race and `npm test` was red on a clean tree.\n\n### Why not just raise the timeouts\n\nThat was already tried and is why this is worth writing down. The PlantUML test had been bumped to 30s once for exactly this reason and blew it anyway. More decisively, [the Mermaid test](0) was already at **60s** and still failed — not on time, but because puppeteer could not *launch* Chromium under the contention. A timeout cannot fix a launch failure, so raising it again would only have moved the threshold.\n\n### What the config does\n\n- Sets `GLASSBOX_LIVE_RENDER_TESTS`, which only this config does — so `npm test` skips both and stays deterministic.\n- Sets `fileParallelism: false`, so the JVM and the browser don't contend with *each other* either. This is why `npm run test:live` finishes both files in ~12s when running them isolated under the default config took ~25s.\n- Sets the variable via `test.env` rather than a shell prefix (`FOO=1 vitest`), which keeps the npm script working on Windows.\n\n### Verification\n\nBoth directions were checked, because the dangerous failure mode here is a live suite that silently skips everything and reports green:\n\n- default config → `21 passed | 2 skipped` (the 2 live tests skip)\n- `npm run test:live` → `23 passed` (they genuinely run)\n\n[The conventions test](1) pins the gate, and was itself verified non-vacuous: removing `!live` from the Mermaid `skipIf` makes it fail with `expected … to match /describe\\.skipIf\\(\\s*!live\\b/`.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vitest.config.live.ts"
+                },
+                "region": {
+                  "startLine": 1,
+                  "endLine": 36,
+                  "snippet": {
+                    "text": "import { defineConfig } from 'vitest/config';\n\n/**\n * Opt-in config for the **live-render** plugin tests (`npm run test:live`).\n *\n * The PlantUML and Mermaid plugins render by spawning a real JVM and a real\n * headless Chromium. Those subprocesses are far heavier than anything else in\n * the suite, and under the default run they were competing with ~150 other test\n * files for CPU: the JVM blew a 30s timeout and Chromium failed to launch\n * outright, while both passed in seconds when run alone. Timeout bumps only\n * moved the threshold (the Mermaid test was already at 60s and still failed on\n * *launch*, not on time), so the fix is to stop them racing the suite at all.\n *\n * The live tests are gated on `GLASSBOX_LIVE_RENDER_TESTS`, which this config\n * sets and the default config does not — so `npm test` skips them and stays\n * deterministic, and this config runs them with `fileParallelism: false` so the\n * JVM and the browser don't even contend with each other. Setting the variable\n * through `test.env` rather than a shell prefix keeps the npm script portable to\n * Windows.\n *\n * Both tests are additionally gated on their tooling being present, so this\n * config still skips whatever isn't installed (see each file's `describe.skipIf`\n * and the `setup.mjs` helper in each plugin directory).\n */\nexport default defineConfig({\n  test: {\n    globals: true,\n    include: [\n      'tests/unit/plugins/mermaid.test.ts',\n      'tests/unit/plugins/plantuml.test.ts',\n    ],\n    fileParallelism: false,\n    env: {\n      GLASSBOX_LIVE_RENDER_TESTS: '1',\n    },\n  },"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/unit/plugins/mermaid.test.ts"
+                },
+                "region": {
+                  "startLine": 170
+                }
+              }
+            },
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/unit/conventions.test.ts"
+                },
+                "region": {
+                  "startLine": 164
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1106"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "ca4bff820511a6aa2067b2cc5cd649e1"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "d97fc91cc292b062f123638be9e4047a3b65fa7c",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

@@ -161,6 +161,42 @@ describe('ground-truth capture determinism', () => {
   });
 });
 
+describe('live-render tests stay out of the default suite', () => {
+  // The PlantUML and Mermaid renderers spawn a real JVM and a real headless
+  // Chromium. Run alongside the ~150 concurrently-executing test files of the
+  // default suite they lost the CPU race — the JVM blew a 30s timeout and
+  // Chromium failed to launch at all — while both passed in seconds alone. That
+  // made `npm test` red on a clean tree, which trains everyone to stop reading
+  // the result.
+  //
+  // The fix is the `GLASSBOX_LIVE_RENDER_TESTS` gate, set only by
+  // `vitest.config.live.ts` (`npm run test:live`), which also disables file
+  // parallelism so the two heavyweights don't contend with each other either.
+  // A tooling gate alone is NOT enough: `describe.skipIf(!hasJava)` still runs
+  // the test on any machine that happens to have the tool installed, which is
+  // exactly how this regressed. Pin the env gate so a future live test can't
+  // rejoin the default suite by only checking for its binary.
+  const LIVE_TESTS = ['tests/unit/plugins/mermaid.test.ts', 'tests/unit/plugins/plantuml.test.ts'];
+
+  it.each(LIVE_TESTS)('%s gates its live render on GLASSBOX_LIVE_RENDER_TESTS', (rel) => {
+    const src = read(rel);
+    expect(src).toContain("process.env.GLASSBOX_LIVE_RENDER_TESTS === '1'");
+    // The gate has to actually reach the describe, not just be computed.
+    expect(src).toMatch(/describe\.skipIf\(\s*!live\b/);
+  });
+
+  it('the default vitest config does not set the live-render gate', () => {
+    expect(read('vitest.config.ts')).not.toContain('GLASSBOX_LIVE_RENDER_TESTS');
+  });
+
+  it('the live config sets the gate and disables file parallelism', () => {
+    const cfg = read('vitest.config.live.ts');
+    expect(cfg).toContain('GLASSBOX_LIVE_RENDER_TESTS');
+    expect(cfg).toContain('fileParallelism: false');
+    for (const rel of LIVE_TESTS) expect(cfg).toContain(rel);
+  });
+});
+
 describe('Tauri launcher ↔ CLI stdout contract', () => {
   // The desktop launcher (src-tauri/src/lib.rs) reads the server's stdout to
   // decide what to show: it navigates on "running at " and shows a "no changes"
