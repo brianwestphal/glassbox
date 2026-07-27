@@ -55,8 +55,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -67,8 +67,8 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -88,8 +88,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -117,8 +117,8 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -139,7 +139,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -173,8 +173,8 @@ jobs:
     needs: [lint, typecheck, test-unit, audit, rust]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -184,7 +184,7 @@ jobs:
       - run: npm run test:e2e
       - name: Upload Playwright report + traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-linux
           path: |
@@ -203,8 +203,8 @@ jobs:
     needs: [lint, typecheck, test-unit, audit, rust]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -214,7 +214,7 @@ jobs:
       - run: npm run test:e2e
       - name: Upload Playwright report + traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-windows
           path: |
@@ -227,8 +227,8 @@ jobs:
     needs: [lint, typecheck, test-unit, audit, rust]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -265,8 +265,8 @@ jobs:
             friendly: Windows-x64
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -295,7 +295,7 @@ jobs:
         with:
           args: --target ${{ matrix.target }}${{ matrix.target == 'x86_64-pc-windows-msvc' && ' --bundles nsis' || '' }}
       - name: Upload Tauri artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tauri-${{ matrix.friendly }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle/
@@ -318,7 +318,7 @@ jobs:
       beta_version: ${{ steps.version.outputs.beta_version }}
       release_id: ${{ steps.create.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Extract beta version from tag
         id: version
@@ -367,7 +367,7 @@ jobs:
       # matching stable-release pattern.
       - name: Create prerelease (as draft — flipped by publish-release at end)
         id: create
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           RELEASE_BODY: ${{ steps.notes.outputs.body }}
         with:
@@ -407,9 +407,9 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       base_version: ${{ steps.version.outputs.base_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ github.ref }}' }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -437,7 +437,7 @@ jobs:
       # attestation (separate flow that uses the runner's OIDC token
       # directly) but DOES NOT know how to use that OIDC token as the bearer
       # for the PUT — it falls through to whatever's in the `.npmrc`
-      # `_authToken=` line that `actions/setup-node@v4` writes when
+      # `_authToken=` line that `actions/setup-node@v7` writes when
       # `NODE_AUTH_TOKEN` is unset (empty string), the registry rejects
       # empty auth, and npm helpfully reports the rejection as a 404 to
       # obscure package existence. Upgrading to npm 11+ here makes the OIDC
@@ -486,9 +486,9 @@ jobs:
             friendly: Windows-x64
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -591,8 +591,8 @@ jobs:
     needs: publish-beta
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install beta globally (with registry-propagation retry)
@@ -610,8 +610,8 @@ jobs:
     needs: publish-beta
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install current stable
@@ -652,13 +652,13 @@ jobs:
       id-token: write
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: '${{ github.ref }}'
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -693,7 +693,7 @@ jobs:
           echo "Created and pushed $FINAL_TAG"
 
       - name: Trigger desktop release workflow
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.actions.createWorkflowDispatch({
@@ -743,7 +743,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Flip prerelease from draft → published
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const releaseId = ${{ needs.create-release.outputs.release_id }};

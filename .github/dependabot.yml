@@ -23,3 +23,26 @@ updates:
     commit-message:
       prefix: "deps"
       prefix-development: "deps-dev"
+
+  # The npm block above is why workflow actions drifted unnoticed: it covers
+  # package.json only, so nothing watched `uses:` pins. They sat on `@v4` until
+  # a run started warning that Node 20 was deprecated — by which point checkout,
+  # setup-node and upload-artifact were each three majors behind and
+  # github-script two. Actions are a supply-chain surface with credentials in
+  # scope, so staleness here is not merely cosmetic.
+  #
+  # Grouped into one weekly PR rather than eight: these move together (the whole
+  # `actions/*` family bumps in lockstep whenever the runner's Node changes),
+  # and one PR touching every workflow is far easier to reason about than eight
+  # that each touch a few lines of the same files.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
