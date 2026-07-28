@@ -99,7 +99,7 @@
     "eslint-plugin-kerfjs": "^3.0.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-tsdoc": "^0.5.2",
-    "gitgist": "^1.1.0",
+    "gitgist": "^1.2.0",
     "highlight.js": "^11.11.1",
     "sass": "^1.97.3",
     "tsup": "^8.5.1",
