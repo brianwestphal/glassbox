@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { mkdirSync, rmSync } from 'fs';
+import { existsSync,mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
 
 import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './ddl.js';
@@ -46,17 +46,60 @@ export async function getDb(): Promise<PGlite> {
     // PGLite WASM can abort on corrupt databases — offer recovery
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('Aborted') || message.includes('RuntimeError')) {
-      console.error('Database appears to be corrupt. Recreating...');
-      console.error('(Previous review data will be lost.)');
-      try {
-        rmSync(currentDbPath, { recursive: true, force: true });
-      } catch { /* may not exist */ }
+      // This branch used to `rmSync` the data directory, which destroyed every
+      // review and annotation the user had. "The engine could not open it" is
+      // not the same as "the bytes are worthless": the same abort is produced
+      // by causes that are entirely recoverable — a half-written WAL, a file
+      // locked by another process, or a data directory written by a different
+      // Postgres major (PGlite has no pg_upgrade, so a future engine bump
+      // cannot open today's directory at all). Deleting on that signal turns a
+      // recoverable situation into permanent loss, so move it aside instead
+      // and let the user — or a migration — still get at it.
+      const result = quarantineDataDir(currentDbPath);
+      if (!result.cleared) {
+        // The old directory is still in place, so a fresh database cannot be
+        // created over it. Fail loudly rather than fall back to deleting.
+        throw err;
+      }
+      console.error('Database could not be opened. Starting a fresh one.');
+      if (result.movedTo !== null) {
+        console.error(`Your previous data has NOT been deleted — it is at: ${result.movedTo}`);
+      }
       db = new PGlite(currentDbPath, DB_OPTIONS);
       await db.waitReady;
       await initSchema(db);
       return db;
     }
     throw err;
+  }
+}
+
+/**
+ * Outcome of trying to move an unopenable data directory aside. `cleared` means
+ * the path is now free for a fresh database; `movedTo` is null only when there
+ * was nothing there to move. `blocked` means the old directory is still in
+ * place, so creating a fresh one over it must not be attempted.
+ */
+type QuarantineResult =
+  | { cleared: true; movedTo: string | null }
+  | { cleared: false };
+
+/**
+ * Move an unopenable data directory aside so a fresh one can be created in its
+ * place without destroying the old bytes.
+ *
+ * @param dbPath - The data directory that could not be opened.
+ * @returns Whether the path was cleared, and where the old directory went.
+ */
+export function quarantineDataDir(dbPath: string): QuarantineResult {
+  if (!existsSync(dbPath)) return { cleared: true, movedTo: null };
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const quarantined = `${dbPath}.unreadable-${stamp}`;
+  try {
+    renameSync(dbPath, quarantined);
+    return { cleared: true, movedTo: quarantined };
+  } catch {
+    return { cleared: false };
   }
 }
 

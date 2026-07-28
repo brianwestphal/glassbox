@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
   rmSync: vi.fn(),
+  renameSync: vi.fn(),
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
@@ -39,15 +40,21 @@ vi.mock('@electric-sql/pglite', () => ({
   PGlite: mockPGliteConstructor,
 }));
 
-import { mkdirSync } from 'fs';
+import { existsSync,mkdirSync, renameSync, rmSync } from 'fs';
 
 const mockMkdirSync = vi.mocked(mkdirSync);
+const mockRenameSync = vi.mocked(renameSync);
+const mockExistsSync = vi.mocked(existsSync);
+const mockRmSync = vi.mocked(rmSync);
 
 describe('connection', () => {
   beforeEach(() => {
     vi.resetModules();
     mockMkdirSync.mockClear();
     mockPGliteConstructor.mockClear();
+    mockRenameSync.mockReset();
+    mockExistsSync.mockReset();
+    mockRmSync.mockReset();
   });
 
   it('setDataDir creates data directory and sets db path', async () => {
@@ -139,5 +146,94 @@ describe('connection', () => {
       (sql: string) => sql.includes('UPDATE ai_analyses') && sql.includes("status = 'failed'")
     );
     expect(resetCall).toBeDefined();
+  });
+});
+
+// An unopenable data directory used to be deleted outright. It must never be:
+// the same abort is raised by causes that are entirely recoverable, and the
+// most consequential of them is a Postgres major bump — PGlite has no
+// pg_upgrade, so a future engine cannot open today's directory, and the old
+// behavior would have met that upgrade by erasing every review the user had.
+describe('unopenable data directory is preserved, never deleted', () => {
+  const DB_PATH = join('/tmp/test-glassbox', 'data', 'reviews');
+
+  // `getDb` memoizes the connection in module scope, so without resetting the
+  // module registry every test here would be handed the singleton a previous
+  // test opened and the constructor would never run at all.
+  beforeEach(() => {
+    vi.resetModules();
+    mockPGliteConstructor.mockReset();
+    mockRenameSync.mockReset();
+    mockExistsSync.mockReset();
+    mockRmSync.mockReset();
+  });
+
+  /** Make the first PGlite construction abort, and later ones succeed. */
+  function abortFirstOpen(message: string) {
+    let first = true;
+    mockPGliteConstructor.mockImplementation(function (this: any, _path: string) {
+      if (first) { first = false; throw new Error(message); }
+      const mock = createMockPGlite();
+      Object.assign(this, mock);
+      this.waitReady = mock.waitReady;
+      this.exec = mock.exec;
+      this.query = mock.query;
+    });
+  }
+
+  it.each(['Aborted(native code called abort)', 'RuntimeError: memory access out of bounds'])(
+    'moves the directory aside instead of deleting it (%s)',
+    async (message) => {
+      abortFirstOpen(message);
+      mockExistsSync.mockReturnValue(true);
+      const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+      setDataDir('/tmp/test-glassbox');
+
+      await getDb();
+
+      expect(mockRmSync).not.toHaveBeenCalled();
+      expect(mockRenameSync).toHaveBeenCalledTimes(1);
+      const [from, to] = mockRenameSync.mock.calls[0] as unknown as [string, string];
+      expect(from).toBe(DB_PATH);
+      expect(to.startsWith(`${DB_PATH}.unreadable-`)).toBe(true);
+    },
+  );
+
+  it('rethrows rather than deleting when the directory cannot be moved aside', async () => {
+    abortFirstOpen('Aborted(native code called abort)');
+    mockExistsSync.mockReturnValue(true);
+    mockRenameSync.mockImplementation(() => { throw new Error('EPERM'); });
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    // Failing to start is the correct outcome here: the old directory is still
+    // in place, so a fresh database cannot be created over it, and falling back
+    // to deletion is the exact behavior being removed.
+    await expect(getDb()).rejects.toThrow('Aborted');
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it('still starts fresh when the abort happened with nothing on disk to preserve', async () => {
+    abortFirstOpen('Aborted(native code called abort)');
+    mockExistsSync.mockReturnValue(false);
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    const db = await getDb();
+
+    expect(db).toBeDefined();
+    expect(mockRenameSync).not.toHaveBeenCalled();
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an unrelated open failure as recoverable', async () => {
+    abortFirstOpen('ENOSPC: no space left on device');
+    mockExistsSync.mockReturnValue(true);
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    await expect(getDb()).rejects.toThrow('ENOSPC');
+    expect(mockRenameSync).not.toHaveBeenCalled();
+    expect(mockRmSync).not.toHaveBeenCalled();
   });
 });
