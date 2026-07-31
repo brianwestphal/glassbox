@@ -76,7 +76,7 @@
     "apple-fm": "^1.0.0",
     "hono": "^4.12.25",
     "jpeg-js": "^0.4.4",
-    "kerfjs": "^3.0.0",
+    "kerfjs": "^4.1.0",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
     "zod": "^4.4.3"
@@ -96,7 +96,7 @@
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "eslint-plugin-import-x": "^4.16.2",
-    "eslint-plugin-kerfjs": "^3.0.0",
+    "eslint-plugin-kerfjs": "^4.1.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-tsdoc": "^0.5.2",
     "gitgist": "^1.2.0",

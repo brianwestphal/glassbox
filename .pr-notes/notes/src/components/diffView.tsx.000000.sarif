@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms8o5q0pr4x5ohmd",
+          "message": {
+            "text": "draggable=\"false\" on the note-artifact image is the fix for the inverse of the drag-handle bug: omitting the attribute left native image drag on, competing with the drag-to-mark-a-region gesture.\n\nThe old draggable={false} rendered nothing at all — kerf omits a false boolean — and omission selects auto, which for an <img> means draggable. Confirmed in real Chromium: an <img> with no draggable attribute reads back el.draggable === true, while draggable=\"false\" reads false.\n\nThat matters specifically here because this image is the drag surface for marking a region (the title says so, and the sibling .ai-note-artifact-region-overlay is what the drag paints into). With native drag live, a press-and-move on the image could start a browser image-drag instead of the region gesture. The same one-word fix applies to the plugin-rendered SVG artifact above and to the shared lightbox image in src/client/lightbox.tsx — all three are drawn on or dragged over, and none of them should be natively draggable.\n\nSee also src/client/annotations/render.tsx, which carries the opposite half of this change (the handle that should be draggable and was not).\n",
+            "markdown": "`draggable=\"false\"` on the note-artifact image is the fix for the inverse of the drag-handle bug: omitting the attribute left native image drag *on*, competing with the drag-to-mark-a-region gesture.\n\nThe old `draggable={false}` rendered nothing at all — kerf omits a false boolean — and omission selects `auto`, which for an `<img>` means draggable. Confirmed in real Chromium: an `<img>` with no `draggable` attribute reads back `el.draggable === true`, while `draggable=\"false\"` reads `false`.\n\nThat matters specifically here because this image is the drag surface for marking a region (the `title` says so, and the sibling `.ai-note-artifact-region-overlay` is what the drag paints into). With native drag live, a press-and-move on the image could start a browser image-drag instead of the region gesture. The same one-word fix applies to the plugin-rendered SVG artifact above and to the shared lightbox image in `src/client/lightbox.tsx` — all three are drawn on or dragged over, and none of them should be natively draggable.\n\nSee also `src/client/annotations/render.tsx`, which carries the opposite half of this change (the handle that *should* be draggable and was not).\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/components/diffView.tsx"
+                },
+                "region": {
+                  "startLine": 465,
+                  "endLine": 465,
+                  "snippet": {
+                    "text": "                      <img className=\"ai-note-artifact-img\" loading=\"lazy\" alt={a.uri} draggable=\"false\""
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ],
+            "ext-ai-tool-confidence": 1
+          },
+          "workItemUris": [
+            "GB-1112"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "fb91a29886dff7aaebf7ec73bde7ac23"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "715c4edd00e2c1ebd68f17749f546d09787ce9fe",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

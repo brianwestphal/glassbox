@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms8o5icdzi9903v0",
+          "message": {
+            "text": "draggable needs the keyword string because it is an HTML enumerated attribute, and the boolean form it replaced had silently disabled annotation drag for every mouse user.\n\nkerf 4.0 made the JSX types reject boolean here. That is not a style preference — it is a bug the types now catch. draggable={true} rendered a bare <span draggable>, and an empty value is not one of the attribute's keywords, so the element falls back to the auto state. auto for a <span> means not draggable. Verified in real Chromium:\n\n<span draggable>        -> el.draggable === false\n<span draggable=\"true\"> -> el.draggable === true\n\nThe handle's drag is wired purely through a delegated dragstart listener (the delegate (0)); nothing sets .draggable imperatively. So the browser never started a drag from a real mouse gesture, and the feature was dead in the product while looking fine in the suite — a dispatched dragstart fires regardless of the attribute, which is exactly what the existing gesture e2e does.\n\nThe same edit is applied to the server-rendered twin in src/components/diffView.tsx; the two must stay in sync, since the client re-renders annotations with this markup after every mutation.\n",
+            "markdown": "`draggable` needs the keyword string because it is an HTML *enumerated* attribute, and the boolean form it replaced had silently disabled annotation drag for every mouse user.\n\nkerf 4.0 made the JSX types reject `boolean` here. That is not a style preference — it is a bug the types now catch. `draggable={true}` rendered a bare `<span draggable>`, and an empty value is not one of the attribute's keywords, so the element falls back to the `auto` state. `auto` for a `<span>` means **not draggable**. Verified in real Chromium:\n\n```\n<span draggable>        -> el.draggable === false\n<span draggable=\"true\"> -> el.draggable === true\n```\n\nThe handle's drag is wired purely through a delegated `dragstart` listener ([the delegate](0)); nothing sets `.draggable` imperatively. So the browser never started a drag from a real mouse gesture, and the feature was dead in the product while looking fine in the suite — a dispatched `dragstart` fires regardless of the attribute, which is exactly what the existing gesture e2e does.\n\nThe same edit is applied to the server-rendered twin in `src/components/diffView.tsx`; the two must stay in sync, since the client re-renders annotations with this markup after every mutation.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/annotations/render.tsx"
+                },
+                "region": {
+                  "startLine": 11,
+                  "endLine": 11,
+                  "snippet": {
+                    "text": "      <span className=\"annotation-drag-handle\" draggable=\"true\" title=\"Drag to move\"><IconGripVertical /></span>"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ],
+            "ext-ai-tool-confidence": 1
+          },
+          "workItemUris": [
+            "GB-1112"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "caceb0a5d85e71493bef6ebfcdac2eeb"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "715c4edd00e2c1ebd68f17749f546d09787ce9fe",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

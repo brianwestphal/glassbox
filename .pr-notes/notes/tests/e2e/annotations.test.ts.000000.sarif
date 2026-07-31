@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms8o5yrbkse0y1hl",
+          "message": {
+            "text": "This assertion is the one that actually holds annotation drag up, and it was proven to fail against the pre-fix markup.\n\nThe suite already had real-gesture drag coverage below, but that coverage cannot see this class of bug: Playwright's dispatchEvent('dragstart', …) and its mouse-driven drag helper both deliver the event regardless of whether the browser considers the element draggable. So the drag tests passed for as long as the feature was broken.\n\nAsserting HTMLElement.draggable instead of the attribute string asks the browser for its own verdict — it folds in the invalid-value-to-auto fallback that caused the bug, which a toHaveAttribute check would not.\n\nProof it regresses: reverting diffView.tsx to the boolean form (cast past the new kerf 4 types) and rebuilding the client made exactly this test fail, while the gesture tests stayed green.\n\n✘ Annotation UI elements › drag handle is natively draggable, and images are not\n\nA markup-level companion assertion lives in tests/unit/components/diffView.test.ts for the fast unit signal.\n",
+            "markdown": "This assertion is the one that actually holds annotation drag up, and it was proven to fail against the pre-fix markup.\n\nThe suite already had real-gesture drag coverage below, but that coverage cannot see this class of bug: Playwright's `dispatchEvent('dragstart', …)` and its mouse-driven drag helper both deliver the event regardless of whether the browser considers the element draggable. So the drag tests passed for as long as the feature was broken.\n\nAsserting `HTMLElement.draggable` instead of the attribute string asks the browser for its own verdict — it folds in the invalid-value-to-`auto` fallback that caused the bug, which a `toHaveAttribute` check would not.\n\nProof it regresses: reverting `diffView.tsx` to the boolean form (cast past the new kerf 4 types) and rebuilding the client made exactly this test fail, while the gesture tests stayed green.\n\n```\n✘ Annotation UI elements › drag handle is natively draggable, and images are not\n```\n\nA markup-level companion assertion lives in `tests/unit/components/diffView.test.ts` for the fast unit signal.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/e2e/annotations.test.ts"
+                },
+                "region": {
+                  "startLine": 168,
+                  "endLine": 178,
+                  "snippet": {
+                    "text": "  test('drag handle is natively draggable, and images are not', async ({ page }) => {\n    await openFile(page, 'session');\n    await expect(page.locator('.annotation-item').first()).toBeVisible();\n    const handleDraggable = await page.locator('.annotation-drag-handle').first()\n      .evaluate((el: HTMLElement) => el.draggable);\n    expect(handleDraggable).toBe(true);\n  });\n});\n\n// Real drag-gesture coverage (GB-1088): the suite previously asserted only\n// that the drag HANDLE is visible; the gesture itself — HTML5 dragstart on the"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "test-evidence"
+            ],
+            "ext-ai-tool-confidence": 1
+          },
+          "workItemUris": [
+            "GB-1112"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "91983b293650afe295011aed997be470"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "715c4edd00e2c1ebd68f17749f546d09787ce9fe",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

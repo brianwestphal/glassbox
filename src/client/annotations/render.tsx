@@ -8,7 +8,7 @@ import type { Annotation } from '../state.js';
 export function buildAnnotationItemHtml(annotation: Annotation): SafeHtml {
   return (
     <>
-      <span className="annotation-drag-handle" draggable={true} title="Drag to move"><IconGripVertical /></span>
+      <span className="annotation-drag-handle" draggable="true" title="Drag to move"><IconGripVertical /></span>
       <span className={`annotation-category category-${annotation.category}`} data-action="reclassify">{annotation.category}</span>
       {annotation.reply_to_note_id !== null && annotation.reply_to_note_id !== undefined && <span className="annotation-reply-tag" title="Reply to an AI review note"><IconCornerDownRight /> reply</span>}
       <span className="annotation-text">{annotation.content}</span>

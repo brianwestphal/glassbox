@@ -1,11 +1,11 @@
-<!-- kerf-skill-version: 1.12.0 -->
+<!-- kerf-skill-version: 1.14.2 -->
 # kerf.cursorrules — rules for building apps with kerf
 #
 # Drop this file into your project as `.cursorrules` (Cursor will pick it
 # up automatically) when you're using kerf (https://github.com/brianwestphal/kerf).
 # These rules condense `docs/ai/usage-guide.md` into the form Cursor parses.
 
-You are writing a UI in kerf — a ~6.1 KB reactive framework (6.5 KB with `arraySignal`): signals + DOM morphing + JSX → HTML strings. No virtual DOM, no compiler, no scheduler.
+You are writing a UI in kerf — a ~12 KB reactive framework (~13 KB with `arraySignal`): signals + DOM morphing + JSX → HTML strings. No virtual DOM, no compiler, no scheduler.
 
 ## Setup
 
@@ -97,7 +97,7 @@ When deciding which primitive to reach for, work down the axes:
 **Raw HTML.**
 - User-controlled HTML → sanitize first (DOMPurify) then `raw(sanitized)`.
 - Author-controlled trusted HTML → `raw(html)` directly.
-- Dangerous URLs (`javascript:`/`vbscript:`/script-executing `data:`) on `href`/`src`/`xlink:href`/`formaction`/`action`/`data` are dropped — kerf THROWS in dev, WARNS + drops in prod. Sanitize user URLs upstream; wrap an intentional trusted one in `raw(url)` to bypass the screen in both modes.
+- Dangerous URLs (`javascript:`/`vbscript:`/script-executing `data:`) on `href`/`src`/`xlink:href`/`formaction`/`action`/`data` are dropped — kerf THROWS in dev, WARNS + drops in prod. Sanitize user URLs upstream; wrap an intentional trusted one in `raw(url)` to bypass the screen in both modes. The `javascript:` no-op placeholders (`javascript:void(0)`, `javascript:;`, …) are allowed — they're the placeholder-link idiom, matched whole so nothing can ride along.
 
 ## Canonical patterns
 
@@ -162,6 +162,8 @@ mount(listEl, () => (
 ## Common errors → fixes
 
 - `JSX: DOM elements cannot be passed as children` → you passed a `toElement()` result inside JSX. Build the whole tree in JSX; get refs via `querySelector` after rendering.
+- `draggable={true}` / `spellCheck={false}` / `contentEditable={false}` / `writingsuggestions={false}` / `translate={false}` / `autocorrect={false}` won't typecheck → these are HTML **enumerated** attributes, not boolean ones: they take keyword strings (`"true"` / `"false"`; `"yes"` / `"no"` for `translate`; `"on"` / `"off"` for `autocorrect`), and omitting one selects a third state, so the boolean form rendered the opposite of what was meant. Write the keyword (`draggable="true"`, `spellCheck="false"`, `writingsuggestions="false"`, `translate="no"`, `autocorrect="off"`) and omit the attribute for the default state. Real boolean attributes (`hidden`, `checked`, `disabled`, `autofocus`, `required`, `inert`) are unaffected, and so is `popover` (its bare form is the spec's `auto` state); for a signal, put the string in it (`signal('true')`).
+- `<select value={x}>` / `<textarea value={x}>` won't typecheck → neither element has a `value` content attribute, so that markup was inert. Use `<option value="b" selected>` and `<textarea>{draft}</textarea>`.
 - Focus / cursor lost on every keystroke → list items lack `data-key`. Add it.
 - Click handler stops firing after re-render → `el.addEventListener` was used. Replace with `delegate(rootEl, 'click', ACTIONS.foo.selector, ...)` (or a string literal `'[data-action="foo"]'` for ad-hoc cases).
 - Render fn never re-runs → signal was read outside the render fn. Move the `signal.value` read inside.

@@ -1,7 +1,7 @@
 ---
 name: kerf-app
 description: Build UIs in the kerf reactive framework (https://github.com/brianwestphal/kerf). Use this skill whenever the user is writing or modifying code that imports `kerfjs`, asks to add a feature to a kerf app, or asks "how do I do X in kerf?". Use it proactively the moment you spot a kerf import in the file you're editing.
-kerf-skill-version: 1.12.0
+kerf-skill-version: 1.14.2
 ---
 
 # Building apps with kerf
@@ -10,7 +10,7 @@ kerf-skill-version: 1.12.0
 > project's `.claude/skills/kerf-app/SKILL.md`) so Claude Code activates
 > it whenever you work on a kerf app.
 
-kerf is a ~11 KB reactive UI framework (~12 KB with `arraySignal`): signals + DOM morphing + JSX → HTML strings. No virtual DOM, no compiler, no scheduler. The whole public surface fits in 15 exports.
+kerf is a ~12 KB reactive UI framework (~13 KB with `arraySignal`): signals + DOM morphing + JSX → HTML strings. No virtual DOM, no compiler, no scheduler. The whole public surface fits in 17 exports.
 
 ## Setup
 
@@ -106,7 +106,7 @@ When deciding which primitive to reach for, work down the axes:
 - User-controlled HTML → sanitize first (DOMPurify) then `raw(sanitized)`.
 - Author-controlled trusted HTML → `raw(html)` directly.
 
-**Dangerous URLs.** `javascript:`/`vbscript:`/script-executing `data:` values on `href`/`src`/`xlink:href`/`formaction`/`action`/`data` are dropped — kerf **throws in dev**, **warns + drops in prod**. Sanitize user URLs upstream; wrap an intentional trusted one in `raw(url)` (bypasses the screen in both modes).
+**Dangerous URLs.** `javascript:`/`vbscript:`/script-executing `data:` values on `href`/`src`/`xlink:href`/`formaction`/`action`/`data` are dropped — kerf **throws in dev**, **warns + drops in prod**. Sanitize user URLs upstream; wrap an intentional trusted one in `raw(url)` (bypasses the screen in both modes). The `javascript:` no-op placeholders (`javascript:void(0)`, `javascript:;`, …) are allowed — they're the placeholder-link idiom, matched against the whole value so nothing can ride along.
 
 ## Canonical patterns
 
@@ -176,6 +176,8 @@ mount(rootEl, () => html`
 | Error / symptom | Root cause | Fix |
 | --- | --- | --- |
 | `JSX: DOM elements cannot be passed as children` | passed a `toElement()` result inside JSX | Build the whole tree in JSX; refs via `querySelector` after rendering |
+| `draggable={true}` / `spellCheck={false}` / `contentEditable={false}` / `writingsuggestions={false}` / `translate={false}` / `autocorrect={false}` won't typecheck | these are HTML **enumerated** attributes, not boolean ones — they take keyword strings (`"true"`/`"false"`; `"yes"`/`"no"` for `translate`; `"on"`/`"off"` for `autocorrect`), and omitting one selects a third state, so the boolean form rendered the opposite of what was meant | Write the keyword: `draggable="true"`, `spellCheck="false"`, `writingsuggestions="false"`, `translate="no"`, `autocorrect="off"`. Omit for the default state. Real boolean attrs (`hidden`, `checked`, `disabled`, `autofocus`, `required`, `inert`) are unaffected, as is `popover` (bare form = the spec's `auto` state); for a signal use `signal('true')` |
+| `<select value={x}>` / `<textarea value={x}>` won't typecheck | neither element has a `value` content attribute — the markup was inert | `<option value="b" selected>`; `<textarea>{draft}</textarea>` |
 | Focus / cursor lost on every keystroke | list items lack `data-key` | Add `data-key` (or `id`) to each list item |
 | Click handler stops firing after re-render | `el.addEventListener` was used | Replace with `delegate(rootEl, 'click', ACTIONS.foo.selector, ...)` (or a string literal for ad-hoc cases) |
 | Render fn never re-runs | signal was read outside the render fn | Move `signal.value` read inside the render fn |

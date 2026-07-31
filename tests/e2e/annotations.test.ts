@@ -158,6 +158,20 @@ test.describe('Annotation UI elements', () => {
     await expect(annotation.locator('[data-action="delete"]')).toBeVisible();
     await expect(annotation.locator('[data-action="reclassify"]')).toBeVisible();
   });
+
+  // The browser's own verdict, not the markup's: `HTMLElement.draggable` is what
+  // decides whether a real mouse gesture can start a drag at all. A bare
+  // `<span draggable>` reads back as false (invalid value -> `auto` -> off for a
+  // span), which is what shipped until the drag handle was given the keyword
+  // string. The gesture tests below dispatch `dragstart` directly and so pass
+  // either way — this is the assertion that actually holds the feature up.
+  test('drag handle is natively draggable, and images are not', async ({ page }) => {
+    await openFile(page, 'session');
+    await expect(page.locator('.annotation-item').first()).toBeVisible();
+    const handleDraggable = await page.locator('.annotation-drag-handle').first()
+      .evaluate((el: HTMLElement) => el.draggable);
+    expect(handleDraggable).toBe(true);
+  });
 });
 
 // Real drag-gesture coverage (GB-1088): the suite previously asserted only

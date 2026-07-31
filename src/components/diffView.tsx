@@ -442,7 +442,7 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                           loads, the GB-932 rationale). The SVG is plugin-rendered from trusted
                           opt-in-installed code (doc 29 §29.6) and encodeURIComponent leaves no
                           quote to break out of the attribute, so raw() is the documented opt-out. */}
-                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable={false}
+                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
                         // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- trusted plugin SVG, inert in <img> context (NFR-29.2)
                         src={raw(`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`)} />
                     </div>
@@ -462,7 +462,7 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                   <details className="ai-note-artifact">
                     <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
                     <div className="ai-note-artifact-imgwrap">
-                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable={false}
+                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
                         data-artifact-uri={a.uri} title="Drag to mark a region, or click to view full screen"
                         src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
                       <div className="ai-note-artifact-region-overlay" data-artifact-uri={a.uri}></div>
@@ -492,7 +492,7 @@ function AnnotationItem({ annotation: a }: { annotation: Annotation }) {
     <div className={`annotation-item${a.is_stale ? ' annotation-stale' : ''}`}
       data-key={a.id} data-annotation-id={a.id} data-is-stale={a.is_stale ? 'true' : undefined}
       data-region-data={a.region_data ?? undefined}>
-      <span className="annotation-drag-handle" draggable={true} title="Drag to move"><IconGripVertical /></span>
+      <span className="annotation-drag-handle" draggable="true" title="Drag to move"><IconGripVertical /></span>
       <span className={`annotation-category category-${a.category}`} data-action="reclassify">{a.category}</span>
       {a.reply_to_note_id !== null ? <span className="annotation-reply-tag" title="Reply to an AI review note"><IconCornerDownRight /> reply</span> : null}
       <span className="annotation-text">{a.content}</span>

@@ -58,7 +58,7 @@ export function openLightbox(opts: LightboxOptions): void {
 
   const media = opts.kind === 'pdf'
     ? <iframe className="lightbox-pdf" src={opts.src} title={opts.alt ?? 'attachment'}></iframe>
-    : <img className="lightbox-img" src={opts.src} alt={opts.alt ?? ''} draggable={false} />;
+    : <img className="lightbox-img" src={opts.src} alt={opts.alt ?? ''} draggable="false" />;
 
   const overlay = toElement(
     <div className="lightbox-overlay" role="dialog" aria-label={opts.alt ?? 'Preview'}>

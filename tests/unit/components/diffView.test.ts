@@ -411,4 +411,22 @@ describe('DiffView', () => {
     // GB-952: the drag handle is a lucide grip icon, not the ⠿ braille glyph.
     expect(html).not.toContain('⠿');
   });
+
+  // `draggable` is an HTML *enumerated* attribute, not a boolean one: the bare
+  // `<span draggable>` a boolean JSX value used to emit is an invalid value, so
+  // the element falls back to `auto` — and `auto` for a span is NOT draggable,
+  // which silently disabled mouse drag for every annotation. Only the keyword
+  // string turns it on. The drag e2e cannot catch this because a dispatched
+  // `dragstart` fires regardless of the attribute, so pin the markup here.
+  it('gives the drag handle the draggable="true" keyword, not a bare attribute', () => {
+    const lines = [makeLine('add', 1, 'code')];
+    const ann = makeAnnotation({ line_number: 1, side: 'new' });
+    const html = DiffView({
+      file: makeFile(),
+      diff: makeDiff({ status: 'added', hunks: [makeHunk(lines)] }),
+      annotations: [ann], mode: 'unified',
+    }).toString();
+    expect(html).toContain('<span class="annotation-drag-handle" draggable="true"');
+    expect(html).not.toContain('annotation-drag-handle" draggable>');
+  });
 });
