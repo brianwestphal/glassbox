@@ -215,3 +215,35 @@ describe('Tauri launcher ↔ CLI stdout contract', () => {
     expect(read('src-tauri/src/lib.rs')).toContain('running at ');
   });
 });
+
+describe('smoke scripts bind an overridable, pre-checked port', () => {
+  // Every smoke server runs with --strict-port, so a port already held by an
+  // unrelated local service killed the run with a raw Node `listen EADDRINUSE`
+  // stack dump that read as "the bundle is broken". The scripts must route the
+  // port through the shared resolver, which both honors an override and fails
+  // with a message naming the port.
+  const SMOKE_SCRIPTS = ['smoke-test.sh', 'difftool-accumulate.sh', 'ground-truth.sh'];
+
+  it('no smoke script hardcodes its port as a bare assignment', () => {
+    for (const name of SMOKE_SCRIPTS) {
+      const src = read(join('tests', 'smoke', name));
+      expect(src, `${name} must not assign a literal port`).not.toMatch(/^PORT=\d+$/m);
+      expect(src, `${name} must resolve its port via the shared helper`).toContain('smoke_resolve_port ');
+    }
+  });
+
+  it('each smoke script names a distinct default port and override variable', () => {
+    const defaults: string[] = [];
+    const vars: string[] = [];
+    for (const name of SMOKE_SCRIPTS) {
+      const call = /smoke_resolve_port (\d+) (\w+)/.exec(read(join('tests', 'smoke', name)));
+      expect(call, `${name} must call smoke_resolve_port <port> <ENV_VAR>`).not.toBeNull();
+      defaults.push(call![1]);
+      vars.push(call![2]);
+    }
+    // Distinct defaults keep the three suites runnable back-to-back; distinct
+    // variables keep an override aimed at one from silently moving the others.
+    expect(new Set(defaults).size).toBe(SMOKE_SCRIPTS.length);
+    expect(new Set(vars).size).toBe(SMOKE_SCRIPTS.length);
+  });
+});

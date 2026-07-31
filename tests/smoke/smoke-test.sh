@@ -16,8 +16,24 @@
 #
 set -euo pipefail
 
-GLASSBOX="${1:-glassbox}"
-PORT=4199
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=tests/smoke/smoke-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/smoke-lib.sh"
+
+# With no argument, prefer this checkout's built bundle over a globally linked
+# `glassbox`, so `npm run test:smoke` works on a dev machine that never ran
+# `npm link`. CI passes the binary explicitly (`smoke-test.sh glassbox`) when it
+# means to exercise the *installed* package, so this default cannot weaken it.
+if [[ -n "${1:-}" ]]; then
+  GLASSBOX="$1"
+elif [[ -f "$ROOT/dist/cli.js" ]]; then
+  GLASSBOX="$ROOT/dist/cli.js"
+else
+  GLASSBOX="glassbox"
+fi
+
+smoke_resolve_port 4199 GLASSBOX_SMOKE_PORT
+PORT="$SMOKE_PORT"
 ORIGINAL_DIR="$(pwd)"
 TEST_REPO_URL="https://github.com/brianwestphal/glassbox.git"
 TEST_REPO_DIR=""
@@ -56,6 +72,12 @@ echo ""
 if ! $GLASSBOX --help > /dev/null 2>&1; then
   fail "Binary not runnable: $GLASSBOX"
   echo ""
+  if [[ "$GLASSBOX" == "glassbox" ]]; then
+    echo -e "${DIM}No built bundle at dist/cli.js and no \`glassbox\` on PATH."
+    echo -e "Run \`npm run build\` first, or pass a binary:"
+    echo -e "    bash tests/smoke/smoke-test.sh /path/to/cli.js${RESET}"
+    echo ""
+  fi
   echo -e "${RED}${BOLD}FAILED${RESET} — binary not accessible"
   exit 1
 fi

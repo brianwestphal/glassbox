@@ -13,9 +13,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=tests/smoke/smoke-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/smoke-lib.sh"
 CLI="$ROOT/dist/cli.js"
 FIXTURES="$ROOT/tests/fixtures/ground-truth"
-PORT=4196
+smoke_resolve_port 4196 GLASSBOX_GT_SMOKE_PORT
+PORT="$SMOKE_PORT"
 PASSED=0
 FAILED=0
 pass() { echo "  ok   $1"; PASSED=$((PASSED + 1)); }

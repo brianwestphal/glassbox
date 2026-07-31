@@ -764,10 +764,16 @@ tests/
 ├── unit/         # vitest; mocks at boundaries (db, fs, network)
 ├── integration/  # vitest; cross-module, in-memory DB
 ├── e2e/          # Playwright; Chromium; real server in demo mode on 4183
-├── smoke/        # bash CLI smoke tests
+├── smoke/        # bash CLI smoke tests (+ smoke-lib.sh, the shared port resolver)
 ├── fixtures/     # shared test data
 └── helpers/      # db.ts test helpers
 ```
+
+Each smoke script resolves its port through `tests/smoke/smoke-lib.sh`
+(`smoke_resolve_port <default> <ENV_VAR>`), which pre-checks the port and exits
+with a readable message rather than letting the `--strict-port` server die on a
+raw `EADDRINUSE`. Defaults 4199 / 4197 / 4196, overridable via
+`GLASSBOX_SMOKE_PORT` / `GLASSBOX_DIFFTOOL_SMOKE_PORT` / `GLASSBOX_GT_SMOKE_PORT`.
 
 The E2E web server runs `--demo:4 --ai-service-test` (see
 `playwright.config.ts`). `--ai-service-test` makes AI analysis use mock

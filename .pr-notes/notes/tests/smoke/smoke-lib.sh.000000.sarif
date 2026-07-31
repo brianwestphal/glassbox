@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms8p4z0mxt56ieob",
+          "message": {
+            "text": "--max-time is load-bearing here, not belt-and-braces: --connect-timeout alone cannot bound this probe.\n\nThe kernel completes the TCP handshake into the listen backlog as soon as a socket is bound, without the owning process calling accept(). So against a port held by a process that is listening but busy — or wedged, or simply not speaking HTTP — connect() returns immediately and only the response never arrives. A connect timeout has already been satisfied at that point and will never fire, leaving the probe blocked indefinitely on a port-in-use check whose entire job is to fail fast.\n\nThis is not hypothetical. The first version of the accompanying test deadlocked on exactly this: it held the busy port with an in-process Node server, and spawnSync blocks the event loop for the duration of the call, so the server could not accept while the probe ran. The probe hung, and with it the whole vitest file. The test now holds the port in a separate process (see tests/unit/smoke/smokeLib.test.ts), and the helper carries a hard --max-time so a real wedged listener cannot reproduce the hang in a smoke run.\n\nReading curl's exit code rather than its output is what makes the check meaningful: 7 (CURLECOULDNTCONNECT) is the only outcome that proves nothing is listening. Every other code — including the timeout — means something accepted the connection, so it is treated as in-use. Erring that way turns an ambiguous probe into a readable failure instead of a raw EADDRINUSE crash.\n",
+            "markdown": "`--max-time` is load-bearing here, not belt-and-braces: `--connect-timeout` alone cannot bound this probe.\n\nThe kernel completes the TCP handshake into the listen backlog as soon as a socket is bound, without the owning process calling `accept()`. So against a port held by a process that is listening but busy — or wedged, or simply not speaking HTTP — `connect()` returns *immediately* and only the response never arrives. A connect timeout has already been satisfied at that point and will never fire, leaving the probe blocked indefinitely on a port-in-use check whose entire job is to fail fast.\n\nThis is not hypothetical. The first version of the accompanying test deadlocked on exactly this: it held the busy port with an in-process Node server, and `spawnSync` blocks the event loop for the duration of the call, so the server could not accept while the probe ran. The probe hung, and with it the whole vitest file. The test now holds the port in a separate process (see `tests/unit/smoke/smokeLib.test.ts`), and the helper carries a hard `--max-time` so a real wedged listener cannot reproduce the hang in a smoke run.\n\nReading curl's exit code rather than its output is what makes the check meaningful: 7 (`CURLE_COULDNT_CONNECT`) is the only outcome that proves nothing is listening. Every other code — including the timeout — means something accepted the connection, so it is treated as in-use. Erring that way turns an ambiguous probe into a readable failure instead of a raw `EADDRINUSE` crash.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/smoke/smoke-lib.sh"
+                },
+                "region": {
+                  "startLine": 14,
+                  "endLine": 26,
+                  "snippet": {
+                    "text": "#\n# --max-time as well as --connect-timeout, because the kernel completes the TCP\n# handshake into the listen backlog even when the owning process never calls\n# accept(). Against such a port connect() returns immediately and only the\n# response is missing, so a connect timeout alone would hang here forever.\nsmoke_port_in_use() {\n  local port=\"$1\" rc=0\n  curl -s -o /dev/null --connect-timeout 2 --max-time 5 \"http://127.0.0.1:$port/\" 2>/dev/null || rc=$?\n  [[ $rc -ne 7 ]]\n}\n\n# Resolve the port a smoke server should bind, failing early and readably when\n# it is taken. Sets SMOKE_PORT."
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ],
+            "ext-ai-tool-confidence": 1
+          },
+          "workItemUris": [
+            "GB-1113"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "e8d9e0276b8cf907c2c37ab69583e624"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "ms8p59fkbdlt61xb",
+          "message": {
+            "text": "The resolver sets a variable instead of echoing the port, and fails instead of auto-picking a free one. Both were deliberate.\n\nWhy not echo the port. The obvious shape is PORT=\"$(smokeresolveport …)\", but the failure path has to exit, and an exit inside a $(...) substitution only leaves the subshell. The parent would carry on with an empty PORT — saved from disaster only incidentally, by set -e noticing the failed assignment. Setting SMOKE_PORT keeps the abort in the caller's own shell where it belongs, and does not depend on set -e staying on. There is a regression test for precisely this (\"aborts the calling script rather than continuing past a busy port\").\n\nWhy not auto-select the next free port. It would make collisions vanish entirely, which is tempting. Rejected because every smoke server runs with --strict-port on a port the script then hardcodes into its assertions, and because a suite that quietly relocates itself is harder to reason about when something else is wrong — you lose the signal that a stale server from a previous run is still up. A named override plus a message that says which port and which variable keeps the behavior predictable and puts the choice with the person running it.\n\nWhy per-script variables (GLASSBOXSMOKEPORT, GLASSBOXDIFFTOOLSMOKEPORT, GLASSBOXGTSMOKEPORT) rather than a bare PORT: PORT is set in plenty of dev environments for unrelated reasons, and honoring it would silently move all three suites. The conventions suite pins that the three names and their three defaults stay distinct.\n",
+            "markdown": "The resolver sets a variable instead of echoing the port, and fails instead of auto-picking a free one. Both were deliberate.\n\n**Why not echo the port.** The obvious shape is `PORT=\"$(smoke_resolve_port …)\"`, but the failure path has to `exit`, and an `exit` inside a `$(...)` substitution only leaves the subshell. The parent would carry on with an empty `PORT` — saved from disaster only incidentally, by `set -e` noticing the failed assignment. Setting `SMOKE_PORT` keeps the abort in the caller's own shell where it belongs, and does not depend on `set -e` staying on. There is a regression test for precisely this (\"aborts the calling script rather than continuing past a busy port\").\n\n**Why not auto-select the next free port.** It would make collisions vanish entirely, which is tempting. Rejected because every smoke server runs with `--strict-port` on a port the script then hardcodes into its assertions, and because a suite that quietly relocates itself is harder to reason about when something *else* is wrong — you lose the signal that a stale server from a previous run is still up. A named override plus a message that says which port and which variable keeps the behavior predictable and puts the choice with the person running it.\n\n**Why per-script variables** (`GLASSBOX_SMOKE_PORT`, `GLASSBOX_DIFFTOOL_SMOKE_PORT`, `GLASSBOX_GT_SMOKE_PORT`) rather than a bare `PORT`: `PORT` is set in plenty of dev environments for unrelated reasons, and honoring it would silently move all three suites. The conventions suite pins that the three names and their three defaults stay distinct.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/smoke/smoke-lib.sh"
+                },
+                "region": {
+                  "startLine": 34,
+                  "endLine": 52,
+                  "snippet": {
+                    "text": "# Every smoke server runs with --strict-port (the test has to know where to\n# send its requests, so silently sliding to another port would be worse), which\n# means a collision otherwise surfaces as a raw Node `listen EADDRINUSE` stack\n# dump with no hint that an unrelated local service — not the code under test —\n# is what broke the run.\nsmoke_resolve_port() {\n  local default_port=\"$1\" var_name=\"$2\" port\n  port=\"${!var_name-}\"\n  port=\"${port:-$default_port}\"\n\n  if smoke_port_in_use \"$port\"; then\n    echo \"\" >&2\n    echo \"  port $port is already in use — cannot start the smoke server.\" >&2\n    echo \"  Something unrelated is listening on it (another dev server, or a\" >&2\n    echo \"  previous run that did not shut down).\" >&2\n    echo \"\" >&2\n    echo \"  Free the port, or pick another one:\" >&2\n    echo \"      $var_name=<port> $0\" >&2\n    echo \"\" >&2"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "alternative-considered"
+            ],
+            "ext-ai-tool-confidence": 0.9
+          },
+          "workItemUris": [
+            "GB-1113"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "fb552407398ec34e8eb64078960e4e5d"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "b011821dbb08624768596d0d93272520397e3628",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}
