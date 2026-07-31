@@ -3,7 +3,7 @@ name: hs-task
 description: Create a new task ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 23 -->
+<!-- hotsheet-skill-version: 25 -->
 
 Create a new Hot Sheet **task** ticket. General tasks to complete.
 
@@ -16,12 +16,18 @@ Call the `hotsheet_create_ticket` tool with `{ "title": "<TITLE>", "category": "
 
 **Fallback (curl):**
 ```bash
-curl -s -X POST http://localhost:4174/api/tickets \
+curl -s -X POST "http://localhost:$HOTSHEET_PORT/api/tickets" \
   -H "Content-Type: application/json" \
-  -H "X-Hotsheet-Secret: 23780cba3d23d4980a569de5b0af0bd2" \
+  -H "X-Hotsheet-Secret: $HOTSHEET_SECRET" \
   -d '{"title": "<TITLE>", "defaults": {"category": "task", "up_next": <true|false>}}'
 ```
 
-If the request fails (connection refused or 403), re-read `.hotsheet/settings.json` for the current `port` and `secret` values — you may be connecting to the wrong Hot Sheet instance.
+Set these first. Both are machine-specific and deliberately not stored in this file (which is committed and shared with everyone on the repo):
+```bash
+export HOTSHEET_PORT=$(node -p "require('./.hotsheet/settings.local.json').port ?? 4174")
+export HOTSHEET_SECRET=$(node -p "require('./.hotsheet/secret.json').secret")
+```
+
+If the request fails (connection refused or 403), re-read those two files — you may be connecting to the wrong Hot Sheet instance. (Older projects keep `port` and `secret` in `.hotsheet/settings.json` instead.)
 
 Report the created ticket number and title to the user.

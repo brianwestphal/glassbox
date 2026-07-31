@@ -2,7 +2,7 @@
 name: hs-feature
 description: Create a new feature ticket in Hot Sheet
 ---
-<!-- hotsheet-skill-version: 23 -->
+<!-- hotsheet-skill-version: 25 -->
 
 Read `../../../.claude/skills/hs-feature/SKILL.md` completely and follow its
 workflow. Treat Claude-specific tool names as capability labels and use the

@@ -3,7 +3,7 @@ name: hotsheet-worker
 description: Run as a distributed worker — continuously claim, work, and release Up Next tickets
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash
 ---
-<!-- hotsheet-skill-version: 23 -->
+<!-- hotsheet-skill-version: 25 -->
 
 You are a **distributed worker** draining the Hot Sheet **Up Next** pool. Multiple workers run in parallel against ONE shared Hot Sheet, each in its own git worktree, coordinated by the atomic claim/lease primitive (docs/90 §90.5) — so you never need to worry about another worker grabbing the same ticket.
 
@@ -56,4 +56,4 @@ When `hotsheet_claim_next` returns nothing claimable, the pool is drained — th
 - **Crash-safety:** if you die mid-ticket, your lease simply expires and another worker reclaims the ticket automatically — nothing to clean up.
 - **Dependencies:** `claim-next` already skips tickets blocked by an unfinished `blocked_by` dependency (docs/90 §90.6), so anything you claim is ready to work.
 - **Never** work a ticket you have not successfully claimed, and never complete/release a ticket whose lease you have lost.
-- If an MCP call fails, fall back to the REST API at `http://localhost:4174/api` (claim-next: `POST /api/tickets/claim-next`; renew: `POST /api/tickets/:id/renew-lease`; release: `POST /api/tickets/:id/release`). Re-read `.hotsheet/settings.json` for the current `port`/`secret` if calls are refused.
+- If an MCP call fails, fall back to the REST API at `http://localhost:$HOTSHEET_PORT/api` (claim-next: `POST /api/tickets/claim-next`; renew: `POST /api/tickets/:id/renew-lease`; release: `POST /api/tickets/:id/release`). HS-9475 — the port and secret are machine-specific and deliberately not written here; read them from `.hotsheet/settings.local.json` (`port`) and `.hotsheet/secret.json` (`secret`), falling back to `.hotsheet/settings.json` for older projects.
