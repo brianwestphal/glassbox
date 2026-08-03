@@ -96,6 +96,58 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # Real PostgreSQL 17 -> 18 data-directory migration (doc 9 §9.1a).
+  #
+  # This is a release gate rather than a manual workflow because a regression
+  # here does not merely fail a feature — it meets an upgrading user with an
+  # unopenable database. The default suite covers the logic with mocks only;
+  # nothing else anywhere runs the migration against real engines.
+  #
+  # It is kept out of `npm test` because it downloads the ~25 MB pinned PG17
+  # engine from the npm registry and boots two Postgres WASM clusters, which
+  # would make the default suite network-dependent. Unlike the live-render
+  # tests in `live-render.yml`, it needs no system tooling at all — no JRE, no
+  # Chromium — just network, so it costs a plain runner ~7s and belongs here
+  # rather than in a heavyweight manual workflow.
+  test-migration:
+    name: DB Major-Version Migration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # Run only the migration file: the live config also lists the PlantUML and
+      # Mermaid render tests, and this job deliberately provisions neither.
+      #
+      # The JSON report is not decoration. The test is `describe.skipIf`-gated,
+      # so if the env gate or the config's `include` ever drifts, vitest would
+      # report a green run having executed nothing — the same silent
+      # false-negative `live-render.yml` guards against by asserting its tooling
+      # is present. Assert instead that tests actually ran and none were pending.
+      - name: Run the live PG17 -> PG18 migration test
+        run: |
+          set -euo pipefail
+          npx vitest run --config vitest.config.live.ts \
+            tests/integration/db/major-migration.test.ts \
+            --reporter=json --outputFile="$RUNNER_TEMP/migration.json"
+          node -e '
+            const r = require(process.env.RUNNER_TEMP + "/migration.json");
+            const { numPassedTests: passed, numPendingTests: skipped, numTotalTests: total } = r;
+            console.log(`passed=${passed} skipped=${skipped} total=${total}`);
+            if (total === 0 || passed === 0) {
+              console.error("::error::the migration test ran nothing — the skipIf gate or the live config include has drifted");
+              process.exit(1);
+            }
+            if (skipped > 0) {
+              console.error(`::error::${skipped} migration test(s) were skipped; this job must run all of them`);
+              process.exit(1);
+            }
+          '
+
   # Security audit gate. A release publishes to npm AND ships a bundled Node
   # server (the desktop "sidecar"), so a known-vulnerable SHIPPED dependency
   # reaches end users. This job hard-fails the release when any high/critical
@@ -170,7 +222,7 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    needs: [lint, typecheck, test-unit, audit, rust]
+    needs: [lint, typecheck, test-unit, test-migration, audit, rust]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -200,7 +252,7 @@ jobs:
   # Node mkdir in config + build:client, favicon 204, and the GB-868 keychain fix.)
   test-e2e-windows:
     name: E2E Tests (Windows)
-    needs: [lint, typecheck, test-unit, audit, rust]
+    needs: [lint, typecheck, test-unit, test-migration, audit, rust]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -224,7 +276,7 @@ jobs:
 
   npm-pack:
     name: npm Pack (Dry Run)
-    needs: [lint, typecheck, test-unit, audit, rust]
+    needs: [lint, typecheck, test-unit, test-migration, audit, rust]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -246,7 +298,7 @@ jobs:
     # discarded; the real signed beta bundles come from the `build` phase
     # below which DOES do the bump and therefore needs the MSI-skip conditional.
     name: Build Tauri (${{ matrix.friendly }})
-    needs: [lint, typecheck, test-unit, audit, rust]
+    needs: [lint, typecheck, test-unit, test-migration, audit, rust]
     strategy:
       fail-fast: true
       matrix:
