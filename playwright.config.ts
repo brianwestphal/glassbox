@@ -46,9 +46,12 @@ mkdirSync(PLUGIN_WORK_DIR, { recursive: true });
 // something to render. A real one only exists after a PostgreSQL major upgrade,
 // which no test can provoke against a fresh install; the section keys purely off
 // a `reviews.bak-<stamp>` sibling existing, so a directory with a file in it is
-// a faithful stand-in. This server is used rather than the demo one because its
-// data dir is a fixed path known before startup, not a timestamped tmpdir.
-const DIFF_DB_BACKUP = join(DIFF_WORK_DIR, '.glassbox', 'data', 'reviews.bak-2026-08-03T04-04-05-853Z');
+// a faithful stand-in. The name uses the REAL shape pglite-migrate produces —
+// `sanitizedTimestamp` replaces only `:`, so the `.` before the milliseconds
+// survives — so the rendered date is exercised, not the no-date fallback. This
+// server is used rather than the demo one because its data dir is a fixed path
+// known before startup, not a timestamped tmpdir.
+const DIFF_DB_BACKUP = join(DIFF_WORK_DIR, '.glassbox', 'data', 'reviews.bak-2026-08-03T04-04-05.853Z');
 mkdirSync(DIFF_DB_BACKUP, { recursive: true });
 writeFileSync(join(DIFF_DB_BACKUP, 'PG_VERSION'), '17\n');
 writeFileSync(join(DIFF_DB_BACKUP, 'base'), Buffer.alloc(4096));

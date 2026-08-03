@@ -44,21 +44,23 @@ describe('listDatabaseBackups', () => {
 
   it('reports a backup with its size and parsed timestamp', () => {
     makeDir('reviews', 10);
-    makeDir('reviews.bak-2026-08-03T04-04-05-853Z', 2048);
+    makeDir('reviews.bak-2026-08-03T04-04-05.853Z', 2048);
 
     const [backup, ...rest] = listDatabaseBackups(dbPath);
 
     expect(rest).toHaveLength(0);
-    expect(backup.name).toBe('reviews.bak-2026-08-03T04-04-05-853Z');
+    expect(backup.name).toBe('reviews.bak-2026-08-03T04-04-05.853Z');
     expect(backup.bytes).toBe(2048);
-    // The suffix substitutes `:` and `.` with `-`, which is not reversible by a
-    // plain swap — the date's own hyphens look identical to the substituted
-    // ones — so this pins that the fixed-shape parse recovers the real instant.
+    // This is the REAL name pglite-migrate produces: `sanitizedTimestamp`
+    // replaces only `:`, so the `.` before the milliseconds survives. An earlier
+    // version of this test invented an all-hyphen name, which the parser
+    // happened to match while never matching anything on disk — the assertion
+    // confirmed itself and the UI showed no date for every real backup.
     expect(backup.createdAt).toBe('2026-08-03T04:04:05.853Z');
   });
 
   it('sums sizes recursively', () => {
-    const backup = makeDir('reviews.bak-2026-08-03T04-04-05-853Z', 100);
+    const backup = makeDir('reviews.bak-2026-08-03T04-04-05.853Z', 100);
     mkdirSync(join(backup, 'pg_wal'), { recursive: true });
     writeFileSync(join(backup, 'pg_wal', 'seg'), Buffer.alloc(400));
 
@@ -66,9 +68,9 @@ describe('listDatabaseBackups', () => {
   });
 
   it('orders newest first', () => {
-    makeDir('reviews.bak-2026-01-01T00-00-00-000Z');
-    makeDir('reviews.bak-2026-08-03T04-04-05-853Z');
-    makeDir('reviews.bak-2026-05-05T00-00-00-000Z');
+    makeDir('reviews.bak-2026-01-01T00-00-00.000Z');
+    makeDir('reviews.bak-2026-08-03T04-04-05.853Z');
+    makeDir('reviews.bak-2026-05-05T00-00-00.000Z');
 
     expect(listDatabaseBackups(dbPath).map(b => b.createdAt)).toEqual([
       '2026-08-03T04:04:05.853Z',
@@ -94,10 +96,10 @@ describe('listDatabaseBackups', () => {
     // migrated. Offering a one-click delete for it would be a different and
     // much riskier feature, so it must not appear here.
     makeDir('reviews.unreadable-2026-08-03T04-04-05-853Z', 999);
-    makeDir('reviews.bak-2026-08-03T04-04-05-853Z', 10);
+    makeDir('reviews.bak-2026-08-03T04-04-05.853Z', 10);
 
     expect(listDatabaseBackups(dbPath).map(b => b.name)).toEqual([
-      'reviews.bak-2026-08-03T04-04-05-853Z',
+      'reviews.bak-2026-08-03T04-04-05.853Z',
     ]);
   });
 
@@ -112,23 +114,23 @@ describe('listDatabaseBackups', () => {
 
 describe('deleteDatabaseBackup', () => {
   it('removes a real backup and reports success', () => {
-    const path = makeDir('reviews.bak-2026-08-03T04-04-05-853Z', 32);
+    const path = makeDir('reviews.bak-2026-08-03T04-04-05.853Z', 32);
 
-    expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBe(true);
+    expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05.853Z')).toBe(true);
     expect(existsSync(path)).toBe(false);
   });
 
   it('leaves other backups alone', () => {
-    makeDir('reviews.bak-2026-01-01T00-00-00-000Z');
-    const keep = makeDir('reviews.bak-2026-08-03T04-04-05-853Z');
+    makeDir('reviews.bak-2026-01-01T00-00-00.000Z');
+    const keep = makeDir('reviews.bak-2026-08-03T04-04-05.853Z');
 
-    deleteDatabaseBackup(dbPath, 'reviews.bak-2026-01-01T00-00-00-000Z');
+    deleteDatabaseBackup(dbPath, 'reviews.bak-2026-01-01T00-00-00.000Z');
 
     expect(existsSync(keep)).toBe(true);
   });
 
   it('reports false for a name that does not exist', () => {
-    expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBe(false);
+    expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05.853Z')).toBe(false);
   });
 
   // The safety property: this deletes recursively, so it must be impossible to
@@ -175,10 +177,10 @@ describe('deleteDatabaseBackup', () => {
   it('refuses a file that merely has the backup prefix', () => {
     // Only whole clusters are ever backups; a stray file matching the prefix
     // should not be silently removed by a "delete backup" action.
-    const path = join(root, 'data', 'reviews.bak-2026-08-03T04-04-05-853Z');
+    const path = join(root, 'data', 'reviews.bak-2026-08-03T04-04-05.853Z');
     writeFileSync(path, 'not a directory');
 
-    expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBe(false);
+    expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05.853Z')).toBe(false);
     expect(existsSync(path)).toBe(true);
   });
 });
@@ -200,14 +202,14 @@ describe('listQuarantinedDirectories', () => {
     // The two lists must stay disjoint: only one of them may be offered a
     // delete button, and merging them would hand the wrong affordance to data
     // Glassbox could not read.
-    makeDir('reviews.bak-2026-08-03T04-04-05-853Z', 10);
+    makeDir('reviews.bak-2026-08-03T04-04-05.853Z', 10);
     makeDir('reviews.unreadable-2026-01-01T00-00-00-000Z', 10);
 
     expect(listQuarantinedDirectories(dbPath).map(d => d.name)).toEqual([
       'reviews.unreadable-2026-01-01T00-00-00-000Z',
     ]);
     expect(listDatabaseBackups(dbPath).map(d => d.name)).toEqual([
-      'reviews.bak-2026-08-03T04-04-05-853Z',
+      'reviews.bak-2026-08-03T04-04-05.853Z',
     ]);
   });
 
@@ -220,7 +222,7 @@ describe('listQuarantinedDirectories', () => {
 
 describe('resolvePreservedDirectory', () => {
   it.each([
-    ['a backup', 'reviews.bak-2026-08-03T04-04-05-853Z'],
+    ['a backup', 'reviews.bak-2026-08-03T04-04-05.853Z'],
     ['a quarantined directory', 'reviews.unreadable-2026-08-03T04-04-05-853Z'],
   ])('resolves %s', (_label, name) => {
     const path = makeDir(name, 8);
@@ -229,7 +231,7 @@ describe('resolvePreservedDirectory', () => {
   });
 
   it('returns null for a directory that does not exist', () => {
-    expect(resolvePreservedDirectory(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBeNull();
+    expect(resolvePreservedDirectory(dbPath, 'reviews.bak-2026-08-03T04-04-05.853Z')).toBeNull();
   });
 
   // Revealing is read-only, so it accepts both prefixes — but it must still be
@@ -251,8 +253,25 @@ describe('resolvePreservedDirectory', () => {
   });
 
   it('returns null for a file that merely has the prefix', () => {
-    writeFileSync(join(root, 'data', 'reviews.bak-2026-08-03T04-04-05-853Z'), 'not a dir');
+    writeFileSync(join(root, 'data', 'reviews.bak-2026-08-03T04-04-05.853Z'), 'not a dir');
 
-    expect(resolvePreservedDirectory(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBeNull();
+    expect(resolvePreservedDirectory(dbPath, 'reviews.bak-2026-08-03T04-04-05.853Z')).toBeNull();
+  });
+});
+
+describe('timestamp formats produced by the two real producers', () => {
+  // The producers sanitize differently and both shapes exist on disk. Pinning
+  // both is the point: a parser matching only one silently degrades every
+  // affected row in the UI to "no date" rather than failing loudly.
+  it('parses the pglite-migrate backup format (only `:` replaced)', () => {
+    makeDir('reviews.bak-2026-08-03T07-01-32.032Z', 8);
+
+    expect(listDatabaseBackups(dbPath)[0].createdAt).toBe('2026-08-03T07:01:32.032Z');
+  });
+
+  it('parses the quarantineDataDir format (`:` and `.` both replaced)', () => {
+    makeDir('reviews.unreadable-2026-08-03T07-01-32-032Z', 8);
+
+    expect(listQuarantinedDirectories(dbPath)[0].createdAt).toBe('2026-08-03T07:01:32.032Z');
   });
 });

@@ -12,14 +12,22 @@ vi.mock('fs', () => ({
 // `vi.mock` is hoisted above every top-level statement, so the constructor it
 // returns has to be created inside `vi.hoisted` — a plain `const` above would
 // still be in its temporal dead zone when the factory runs.
-const { mockPGlite } = vi.hoisted(() => ({
-  mockPGlite: vi.fn(function (this: any, _dataDir: string, _options?: unknown) {
-    this.waitReady = Promise.resolve();
-    this.exec = vi.fn().mockResolvedValue(undefined);
-    this.query = vi.fn().mockResolvedValue({ rows: [] });
-    this.close = vi.fn().mockResolvedValue(undefined);
-  }),
-}));
+const { mockPGlite, targetState } = vi.hoisted(() => {
+  // Column names the mocked target reports for every table. Empty means the
+  // target has no such table, which the module treats as "leave it alone".
+  const targetState: { columns: string[] } = { columns: [] };
+  return {
+    targetState,
+    mockPGlite: vi.fn(function (this: any, _dataDir: string, _options?: unknown) {
+      this.waitReady = Promise.resolve();
+      this.exec = vi.fn().mockResolvedValue(undefined);
+      this.query = vi.fn().mockImplementation(() =>
+        Promise.resolve({ rows: targetState.columns.map((column_name) => ({ column_name })) }),
+      );
+      this.close = vi.fn().mockResolvedValue(undefined);
+    }),
+  };
+});
 vi.mock('@electric-sql/pglite', () => ({ PGlite: mockPGlite }));
 
 const mocks = {
@@ -74,6 +82,7 @@ describe('migrateMajorIfNeeded', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     for (const m of Object.values(mocks)) m.mockReset();
+    targetState.columns = [];
   });
 
   it('does nothing when there is no data directory', async () => {
@@ -239,5 +248,91 @@ describe('migrateMajorIfNeeded', () => {
     expect(sourceClose).toHaveBeenCalled();
     const target = mockPGlite.mock.instances.at(-1) as { close: ReturnType<typeof vi.fn> };
     expect(target.close).toHaveBeenCalled();
+  });
+});
+
+// A long-lived database carries columns from features that were later removed:
+// the revert drops them from the DDL but never from disk. The transfer copies
+// SOURCE columns, so without special handling it fails outright and a perfectly
+// good database becomes unopenable. This is not hypothetical — it is what
+// happened on the maintainer's own database, where `user_preferences` still
+// carried a `scope_filter` column from a reverted feature.
+describe('columns the current schema no longer has', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    for (const m of Object.values(mocks)) m.mockReset();
+    targetState.columns = [];
+  });
+
+  /** Source schema with one column the target (per `targetState`) lacks. */
+  function sourceWithObsoleteColumn() {
+    mocks.introspectSchema.mockResolvedValue({
+      tables: [{
+        schema: 'public',
+        name: 'user_preferences',
+        columns: [
+          { name: 'id', type: 'text' },
+          { name: 'scope_filter', type: 'text' },
+        ],
+      }],
+    });
+  }
+
+  it('recreates them on the target so the transfer can copy them', async () => {
+    happyPath();
+    sourceWithObsoleteColumn();
+    targetState.columns = ['id']; // the target has no `scope_filter`
+
+    const result = await migrateMajorIfNeeded(DB_PATH, initSchema);
+
+    expect(result.status).toBe('migrated');
+    const target = mockPGlite.mock.instances.at(-1) as { exec: ReturnType<typeof vi.fn> };
+    const sql = target.exec.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(sql.some(q => /ADD COLUMN "scope_filter" text/.test(q))).toBe(true);
+  });
+
+  it('drops them again, but only after validation has proven they transferred', async () => {
+    happyPath();
+    sourceWithObsoleteColumn();
+    targetState.columns = ['id'];
+
+    await migrateMajorIfNeeded(DB_PATH, initSchema);
+
+    const target = mockPGlite.mock.instances.at(-1) as { exec: ReturnType<typeof vi.fn> };
+    const drop = target.exec.mock.calls.findIndex(
+      (c: unknown[]) => /DROP COLUMN "scope_filter"/.test(String(c[0])),
+    );
+    expect(drop).toBeGreaterThanOrEqual(0);
+    // Dropping before validation would mean never checking that the rows
+    // carrying the obsolete column transferred correctly.
+    const dropOrder = target.exec.mock.invocationCallOrder[drop];
+    expect(mocks.validateMigration.mock.invocationCallOrder[0]).toBeLessThan(dropOrder);
+  });
+
+  it('leaves a table the target does not have at all to the transfer to report', async () => {
+    happyPath();
+    sourceWithObsoleteColumn();
+    targetState.columns = []; // no such table on the target
+
+    await migrateMajorIfNeeded(DB_PATH, initSchema);
+
+    // Recreating a whole removed table would resurrect a schema the app
+    // deliberately dropped, so nothing is added for it.
+    const target = mockPGlite.mock.instances.at(-1) as { exec: ReturnType<typeof vi.fn> };
+    const sql = target.exec.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(sql.some(q => q.includes('ADD COLUMN'))).toBe(false);
+  });
+
+  it('adds nothing when the target already has every source column', async () => {
+    happyPath();
+    sourceWithObsoleteColumn();
+    targetState.columns = ['id', 'scope_filter'];
+
+    await migrateMajorIfNeeded(DB_PATH, initSchema);
+
+    const target = mockPGlite.mock.instances.at(-1) as { exec: ReturnType<typeof vi.fn> };
+    const sql = target.exec.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(sql.some(q => q.includes('ADD COLUMN'))).toBe(false);
+    expect(sql.some(q => q.includes('DROP COLUMN'))).toBe(false);
   });
 });

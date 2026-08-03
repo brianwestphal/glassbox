@@ -99,7 +99,10 @@
         "delete aimed at the live cluster / staged / quarantined dir or a traversal name -> refused",
         "quarantined dir exists -> its own 'Preserved unreadable data' section renders, with Reveal and no Delete",
         "deleting a backup leaves the quarantined section untouched",
-        "reveal resolves either prefix but refuses the live cluster, a staged dir, or a traversal name"
+        "reveal resolves either prefix but refuses the live cluster, a staged dir, or a traversal name",
+        "source has a column the current schema dropped -> recreated on the target, transferred, validated, then dropped",
+        "source has a table the current schema dropped -> left alone, reported by the transfer",
+        "backup/quarantine timestamp formats (only ':' replaced vs ':' and '.') -> both parse to a real date"
       ]
     },
     "9.2": {

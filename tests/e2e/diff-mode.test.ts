@@ -156,6 +156,10 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     // fixture writes — proving the recursive walk ran rather than reporting 0.
     await expect(row.locator('.settings-backup-size')).toHaveText(/\d+(\.\d+)?\s*(KB|MB)/);
     await expect(row.locator('.settings-backup-path')).toContainText('reviews.bak-');
+    // A real backup name must parse into a date. The parser originally matched
+    // only a hand-written all-hyphen shape, so every real backup rendered the
+    // "Saved before a database upgrade" fallback instead.
+    await expect(row.locator('.settings-backup-date')).toHaveText(/^Saved \d/);
 
     // Deleting is confirmed first — the backup is the user's only fallback.
     await row.locator('[data-delete-backup]').click();

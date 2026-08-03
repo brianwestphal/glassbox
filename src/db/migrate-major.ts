@@ -1,5 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { existsSync, rmSync } from 'fs';
+import type { SchemaInfo } from 'pglite-migrate';
 import {
   backupDataDir,
   introspectSchema,
@@ -138,12 +139,17 @@ async function runMigration(
     try {
       await target.waitReady;
 
-      const report = await migrate({ source, target });
       const schema = await introspectSchema(source);
+      const obsolete = await materializeObsoleteColumns(target, schema);
+
+      const report = await migrate({ source, target });
       const validation = await validateMigration(source, target, schema, 'full');
       if (!validation.ok) {
         throw new Error(`post-migration validation failed: ${summarize(validation)}`);
       }
+      // Only after validation has proven every source column round-tripped,
+      // including the obsolete ones, are those discarded.
+      await dropObsoleteColumns(target, obsolete);
       const rows = report.tables.reduce((n, t) => n + t.rowsCopied, 0);
 
       // Both clusters must be closed before the swap: the directories are being
@@ -165,6 +171,90 @@ async function runMigration(
   } finally {
     await engine.cleanup().catch(() => undefined);
   }
+}
+
+/** A source column the current schema no longer has. */
+interface ObsoleteColumn {
+  table: string;
+  name: string;
+}
+
+/**
+ * Temporarily recreate, on the target, any column the source has that the
+ * current schema no longer declares.
+ *
+ * A long-lived database accumulates columns from features that were later
+ * removed: the revert drops them from the DDL, but `ALTER TABLE ADD COLUMN` is
+ * never undone on disk, so the old cluster still carries them. The transfer
+ * copies *source* columns, so without this it fails outright — both the `COPY`
+ * and its row-by-row fallback error with "column x of relation y does not
+ * exist", and a perfectly good database becomes unopenable.
+ *
+ * Adding the columns and dropping them after validation, rather than skipping
+ * them during the transfer, is what lets validation still prove **full** parity:
+ * every source column is compared, including the obsolete ones, and only then is
+ * the data the app no longer models deliberately discarded. Skipping them would
+ * mean never checking that the rows carrying them transferred correctly.
+ *
+ * @returns The columns added, for {@link dropObsoleteColumns} to remove.
+ */
+async function materializeObsoleteColumns(
+  target: PGlite,
+  sourceSchema: SchemaInfo,
+): Promise<ObsoleteColumn[]> {
+  const added: ObsoleteColumn[] = [];
+  for (const table of sourceSchema.tables) {
+    const present = await targetColumns(target, table.schema, table.name);
+    // A table the target lacks entirely is a different case and is left to the
+    // transfer to report — recreating a whole removed table here would be
+    // resurrecting a schema the app deliberately dropped.
+    if (present === null) continue;
+    for (const column of table.columns) {
+      if (present.has(column.name)) continue;
+      // `type` comes from the catalog's own `format_type`, so it is already
+      // valid DDL for the same engine family.
+      await target.exec(
+        `ALTER TABLE ${quote(table.schema)}.${quote(table.name)} ADD COLUMN ${quote(column.name)} ${column.type}`,
+      );
+      added.push({ table: `${table.schema}.${table.name}`, name: column.name });
+    }
+  }
+  if (added.length > 0) {
+    console.error(
+      `Carrying over ${String(added.length)} column(s) from a removed feature so they can be ` +
+        `verified, then discarding them: ${added.map((c) => `${c.table}.${c.name}`).join(', ')}`,
+    );
+  }
+  return added;
+}
+
+/** Drop the columns {@link materializeObsoleteColumns} added. */
+async function dropObsoleteColumns(target: PGlite, columns: ObsoleteColumn[]): Promise<void> {
+  for (const column of columns) {
+    const [schema, table] = column.table.split('.');
+    await target.exec(
+      `ALTER TABLE ${quote(schema)}.${quote(table)} DROP COLUMN ${quote(column.name)}`,
+    );
+  }
+}
+
+/** The target's column names for a table, or null when it has no such table. */
+async function targetColumns(
+  target: PGlite,
+  schema: string,
+  table: string,
+): Promise<Set<string> | null> {
+  const { rows } = await target.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = $2`,
+    [schema, table],
+  );
+  return rows.length === 0 ? null : new Set(rows.map((r) => r.column_name));
+}
+
+/** Quote an identifier for DDL. Catalog names, but doubling `"` costs nothing. */
+function quote(identifier: string): string {
+  return `"${identifier.replace(/"/g, '""')}"`;
 }
 
 /**

@@ -43,6 +43,16 @@ describe.skipIf(!live)('major-version migration (live PG17 -> PG18)', () => {
     await db.exec(SCHEMA_CORE_SQL);
     await db.exec(SCHEMA_AI_SQL);
     await db.exec('ALTER TABLE review_files DROP COLUMN difference_score');
+    // …and a column from a feature that was later REMOVED. The revert drops it
+    // from the DDL but never from disk, so a long-lived cluster still carries
+    // it. This is the shape that broke the first real upgrade attempt: the
+    // transfer copies SOURCE columns, so a column the current schema lacks made
+    // both the COPY and its row-by-row fallback fail, leaving the database
+    // unopenable.
+    await db.exec("ALTER TABLE user_preferences ADD COLUMN scope_filter TEXT DEFAULT 'all'");
+    await db.exec(
+      `INSERT INTO user_preferences (id, sort_mode, scope_filter) VALUES (1, 'folder', 'staged')`,
+    );
     for (let i = 0; i < 10; i++) {
       await db.exec(
         `INSERT INTO reviews (id, repo_path, repo_name, mode, status)
@@ -106,6 +116,18 @@ describe.skipIf(!live)('major-version migration (live PG17 -> PG18)', () => {
        WHERE table_name = 'review_files' AND column_name = 'difference_score'`,
     );
     expect(col.rows).toHaveLength(1);
+
+    // The obsolete column is gone from the migrated cluster — the app's schema
+    // is what the upgraded database ends up with, not the old one's.
+    const obsolete = await db.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'user_preferences' AND column_name = 'scope_filter'`,
+    );
+    expect(obsolete.rows).toHaveLength(0);
+
+    // …but the row that carried it survived, with its still-modelled columns.
+    const prefs = await db.query<{ sort_mode: string }>('SELECT sort_mode FROM user_preferences');
+    expect(prefs.rows).toEqual([{ sort_mode: 'folder' }]);
 
     await db.exec(
       `INSERT INTO reviews (id, repo_path, repo_name, mode, status)

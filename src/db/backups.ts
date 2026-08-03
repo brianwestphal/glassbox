@@ -172,13 +172,19 @@ function directorySize(path: string): number {
 /**
  * Recover an ISO timestamp from the directory suffix.
  *
- * `backupDataDir` builds the suffix by replacing `:` and `.` with `-`, which is
- * not reversible by a plain swap — the date's own hyphens are indistinguishable
- * from the substituted ones. Matching the fixed shape instead is what makes it
- * unambiguous.
+ * The two producers sanitize differently and BOTH shapes occur on disk:
+ * `pglite-migrate`'s `backupDataDir` replaces only `:` (leaving
+ * `2026-08-03T07-01-32.032Z`), while `quarantineDataDir` replaces `:` and `.`
+ * alike (`2026-08-03T07-01-32-032Z`). Accepting either separator before the
+ * milliseconds is what makes this work for a real directory rather than only a
+ * hand-written one.
+ *
+ * Matching a fixed shape rather than swapping characters back is deliberate:
+ * the substitution is not reversible, since the date's own hyphens are
+ * indistinguishable from the substituted ones.
  */
 function parseStamp(suffix: string): string | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(suffix);
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})[.-](\d{3})Z$/.exec(suffix);
   if (m === null) return null;
   const [, y, mo, d, h, mi, s, ms] = m;
   const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}.${ms}Z`;

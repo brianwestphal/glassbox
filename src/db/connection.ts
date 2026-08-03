@@ -77,9 +77,16 @@ export async function getDb(): Promise<PGlite> {
       throw new Error(
         `Your database was created by PostgreSQL ${migration.fromMajor}, which this version of ` +
           `Glassbox cannot open directly. A one-time upgrade is needed and it could not be ` +
-          `completed: ${migration.reason}\n` +
-          `This most often means no network connection — the upgrade downloads the older ` +
-          `database engine once. Your data has not been modified; try again when connected.`,
+          `completed.\n\n` +
+          `Reason: ${migration.reason}\n\n` +
+          // Do not assert a cause here. An earlier version of this message
+          // asserted "this most often means no network connection", which read
+          // as a diagnosis; the first real-world failure was a schema mismatch,
+          // so the message actively misdirected. State the reason and offer the
+          // network only as one possibility.
+          `Your data has not been modified. If the reason above mentions the network or the ` +
+          `registry, reconnect and start Glassbox again — the upgrade downloads the older ` +
+          `database engine once.`,
         { cause: err }
       );
     }
