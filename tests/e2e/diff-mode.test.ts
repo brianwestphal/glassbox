@@ -137,7 +137,20 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     await settingsBtn.click();
     await expect(page.locator('.settings-dialog')).toBeVisible({ timeout: 5000 });
 
-    const row = page.locator('.settings-backup-row');
+    // Two preserved directories are seeded, one of each kind. They must render
+    // as separate sections: only the backup may be deleted.
+    const backupSection = page.locator('.settings-section').filter({ hasText: 'Database backups' });
+    const quarantineSection = page.locator('.settings-section').filter({ hasText: 'Preserved unreadable data' });
+    await expect(backupSection).toHaveCount(1);
+    await expect(quarantineSection).toHaveCount(1);
+
+    // The quarantined one offers Reveal and NO delete — it may be the user's
+    // only copy of data Glassbox could not read.
+    await expect(quarantineSection.locator('[data-reveal-backup]')).toHaveCount(1);
+    await expect(quarantineSection.locator('[data-delete-backup]')).toHaveCount(0);
+    await expect(quarantineSection.locator('.settings-backup-path')).toContainText('reviews.unreadable-');
+
+    const row = backupSection.locator('.settings-backup-row');
     await expect(row).toHaveCount(1);
     // The size is the whole directory, so it must exceed the 4096-byte file the
     // fixture writes — proving the recursive walk ran rather than reporting 0.
@@ -151,14 +164,16 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
 
     // Cancelling must leave it in place.
     await confirm.locator('#backup-del-cancel').click();
-    await expect(page.locator('.settings-backup-row')).toHaveCount(1);
+    await expect(row).toHaveCount(1);
 
     await row.locator('[data-delete-backup]').click();
     await page.locator('#backup-del-confirm').click();
 
     // The list is re-read from the server, so an empty result means the
     // directory is really gone — and the whole section stops rendering.
-    await expect(page.locator('.settings-backup-row')).toHaveCount(0, { timeout: 5000 });
+    await expect(backupSection).toHaveCount(0, { timeout: 5000 });
+    // The quarantined section is untouched by deleting a backup.
+    await expect(quarantineSection).toHaveCount(1);
     await expect(page.locator('.settings-dialog')).toContainText('Git difftool');
   });
 });

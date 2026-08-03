@@ -83,7 +83,7 @@
         "tests/integration/db/major-migration.test.ts",
         "tests/e2e/diff-mode.test.ts"
       ],
-      "note": "Mocked unit coverage of every migration outcome plus the getDb branch it drives; backups.test.ts covers listing/deleting the retained copy including the refusals; the integration test performs a real PG17 -> PG18 round trip and is gated on GLASSBOX_LIVE_MIGRATION_TESTS (npm run test:live) because it downloads the old engine and boots two WASM clusters; the e2e drives the Settings -> General backups section against a seeded backup.",
+      "note": "Mocked unit coverage of every migration outcome plus the getDb branch it drives; backups.test.ts covers listing/deleting the retained copy including the refusals; the integration test performs a real PG17 -> PG18 round trip and is gated on GLASSBOX_LIVE_MIGRATION_TESTS (npm run test:live) because it downloads the old engine and boots two WASM clusters; the e2e drives the Settings -> General sections against a seeded backup AND a seeded quarantined dir, so the two rendering as one merged list would fail.",
       "transitions": [
         "open succeeds -> migration never attempted (no version probe, no download)",
         "no data directory / unreadable PG_VERSION -> not-needed",
@@ -96,7 +96,10 @@
         "backup exists -> Settings shows the Database backups section with size, date and path",
         "delete confirmed -> backup removed, list re-read, section stops rendering",
         "delete cancelled -> backup left in place",
-        "delete aimed at the live cluster / staged / quarantined dir or a traversal name -> refused"
+        "delete aimed at the live cluster / staged / quarantined dir or a traversal name -> refused",
+        "quarantined dir exists -> its own 'Preserved unreadable data' section renders, with Reveal and no Delete",
+        "deleting a backup leaves the quarantined section untouched",
+        "reveal resolves either prefix but refuses the live cluster, a staged dir, or a traversal name"
       ]
     },
     "9.2": {

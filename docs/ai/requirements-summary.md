@@ -412,7 +412,11 @@ pre-upgrade copy is **surfaced, not silently removed**: Settings → General
 grows a **Database backups** section (size, date, path + a confirmed
 Delete) whenever one exists, and the delete is scoped to `reviews.bak-*`
 so the live cluster, a staged migration dir, and the §9.5 quarantined
-dirs can never be its target.
+dirs can never be its target. Those quarantined dirs get their own
+**Preserved unreadable data** section with a Reveal action and *no*
+delete — a backup is redundant by construction, but unreadable data may
+be the user's only copy, and giving both the same affordance would
+flatten the distinction they need to decide safely.
 
 ## 11. Desktop app (`10-desktop-app.md`) — **Shipped**
 

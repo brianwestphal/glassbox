@@ -53,6 +53,16 @@ mkdirSync(DIFF_DB_BACKUP, { recursive: true });
 writeFileSync(join(DIFF_DB_BACKUP, 'PG_VERSION'), '17\n');
 writeFileSync(join(DIFF_DB_BACKUP, 'base'), Buffer.alloc(4096));
 
+// …and a quarantined directory from the corrupt-database recovery (§9.5). It is
+// seeded alongside the backup precisely so the e2e can assert the two render as
+// SEPARATE sections with different affordances — the backup deletable, this one
+// only revealable. A test that saw just one of them could not catch them being
+// merged.
+const DIFF_DB_QUARANTINE = join(DIFF_WORK_DIR, '.glassbox', 'data', 'reviews.unreadable-2026-01-02T03-04-05-678Z');
+mkdirSync(DIFF_DB_QUARANTINE, { recursive: true });
+writeFileSync(join(DIFF_DB_QUARANTINE, 'PG_VERSION'), '17\n');
+writeFileSync(join(DIFF_DB_QUARANTINE, 'base'), Buffer.alloc(2048));
+
 // Seed the plugin server's project dir with a committed `.pr-notes/` review note
 // anchored to `diagram.fdiag` plus its `.fdiag` proof artifact, so the review-note
 // **artifact** render path (doc 29 FR-29.2, the other integration point) is also

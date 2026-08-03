@@ -95,6 +95,48 @@ function renderBackupsSection(ctx: TabContext): SafeHtml {
   );
 }
 
+/**
+ * Quarantined directories the corrupt-database recovery set aside (doc 9 §9.5).
+ *
+ * Listed separately from the backups above, with no Delete. The distinction is
+ * the point: a backup is redundant by construction, whereas this is data
+ * Glassbox could not read and may be the user's only copy. Offering the same
+ * one-click delete would flatten that difference, so the only action here is to
+ * reveal it in the file manager — an invitation to try to recover it, not to
+ * discard it.
+ */
+function renderQuarantinedSection(ctx: TabContext): SafeHtml {
+  const { dbQuarantined } = ctx;
+  if (dbQuarantined.length === 0) return <></>;
+  return (
+    <>
+      <div className="settings-divider"></div>
+      <div className="settings-section">
+        <label className="settings-label">Preserved unreadable data</label>
+        {dbQuarantined.map(d => (
+          <div className="settings-backup-row" data-key={d.name}>
+            <div className="settings-backup-info">
+              <span className="settings-backup-size">{formatBytes(d.bytes)}</span>
+              <span className="settings-backup-date">
+                {d.createdAt !== null
+                  ? `Set aside ${new Date(d.createdAt).toLocaleDateString()}`
+                  : 'Set aside after a failed startup'}
+              </span>
+              <code className="settings-backup-path">{d.path}</code>
+            </div>
+            <button className="btn btn-sm" data-reveal-backup={d.name}>Reveal</button>
+          </div>
+        ))}
+        <p className="settings-hint">
+          A database Glassbox could not open. It was kept rather than deleted, because it may hold
+          reviews that exist nowhere else. Glassbox won't remove it — open it in your file manager
+          if you want to try recovering it, or delete it yourself once you're sure you don't need it.
+        </p>
+      </div>
+    </>
+  );
+}
+
 function renderGeneralTab(ctx: TabContext): SafeHtml {
   const { themesData, activeThemeId, appName, isTauri } = ctx;
   return (
@@ -128,6 +170,7 @@ function renderGeneralTab(ctx: TabContext): SafeHtml {
       <div className="settings-divider"></div>
       {renderDifftoolSection(ctx)}
       {renderBackupsSection(ctx)}
+      {renderQuarantinedSection(ctx)}
       <div className="settings-divider"></div>
       <div className="settings-section">
         <a className="settings-share-link" id="settings-share-link" href="#">Know someone who'd love this? <strong>Share Glassbox</strong></a>

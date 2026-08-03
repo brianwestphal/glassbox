@@ -69,6 +69,11 @@ export interface TabContext {
   // most users will never have upgraded across a Postgres major.
   dbBackups: DatabaseBackup[];
 
+  // Quarantined directories the corrupt-database recovery set aside (doc 9
+  // §9.5). Kept separate from `dbBackups` so a tab cannot accidentally offer
+  // the delete affordance for data Glassbox could not read.
+  dbQuarantined: DatabaseBackup[];
+
   // Cross-tab actions kept for the small number of tabs whose render fn
   // emits inline event handlers (e.g. updates-tab status text). Most tab
   // interactions flow through the centralized `delegate(overlay, …)` calls

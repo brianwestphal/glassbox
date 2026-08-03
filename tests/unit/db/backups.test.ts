@@ -3,7 +3,12 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { deleteDatabaseBackup, listDatabaseBackups } from '../../../src/db/backups.js';
+import {
+  deleteDatabaseBackup,
+  listDatabaseBackups,
+  listQuarantinedDirectories,
+  resolvePreservedDirectory,
+} from '../../../src/db/backups.js';
 
 let root: string;
 let dbPath: string;
@@ -175,5 +180,79 @@ describe('deleteDatabaseBackup', () => {
 
     expect(deleteDatabaseBackup(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBe(false);
     expect(existsSync(path)).toBe(true);
+  });
+});
+
+describe('listQuarantinedDirectories', () => {
+  it('finds the directories the corrupt-database recovery set aside', () => {
+    makeDir('reviews', 10);
+    makeDir('reviews.unreadable-2026-08-03T04-04-05-853Z', 512);
+
+    const [dir, ...rest] = listQuarantinedDirectories(dbPath);
+
+    expect(rest).toHaveLength(0);
+    expect(dir.name).toBe('reviews.unreadable-2026-08-03T04-04-05-853Z');
+    expect(dir.bytes).toBe(512);
+    expect(dir.createdAt).toBe('2026-08-03T04:04:05.853Z');
+  });
+
+  it('does not include backups', () => {
+    // The two lists must stay disjoint: only one of them may be offered a
+    // delete button, and merging them would hand the wrong affordance to data
+    // Glassbox could not read.
+    makeDir('reviews.bak-2026-08-03T04-04-05-853Z', 10);
+    makeDir('reviews.unreadable-2026-01-01T00-00-00-000Z', 10);
+
+    expect(listQuarantinedDirectories(dbPath).map(d => d.name)).toEqual([
+      'reviews.unreadable-2026-01-01T00-00-00-000Z',
+    ]);
+    expect(listDatabaseBackups(dbPath).map(d => d.name)).toEqual([
+      'reviews.bak-2026-08-03T04-04-05-853Z',
+    ]);
+  });
+
+  it('returns nothing when there are none', () => {
+    makeDir('reviews', 10);
+
+    expect(listQuarantinedDirectories(dbPath)).toEqual([]);
+  });
+});
+
+describe('resolvePreservedDirectory', () => {
+  it.each([
+    ['a backup', 'reviews.bak-2026-08-03T04-04-05-853Z'],
+    ['a quarantined directory', 'reviews.unreadable-2026-08-03T04-04-05-853Z'],
+  ])('resolves %s', (_label, name) => {
+    const path = makeDir(name, 8);
+
+    expect(resolvePreservedDirectory(dbPath, name)).toBe(path);
+  });
+
+  it('returns null for a directory that does not exist', () => {
+    expect(resolvePreservedDirectory(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBeNull();
+  });
+
+  // Revealing is read-only, so it accepts both prefixes — but it must still be
+  // impossible to aim at the live cluster or outside the data directory, since
+  // the resolved path is handed to the OS file manager.
+  it.each([
+    ['the live cluster', 'reviews'],
+    ['an unrelated sibling', 'attachments'],
+    ['a staged migration directory', 'reviews.migrating-2026-08-03T04-04-05-853Z'],
+    ['a traversal name', 'reviews.bak-a/../../escape'],
+    ['a parent reference', '../escape'],
+  ])('refuses %s', (_label, name) => {
+    mkdirSync(join(root, 'escape'), { recursive: true });
+    makeDir('reviews', 8);
+    makeDir('attachments', 8);
+    makeDir('reviews.migrating-2026-08-03T04-04-05-853Z', 8);
+
+    expect(resolvePreservedDirectory(dbPath, name)).toBeNull();
+  });
+
+  it('returns null for a file that merely has the prefix', () => {
+    writeFileSync(join(root, 'data', 'reviews.bak-2026-08-03T04-04-05-853Z'), 'not a dir');
+
+    expect(resolvePreservedDirectory(dbPath, 'reviews.bak-2026-08-03T04-04-05-853Z')).toBeNull();
   });
 });

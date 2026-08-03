@@ -1,8 +1,8 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
-import type { DatabaseBackup } from '../../api/db-backups.js';
-import { deleteDatabaseBackup, listDatabaseBackups } from '../../api/db-backups.js';
+import type { DatabaseBackup, ListBackupsResp } from '../../api/db-backups.js';
+import { deleteDatabaseBackup, listDatabaseBackups, revealDatabaseBackup } from '../../api/db-backups.js';
 import type { DifftoolStatusResp } from '../../api/index.js';
 import {
   deleteAIKey,
@@ -62,6 +62,7 @@ interface SettingsUIState {
   // Retained pre-upgrade database backups (doc 9 §9.1a). Re-fetched after a
   // delete so the section disappears once the last one is gone.
   dbBackups: DatabaseBackup[];
+  dbQuarantined: DatabaseBackup[];
 }
 
 export function showSettingsDialog(onClose?: () => void): void {
@@ -87,7 +88,7 @@ export function showSettingsDialog(onClose?: () => void): void {
       meetsMinimum: channelCheck.meetsMinimum,
     };
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, backups.backups, onClose);
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, backups, onClose);
   })();
 }
 
@@ -135,7 +136,7 @@ function renderSettingsModal(
   themesData: ThemesResponse,
   channelState: ChannelState,
   initialDifftoolStatus: DifftoolStatusResp,
-  initialDbBackups: DatabaseBackup[],
+  initialBackups: ListBackupsResp,
   onClose?: () => void,
 ): void {
   const isTauri = getTauriGlobal() !== undefined;
@@ -157,7 +158,8 @@ function renderSettingsModal(
     appName: projectSettings.appName ?? '',
     activeThemeId: themesData.activeId,
     difftoolStatus: initialDifftoolStatus,
-    dbBackups: initialDbBackups,
+    dbBackups: initialBackups.backups,
+    dbQuarantined: initialBackups.quarantined,
   });
 
   const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog"></div></div>);
@@ -503,6 +505,7 @@ function buildContext(args: {
     activeThemeId: cur.activeThemeId,
     difftoolStatus: cur.difftoolStatus,
     dbBackups: cur.dbBackups,
+    dbQuarantined: cur.dbQuarantined,
     saveConfig: args.actions.saveConfig,
     saveKey: args.actions.saveKey,
     removeKey: args.actions.removeKey,
@@ -630,10 +633,24 @@ function setupDelegates(args: {
         // Re-read from the server rather than filtering locally, so the list
         // reflects what is actually on disk.
         const fresh = await listDatabaseBackups();
-        setUi({ dbBackups: fresh.backups });
+        setUi({ dbBackups: fresh.backups, dbQuarantined: fresh.quarantined });
         showToast('Backup deleted');
       })();
     });
+  });
+  // Reveal a preserved directory in the OS file manager. The only action
+  // offered for quarantined unreadable data (doc 9 §9.5) — it may be the user's
+  // only copy, so Glassbox points at it rather than removing it.
+  void delegate(overlay, 'click', '[data-reveal-backup]', (_e, btn) => {
+    const name = asEl(btn).dataset.revealBackup;
+    if (name === undefined) return;
+    void (async () => {
+      try {
+        await revealDatabaseBackup(name);
+      } catch {
+        showToast('Could not open the folder');
+      }
+    })();
   });
 
   // Profile tab
