@@ -1,6 +1,8 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
 
+import type { DatabaseBackup } from '../../api/db-backups.js';
+import { deleteDatabaseBackup, listDatabaseBackups } from '../../api/db-backups.js';
 import type { DifftoolStatusResp } from '../../api/index.js';
 import {
   deleteAIKey,
@@ -57,12 +59,15 @@ interface SettingsUIState {
   // GB-850 — current `git difftool` registration state. Updated after
   // register/unregister actions so the General tab's button re-renders.
   difftoolStatus: DifftoolStatusResp;
+  // Retained pre-upgrade database backups (doc 9 §9.1a). Re-fetched after a
+  // delete so the section disappears once the last one is gone.
+  dbBackups: DatabaseBackup[];
 }
 
 export function showSettingsDialog(onClose?: () => void): void {
   resetPluginsTab(); // fresh plugin list per dialog session (doc 29, GB-1040)
   void (async () => {
-    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus] = await Promise.all([
+    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus, backups] = await Promise.all([
       getAIKeyStatus(),
       listAIModels(),
       getAIConfig(),
@@ -71,6 +76,7 @@ export function showSettingsDialog(onClose?: () => void): void {
       getClaudeCheck(),
       getChannelStatus(),
       getDifftoolStatus(),
+      listDatabaseBackups(),
     ]);
 
     const channelState: ChannelState = {
@@ -81,8 +87,44 @@ export function showSettingsDialog(onClose?: () => void): void {
       meetsMinimum: channelCheck.meetsMinimum,
     };
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, onClose);
+    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, backups.backups, onClose);
   })();
+}
+
+/**
+ * Confirm deleting a retained database backup.
+ *
+ * Mirrors the theme-manager confirm rather than using `window.confirm`, which
+ * does not render inside the Tauri webview.
+ */
+function showDeleteBackupConfirm(name: string, onConfirm: () => void): void {
+  const confirmOverlay = toElement(
+    <div className="modal-overlay">
+      <div className="modal" style="max-width:420px">
+        <h3>Delete Database Backup</h3>
+        <p>
+          Delete this backup of your review database? Your current reviews are not affected — but
+          this removes the copy kept from before the upgrade, and it cannot be undone.
+        </p>
+        <p><code>{name}</code></p>
+        <div className="modal-actions">
+          <button className="btn btn-sm" id="backup-del-cancel">Cancel</button>
+          <button className="btn btn-sm btn-danger" id="backup-del-confirm">Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  confirmOverlay.querySelector('#backup-del-cancel')?.addEventListener('click', () => { confirmOverlay.remove(); });
+  confirmOverlay.querySelector('#backup-del-confirm')?.addEventListener('click', () => {
+    confirmOverlay.remove();
+    onConfirm();
+  });
+  confirmOverlay.addEventListener('click', (e) => {
+    if (e.target === confirmOverlay) confirmOverlay.remove();
+  });
+
+  document.body.appendChild(confirmOverlay);
 }
 
 function renderSettingsModal(
@@ -93,6 +135,7 @@ function renderSettingsModal(
   themesData: ThemesResponse,
   channelState: ChannelState,
   initialDifftoolStatus: DifftoolStatusResp,
+  initialDbBackups: DatabaseBackup[],
   onClose?: () => void,
 ): void {
   const isTauri = getTauriGlobal() !== undefined;
@@ -114,6 +157,7 @@ function renderSettingsModal(
     appName: projectSettings.appName ?? '',
     activeThemeId: themesData.activeId,
     difftoolStatus: initialDifftoolStatus,
+    dbBackups: initialDbBackups,
   });
 
   const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog"></div></div>);
@@ -458,6 +502,7 @@ function buildContext(args: {
     appName: cur.appName,
     activeThemeId: cur.activeThemeId,
     difftoolStatus: cur.difftoolStatus,
+    dbBackups: cur.dbBackups,
     saveConfig: args.actions.saveConfig,
     saveKey: args.actions.saveKey,
     removeKey: args.actions.removeKey,
@@ -569,6 +614,27 @@ function setupDelegates(args: {
   });
   void delegate(overlay, 'click', '#difftool-register-btn', actions.registerDifftoolAction);
   void delegate(overlay, 'click', '#difftool-unregister-btn', actions.unregisterDifftoolAction);
+  // Deleting a pre-upgrade database backup (doc 9 §9.1a). Confirmed first: it
+  // is the user's only fallback copy, and the deletion is irreversible.
+  void delegate(overlay, 'click', '[data-delete-backup]', (_e, btn) => {
+    const name = asEl(btn).dataset.deleteBackup;
+    if (name === undefined) return;
+    showDeleteBackupConfirm(name, () => {
+      void (async () => {
+        try {
+          await deleteDatabaseBackup(name);
+        } catch {
+          showToast('Could not delete the backup');
+          return;
+        }
+        // Re-read from the server rather than filtering locally, so the list
+        // reflects what is actually on disk.
+        const fresh = await listDatabaseBackups();
+        setUi({ dbBackups: fresh.backups });
+        showToast('Backup deleted');
+      })();
+    });
+  });
 
   // Profile tab
   void delegate(overlay, 'click', '.settings-tag', (_e, tag) => {

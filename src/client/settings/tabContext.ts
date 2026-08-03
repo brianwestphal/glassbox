@@ -1,5 +1,6 @@
 import type { SafeHtml } from 'kerfjs';
 
+import type { DatabaseBackup } from '../../api/db-backups.js';
 import type {
   DifftoolStatusResp,
   GetAIKeyStatusResp,
@@ -62,6 +63,11 @@ export interface TabContext {
   // affordance; the registerDifftool/unregisterDifftool actions refetch and
   // update it.
   difftoolStatus: DifftoolStatusResp;
+
+  // Retained pre-upgrade database backups (doc 9 §9.1a). Normally empty — the
+  // General tab renders its section only when a backup actually exists, since
+  // most users will never have upgraded across a Postgres major.
+  dbBackups: DatabaseBackup[];
 
   // Cross-tab actions kept for the small number of tabs whose render fn
   // emits inline event handlers (e.g. updates-tab status text). Most tab

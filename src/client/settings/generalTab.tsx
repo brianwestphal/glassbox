@@ -41,6 +41,60 @@ function renderDifftoolSection(ctx: TabContext): SafeHtml {
   );
 }
 
+/** Human-readable byte size — these are whole data directories, so MB/GB. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${String(bytes)} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value < 10 ? value.toFixed(1) : String(Math.round(value))} ${units[unit]}`;
+}
+
+/**
+ * Retained pre-upgrade database backups (doc 9 §9.1a).
+ *
+ * Rendered only when one exists — most users never upgrade across a Postgres
+ * major, and an always-present "no backups" row would be noise. The app keeps
+ * the copy indefinitely and never deletes it on its own, which is the right
+ * default for the user's only fallback but leaves a full-size duplicate on
+ * disk; this section is how they find it and reclaim the space deliberately.
+ */
+function renderBackupsSection(ctx: TabContext): SafeHtml {
+  const { dbBackups } = ctx;
+  if (dbBackups.length === 0) return <></>;
+  return (
+    <>
+      <div className="settings-divider"></div>
+      <div className="settings-section">
+        <label className="settings-label">Database backups</label>
+        {dbBackups.map(b => (
+          <div className="settings-backup-row" data-key={b.name}>
+            <div className="settings-backup-info">
+              <span className="settings-backup-size">{formatBytes(b.bytes)}</span>
+              <span className="settings-backup-date">
+                {b.createdAt !== null
+                  ? `Saved ${new Date(b.createdAt).toLocaleDateString()}`
+                  : 'Saved before a database upgrade'}
+              </span>
+              <code className="settings-backup-path">{b.path}</code>
+            </div>
+            <button className="btn btn-sm btn-danger" data-delete-backup={b.name}>Delete</button>
+          </div>
+        ))}
+        <p className="settings-hint">
+          A copy of your review database kept from before a PostgreSQL version upgrade. Everything
+          in it was carried over, so this is only a fallback — safe to delete once you're satisfied
+          your reviews are intact.
+        </p>
+      </div>
+    </>
+  );
+}
+
 function renderGeneralTab(ctx: TabContext): SafeHtml {
   const { themesData, activeThemeId, appName, isTauri } = ctx;
   return (
@@ -73,6 +127,7 @@ function renderGeneralTab(ctx: TabContext): SafeHtml {
       )}
       <div className="settings-divider"></div>
       {renderDifftoolSection(ctx)}
+      {renderBackupsSection(ctx)}
       <div className="settings-divider"></div>
       <div className="settings-section">
         <a className="settings-share-link" id="settings-share-link" href="#">Know someone who'd love this? <strong>Share Glassbox</strong></a>

@@ -407,7 +407,12 @@ is retained. When it can't complete (usually offline) the app **fails to
 start with an actionable message** rather than quarantining — quarantining
 would leave an empty cluster at the canonical path and strand the user's
 history forever. A same-major open abort still takes the preserve-aside
-recovery path (§9.5); an unopenable dir is never deleted.
+recovery path (§9.5); an unopenable dir is never deleted. The retained
+pre-upgrade copy is **surfaced, not silently removed**: Settings → General
+grows a **Database backups** section (size, date, path + a confirmed
+Delete) whenever one exists, and the delete is scoped to `reviews.bak-*`
+so the live cluster, a staged migration dir, and the §9.5 quarantined
+dirs can never be its target.
 
 ## 11. Desktop app (`10-desktop-app.md`) — **Shipped**
 

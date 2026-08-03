@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync } from 'fs';
+import { cpSync, mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -40,6 +40,18 @@ mkdirSync(DIFF_WORK_DIR, { recursive: true });
 mkdirSync(GT_WORK_DIR, { recursive: true });
 mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 mkdirSync(PLUGIN_WORK_DIR, { recursive: true });
+
+// Seed the `--diff` server's data dir with a fake retained pre-upgrade database
+// backup (doc 9 §9.1a), so the Settings → General "Database backups" section has
+// something to render. A real one only exists after a PostgreSQL major upgrade,
+// which no test can provoke against a fresh install; the section keys purely off
+// a `reviews.bak-<stamp>` sibling existing, so a directory with a file in it is
+// a faithful stand-in. This server is used rather than the demo one because its
+// data dir is a fixed path known before startup, not a timestamped tmpdir.
+const DIFF_DB_BACKUP = join(DIFF_WORK_DIR, '.glassbox', 'data', 'reviews.bak-2026-08-03T04-04-05-853Z');
+mkdirSync(DIFF_DB_BACKUP, { recursive: true });
+writeFileSync(join(DIFF_DB_BACKUP, 'PG_VERSION'), '17\n');
+writeFileSync(join(DIFF_DB_BACKUP, 'base'), Buffer.alloc(4096));
 
 // Seed the plugin server's project dir with a committed `.pr-notes/` review note
 // anchored to `diagram.fdiag` plus its `.fdiag` proof artifact, so the review-note

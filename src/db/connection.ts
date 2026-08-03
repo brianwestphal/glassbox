@@ -34,6 +34,12 @@ export function getDataDir(): string | null {
   return currentDataDir;
 }
 
+/** The review cluster's directory, or null before `setDataDir`. Retained
+ *  pre-upgrade backups are siblings of it (doc 9 §9.1a). */
+export function getDbPath(): string | null {
+  return currentDbPath;
+}
+
 export async function getDb(): Promise<PGlite> {
   if (db) return db;
   if (currentDbPath === null) throw new Error('Data directory not set. Call setDataDir() first.');

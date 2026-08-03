@@ -123,4 +123,42 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     await page.locator('#complete-review').click();
     await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
   });
+  // Retained pre-upgrade database backup (doc 9 §9.1a). The section is rendered
+  // only when a backup actually exists on disk; `playwright.config.ts` seeds a
+  // `reviews.bak-<stamp>` directory into this server's data dir before startup,
+  // since a real one can only appear after a PostgreSQL major upgrade that no
+  // test can provoke against a fresh install. Runs last: it deletes the backup,
+  // so the section is gone for anything after it.
+  test('Settings shows the retained database backup and can delete it', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+
+    const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]').first();
+    await settingsBtn.click();
+    await expect(page.locator('.settings-dialog')).toBeVisible({ timeout: 5000 });
+
+    const row = page.locator('.settings-backup-row');
+    await expect(row).toHaveCount(1);
+    // The size is the whole directory, so it must exceed the 4096-byte file the
+    // fixture writes — proving the recursive walk ran rather than reporting 0.
+    await expect(row.locator('.settings-backup-size')).toHaveText(/\d+(\.\d+)?\s*(KB|MB)/);
+    await expect(row.locator('.settings-backup-path')).toContainText('reviews.bak-');
+
+    // Deleting is confirmed first — the backup is the user's only fallback.
+    await row.locator('[data-delete-backup]').click();
+    const confirm = page.locator('.modal-overlay').filter({ hasText: 'Delete Database Backup' });
+    await expect(confirm).toBeVisible({ timeout: 3000 });
+
+    // Cancelling must leave it in place.
+    await confirm.locator('#backup-del-cancel').click();
+    await expect(page.locator('.settings-backup-row')).toHaveCount(1);
+
+    await row.locator('[data-delete-backup]').click();
+    await page.locator('#backup-del-confirm').click();
+
+    // The list is re-read from the server, so an empty result means the
+    // directory is really gone — and the whole section stops rendering.
+    await expect(page.locator('.settings-backup-row')).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('.settings-dialog')).toContainText('Git difftool');
+  });
 });
