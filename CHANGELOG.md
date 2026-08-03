@@ -2,6 +2,28 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] - 2026-08-03
+
+
+
+- Automatic PostgreSQL major-version upgrade: databases created by PGLite 0.4.x (PG17) are migrated in place to PG18 on first launch, instead of failing to open. The pre-upgrade cluster is copied, verified, and retained as a fallback.
+- Settings → General now lists retained pre-upgrade database backups with size on disk, date taken, and full path, plus Reveal and Delete actions to reclaim the space once the upgrade is trusted.
+- Settings → General also lists quarantined unreadable data directories in a "Preserved unreadable data" section, with size, date, path, and a Reveal action (no delete — the data is never destroyed for you).
+- Git LFS-tracked images now work: pointer files are detected as binary and their real bytes are fetched through git's filters, so an LFS-tracked PNG shows the image comparison instead of a text diff of `oid sha256:…`.
+- AI review notes accept `--related <file:line>` (repeatable), and a note body's embedded links jump straight to the referenced line — in the same file, another review file, or elsewhere in the repo.
+
+
+- An unopenable database is no longer deleted. Previously any PGLite open failure mentioning "Aborted" or "RuntimeError" was treated as corruption and the data directory was removed, destroying every review and annotation; it is now preserved and quarantined.
+- The upgrade now also transfers columns the current schema has since dropped, so a long-lived database carrying a stale column no longer fails the migration and leaves the app unable to start.
+- Annotation drag handles are draggable again — the markup emitted an invalid `draggable` value that silently disabled mouse dragging. Note-artifact and lightbox images are correspondingly no longer draggable, which was fighting the drag-to-mark-a-region gesture.
+- `glassbox note` rejects unknown flags instead of silently accepting and dropping them, so a typo (or a flag your installed binary predates) no longer exits 0 having written an incomplete note.
+- Review-note artifacts that are unresolved LFS pointers return 404 rather than being served as a corrupt image.
+
+
+- AI review notes and risk/narrative/guided notes render block-level markdown — headings, lists, and paragraphs — instead of collapsing to literal `###`, `**`, and `- ` on one line.
+- Note bodies are now written to SARIF correctly: the markdown source in `message.markdown` with a genuine plain-text rendering in `message.text`, so third-party SARIF viewers show prose rather than raw markers. Markdown headings in exported notes are demoted so they can't outrank the export's own structure.
+- Mermaid and PlantUML renders are bounded by a wall-clock timeout and fall back to the code block, so a subprocess that never exits can no longer hang the request.
+
 ## [1.0.0] - 2026-07-23
 
 
