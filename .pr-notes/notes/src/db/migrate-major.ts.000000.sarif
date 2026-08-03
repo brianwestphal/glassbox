@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mscpynuxgmlweh8q",
+          "message": {
+            "text": "Two copies of the original exist by default; this keeps the earlier one and drops the later one, which is the opposite of what the call order suggests.\n\nbackupDataDir copies the directory before the old engine opens it. swapIntoPlace would separately retain the displaced original as .old-<ts> after the migration. Keeping both leaves two full-size duplicates after every upgrade — on the maintainer's own 35 MB database that is 70 MB of redundancy.\n\nThe pre-open copy is the better one to keep. Starting a Postgres cluster is not a read-only act: WAL replay and crash recovery can write to the directory during open. So the .old-<ts> copy is post-open state, while the backup is provably what the user had. Hence keep: 1 on the backup and keepOld: false on the swap.\n\nkeepOld: false is safe because the library removes the displaced directory only after the new cluster is successfully renamed into place — a failed swap restores the original instead.\n\nSee src/db/connection.ts for why a failure here must not be treated as corruption.\n",
+            "markdown": "Two copies of the original exist by default; this keeps the earlier one and drops the later one, which is the opposite of what the call order suggests.\n\n`backupDataDir` copies the directory *before* the old engine opens it. `swapIntoPlace` would separately retain the displaced original as `.old-<ts>` after the migration. Keeping both leaves two full-size duplicates after every upgrade — on the maintainer's own 35 MB database that is 70 MB of redundancy.\n\nThe pre-open copy is the better one to keep. Starting a Postgres cluster is not a read-only act: WAL replay and crash recovery can write to the directory during open. So the `.old-<ts>` copy is post-open state, while the backup is provably what the user had. Hence `keep: 1` on the backup and `keepOld: false` on the swap.\n\n`keepOld: false` is safe because the library removes the displaced directory only after the new cluster is successfully renamed into place — a failed swap restores the original instead.\n\nSee `src/db/connection.ts` for why a failure here must not be treated as corruption.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/db/migrate-major.ts"
+                },
+                "region": {
+                  "startLine": 125,
+                  "endLine": 158,
+                  "snippet": {
+                    "text": "    // Taken before the old engine opens the directory. That ordering is the\n    // point: starting a cluster can write to it (WAL replay, recovery), so this\n    // is the only copy guaranteed to be exactly what the user had. It also\n    // makes the swap's own `.old-<ts>` copy redundant — see `keepOld` below.\n    const backupPath = await backupDataDir(dbPath, { keep: 1 });\n\n    // The old engine must be named explicitly: `openDataDir` prefers an\n    // installed engine, and the one installed here is the *new* major that\n    // cannot read this directory.\n    const source = await openDataDir(dbPath, engine.entry, { pgliteOptions: DB_OPTIONS });\n    // The staged cluster already carries the schema from `buildTarget`; this\n    // only reopens it.\n    const target = new PGlite(staged, DB_OPTIONS);\n    try {\n      await target.waitReady;\n\n      const report = await migrate({ source, target });\n      const schema = await introspectSchema(source);\n      const validation = await validateMigration(source, target, schema, 'full');\n      if (!validation.ok) {\n        throw new Error(`post-migration validation failed: ${summarize(validation)}`);\n      }\n      const rows = report.tables.reduce((n, t) => n + t.rowsCopied, 0);\n\n      // Both clusters must be closed before the swap: the directories are being\n      // renamed out from under whatever still holds them open.\n      await source.close();\n      await target.close();\n      // `keepOld: false` because the pre-open backup above already preserves the\n      // original, and it is the better copy of the two. Retaining both would\n      // leave two full-size duplicates of the database on disk after every\n      // upgrade. The displaced directory is only removed once the new cluster is\n      // successfully in place.\n      await swapIntoPlace(dbPath, staged, { keepOld: false });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/db/connection.ts"
+                },
+                "region": {
+                  "startLine": 64
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-875"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "33292a1671bfc87e77caf7516ad45c58"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mscpyo0o68vrp9xj",
+          "message": {
+            "text": "The old engine is named by absolute path rather than letting openDataDir resolve it, because its default resolution would silently pick the wrong engine.\n\nopenDataDir tries the module specifier first and only downloads when it does not resolve at all — \"an installed engine wins\". The engine installed here is @electric-sql/pglite at the new major, which is precisely the one that cannot read this directory. Passing the default specifier would therefore resolve successfully and then fail on the first query with an opaque PGlite failed to initialize properly.\n\nPassing engine.entry from acquireEngine removes the ambiguity: the acquired PG17 build opens the PG17 directory, by construction.\n\nThis assumption depends on openDataDir keeping resolution-before-acquisition semantics. If a future pglite-migrate gains a force-acquire option, this could use it instead — but naming the engine explicitly stays correct either way.\n",
+            "markdown": "The old engine is named by absolute path rather than letting `openDataDir` resolve it, because its default resolution would silently pick the wrong engine.\n\n`openDataDir` tries the module specifier first and only downloads when it does not resolve at all — \"an installed engine wins\". The engine installed here is `@electric-sql/pglite` at the *new* major, which is precisely the one that cannot read this directory. Passing the default specifier would therefore resolve successfully and then fail on the first query with an opaque `PGlite failed to initialize properly`.\n\nPassing `engine.entry` from `acquireEngine` removes the ambiguity: the acquired PG17 build opens the PG17 directory, by construction.\n\nThis assumption depends on `openDataDir` keeping resolution-before-acquisition semantics. If a future `pglite-migrate` gains a force-acquire option, this could use it instead — but naming the engine explicitly stays correct either way.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/db/migrate-major.ts"
+                },
+                "region": {
+                  "startLine": 131,
+                  "endLine": 134,
+                  "snippet": {
+                    "text": "    // The old engine must be named explicitly: `openDataDir` prefers an\n    // installed engine, and the one installed here is the *new* major that\n    // cannot read this directory.\n    const source = await openDataDir(dbPath, engine.entry, { pgliteOptions: DB_OPTIONS });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "assumption"
+            ]
+          },
+          "workItemUris": [
+            "GB-875"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "bb8b2649c021d9140afbe24f5d581b8d"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f3bab8708d3f4c89a4e21e4deb684a2c023e7917",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

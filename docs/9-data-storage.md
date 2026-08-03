@@ -12,6 +12,19 @@ Requirements for data persistence, database schema, and data management.
 - Schema migrations shall be applied safely on startup without data loss.
 - The application tables shall live in the `template1` database. PGLite ≤0.3.x used `template1` as its default working database; PGLite 0.4.0 changed the default to `postgres`. To keep existing on-disk data dirs readable across that upgrade, the connection explicitly pins `database: 'template1'` (see `src/db/connection.ts`) so the storage location is identical for both pre-0.4 and freshly created databases. A future PGLite upgrade must preserve this option (or perform a one-time `template1` → `postgres` data migration) or existing users' reviews will appear to vanish.
 
+### 9.1a PostgreSQL Major-Version Upgrades
+
+PGLite embeds a fixed PostgreSQL major and ships no `pg_upgrade`, so a data directory written by an older engine cannot be opened at all — the failure is total, and PGLite reports it as a bare `PGlite failed to initialize properly`, indistinguishable by message from real corruption. PGLite 0.5.0 moved the embedded engine from PostgreSQL 17 to 18, which every existing user's data directory predates.
+
+- On an open failure, the system shall attempt a one-time major-version migration **before** the corruption-recovery path in §9.5, and shall skip it when the directory's major already matches the running engine.
+- The migration shall read the on-disk major from `PG_VERSION` **without booting the cluster**, so the check costs nothing for directories that do not need it.
+- The old engine shall be **downloaded on demand** (pinned version, verified against a `sha512` integrity hash) rather than shipped, and removed once the migration completes — shipping a second ~25 MB engine permanently would burden every user for a one-time, once-per-user operation.
+- The migration shall write to a **staged sibling** directory and shall move it into the canonical location only after post-migration validation passes; the original directory shall never be modified in place.
+- A copy of the original shall be retained alongside the upgraded database, taken **before** the old engine opens the directory (starting a cluster can write to it during recovery, so a later copy would not reflect what the user had). Exactly one copy shall be kept — the swap's own displaced copy is discarded so an upgrade does not double the on-disk cost.
+- When the migration cannot complete (most often no network connection), the system shall **fail to start with an actionable message** naming the source major and the blocking reason, and shall **not** fall through to the quarantine path in §9.5. Quarantining would leave an empty cluster at the canonical path and strand the user's history permanently, since no later launch would retry; failing loudly keeps the data in place and self-heals once the user is online.
+
+Implemented by `src/db/migrate-major.ts` (`migrateMajorIfNeeded`) over the `pglite-migrate` library, called from `getDb()`. Covered by mocked unit tests plus a live PG17→PG18 round-trip (`npm run test:live`).
+
 ### 9.2 Data Model
 
 The system shall persist the following seven entities:
@@ -44,6 +57,7 @@ The system shall persist the following seven entities:
 - Database operations shall use raw SQL queries (no ORM).
 - Entity IDs shall be generated using `Date.now().toString(36) + Math.random().toString(36).slice(2, 10)`.
 - The system shall not corrupt data on unexpected shutdown (PGLite handles WASM-level crash recovery).
+- A data directory that cannot be opened shall never be deleted. "The engine could not open it" is not the same as "the bytes are worthless" — the same failure is produced by a half-written WAL, a file locked by another process, or a directory written by a different PostgreSQL major (§9.1a). The system shall move it aside to `reviews.unreadable-<timestamp>`, print that path, and start fresh; if it cannot be moved, the system shall rethrow rather than fall back to deleting.
 
 ### 9.6 Data Isolation
 

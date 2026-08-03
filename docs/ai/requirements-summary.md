@@ -395,6 +395,20 @@ settings in `<repo>/.glassbox/settings.json` with REST at
 `repo_path`. Instance lock file (`glassbox.lock`) prevents concurrent DB
 access; PGLite handles WASM crash recovery.
 
+**PostgreSQL major-version upgrades** (§9.1a, shipped): PGLite embeds a
+fixed major and ships no `pg_upgrade`, so PGLite 0.5.0's move from
+PostgreSQL 17 to 18 left every existing data dir unopenable — and the
+failure is indistinguishable by message from corruption. `getDb` now
+attempts a one-time migration first (`src/db/migrate-major.ts` over
+`pglite-migrate`): read `PG_VERSION` without booting, download the pinned
+old engine on demand, copy into a staged sibling built by the app's own
+`initSchema`, validate, then atomically swap. One verified pre-open backup
+is retained. When it can't complete (usually offline) the app **fails to
+start with an actionable message** rather than quarantining — quarantining
+would leave an empty cluster at the canonical path and strand the user's
+history forever. A same-major open abort still takes the preserve-aside
+recovery path (§9.5); an unopenable dir is never deleted.
+
 ## 11. Desktop app (`10-desktop-app.md`) — **Shipped**
 
 Tauri v2 native window wraps the Node server via a sidecar (Node.js

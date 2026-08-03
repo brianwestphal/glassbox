@@ -74,6 +74,25 @@
         "startup -> running analyses reset to failed"
       ]
     },
+    "9.1a": {
+      "stateful": true,
+      "tests": [
+        "tests/unit/db/migrate-major.test.ts",
+        "tests/unit/db/connection.test.ts",
+        "tests/integration/db/major-migration.test.ts"
+      ],
+      "note": "Mocked unit coverage of every migration outcome plus the getDb branch it drives; the integration test performs a real PG17 -> PG18 round trip and is gated on GLASSBOX_LIVE_MIGRATION_TESTS (npm run test:live) because it downloads the old engine and boots two WASM clusters.",
+      "transitions": [
+        "open succeeds -> migration never attempted (no version probe, no download)",
+        "no data directory / unreadable PG_VERSION -> not-needed",
+        "directory already at the running major -> not-needed, staged probe dir removed",
+        "PG17 directory + PG18 engine -> backup taken before open, migrate, validate, swap, reopen",
+        "validation fails -> blocked, canonical directory never swapped",
+        "engine download / transfer / swap fails -> blocked, only the staged sibling removed, acquired engine still released",
+        "blocked -> getDb throws an actionable error instead of quarantining",
+        "same-major open abort (real corruption) -> falls through to the quarantine path"
+      ]
+    },
     "9.2": {
       "tests": [
         "tests/unit/db/queries.test.ts",

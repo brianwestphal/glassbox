@@ -1,7 +1,23 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Opt-in config for the **live-render** plugin tests (`npm run test:live`).
+ * Opt-in config for the **live** tests (`npm run test:live`) — the ones that
+ * spawn real external tooling or reach the network.
+ *
+ * Two families live here, each with its own gate so neither can be pulled into
+ * the default suite by accident:
+ *
+ * - **Live render** (`GLASSBOX_LIVE_RENDER_TESTS`) — the PlantUML and Mermaid
+ *   plugin renders, covered in detail below.
+ * - **Live migration** (`GLASSBOX_LIVE_MIGRATION_TESTS`) — the real PostgreSQL
+ *   17 -> 18 data-directory migration. It downloads the ~25 MB PG17 engine from
+ *   the npm registry and boots two Postgres WASM clusters, so it is both
+ *   network-dependent and heavy. Its logic is covered by mocked unit tests in
+ *   the default suite; this proves the whole thing against real engines.
+ *
+ * The gates are separate rather than one shared flag because the two families
+ * fail for completely different reasons — a missing JRE versus no network — and
+ * a single flag would make "why did this skip?" ambiguous.
  *
  * The PlantUML and Mermaid plugins render by spawning a real JVM and a real
  * headless Chromium. Those subprocesses are far heavier than anything else in
@@ -28,10 +44,12 @@ export default defineConfig({
     include: [
       'tests/unit/plugins/mermaid.test.ts',
       'tests/unit/plugins/plantuml.test.ts',
+      'tests/integration/db/major-migration.test.ts',
     ],
     fileParallelism: false,
     env: {
       GLASSBOX_LIVE_RENDER_TESTS: '1',
+      GLASSBOX_LIVE_MIGRATION_TESTS: '1',
     },
   },
 });

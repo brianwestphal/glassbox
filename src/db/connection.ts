@@ -3,6 +3,7 @@ import { existsSync,mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
 
 import { SCHEMA_AI_SQL,SCHEMA_CORE_SQL } from './ddl.js';
+import { migrateMajorIfNeeded } from './migrate-major.js';
 
 let db: PGlite | null = null;
 let currentDbPath: string | null = null;
@@ -43,6 +44,40 @@ export async function getDb(): Promise<PGlite> {
     return db;
   } catch (err: unknown) {
     db = null;
+    // A directory written by an older Postgres major cannot be opened at all,
+    // and the abort it produces is indistinguishable from real corruption by
+    // message alone — PGlite reports it as a bare "failed to initialize
+    // properly". So attempt the version migration *before* the corruption
+    // recovery below, and only for a directory whose major actually differs;
+    // it is a no-op in every other case.
+    const migration = await migrateMajorIfNeeded(currentDbPath, initSchema);
+    if (migration.status === 'migrated') {
+      console.error(
+        `Upgraded your database from PostgreSQL ${migration.fromMajor} to ${migration.toMajor} ` +
+          `(${migration.rows} rows). A backup of the original is at: ${migration.backupPath}`
+      );
+      db = new PGlite(currentDbPath, DB_OPTIONS);
+      await db.waitReady;
+      await initSchema(db);
+      return db;
+    }
+    if (migration.status === 'blocked') {
+      // Deliberately fail to start rather than fall through to the recovery
+      // path below. That path moves the directory aside and starts fresh, which
+      // here would strand a perfectly good database: the canonical path would
+      // then hold an empty cluster and no later launch would ever retry the
+      // migration. Failing loudly keeps the data in place and self-heals once
+      // the blocking condition (usually no network) clears.
+      throw new Error(
+        `Your database was created by PostgreSQL ${migration.fromMajor}, which this version of ` +
+          `Glassbox cannot open directly. A one-time upgrade is needed and it could not be ` +
+          `completed: ${migration.reason}\n` +
+          `This most often means no network connection — the upgrade downloads the older ` +
+          `database engine once. Your data has not been modified; try again when connected.`,
+        { cause: err }
+      );
+    }
+
     // PGLite WASM can abort on corrupt databases — offer recovery
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('Aborted') || message.includes('RuntimeError')) {

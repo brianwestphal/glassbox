@@ -185,15 +185,30 @@ describe('live-render tests stay out of the default suite', () => {
     expect(src).toMatch(/describe\.skipIf\(\s*!live\b/);
   });
 
-  it('the default vitest config does not set the live-render gate', () => {
-    expect(read('vitest.config.ts')).not.toContain('GLASSBOX_LIVE_RENDER_TESTS');
+  // The real PG17 -> PG18 migration is live for a different reason: it downloads
+  // the ~25 MB old engine from the npm registry and boots two Postgres WASM
+  // clusters. Same hazard as the renders — left ungated it would make `npm test`
+  // network-dependent — so it gets the same treatment under its own flag.
+  const LIVE_MIGRATION_TEST = 'tests/integration/db/major-migration.test.ts';
+
+  it('the live migration test gates on GLASSBOX_LIVE_MIGRATION_TESTS', () => {
+    const src = read(LIVE_MIGRATION_TEST);
+    expect(src).toContain("process.env.GLASSBOX_LIVE_MIGRATION_TESTS === '1'");
+    expect(src).toMatch(/describe\.skipIf\(\s*!live\b/);
   });
 
-  it('the live config sets the gate and disables file parallelism', () => {
+  it('the default vitest config sets neither live gate', () => {
+    const cfg = read('vitest.config.ts');
+    expect(cfg).not.toContain('GLASSBOX_LIVE_RENDER_TESTS');
+    expect(cfg).not.toContain('GLASSBOX_LIVE_MIGRATION_TESTS');
+  });
+
+  it('the live config sets both gates and disables file parallelism', () => {
     const cfg = read('vitest.config.live.ts');
     expect(cfg).toContain('GLASSBOX_LIVE_RENDER_TESTS');
+    expect(cfg).toContain('GLASSBOX_LIVE_MIGRATION_TESTS');
     expect(cfg).toContain('fileParallelism: false');
-    for (const rel of LIVE_TESTS) expect(cfg).toContain(rel);
+    for (const rel of [...LIVE_TESTS, LIVE_MIGRATION_TEST]) expect(cfg).toContain(rel);
   });
 });
 

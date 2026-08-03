@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mscpyd8ta4sf0zqj",
+          "message": {
+            "text": "A blocked upgrade deliberately crashes startup instead of falling through to the quarantine path twelve lines below.\n\nThat looks like the harsher option and is actually the recoverable one. The quarantine path renames the directory to reviews.unreadable-<ts> and creates a fresh empty cluster at the canonical path. If a version mismatch took that path, the next launch would find a valid PG18 directory, migrateMajorIfNeeded would return not-needed, and the migration would never be retried — the user's history would sit on disk forever with nothing in the product ever looking at it again.\n\nFailing loudly leaves the PG17 directory exactly where it is, so the very next launch retries. The dominant blocked cause is no network (the old engine is downloaded on demand), which is transient by nature.\n\nThe message names the source major and the concrete reason because \"try again when connected\" is only actionable if the user can tell that connectivity is what's missing.\n",
+            "markdown": "A blocked upgrade deliberately crashes startup instead of falling through to the quarantine path twelve lines below.\n\nThat looks like the harsher option and is actually the recoverable one. The quarantine path renames the directory to `reviews.unreadable-<ts>` and creates a fresh empty cluster at the canonical path. If a *version* mismatch took that path, the next launch would find a valid PG18 directory, `migrateMajorIfNeeded` would return `not-needed`, and the migration would never be retried — the user's history would sit on disk forever with nothing in the product ever looking at it again.\n\nFailing loudly leaves the PG17 directory exactly where it is, so the very next launch retries. The dominant `blocked` cause is no network (the old engine is downloaded on demand), which is transient by nature.\n\nThe message names the source major and the concrete reason because \"try again when connected\" is only actionable if the user can tell that connectivity is what's missing.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/db/connection.ts"
+                },
+                "region": {
+                  "startLine": 64,
+                  "endLine": 78,
+                  "snippet": {
+                    "text": "    if (migration.status === 'blocked') {\n      // Deliberately fail to start rather than fall through to the recovery\n      // path below. That path moves the directory aside and starts fresh, which\n      // here would strand a perfectly good database: the canonical path would\n      // then hold an empty cluster and no later launch would ever retry the\n      // migration. Failing loudly keeps the data in place and self-heals once\n      // the blocking condition (usually no network) clears.\n      throw new Error(\n        `Your database was created by PostgreSQL ${migration.fromMajor}, which this version of ` +\n          `Glassbox cannot open directly. A one-time upgrade is needed and it could not be ` +\n          `completed: ${migration.reason}\\n` +\n          `This most often means no network connection — the upgrade downloads the older ` +\n          `database engine once. Your data has not been modified; try again when connected.`,\n        { cause: err }\n      );"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-875"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "e63681388f2bfb777e5da5ce934c827a"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f3bab8708d3f4c89a4e21e4deb684a2c023e7917",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

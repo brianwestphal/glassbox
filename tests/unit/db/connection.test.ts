@@ -40,6 +40,14 @@ vi.mock('@electric-sql/pglite', () => ({
   PGlite: mockPGliteConstructor,
 }));
 
+// The major-version migration is exercised on its own in migrate-major.test.ts
+// (and for real in tests/integration/db/major-migration.test.ts); here it is
+// stubbed so the branch `getDb` takes for each outcome can be driven directly.
+const mockMigrateMajor = vi.fn().mockResolvedValue({ status: 'not-needed' });
+vi.mock('../../../src/db/migrate-major.js', () => ({
+  migrateMajorIfNeeded: (...args: unknown[]) => mockMigrateMajor(...args),
+}));
+
 import { existsSync,mkdirSync, renameSync, rmSync } from 'fs';
 
 const mockMkdirSync = vi.mocked(mkdirSync);
@@ -55,6 +63,7 @@ describe('connection', () => {
     mockRenameSync.mockReset();
     mockExistsSync.mockReset();
     mockRmSync.mockReset();
+    mockMigrateMajor.mockReset().mockResolvedValue({ status: 'not-needed' });
   });
 
   it('setDataDir creates data directory and sets db path', async () => {
@@ -166,6 +175,7 @@ describe('unopenable data directory is preserved, never deleted', () => {
     mockRenameSync.mockReset();
     mockExistsSync.mockReset();
     mockRmSync.mockReset();
+    mockMigrateMajor.mockReset().mockResolvedValue({ status: 'not-needed' });
   });
 
   /** Make the first PGlite construction abort, and later ones succeed. */
@@ -234,6 +244,99 @@ describe('unopenable data directory is preserved, never deleted', () => {
 
     await expect(getDb()).rejects.toThrow('ENOSPC');
     expect(mockRenameSync).not.toHaveBeenCalled();
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+});
+
+// A directory written by an older Postgres major cannot be opened at all, and
+// PGlite reports it as a bare "failed to initialize properly" — indistinguishable
+// by message from real corruption. So `getDb` must consult the migration before
+// the corruption recovery, and must react differently to each outcome.
+describe('major-version upgrade on open failure', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockPGliteConstructor.mockReset();
+    mockRenameSync.mockReset();
+    mockExistsSync.mockReset();
+    mockRmSync.mockReset();
+    mockMigrateMajor.mockReset().mockResolvedValue({ status: 'not-needed' });
+  });
+
+  /** Make the first PGlite construction fail the way a major mismatch does. */
+  function failFirstOpen(message = 'PGlite failed to initialize properly') {
+    let first = true;
+    mockPGliteConstructor.mockImplementation(function (this: any, _path: string) {
+      if (first) { first = false; throw new Error(message); }
+      const mock = createMockPGlite();
+      Object.assign(this, mock);
+      this.waitReady = mock.waitReady;
+      this.exec = mock.exec;
+      this.query = mock.query;
+    });
+  }
+
+  it('is not attempted at all when the database opens normally', async () => {
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    await getDb();
+
+    // The happy path must stay free: no version probe, no engine download.
+    expect(mockMigrateMajor).not.toHaveBeenCalled();
+  });
+
+  it('reopens the migrated database after a successful upgrade', async () => {
+    failFirstOpen();
+    mockMigrateMajor.mockResolvedValue({
+      status: 'migrated', fromMajor: 17, toMajor: 18, rows: 1481, backupPath: '/d/reviews.bak-x',
+    });
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    const db = await getDb();
+
+    expect(db).toBeDefined();
+    expect(mockPGliteConstructor).toHaveBeenCalledTimes(2);
+    // The upgrade path must never reach the quarantine machinery.
+    expect(mockRenameSync).not.toHaveBeenCalled();
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it('fails to start rather than quarantining when the upgrade is blocked', async () => {
+    failFirstOpen();
+    mockExistsSync.mockReturnValue(true);
+    mockMigrateMajor.mockResolvedValue({
+      status: 'blocked', fromMajor: 17, reason: 'could not reach the npm registry',
+    });
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    // Quarantining here would put an empty cluster at the canonical path, and
+    // no later launch would ever retry the upgrade — the user's history would be
+    // stranded on disk forever. Failing loudly keeps it recoverable.
+    const error = await getDb().then(() => null, (e: Error) => e);
+    expect(error).toBeInstanceOf(Error);
+    // The message has to name the major and the actual blocking reason — this is
+    // the only thing the user sees, and "try again when connected" is only
+    // actionable if it says why.
+    expect(error?.message).toMatch(/PostgreSQL 17/);
+    expect(error?.message).toMatch(/could not reach the npm registry/);
+    expect(error?.message).toMatch(/has not been modified/);
+    expect(mockRenameSync).not.toHaveBeenCalled();
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it('still quarantines a same-major directory that is genuinely corrupt', async () => {
+    failFirstOpen('Aborted(native code called abort)');
+    mockExistsSync.mockReturnValue(true);
+    mockMigrateMajor.mockResolvedValue({ status: 'not-needed' });
+    const { setDataDir, getDb } = await import('../../../src/db/connection.js');
+    setDataDir('/tmp/test-glassbox');
+
+    await getDb();
+
+    // Real corruption must still take the preserve-and-restart path.
+    expect(mockRenameSync).toHaveBeenCalledTimes(1);
     expect(mockRmSync).not.toHaveBeenCalled();
   });
 });

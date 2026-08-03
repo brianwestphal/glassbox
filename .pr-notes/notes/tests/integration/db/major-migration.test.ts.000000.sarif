@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mscpyy9tq2851h4o",
+          "message": {
+            "text": "Verified against real engines, not just the mocks: a genuine PG17 cluster is built, then the application's own getDb() upgrades it.\n\nTest Files  1 passed (1)\n     Tests  3 passed (3)\n  Duration  7.28s\n\nThe fixture deliberately drops reviewfiles.differencescore before migrating, reproducing the realistic case where a user is several schema versions behind rather than a same-schema copy. The test asserts the column is present again afterward, since the staged target is built by the app's own initSchema — the major upgrade and the ordinary column migrations happen in one pass.\n\nAlso confirmed against a copy of the maintainer's real 35 MB database: 1481 rows across 6 tables, validateMigration('full').ok = true, and three adversarial mutations (a changed cell, a deleted row, a dropped source column) each still fail validation — so the check is not vacuous.\n\nThe unit tests were separately confirmed non-vacuous by breaking the source: making blocked fall through to quarantine fails the connection test, and swapping despite failed validation fails the migrate-major test.\n",
+            "markdown": "Verified against real engines, not just the mocks: a genuine PG17 cluster is built, then the application's own `getDb()` upgrades it.\n\n```\nTest Files  1 passed (1)\n     Tests  3 passed (3)\n  Duration  7.28s\n```\n\nThe fixture deliberately drops `review_files.difference_score` before migrating, reproducing the realistic case where a user is several schema versions behind rather than a same-schema copy. The test asserts the column is present again afterward, since the staged target is built by the app's own `initSchema` — the major upgrade and the ordinary column migrations happen in one pass.\n\nAlso confirmed against a copy of the maintainer's real 35 MB database: 1481 rows across 6 tables, `validateMigration('full').ok = true`, and three adversarial mutations (a changed cell, a deleted row, a dropped source column) each still fail validation — so the check is not vacuous.\n\nThe unit tests were separately confirmed non-vacuous by breaking the source: making `blocked` fall through to quarantine fails the connection test, and swapping despite failed validation fails the migrate-major test.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/integration/db/major-migration.test.ts"
+                },
+                "region": {
+                  "startLine": 25,
+                  "endLine": 33,
+                  "snippet": {
+                    "text": "\ndescribe.skipIf(!live)('major-version migration (live PG17 -> PG18)', () => {\n  let root: string;\n  let dbPath: string;\n\n  beforeAll(async () => {\n    root = mkdtempSync(join(tmpdir(), 'glassbox-migrate-'));\n    dbPath = join(root, 'data', 'reviews');\n    mkdirSync(join(root, 'data'), { recursive: true });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "test-evidence"
+            ]
+          },
+          "workItemUris": [
+            "GB-875"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "c79ddb67588d7e478bb8a3829dcde6da"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "f3bab8708d3f4c89a4e21e4deb684a2c023e7917",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}
