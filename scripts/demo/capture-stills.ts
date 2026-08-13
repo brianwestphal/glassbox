@@ -47,6 +47,8 @@ import {
 } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
 
+import { nextFreePort } from '../lib/freePort.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
 const OUT_DIR = resolve(ROOT, 'assets');
@@ -304,7 +306,11 @@ async function killServer(server: ChildProcessByStdio<null, Readable, Readable>)
 }
 
 async function captureOne(scenario: Scenario, port: number): Promise<void> {
-  const base = `http://localhost:${String(port)}`;
+  // 127.0.0.1, not `localhost`: the server binds `127.0.0.1` while Node resolves
+  // `localhost` to IPv6 `::1` first, so a dual-stack squatter on `::1` would
+  // answer the probe instead of our server. (See `capture-demo.ts` for the full
+  // rationale.)
+  const base = `http://127.0.0.1:${String(port)}`;
   console.log(`\n▸ ${scenario.label}  →  assets/demo-${scenario.slug}.{png,svg}`);
 
   const dataDir = mkdtempSync(resolve(tmpdir(), `glassbox-stills-${scenario.slug}-`));
@@ -366,17 +372,20 @@ async function main(): Promise<void> {
   const only = onlyArg ? new Set(onlyArg.split(',').map(s => s.trim())) : null;
   const scenarios = only ? SCENARIOS.filter(s => only.has(s.slug)) : SCENARIOS;
 
-  // One demo at a time on a known free port — keeps server lifecycle simple
-  // and avoids glyph-cache cross-talk between scenarios. Starting just above
-  // the default 4183 keeps it out of the way of any open dev/e2e servers. A
-  // scene failure is collected, not fatal, so one flaky capture doesn't drop
-  // the rest of the set.
+  // One demo at a time, walking up from just above the default 4183 (out of the
+  // way of any open dev/e2e servers). Each scenario takes the first free port
+  // at/above the cursor via `nextFreePort`, so an unrelated process squatting in
+  // the range costs a port rather than failing the scene with a cryptic
+  // "server never came up" (the `--strict-port` server would bind nothing and
+  // the probe would hit the squatter). A scene failure is collected, not fatal,
+  // so one flaky capture doesn't drop the rest of the set.
   let port = 4191;
   const failed: string[] = [];
   const skipped: string[] = [];
   for (const scenario of scenarios) {
     try {
       if (scenario.prepare?.() === false) { skipped.push(scenario.slug); continue; }
+      port = await nextFreePort(port);
       await captureOne(scenario, port++);
     } catch (err) {
       console.error(`\n✗ ${scenario.slug} FAILED: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);

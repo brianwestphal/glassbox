@@ -20,7 +20,6 @@
  */
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -29,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { launchChromium } from 'domotion-svg';
 import type { Browser } from '@playwright/test';
 
+import { nextFreePort } from '../lib/freePort.js';
 import { SCENES, type Scene, type SceneRepo } from './scenes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -102,27 +102,12 @@ async function killServer(server: ChildProcessByStdio<null, Readable, Readable>)
   });
 }
 
-/** Whether a local TCP port can be bound right now. */
-function isPortFree(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const probe = createServer();
-    probe.once('error', () => { resolve(false); });
-    probe.once('listening', () => { probe.close(() => { resolve(true); }); });
-    probe.listen(port, '127.0.0.1');
-  });
-}
-
-/** The first free port at or above `from`, so an unrelated process squatting
- *  inside the scan range costs a port rather than a scene. */
-async function nextFreePort(from: number): Promise<number> {
-  for (let port = from; port < from + 100; port++) {
-    if (await isPortFree(port)) return port;
-  }
-  throw new Error(`no free port found in ${String(from)}..${String(from + 99)}`);
-}
-
 async function captureScene(scene: Scene, port: number, outDir: string): Promise<void> {
-  const base = `http://localhost:${String(port)}`;
+  // 127.0.0.1, not `localhost`: the server binds `127.0.0.1` while Node resolves
+  // `localhost` to IPv6 `::1` first, so a dual-stack squatter on `::1` would
+  // answer the probe instead of our server. (See `capture-demo.ts` for the full
+  // rationale.)
+  const base = `http://127.0.0.1:${String(port)}`;
   const pngPath = join(outDir, `${scene.slug}.png`);
   console.log(`\n▸ ${scene.label}  (${scene.featureArea})  →  ${pngPath}`);
 

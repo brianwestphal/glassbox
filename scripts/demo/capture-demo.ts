@@ -55,6 +55,7 @@ import {
 import type { AnimationFrame, CursorEvent, TypingOverlay } from 'domotion-svg';
 import type { Browser, Page } from '@playwright/test';
 
+import { nextFreePort } from '../lib/freePort.js';
 import { claudeCast, launchCast } from './casts.js';
 import { popInAnimations, popInFrameSvg, popInIds } from './popIn.js';
 import {
@@ -89,12 +90,12 @@ const OUT_SVGZ = resolve(ROOT, 'assets/demo.svgz');
 const DEBUG_DIR = resolve(__dirname, '.debug');
 const EXPORT_MD = resolve(ROOT, '.glassbox/latest-review.md');
 
-// Ephemeral port for the demo server. Overridable via DEMO_PORT so a run can
-// dodge a port collision (e.g. a stray `python -m http.server 4188` squatting the
-// default), which otherwise makes the browser hit the wrong server and every
-// in-page `/api/*` fetch return 404 HTML.
-const PORT = Number(process.env.DEMO_PORT) || 4188;
-const BASE = `http://localhost:${String(PORT)}`;
+// Starting port for the demo server. `main()` scans up from here for the first
+// free port (`nextFreePort`), so a stray process squatting on the default (e.g.
+// `python -m http.server 4188`) costs a port rather than making the browser hit
+// the wrong server and every in-page `/api/*` fetch return 404 HTML. DEMO_PORT
+// overrides the starting point (an explicit pin / a different scan origin).
+const START_PORT = Number(process.env.DEMO_PORT) || 4188;
 
 // Isolate the demo server's GLOBAL config under a disposable pid-scoped dir via
 // GLASSBOX_CONFIG_DIR (mirrors the e2e suite + the stills capture, GB-923) so
@@ -177,15 +178,15 @@ function transitionMs(f: AnimationFrame): number {
   return f.transition.duration;
 }
 
-async function waitForServer(): Promise<void> {
+async function waitForServer(base: string): Promise<void> {
   for (let i = 0; i < 60; i++) {
     try {
-      const res = await fetch(BASE, { signal: AbortSignal.timeout(1000) });
+      const res = await fetch(base, { signal: AbortSignal.timeout(1000) });
       if (res.ok) return;
     } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 500));
   }
-  throw new Error(`Glassbox demo server never came up on ${BASE}`);
+  throw new Error(`Glassbox demo server never came up on ${base}`);
 }
 
 async function grabTree(page: Page): Promise<CapturedTree> {
@@ -210,10 +211,22 @@ async function main(): Promise<void> {
   mkdirSync(DEBUG_DIR, { recursive: true });
   mkdirSync(dirname(OUT_SVG), { recursive: true });
 
+  // Bind the first free port at/above the start (`--strict-port` then binds it
+  // exactly, no silent fallback) so a squatter on the default doesn't wedge the run.
+  const port = await nextFreePort(START_PORT);
+  // Address the server as 127.0.0.1, NOT `localhost`: the server binds
+  // `127.0.0.1` (see `src/server.ts`), but Node's DNS resolves `localhost` to
+  // IPv6 `::1` first — so a dual-stack process squatting the port on `::1`
+  // answers the `localhost` probe (non-200) and `waitForServer` never sees the
+  // real server. `nextFreePort` can't catch that squatter (a specific 127.0.0.1
+  // bind coexists with an IPv6 wildcard), so targeting 127.0.0.1 is what makes
+  // the probe + browser deterministically hit our server.
+  const base = `http://127.0.0.1:${String(port)}`;
+
   const tsxBin = resolve(ROOT, 'node_modules/.bin/tsx');
   const server = spawn(
     tsxBin,
-    ['src/cli.ts', '--demo:1', '--no-open', '--strict-port', '--ai-service-test', '--port', String(PORT)],
+    ['src/cli.ts', '--demo:1', '--no-open', '--strict-port', '--ai-service-test', '--port', String(port)],
     { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GLASSBOX_CONFIG_DIR: DEMO_CONFIG_DIR } },
   );
   server.stdout.on('data', d => process.stdout.write(`[server] ${String(d)}`));
@@ -277,10 +290,10 @@ async function main(): Promise<void> {
   let markdown = '';
 
   try {
-    await waitForServer();
+    await waitForServer(base);
     // Risk-score badges are off by default in demo:1; enable them before the
     // page loads so the client initializes risk mode with visible badges.
-    await fetch(`${BASE}/api/ai/preferences`, {
+    await fetch(`${base}/api/ai/preferences`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ show_risk_scores: true, risk_sort_dimension: 'aggregate' }),
@@ -306,7 +319,7 @@ async function main(): Promise<void> {
     });
     const page = await ctx.newPage();
 
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'networkidle' });
     // Let guided "Learn" notes load into the store before opening files (they
     // only inject on a fresh file-open).
     await page.waitForTimeout(5500);
