@@ -2,6 +2,13 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1] - 2026-08-14
+
+
+
+- Auto-pick a free port for the capture scripts (GB-1118) (`995fe3b`)
+- Update domotion-svg to 0.22.2 and regenerate demo assets (GB-1117) (`3475797`)
+
 ## [1.1.0] - 2026-08-03
 
 
