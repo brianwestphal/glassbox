@@ -27,7 +27,7 @@
  * and silently falls back to CSS `<text>` (tofu); rendering once everything else
  * is gone makes path mode reliable, and we assert it at the end.
  *
- * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.21.1; this script
+ * Requires Chromium (Playwright) + `domotion-svg` (pinned 0.22.2; this script
  * renders in embedded-font mode — see `setRenderTextMode('embedded-font')`
  * below). The terminal beats are real `domotion term` cast renders (see
  * `casts.ts`). MUST run OUTSIDE the command sandbox (Chromium needs Mach ports).
@@ -251,7 +251,7 @@ async function main(): Promise<void> {
     o: { title: string; caption: string },
   ): Promise<FrameJob[]> => {
     if (browser === null) throw new Error('browser not ready for cast render');
-    const { frames, width, height } = await castToTermFrames(castText, browser, {
+    const { frames, width } = await castToTermFrames(castText, browser, {
       theme: TERM_THEME, cols: TERM_COLS, rows, fontSize: TERM_FONT_SIZE,
       padding: TERM_PADDING, cursor: 'block', mode: 'incremental', manageFonts: false,
     });

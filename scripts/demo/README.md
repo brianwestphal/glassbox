@@ -81,7 +81,7 @@ DevTools / VS Code can both open them directly.
   bootstrap ports; a sandbox blocks that with a `mach_port_rendezvous … Permission
   denied` crash.
 - **`domotion-svg`** — pinned to an exact version in `devDependencies`
-  (currently `0.21.1`). The script calls `setRenderTextMode('embedded-font')` so
+  (currently `0.22.2`). The script calls `setRenderTextMode('embedded-font')` so
   the demo is always built in **embedded-font** mode: text is `<text>` rendered
   with an `@font-face` subset embedded in the SVG, so it looks identical on any
   viewer regardless of installed fonts, and it's lighter than the older
