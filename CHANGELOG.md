@@ -5,6 +5,11 @@ All notable changes to Glassbox are documented here. Format follows [Keep a Chan
 ## [1.1.1] - 2026-08-14
 
 
+- Updated bundled production dependencies (`fast-uri`, `ip-address`) to resolve high-severity advisories — host-confusion and SSRF/trust-boundary issues carried transitively under the Model Context Protocol SDK.
+
+## [1.1.1] - 2026-08-14
+
+
 
 - Auto-pick a free port for the capture scripts (GB-1118) (`995fe3b`)
 - Update domotion-svg to 0.22.2 and regenerate demo assets (GB-1117) (`3475797`)
