@@ -20,6 +20,18 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    # esbuild is deliberately pinned via an `overrides` entry in package.json
+    # (it forces the security-patched esbuild >=0.28.1 into the nested tsup and
+    # tsx copies, which still declare `^0.27.0` / `~0.28.0` and would otherwise
+    # resolve a separate vulnerable <0.28.1 build). Dependabot cannot update a
+    # dependency that is both a direct dependency and overridden -- it fails the
+    # ENTIRE dev-dependencies group job with "Override for esbuild@X conflicts
+    # with direct dependency." So exclude esbuild here and bump the pin by hand
+    # (the devDependencies entry + the override together) when a newer patched
+    # esbuild is wanted. Removing the override is not an option: tsup/tsx would
+    # then pull an unpatched esbuild back into the tree.
+    ignore:
+      - dependency-name: "esbuild"
     commit-message:
       prefix: "deps"
       prefix-development: "deps-dev"
