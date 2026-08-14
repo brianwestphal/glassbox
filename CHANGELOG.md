@@ -2,6 +2,12 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.2] - 2026-08-14
+
+
+
+- Updated bundled production dependencies (`fast-uri`, `ip-address`) to patched versions, resolving two high-severity advisories carried transitively under the Model Context Protocol SDK — a host-confusion issue and an SSRF / trust-boundary bypass.
+
 ## [1.1.1] - 2026-08-14
 
 
