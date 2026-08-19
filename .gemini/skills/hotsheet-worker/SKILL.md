@@ -1,8 +1,8 @@
 ---
 name: hotsheet-worker
-description: Run as a distributed worker — continuously claim, work, and release Up Next tickets
+description: Run as a self-claim worker — continuously claim, work, and release Up Next tickets
 ---
-<!-- hotsheet-skill-version: 25 -->
+<!-- hotsheet-skill-version: 28 -->
 
 Read `../../../.claude/skills/hotsheet-worker/SKILL.md` completely and follow its
 workflow. Treat Claude-specific tool names as capability labels and use the

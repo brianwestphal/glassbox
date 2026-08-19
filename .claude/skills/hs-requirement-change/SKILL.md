@@ -3,7 +3,7 @@ name: hs-requirement-change
 description: Create a new req change ticket in Hot Sheet
 allowed-tools: Bash
 ---
-<!-- hotsheet-skill-version: 25 -->
+<!-- hotsheet-skill-version: 28 -->
 
 Create a new Hot Sheet **req change** ticket. Changes to existing requirements.
 

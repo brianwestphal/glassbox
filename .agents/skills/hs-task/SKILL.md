@@ -2,7 +2,7 @@
 name: hs-task
 description: Create a new task ticket in Hot Sheet
 ---
-<!-- hotsheet-skill-version: 25 -->
+<!-- hotsheet-skill-version: 28 -->
 
 Read `../../../.claude/skills/hs-task/SKILL.md` completely and follow its
 workflow. Treat Claude-specific tool names as capability labels and use the

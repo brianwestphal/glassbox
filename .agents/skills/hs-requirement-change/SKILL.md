@@ -2,7 +2,7 @@
 name: hs-requirement-change
 description: Create a new req change ticket in Hot Sheet
 ---
-<!-- hotsheet-skill-version: 25 -->
+<!-- hotsheet-skill-version: 28 -->
 
 Read `../../../.claude/skills/hs-requirement-change/SKILL.md` completely and follow its
 workflow. Treat Claude-specific tool names as capability labels and use the
