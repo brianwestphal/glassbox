@@ -79,6 +79,24 @@ test.describe('Completion modal stage machine', () => {
     await closeAndReopen(page);
   });
 
+  // Since GB-1127 the completion modal's lifecycle is owned by kerfjs/overlay,
+  // which adds Escape dismissal (the hand-rolled version only closed on the
+  // Done button or a backdrop click).
+  test('completion modal dismisses on Escape', async ({ page }) => {
+    await openReview(page);
+    await completeBtn(page).click();
+    await expect(modalTitle(page)).toHaveText('Review Completed', { timeout: 10000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 3000 });
+
+    // The review completed regardless of how the modal was dismissed; reopen it
+    // so the shared demo review stays in-progress for other tests.
+    await expect(reopenBtn(page)).toBeVisible();
+    await reopenBtn(page).click();
+    await expect(completeBtn(page)).toBeVisible();
+  });
+
   test('stale-prompt: cancel → fresh prompt → discard-all → done → reopen → no stale prompt', async ({ page }) => {
     await seedStaleCounts(page, 2);
     await openReview(page);

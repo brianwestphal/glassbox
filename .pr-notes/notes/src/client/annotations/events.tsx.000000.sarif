@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mt23yw52v5s9ay6f",
+          "message": {
+            "text": "Do NOT convert these .annotation-item [data-action=...] click delegates to delegateActions — the data-action scoping is load-bearing. delete, edit, keep, and reclassify action names are also rendered by image-feedback (src/client/diff/imageDiff/imageFeedback.tsx) inside the same diff container. delegateActions dispatches on the bare data-action value to the nearest match, so it would fire these annotation handlers on image-feedback buttons too. The .annotation-item  descendant prefix in each selector is what keeps them apart. (This surface also mixes event types — dblclick/dragstart/input/keydown — that a single delegateActions(root,'click',…) can't fold in.) See GB-1127 notes for the full delegateActions-deferral rationale.\n",
+            "markdown": "Do NOT convert these `.annotation-item [data-action=...]` click delegates to `delegateActions` — the `data-action` scoping is load-bearing. `delete`, `edit`, `keep`, and `reclassify` action names are **also rendered by image-feedback** (`src/client/diff/imageDiff/imageFeedback.tsx`) inside the same diff container. `delegateActions` dispatches on the bare `data-action` value to the *nearest* match, so it would fire these annotation handlers on image-feedback buttons too. The `.annotation-item ` descendant prefix in each selector is what keeps them apart. (This surface also mixes event types — dblclick/dragstart/input/keydown — that a single `delegateActions(root,'click',…)` can't fold in.) See GB-1127 notes for the full delegateActions-deferral rationale.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/annotations/events.tsx"
+                },
+                "region": {
+                  "startLine": 28,
+                  "endLine": 33,
+                  "snippet": {
+                    "text": "  void delegate(diffContainer, 'click', '.annotation-item [data-action=\"delete\"]', (e, btn) => {\n    e.stopPropagation();\n    const item = asEl(btn).closest<HTMLElement>('.annotation-item');\n    if (item === null) return;\n    void handleDelete(item);\n  });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ]
+          },
+          "workItemUris": [
+            "GB-1127"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "f0f492eb71d2c92f84a4fa8bf33a28c0"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "5cf90113811a503497ac3110cc9ad2da53a02f5e",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

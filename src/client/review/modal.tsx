@@ -1,6 +1,6 @@
 import type { SafeHtml } from 'kerfjs';
-import { attr, delegate, mount, signal } from 'kerfjs';
-import { choice } from 'kerfjs/overlay';
+import { attr, delegate, signal } from 'kerfjs';
+import { choice, overlay } from 'kerfjs/overlay';
 
 import {
   completeReview as apiCompleteReview,
@@ -104,28 +104,28 @@ function showCompleteModal(): void {
 function openCompletionModal(initialStage: ModalStage): ReturnType<typeof signal<ModalStage>> {
   const stage = signal<ModalStage>(initialStage);
 
-  const overlay = toElement(<div className="modal-overlay"><div className="modal"></div></div>);
-  const modalEl = overlay.querySelector<HTMLElement>('.modal');
-  if (modalEl === null) return stage;
+  // The whole modal — `.modal-overlay` backdrop, the `.modal` content mount,
+  // Escape/backdrop dismissal, focus trap, and focus restore — is owned by
+  // kerfjs/overlay (replaces the hand-rolled append + mount + backdrop listener
+  // + disposeMount). The render fn reads `stage.value`, so the caller driving
+  // `stage` (completing → done/failed) re-runs the mount automatically.
+  const handle = overlay(
+    () => <div className="modal">{renderStage(stage.value)}</div>,
+    { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true },
+  );
 
-  let disposeMount: (() => void) | null = null;
-  function close(): void {
-    if (disposeMount !== null) disposeMount();
-    overlay.remove();
-  }
+  // Delegated handlers on the overlay wrapper (`handle.el`) — the mount root,
+  // stable across the stage re-renders.
+  void delegate(handle.el, 'click', ACTIONS.modalDone.selector, () => { handle.close(); });
 
-  disposeMount = mount(modalEl, () => renderStage(stage.value));
-
-  void delegate(overlay, 'click', ACTIONS.modalDone.selector, close);
-
-  void delegate(overlay, 'click', '.modal-copyable', (_e, el) => {
+  void delegate(handle.el, 'click', '.modal-copyable', (_e, el) => {
     const copyText = asEl(el).dataset.copy ?? '';
     void navigator.clipboard.writeText(copyText);
     asEl(el).classList.add('copied');
     setTimeout(() => { asEl(el).classList.remove('copied'); }, TOAST_DURATION_MS);
   });
 
-  void delegate(overlay, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
+  void delegate(handle.el, 'click', ACTIONS.sendToClaude.selector, (_e, btn) => {
     if (stage.value.kind !== 'done') return;
     const aiCommand = stage.value.aiCommand;
     const sendBtn = asButton(btn);
@@ -138,14 +138,10 @@ function openCompletionModal(initialStage: ModalStage): ReturnType<typeof signal
       }
       sendBtn.textContent = 'Sent!';
       sendBtn.setAttribute('disabled', 'true');
-      setTimeout(() => { close(); }, SEND_TO_CLAUDE_CLOSE_MS);
+      setTimeout(() => { handle.close(); }, SEND_TO_CLAUDE_CLOSE_MS);
     })();
   });
 
-  // Click outside → close. Direct listener on overlay (not in a mount tree).
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-
-  document.body.appendChild(overlay);
   return stage;
 }
 

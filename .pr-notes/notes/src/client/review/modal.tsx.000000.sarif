@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt23yolt0ozi7z34",
+          "message": {
+            "text": "overlay() owns the mount, so the render fn — not an imperative mount() — must read stage.value. The caller (completeReview) drives the modal by mutating the returned stage signal (completing → done/failed); because overlay() mount()s the render closure, reading stage.value inside it re-runs the mount on each transition with no explicit disposeMount to manage. The three click handlers delegate on handle.el (the persistent mount root), and handle.close() replaces the old backdrop-listener + disposeMount() teardown. This also newly enables Escape dismissal (covered by a new e2e in review-completion.test.ts).\n",
+            "markdown": "`overlay()` owns the mount, so the render fn — not an imperative `mount()` — must read `stage.value`. The caller (`completeReview`) drives the modal by mutating the returned `stage` signal (completing → done/failed); because overlay() `mount()`s the render closure, reading `stage.value` inside it re-runs the mount on each transition with no explicit `disposeMount` to manage. The three click handlers delegate on `handle.el` (the persistent mount root), and `handle.close()` replaces the old backdrop-listener + `disposeMount()` teardown. This also newly enables Escape dismissal (covered by a new e2e in review-completion.test.ts).\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/review/modal.tsx"
+                },
+                "region": {
+                  "startLine": 112,
+                  "endLine": 116,
+                  "snippet": {
+                    "text": "  const handle = overlay(\n    () => <div className=\"modal\">{renderStage(stage.value)}</div>,\n    { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true },\n  );\n"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1127"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "dfbc9a0b4bc2c79b2443cf723956b68c"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "5cf90113811a503497ac3110cc9ad2da53a02f5e",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

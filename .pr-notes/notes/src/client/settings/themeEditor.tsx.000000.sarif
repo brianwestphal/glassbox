@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt23yofsbzp1hu7o",
+          "message": {
+            "text": "Cleanup moved from an imperative close() to handle.result.then() so every dismissal path runs it. Under kerfjs/overlay the modal can close three ways — the #te-close button, Escape, or a backdrop click — and only the button path would go through a hand-rolled close(). Resolving the save-on-close + disposeLivePreview() + onDone() off handle.result (which overlay() resolves on any dismissal) guarantees a dirty edit is still persisted when the user hits Escape or clicks the backdrop, matching the pre-migration behavior where the single close() was wired to all three.\n",
+            "markdown": "Cleanup moved from an imperative `close()` to `handle.result.then()` so every dismissal path runs it. Under kerfjs/overlay the modal can close three ways — the `#te-close` button, Escape, or a backdrop click — and only the button path would go through a hand-rolled `close()`. Resolving the save-on-close + `disposeLivePreview()` + `onDone()` off `handle.result` (which overlay() resolves on *any* dismissal) guarantees a dirty edit is still persisted when the user hits Escape or clicks the backdrop, matching the pre-migration behavior where the single `close()` was wired to all three.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/themeEditor.tsx"
+                },
+                "region": {
+                  "startLine": 111,
+                  "endLine": 118,
+                  "snippet": {
+                    "text": "    void handle.result.then(() => {\n      disposeLivePreview();\n      if (dirty) void save();\n      if (onDone !== undefined) onDone();\n    });\n\n    async function save(): Promise<void> {\n      if (!dirty) return;"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1127"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "1aecf41f0c2be47352da56d3ad21def5"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "5cf90113811a503497ac3110cc9ad2da53a02f5e",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

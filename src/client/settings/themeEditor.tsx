@@ -1,9 +1,10 @@
 import type { SafeHtml } from 'kerfjs';
-import { delegate, effect, mount, signal } from 'kerfjs';
+import { delegate, effect, signal } from 'kerfjs';
+import { overlay } from 'kerfjs/overlay';
 
 import { editTheme, listThemes } from '../../api/index.js';
 import { IconX } from '../../icons.js';
-import { asEl, asInput, toElement } from '../dom.js';
+import { asEl, asInput } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
 
 /** Color variable groups for the editor UI. */
@@ -87,27 +88,31 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
     let currentThemeId = themeId;
     const originalName = theme.name;
 
-    const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog theme-editor-dialog"></div></div>);
-    const modalEl = overlay.querySelector<HTMLElement>('.modal');
-    if (modalEl === null) return;
+    // The whole modal — `.modal-overlay` backdrop, the `.modal` content mount,
+    // Escape/backdrop dismissal, focus trap, and focus restore — is owned by
+    // kerfjs/overlay. The render fn reads the edit signals, so every color/name
+    // change re-runs the mount. Replaces the hand-rolled append + mount +
+    // Escape/backdrop listeners + disposeMount.
+    const handle = overlay(
+      () => (
+        <div className="modal settings-dialog theme-editor-dialog">
+          {renderEditor(isBuiltIn, editNameSignal.value, editColorsSignal.value)}
+        </div>
+      ),
+      { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true },
+    );
 
     const disposeLivePreview = effect(() => {
       applyThemeColors(editColorsSignal.value);
     });
 
-    let disposeMount: (() => void) | null = null;
-    function close(): void {
-      document.removeEventListener('keydown', handleEscape);
+    // On any dismissal (close button, Escape, backdrop): stop the live preview,
+    // persist pending edits, and notify. overlay() owns the mount + node removal.
+    void handle.result.then(() => {
       disposeLivePreview();
-      if (disposeMount !== null) disposeMount();
       if (dirty) void save();
-      overlay.remove();
       if (onDone !== undefined) onDone();
-    }
-
-    function handleEscape(e: KeyboardEvent): void {
-      if (e.key === 'Escape') close();
-    }
+    });
 
     async function save(): Promise<void> {
       if (!dirty) return;
@@ -128,50 +133,40 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
       dirty = true;
     }
 
-    disposeMount = mount(modalEl, () => renderEditor(isBuiltIn, editNameSignal.value, editColorsSignal.value));
+    // Delegated event handlers on the overlay wrapper (`handle.el`), the mount
+    // root that persists across re-renders. Per-row inputs (`.theme-editor-picker`,
+    // `.theme-editor-hex`) all match a single delegate selector — kerf morph
+    // preserves the focused input's value and cursor across renders (docs §4.4),
+    // so the picker keeps focus while another color updates.
 
-    // Delegated event handlers. Per-row inputs (`.theme-editor-picker`,
-    // `.theme-editor-hex`) all match a single delegate selector — kerf
-    // morph preserves the focused input's value and cursor across renders
-    // (docs §4.4), so the picker keeps focus while another color updates.
+    void delegate(handle.el, 'click', '#te-close', () => { handle.close(); });
 
-    void delegate(overlay, 'click', '#te-close', close);
-
-    void delegate(overlay, 'input', '#te-name', (_e, input) => {
+    void delegate(handle.el, 'input', '#te-name', (_e, input) => {
       editNameSignal.value = asInput(input).value;
       dirty = true;
     });
 
-    void delegate(overlay, 'input', '.theme-editor-picker', (_e, picker) => {
+    void delegate(handle.el, 'input', '.theme-editor-picker', (_e, picker) => {
       const varName = asEl(picker).dataset.var ?? '';
       if (varName !== '') updateColor(varName, asInput(picker).value);
     });
 
-    void delegate(overlay, 'change', '.theme-editor-hex', (_e, input) => {
+    void delegate(handle.el, 'change', '.theme-editor-hex', (_e, input) => {
       const varName = asEl(input).dataset.var ?? '';
       const value = asInput(input).value.trim();
       if (varName !== '' && value !== '') updateColor(varName, value);
     });
 
-    void delegate(overlay, 'click', '.theme-editor-reset', (_e, btn) => {
+    void delegate(handle.el, 'click', '.theme-editor-reset', (_e, btn) => {
       const varName = asEl(btn).dataset.var ?? '';
       const baseValue = baseColors[varName];
       if (varName !== '' && baseValue !== '') updateColor(varName, baseValue);
     });
 
-    void delegate(overlay, 'click', '#te-reset-all', () => {
+    void delegate(handle.el, 'click', '#te-reset-all', () => {
       editColorsSignal.value = { ...baseColors };
       dirty = true;
     });
-
-    // Click-outside-to-close — direct listener on the overlay (overlay
-    // isn't inside any mount() tree, same precedent as every other modal).
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
-    });
-
-    document.addEventListener('keydown', handleEscape);
-    document.body.appendChild(overlay);
   })();
 }
 

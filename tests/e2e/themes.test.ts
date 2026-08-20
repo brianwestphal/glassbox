@@ -260,4 +260,39 @@ test.describe('Theme system', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.theme-manager-dialog')).not.toBeVisible({ timeout: 3000 });
   });
+
+  // The theme editor is opened from the theme manager (double-click a row) and,
+  // since GB-1127, its modal lifecycle is owned by kerfjs/overlay — so this
+  // covers open, the live-preview effect, and the overlay() Escape dismissal.
+  test('theme editor opens, live-previews a color edit, and closes on Escape', async ({ page }) => {
+    await page.goto('/');
+    const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]');
+    await settingsBtn.first().click();
+    await expect(page.locator('.settings-dialog')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-tab="general"]').click();
+    await page.locator('#manage-themes-btn').click();
+    await expect(page.locator('.theme-manager-dialog')).toBeVisible({ timeout: 5000 });
+
+    // Double-click a theme row to open the editor (themeManager's dblclick
+    // delegate on the overlay wrapper).
+    await page.locator('.theme-manager-item').first().dblclick();
+    await expect(page.locator('.theme-editor-dialog')).toBeVisible({ timeout: 5000 });
+
+    // Edit the accent color's hex field. The `change` delegate feeds
+    // updateColor(), which drives the live-preview effect that pushes the
+    // color onto document.documentElement as a `--<var>` custom property.
+    const accentHex = page.locator('.theme-editor-hex[data-var="accent"]');
+    await accentHex.fill('#ff0000');
+    await accentHex.press('Tab'); // blur → fires the `change` event
+
+    await page.waitForFunction(
+      () => document.documentElement.style.getPropertyValue('--accent').trim() === '#ff0000',
+      undefined,
+      { timeout: 5000 }
+    );
+
+    // Escape dismisses the editor (kerfjs/overlay owns Escape now).
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.theme-editor-dialog')).not.toBeVisible({ timeout: 3000 });
+  });
 });
