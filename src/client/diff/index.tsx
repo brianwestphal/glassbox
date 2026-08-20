@@ -1,4 +1,6 @@
-import { delegate, delegateCapture, effect, mount, raw, signal } from 'kerfjs';
+import { delegate, delegateCapture, effect, raw, signal } from 'kerfjs';
+import { resource } from 'kerfjs/async';
+import { remountOn } from 'kerfjs/remount';
 
 import { discardReviewNote, moveAnnotation, revealFile } from '../../api/index.js';
 import { hydrateAttachments } from '../annotations/attachments.js';
@@ -35,6 +37,13 @@ const DIFF_LOAD_ERROR_HTML =
 
 const diffContentSignal = signal<DiffContent>({ generation: 0, fileId: null, filePath: null, html: '', kind: 'empty' });
 let fetchGen = 0;
+
+// Owns the `/file/:id` fetch lifecycle (kerfjs/async): kerf's built-in
+// stale-response guard replaces the hand-rolled generation compare, and the
+// run input (`{ fileId }`) rides through to `value.input` for the failed state
+// too — so the error branch can key its chrome to the file that actually
+// failed without any module-scope bookkeeping.
+const diffResource = resource<{ html: string; kind: DiffContent['kind'] }, { fileId: string }>();
 
 export function initDiffView(): void {
   const container = document.getElementById('diff-container');
@@ -94,74 +103,71 @@ function setupFetchEffect(): void {
     let params = '?mode=' + diffMode + (ignoreWhitespace ? '&ignoreWhitespace=1' : '');
     if (svgRendered) params += '&view=rendered';
 
-    const myGen = ++fetchGen;
-    void (async () => {
-      try {
-        const res = await fetch('/file/' + fileId + params);
-        if (!res.ok) throw new Error(`/file/${fileId} returned ${String(res.status)}`);
-        const html = await res.text();
-        if (myGen !== fetchGen) return; // newer fetch in flight
-        const kind: DiffContent['kind'] = html.includes('class="image-diff"') ? 'image' : 'text';
-        diffContentSignal.value = { generation: myGen, fileId, filePath: null, html, kind };
-      } catch {
-        if (myGen !== fetchGen) return; // newer fetch in flight — let it win
-        // Surface the failure instead of leaving the prior diff frozen in place.
-        // Clear the dedupe key so re-selecting another file (then this one) retries.
-        lastFetchKey = '';
-        diffContentSignal.value = { generation: myGen, fileId, filePath: null, html: DIFF_LOAD_ERROR_HTML, kind: 'error' };
-      }
-    })();
+    // kerf's resource owns the stale-response guard: only the latest run
+    // resolves. The `{ fileId }` input rides through to `value.input` (below).
+    void diffResource.run({ fileId }, async () => {
+      const res = await fetch('/file/' + fileId + params);
+      if (!res.ok) throw new Error(`/file/${fileId} returned ${String(res.status)}`);
+      const html = await res.text();
+      const kind: DiffContent['kind'] = html.includes('class="image-diff"') ? 'image' : 'text';
+      return { html, kind };
+    });
+  });
+
+  // Project the resource's terminal state onto `diffContentSignal` (the mount's
+  // source of truth), minting a fresh `generation` each time so the diff subtree
+  // is replaced. The stale guard means only the latest run lands here; on
+  // failure, `value.input.fileId` recovers which file failed so the error chrome
+  // still keys to a real file (the post-render effect skips `fileId === null`).
+  effect(() => {
+    const { status, data, input } = diffResource.value;
+    if (status === 'completed' && data !== undefined) {
+      diffContentSignal.value = { generation: ++fetchGen, fileId: input?.fileId ?? null, filePath: null, html: data.html, kind: data.kind };
+    } else if (status === 'failed') {
+      // Surface the failure instead of freezing the prior diff. Clear the dedupe
+      // key so re-selecting another file (then this one) retries.
+      lastFetchKey = '';
+      diffContentSignal.value = { generation: ++fetchGen, fileId: input?.fileId ?? null, filePath: null, html: DIFF_LOAD_ERROR_HTML, kind: 'error' };
+    }
   });
 }
 
 // --- Mount + post-render setup ---
 
 function setupMount(container: HTMLElement): void {
-  let lastGeneration = -1;
-  mount(container, () => {
-    const { generation, html, kind } = diffContentSignal.value;
-    if (kind === 'empty') return raw('');
-    // The fetched HTML is owned by the server template + imperative widgets
-    // (highlight.js, hunk expansion, image zoom/slice). `data-morph-skip`
-    // keeps kerf from touching the subtree on re-renders that share the same
-    // generation key. A bump to `generation` produces a fresh element, which
-    // is how a file/mode/whitespace switch replaces the tree.
-    return (
-      <div className="diff-content" data-key={`gen-${String(generation)}`} data-morph-skip>
-        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- server-rendered HTML from /file/:id or /file-raw; trusted source */}
-        {raw(html)}
-      </div>
-    );
-  });
-
-  // Post-render: highlight, outline, AI notes, server-annotation event
-  // binding, etc. The mount effect runs synchronously before this one (it was
-  // registered first), so by the time we get here the DOM is up-to-date.
-  //
-  // The effect intentionally subscribes only to `diffContentSignal` —
-  // `runPostRender` reads `reviewStore` and `diffViewStore`
-  // internally (and transitively via `applyHighlighting`,
-  // `loadOutline`, etc.), and kerf's reactivity tracker traverses signal
-  // reads through function calls during effect execution. Calling
-  // `runPostRender` synchronously here would silently subscribe this effect
-  // to every read inside that whole subtree, which means it'd re-fire on
-  // every annotation count update, sort-mode flip, file-note write, etc.
-  // Today the `generation === lastGeneration` guard short-circuits before
-  // any of that work runs, so it's a cheap no-op — but the dependency is
-  // invisible from this call site and would break if a future edit moved a
-  // side-effect above the guard. `queueMicrotask` defers `runPostRender` to
-  // a fresh execution context outside the effect's tracking scope, so the
-  // reads inside it never enter the dependency graph. The DOM is already
-  // up-to-date when the microtask runs — same flush burst as the rest of
-  // mount's effect cycle, just one tick later.
-  effect(() => {
-    const content = diffContentSignal.value;
-    if (content.kind === 'empty') return;
-    if (content.kind !== 'raw' && content.fileId === null) return;
-    if (content.generation === lastGeneration) return;
-    lastGeneration = content.generation;
-    queueMicrotask(() => { runPostRender(container, content); });
-  });
+  // remountOn (kerfjs/remount) REPLACES the diff subtree whenever `generation`
+  // changes — a file / split-unified / whitespace / SVG switch — instead of
+  // morphing it. That is exactly what the diff content needs: the server HTML is
+  // owned by imperative widgets (highlight.js, hunk expansion, image zoom/slice),
+  // so it must be torn down and rebuilt on fresh DOM, not patched underneath
+  // them. This names the old `data-key={gen-N}` + `data-morph-skip` counter
+  // trick, so neither attribute is needed here anymore.
+  remountOn(
+    container,
+    () => diffContentSignal.value.generation,
+    () => {
+      const { html, kind } = diffContentSignal.value;
+      if (kind === 'empty') return raw('');
+      // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- server-rendered HTML from /file/:id or /file-raw; trusted source
+      return <div className="diff-content">{raw(html)}</div>;
+    },
+    {
+      // Runs after each (re)mount against the fresh subtree — highlight, outline,
+      // AI notes, annotation-event binding, image widgets. onMount is already
+      // outside the reactive tracking scope (unlike the old post-render effect),
+      // but `runPostRender` is still deferred to a microtask: the image widgets
+      // measure the freshly-mounted canvas, so it must run after the whole effect
+      // flush that (re)builds the diff DOM has settled — the same one-tick defer
+      // the previous `queueMicrotask` provided, which the image-region geometry
+      // depends on.
+      onMount: () => {
+        const content = diffContentSignal.value;
+        if (content.kind === 'empty') return;
+        if (content.kind !== 'raw' && content.fileId === null) return;
+        queueMicrotask(() => { runPostRender(container, content); });
+      },
+    },
+  );
 }
 
 function runPostRender(container: HTMLElement, content: DiffContent): void {

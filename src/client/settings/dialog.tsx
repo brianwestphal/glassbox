@@ -1,13 +1,14 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, mount, signal } from 'kerfjs';
+import { debounce } from 'kerfjs/timing';
 
 import type { DatabaseBackup, ListBackupsResp } from '../../api/db-backups.js';
-import { deleteDatabaseBackup, listDatabaseBackups, revealDatabaseBackup } from '../../api/db-backups.js';
+import { deleteDatabaseBackup as rawDeleteDatabaseBackup, listDatabaseBackups, revealDatabaseBackup } from '../../api/db-backups.js';
 import type { DifftoolStatusResp } from '../../api/index.js';
 import {
-  deleteAIKey,
-  disableChannel,
-  enableChannel,
+  deleteAIKey as rawDeleteAIKey,
+  disableChannel as rawDisableChannel,
+  enableChannel as rawEnableChannel,
   getAIConfig,
   getAIKeyStatus,
   getChannelStatus,
@@ -16,11 +17,11 @@ import {
   getProjectSettings,
   listAIModels,
   listThemes,
-  registerDifftool,
-  saveAIConfig,
-  saveAIKey,
-  unregisterDifftool,
-  updateProjectSettings,
+  registerDifftool as rawRegisterDifftool,
+  saveAIConfig as rawSaveAIConfig,
+  saveAIKey as rawSaveAIKey,
+  unregisterDifftool as rawUnregisterDifftool,
+  updateProjectSettings as rawUpdateProjectSettings,
 } from '../../api/index.js';
 import { IconX } from '../../icons.js';
 import { asButton, asEl, asInput, asSelect, toElement } from '../dom.js';
@@ -30,7 +31,7 @@ import { triggerShare } from '../share.js';
 import { invalidateAnalysisCache } from '../sidebar/sortMode.js';
 import { aiStore } from '../stores/index.js';
 import { getTauriGlobal, getTauriInvoke, showUpdateBanner } from '../tauri.js';
-import { switchTheme } from '../themes.js';
+import { switchTheme as rawSwitchTheme } from '../themes.js';
 import { CHANNEL_STATUS_POLL_MS, SETTINGS_APP_NAME_DEBOUNCE_MS, SETTINGS_CONFIG_DEBOUNCE_MS, TOAST_DURATION_MS } from '../timing.js';
 import { showToast } from '../toast.js';
 import { experimentalTab } from './experimentalTab.js';
@@ -65,21 +66,101 @@ interface SettingsUIState {
   dbQuarantined: DatabaseBackup[];
 }
 
+/** The dialog's server data (9 endpoints). Cached across opens so a repeat open
+ *  renders instantly without a spinner (GB-1131). */
+async function fetchSettingsData() {
+  return Promise.all([
+    getAIKeyStatus(),
+    listAIModels(),
+    getAIConfig(),
+    getProjectSettings(),
+    listThemes(),
+    getClaudeCheck(),
+    getChannelStatus(),
+    getDifftoolStatus(),
+    listDatabaseBackups(),
+  ]);
+}
+type SettingsData = Awaited<ReturnType<typeof fetchSettingsData>>;
+
+// Module-level cache of the last-fetched data. Present ⇒ a repeat open renders
+// immediately (no spinner, no network). Any action that mutates server settings
+// calls `invalidateSettingsData()`, so the next open after a change re-fetches
+// and shows it; a plain view-and-close leaves the cache intact (instant reopen).
+let settingsCache: SettingsData | null = null;
+
+/** Drop the cached settings data so the next open re-fetches. Called after any
+ *  action that changes server-side settings (config, key, theme, app name,
+ *  difftool, channel, backup) — see the wrapped mutators below. */
+function invalidateSettingsData(): void {
+  settingsCache = null;
+}
+
+/** Wrap a mutating API call so it drops the settings cache on success — the
+ *  wrapped names below are used at every dialog call site, so a change is always
+ *  reflected on the next open without threading invalidation through each
+ *  handler. */
+function withInvalidate<A extends unknown[], R>(fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
+  return async (...args: A): Promise<R> => {
+    const result = await fn(...args);
+    invalidateSettingsData();
+    return result;
+  };
+}
+
+const saveAIConfig = withInvalidate(rawSaveAIConfig);
+const saveAIKey = withInvalidate(rawSaveAIKey);
+const deleteAIKey = withInvalidate(rawDeleteAIKey);
+const updateProjectSettings = withInvalidate(rawUpdateProjectSettings);
+const registerDifftool = withInvalidate(rawRegisterDifftool);
+const unregisterDifftool = withInvalidate(rawUnregisterDifftool);
+const enableChannel = withInvalidate(rawEnableChannel);
+const disableChannel = withInvalidate(rawDisableChannel);
+const deleteDatabaseBackup = withInvalidate(rawDeleteDatabaseBackup);
+const switchTheme = withInvalidate(rawSwitchTheme);
+
 export function showSettingsDialog(onClose?: () => void): void {
   resetPluginsTab(); // fresh plugin list per dialog session (doc 29, GB-1040)
-  void (async () => {
-    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus, backups] = await Promise.all([
-      getAIKeyStatus(),
-      listAIModels(),
-      getAIConfig(),
-      getProjectSettings(),
-      listThemes(),
-      getClaudeCheck(),
-      getChannelStatus(),
-      getDifftoolStatus(),
-      listDatabaseBackups(),
-    ]);
 
+  // Show the modal shell IMMEDIATELY. With cached data it renders content at
+  // once; on a cold open (first per session) the spinner shows while the ~9
+  // endpoints load — we never block the modal's appearance on the fetch
+  // (GB-1129).
+  const overlay = toElement(
+    <div className="modal-overlay">
+      <div className="modal settings-dialog">
+        <div className="settings-loading"><span className="analysis-spinner"></span></div>
+      </div>
+    </div>
+  );
+  const foundModal = overlay.querySelector<HTMLElement>('.modal');
+  if (foundModal === null) return;
+  const modalEl: HTMLElement = foundModal; // non-null declared type, usable inside build()
+
+  // Cleanup registry — `renderSettingsModal` appends the mount/poll/action
+  // teardowns once it takes over. `close()` runs them all (LIFO) and is safe to
+  // call whether the user dismisses during loading or after the UI is built.
+  const teardowns: Array<() => void> = [];
+  let closed = false;
+  function close(): void {
+    if (closed) return;
+    closed = true;
+    while (teardowns.length > 0) teardowns.pop()?.();
+    overlay.remove();
+    if (onClose !== undefined) onClose();
+  }
+  const onEsc = (e: KeyboardEvent): void => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onEsc);
+  teardowns.push(() => { document.removeEventListener('keydown', onEsc); });
+  // Backdrop click closes; the dialog content's own clicks go through delegated
+  // handlers on the overlay and don't reach here as `e.target === overlay`.
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
+
+  function build(data: SettingsData): void {
+    // Dismissed before the data arrived? `close()` detached the overlay.
+    if (!overlay.isConnected) return;
+    const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus, backups] = data;
     const channelState: ChannelState = {
       enabled: channelStatus.enabled,
       connected: channelStatus.connected,
@@ -87,9 +168,41 @@ export function showSettingsDialog(onClose?: () => void): void {
       claudeVersion: channelCheck.version,
       meetsMinimum: channelCheck.meetsMinimum,
     };
+    renderSettingsModal(
+      { overlay, modalEl, close, registerTeardown: (fn) => { teardowns.push(fn); } },
+      keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, backups,
+    );
+  }
 
-    renderSettingsModal(keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, backups, onClose);
-  })();
+  if (settingsCache !== null) {
+    // Repeat open: render instantly from cache. `build()` mounts over the
+    // spinner synchronously, so the spinner is never seen.
+    build(settingsCache);
+  } else {
+    // Cold open: the spinner (already in the DOM) shows while we fetch.
+    void (async () => {
+      let data: SettingsData;
+      try {
+        data = await fetchSettingsData();
+      } catch {
+        showToast('Couldn’t load settings — please try again.');
+        close();
+        return;
+      }
+      settingsCache = data;
+      build(data);
+    })();
+  }
+}
+
+/** The already-shown modal shell + lifecycle hooks, handed to
+ *  `renderSettingsModal` so it populates the existing overlay (rather than
+ *  creating its own) and registers its teardown into the shared `close()`. */
+interface ModalShell {
+  overlay: HTMLElement;
+  modalEl: HTMLElement;
+  close: () => void;
+  registerTeardown: (fn: () => void) => void;
 }
 
 /**
@@ -129,6 +242,7 @@ function showDeleteBackupConfirm(name: string, onConfirm: () => void): void {
 }
 
 function renderSettingsModal(
+  shell: ModalShell,
   keyStatus: KeyStatusResponse,
   modelsData: ModelsResponse,
   configData: ConfigResponse,
@@ -137,8 +251,8 @@ function renderSettingsModal(
   channelState: ChannelState,
   initialDifftoolStatus: DifftoolStatusResp,
   initialBackups: ListBackupsResp,
-  onClose?: () => void,
 ): void {
+  const { overlay, modalEl, close: closeDialog, registerTeardown } = shell;
   const isTauri = getTauriGlobal() !== undefined;
 
   // Per-dialog reactive state. Bumps to this signal drive the mount()
@@ -162,10 +276,6 @@ function renderSettingsModal(
     dbQuarantined: initialBackups.quarantined,
   });
 
-  const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog"></div></div>);
-  const modalEl = overlay.querySelector<HTMLElement>('.modal');
-  if (modalEl === null) return;
-
   function setUi(partial: Partial<SettingsUIState>): void {
     ui.value = { ...ui.value, ...partial };
   }
@@ -174,8 +284,7 @@ function renderSettingsModal(
   }
 
   const actions = createActions({ ui, setUi, forceRerender, keyStatus, projectSettings, configData, channelState, overlay, modelsData, themesData });
-
-  let disposeMount: (() => void) | null = null;
+  registerTeardown(() => { actions.dispose(); });
 
   // Periodic Claude-channel health poll (doc 17.3). While the dialog is open we
   // re-read `/api/channel/status` so the connected/disconnected indicator stays
@@ -194,22 +303,10 @@ function renderSettingsModal(
       } catch { /* transient — keep last known state */ }
     })();
   }, CHANNEL_STATUS_POLL_MS);
+  registerTeardown(() => { clearInterval(channelPoll); });
 
-  function closeDialog(): void {
-    actions.dispose();
-    clearInterval(channelPoll);
-    document.removeEventListener('keydown', handleEscape);
-    if (disposeMount !== null) disposeMount();
-    overlay.remove();
-    if (onClose !== undefined) onClose();
-  }
-
-  function handleEscape(e: KeyboardEvent): void {
-    if (e.key === 'Escape') closeDialog();
-  }
-
-  // Mount the reactive shell.
-  disposeMount = mount(modalEl, () => {
+  // Mount the reactive shell (replaces the loading spinner inside the modal).
+  const disposeMount = mount(modalEl, () => {
     const ctx = buildContext({ ui, isTauri, keyStatus, modelsData, themesData, projectSettings, channelState, actions });
     const visible = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
     const cur = ui.value;
@@ -221,11 +318,31 @@ function renderSettingsModal(
     }
     return renderShell(visible, activeId, ctx);
   });
+  registerTeardown(disposeMount);
+
+  // GB-1130: pin the dialog to the TALLEST tab's height so switching tabs never
+  // resizes it. Measure each tab once, synchronously — the mount re-renders on
+  // the `setUi` write before the browser paints, so the intermediate tabs are
+  // never seen — take the max height, and set it as `min-height` on the dialog
+  // element itself (the mount ROOT, whose own style survives the child morphs;
+  // an inline style on the re-rendered `.settings-body` would be clobbered).
+  // Shorter tabs then get empty space at the bottom instead of shrinking.
+  {
+    const ctx = buildContext({ ui, isTauri, keyStatus, modelsData, themesData, projectSettings, channelState, actions });
+    const visibleTabs = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
+    if (visibleTabs.length > 1) {
+      const original = ui.value.activeTab;
+      let maxHeight = 0;
+      for (const t of visibleTabs) {
+        setUi({ activeTab: t.id });
+        maxHeight = Math.max(maxHeight, modalEl.getBoundingClientRect().height);
+      }
+      setUi({ activeTab: original });
+      if (maxHeight > 0) modalEl.style.minHeight = `${String(Math.ceil(maxHeight))}px`;
+    }
+  }
 
   setupDelegates({ overlay, setUi, forceRerender, actions, modelsData, themesData, channelState, closeDialog });
-
-  document.addEventListener('keydown', handleEscape);
-  document.body.appendChild(overlay);
 }
 
 // --- Action handlers (closure-bound, returned as an object so they can be
@@ -264,8 +381,6 @@ function createActions(deps: ActionDeps): Actions {
   const { ui, setUi, forceRerender, keyStatus, projectSettings, configData, overlay } = deps;
   let lastSavedGuidedEnabled = configData.guidedReview.enabled;
   let lastSavedGuidedTopics = new Set(configData.guidedReview.topics);
-  let configTimer: ReturnType<typeof setTimeout> | null = null;
-  let appNameTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Surface a transient error when a settings save/remove request fails, so a
    *  failure isn't silent. Appended to `overlay` (not the mounted modal body)
@@ -332,21 +447,18 @@ function createActions(deps: ActionDeps): Actions {
     })();
   }
 
-  function saveConfigDebounced(): void {
-    if (configTimer) clearTimeout(configTimer);
-    configTimer = setTimeout(saveConfig, SETTINGS_CONFIG_DEBOUNCE_MS);
-  }
+  // Auto-save debouncers (kerfjs/timing) — replace the hand-rolled
+  // configTimer/appNameTimer; canceled on dispose so a pending save can't fire
+  // after the dialog closes.
+  const saveConfigDebounced = debounce(saveConfig, SETTINGS_CONFIG_DEBOUNCE_MS);
 
-  function saveAppNameDebounced(): void {
-    if (appNameTimer) clearTimeout(appNameTimer);
-    appNameTimer = setTimeout(() => {
-      const val = ui.value.appName.trim();
-      if (val !== (projectSettings.appName ?? '')) {
-        void updateProjectSettings({ appName: val });
-        projectSettings.appName = val || undefined;
-      }
-    }, SETTINGS_APP_NAME_DEBOUNCE_MS);
-  }
+  const saveAppNameDebounced = debounce(() => {
+    const val = ui.value.appName.trim();
+    if (val !== (projectSettings.appName ?? '')) {
+      void updateProjectSettings({ appName: val });
+      projectSettings.appName = val || undefined;
+    }
+  }, SETTINGS_APP_NAME_DEBOUNCE_MS);
 
   // Save/remove are parameterized by platform + element ids so the same logic
   // serves the primary platform's key block and the Apple-FM fallback's.
@@ -469,8 +581,8 @@ function createActions(deps: ActionDeps): Actions {
   }
 
   function dispose(): void {
-    if (configTimer) clearTimeout(configTimer);
-    if (appNameTimer) clearTimeout(appNameTimer);
+    saveConfigDebounced.cancel();
+    saveAppNameDebounced.cancel();
   }
 
   return { saveConfig, saveConfigDebounced, saveLocalEndpoint, saveAppNameDebounced, saveKey, removeKey, saveFallbackKey, removeFallbackKey, toggleTopic, registerDifftoolAction, unregisterDifftoolAction, dispose };
@@ -729,13 +841,8 @@ function setupDelegates(args: {
   void delegate(overlay, 'click', '#check-updates-btn', (_e, btn) => {
     void handleCheckUpdates(asButton(btn), overlay);
   });
-
-  // Click outside (on the dimmed overlay background) closes the dialog. Bound
-  // directly on the overlay element — it's the modal root, not inside a
-  // mount() tree, so a direct listener survives.
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeDialog();
-  });
+  // Note: backdrop-click-to-close is wired in `showSettingsDialog` (it must work
+  // during the loading phase too, before this runs), so it's not repeated here.
 }
 
 async function handleCheckUpdates(btn: HTMLButtonElement, overlay: HTMLElement): Promise<void> {

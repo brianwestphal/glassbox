@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { Hono } from 'hono';
+import { renderDocument } from 'kerfjs';
 import { relative, resolve } from 'path';
 
 import { DiffView } from '../components/diffView.js';
@@ -56,7 +57,7 @@ pageRoutes.get('/', async (c) => {
     </Layout>
   );
 
-  return c.html(html.toString());
+  return c.html(renderDocument(html));
 });
 
 pageRoutes.get('/file/:fileId', async (c) => {
@@ -251,7 +252,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
     </Layout>
   );
 
-  return c.html(html.toString());
+  return c.html(renderDocument(html));
 });
 
 pageRoutes.get('/history', async (c) => {
@@ -265,5 +266,5 @@ pageRoutes.get('/history', async (c) => {
     </Layout>
   );
 
-  return c.html(html.toString());
+  return c.html(renderDocument(html));
 });

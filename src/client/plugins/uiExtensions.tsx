@@ -30,7 +30,7 @@ let wired = false;
 /** An inline-SVG icon node (inert; trusted per opt-in install), or null. */
 function iconNode(icon: string | undefined): HTMLElement | null {
   if (icon === undefined || icon === '') return null;
-  // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-supplied inert SVG icon; installed plugins are trusted (doc 29 §29.6).
+  // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-supplied inert SVG icon; installed plugins are trusted (doc 29 §29.6)
   return toElement(<span className="plugin-ui-icon">{raw(icon)}</span>);
 }
 

@@ -1,0 +1,99 @@
+// Styling bridge for the `kerfjs/overlay` subpath (doc 29 / GB-1123). kerf ships
+// no CSS — its `overlay()` wrapper carries `.kerf-overlay`, and `confirm()` /
+// `choice()` / `toast()` render `.kerf-confirm*` / `.kerf-choice*` / `.kerf-toast*`
+// inside it. This partial maps those class names onto Glassbox's existing modal +
+// button variables so any adoption inherits the app's look, matching the
+// hand-rolled `.modal-overlay` / `.modal` it replaces.
+
+.kerf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.kerf-confirm {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 360px;
+  width: 90%;
+
+  &__title { margin: 0 0 12px; font-size: 16px; }
+  &__message { margin: 0 0 16px; color: var(--text-dim); font-size: 14px; }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+
+    button {
+      padding: 3px 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s;
+
+      &:hover { background: var(--bg-hover); }
+    }
+  }
+
+  // For a destructive confirm (`danger: true`), kerf adds `--danger` to the
+  // wrapper — tint the affirmative (OK) button like `.btn-danger`.
+  &--danger &__actions .kerf-confirm__ok {
+    color: var(--red);
+    &:hover { background: rgba(243, 139, 168, 0.15); }
+  }
+}
+
+// The N-way `choice()` dialog (kerfjs/overlay). Same surface as `.kerf-confirm`;
+// its action buttons carry Glassbox's own `.btn`/`.btn-sm`/`.btn-*` classes
+// (passed as each action's `className`), so only the surface + row layout is
+// styled here — the buttons keep the app's exact button styling.
+.kerf-choice {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 360px;
+  width: 90%;
+
+  &__title { margin: 0 0 12px; font-size: 16px; }
+  &__message { margin: 0 0 16px; color: var(--text-dim); font-size: 14px; }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+}
+
+// Auto-dismissing notifications from `toast()`. Glassbox has its own
+// `showToast` (src/client/toast.tsx) for in-app toasts; these styles exist so a
+// future `toast()` use is presentable, and share the visual language.
+.kerf-toasts {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+}
+
+.kerf-toast {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}

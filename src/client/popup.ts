@@ -10,14 +10,20 @@
  * instead, because re-renders silently drop per-element listeners.
  */
 
+import { positionAnchored } from 'kerfjs/overlay';
+
 /** Fixed-position `el` directly below `anchor`, left-aligned (the shared
  *  popup placement). Layering comes from the element's SCSS class — don't set
- *  inline z-index. */
+ *  inline z-index.
+ *
+ *  Delegates to kerfjs/overlay's placement core (`positionAnchored`): same
+ *  below-and-left-aligned default as before, but it now FLIPS above the anchor
+ *  when the popup would overflow the bottom of the viewport and CLAMPS it
+ *  horizontally into view — a free upgrade for all five popups that route
+ *  through here. It positions our own element (`position: fixed` + left/top),
+ *  so the popups' existing SCSS is untouched; no overlay wrapper is introduced. */
 export function positionBelowAnchor(el: HTMLElement, anchor: HTMLElement, gapPx = 4): void {
-  const rect = anchor.getBoundingClientRect();
-  el.style.position = 'fixed';
-  el.style.left = `${String(rect.left)}px`;
-  el.style.top = `${String(rect.bottom + gapPx)}px`;
+  positionAnchored(el, anchor, { gap: gapPx });
 }
 
 /**

@@ -418,9 +418,9 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
           <div className="ai-note-item">
             <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
             {n.stale === true ? <span className="ai-note-stale-tag" title="The code this note referred to has changed">outdated</span> : null}
-            {/* A div, not a span: the body renders block-level markdown (doc 20 §20.6). */}
-            {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- renderNoteMarkdown escapes first; output is safe HTML */}
-            <div className="ai-note-text">{raw(renderNoteMarkdown(n.body, n.related))}</div>
+            {/* A div, not a span: the body renders block-level markdown (doc 20 §20.6).
+                renderNoteMarkdown returns SafeHtml, so it embeds directly. */}
+            <div className="ai-note-text">{renderNoteMarkdown(n.body, n.related)}</div>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
             {n.guid !== undefined ? <button className="ai-note-reply-btn" data-line={String(n.line)}>Reply</button> : null}
             {n.stale === true && n.guid !== undefined ? (
@@ -443,7 +443,7 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
                           opt-in-installed code (doc 29 §29.6) and encodeURIComponent leaves no
                           quote to break out of the attribute, so raw() is the documented opt-out. */}
                       <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
-                        // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- trusted plugin SVG, inert in <img> context (NFR-29.2)
+                        // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- trusted plugin SVG (opt-in install; doc 29 §29.6), inert in <img> context (NFR-29.2)
                         src={raw(`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`)} />
                     </div>
                   </details>

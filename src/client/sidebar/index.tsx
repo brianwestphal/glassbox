@@ -1,4 +1,6 @@
 import { delegate, effect, mount } from 'kerfjs';
+import { delegateActions } from 'kerfjs/actions';
+import { debounce } from 'kerfjs/timing';
 
 import { RiskDimensionSchema, saveAIPreferences } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
@@ -71,12 +73,6 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
     switchSortMode(mode);
   });
 
-  void delegate(sidebar, 'click', ACTIONS.toggleRiskScores.selector, () => {
-    const next = !aiStore.state.value.showRiskScores;
-    aiStore.actions.update({ showRiskScores: next });
-    void saveAIPreferences({ show_risk_scores: next });
-  });
-
   void delegate(sidebar, 'change', ACTIONS.setRiskDimension.selector, (_e, sel) => {
     const value = asSelect(sel).value;
     aiStore.actions.update({ riskSortDimension: value });
@@ -86,53 +82,62 @@ function bindDelegatedEvents(sidebar: HTMLElement): void {
     }
   });
 
-  let filterTimer: ReturnType<typeof setTimeout> | null = null;
+  // Trailing-edge debounce (kerfjs/timing) — replaces the hand-rolled
+  // filterTimer + clearTimeout dance.
+  const applyFilter = debounce((value: string) => {
+    reviewStore.actions.update({ filterText: value });
+  }, FILTER_DEBOUNCE_MS);
   void delegate(sidebar, 'input', '#file-filter', (_e, input) => {
-    const value = asInput(input).value;
-    if (filterTimer !== null) clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => {
-      reviewStore.actions.update({ filterText: value });
-    }, FILTER_DEBOUNCE_MS);
+    applyFilter(asInput(input).value);
   });
   void delegate(sidebar, 'keydown', '#file-filter', (e, input) => {
     if ((e as KeyboardEvent).key === 'Escape') {
       const el = asInput(input);
       el.value = '';
+      applyFilter.cancel(); // drop a pending debounced update so it can't clobber the clear
       reviewStore.actions.update({ filterText: '' });
       el.blur();
     }
   });
 
-  void delegate(sidebar, 'click', ACTIONS.selectFile.selector, (_e, el) => {
-    const fileId = asEl(el).dataset.fileId;
-    if (fileId !== undefined && fileId !== '') void selectFile(fileId);
-  });
-
-  void delegate(sidebar, 'click', ACTIONS.toggleFolder.selector, (_e, header) => {
-    const path = asEl(header).dataset.folderPath ?? '';
-    if (path === '') return;
-    if (diffViewStore.state.value.collapsedFolders.has(path)) {
-      diffViewStore.actions.removeCollapsedFolder(path);
-    } else {
-      diffViewStore.actions.addCollapsedFolder(path);
-    }
-    saveCollapsedFolders();
-  });
-
-  void delegate(sidebar, 'click', ACTIONS.showRiskPopover.selector, (e, badge) => {
-    e.stopPropagation();
-    const fileId = asEl(badge).dataset.fileId ?? '';
-    const score = (aiStore.state.value.riskScores ?? []).find(s => s.reviewFileId === fileId);
-    if (score !== undefined) showRiskPopover(asEl(badge), score);
-  });
-
-  void delegate(sidebar, 'click', ACTIONS.retryAnalysis.selector, (_e, btn) => {
-    const mode = asEl(btn).dataset.mode as 'risk' | 'narrative';
-    void import('./sortMode.js').then(m => { m.triggerAnalysis(mode); });
-  });
-
-  void delegate(sidebar, 'click', ACTIONS.toggleHideIdentical.selector, () => {
-    diffViewStore.actions.update({ hideIdentical: !diffViewStore.state.value.hideIdentical });
+  // The whole `data-action` click table dispatched by one delegated listener
+  // (kerfjs/actions `delegateActions`) — replaces six separate delegate() calls.
+  // Nearest-action-wins is exactly what the nesting needs: a click on the risk
+  // badge (`show-risk-popover`, a child of a `select-file` row) resolves to the
+  // badge's own action, so it opens the popover without also selecting the file
+  // (what the previous code's `e.stopPropagation()` was reaching for).
+  void delegateActions(sidebar, 'click', {
+    [ACTIONS.toggleRiskScores.value]: () => {
+      const next = !aiStore.state.value.showRiskScores;
+      aiStore.actions.update({ showRiskScores: next });
+      void saveAIPreferences({ show_risk_scores: next });
+    },
+    [ACTIONS.selectFile.value]: (_e, el) => {
+      const fileId = asEl(el).dataset.fileId;
+      if (fileId !== undefined && fileId !== '') void selectFile(fileId);
+    },
+    [ACTIONS.toggleFolder.value]: (_e, header) => {
+      const path = asEl(header).dataset.folderPath ?? '';
+      if (path === '') return;
+      if (diffViewStore.state.value.collapsedFolders.has(path)) {
+        diffViewStore.actions.removeCollapsedFolder(path);
+      } else {
+        diffViewStore.actions.addCollapsedFolder(path);
+      }
+      saveCollapsedFolders();
+    },
+    [ACTIONS.showRiskPopover.value]: (_e, badge) => {
+      const fileId = asEl(badge).dataset.fileId ?? '';
+      const score = (aiStore.state.value.riskScores ?? []).find(s => s.reviewFileId === fileId);
+      if (score !== undefined) showRiskPopover(asEl(badge), score);
+    },
+    [ACTIONS.retryAnalysis.value]: (_e, btn) => {
+      const mode = asEl(btn).dataset.mode as 'risk' | 'narrative';
+      void import('./sortMode.js').then(m => { m.triggerAnalysis(mode); });
+    },
+    [ACTIONS.toggleHideIdentical.value]: () => {
+      diffViewStore.actions.update({ hideIdentical: !diffViewStore.state.value.hideIdentical });
+    },
   });
 }
 

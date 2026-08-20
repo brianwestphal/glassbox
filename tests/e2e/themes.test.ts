@@ -239,9 +239,9 @@ test.describe('Theme system', () => {
     // Click Delete in context menu
     await page.locator('.tm-menu-item', { hasText: 'Delete' }).click();
 
-    // Confirm in the delete confirmation modal
-    await expect(page.locator('#del-confirm')).toBeVisible({ timeout: 3000 });
-    await page.locator('#del-confirm').click();
+    // Confirm in the delete confirmation modal (kerfjs/overlay confirm())
+    await expect(page.locator('.kerf-confirm button[data-confirm="ok"]')).toBeVisible({ timeout: 3000 });
+    await page.locator('.kerf-confirm button[data-confirm="ok"]').click();
 
     // Wait for item count to decrease
     await expect(page.locator('.theme-manager-item')).toHaveCount(countAfterDup - 1, { timeout: 5000 });

@@ -23,7 +23,8 @@
  * `src/review-notes/instructions.ts`; see that text before adding to it.
  */
 
-import { escapeAttr, escapeHtml } from './escapeHtml.js';
+import { raw, type SafeHtml } from 'kerfjs';
+import { html } from 'kerfjs/html';
 
 /** Only these schemes are allowed for rendered links. */
 const SAFE_URL = /^(https?:\/\/|mailto:)/i;
@@ -55,9 +56,13 @@ function renderEmbeddedLink(text: string, destination: string, ctx: RenderContex
   if (!/^\d+$/.test(destination)) return null;
   const target = ctx.related.at(Number(destination));
   if (target === undefined || target.uri === '' || target.line < 1) return null;
-  // `related` arrives from SARIF and is NOT part of the escaped body, so its
-  // values must be attribute-escaped here.
-  return `<a class="ai-note-loclink" data-loc-file="${escapeAttr(target.uri)}" data-loc-line="${String(target.line)}" title="${escapeAttr(`${target.uri}:${String(target.line)}`)}">${text}</a>`;
+  // `related` arrives from SARIF and is NOT part of the escaped body, so escape
+  // its values (via kerf's `html` text-hole escaping — a safe superset of what a
+  // double-quoted attribute needs) before placing them in the attributes below.
+  // `text` is already-processed inline HTML, so it stays as-is.
+  const file = html`${target.uri}`.toString();
+  const title = html`${`${target.uri}:${String(target.line)}`}`.toString();
+  return `<a class="ai-note-loclink" data-loc-file="${file}" data-loc-line="${String(target.line)}" title="${title}">${text}</a>`;
 }
 
 /** Apply inline markdown to a single already-escaped line. */
@@ -298,6 +303,14 @@ function renderBlocks(lines: string[], depth: number, ctx: RenderContext): strin
  * blocks, blockquotes, thematic breaks, and the inline set (code, bold, italic,
  * http(s)/mailto links). Everything else is escaped literal text.
  */
-export function renderNoteMarkdown(text: string, related: NoteLinkTarget[] = []): string {
-  return renderBlocks(escapeHtml(text).split('\n'), 0, { related });
+export function renderNoteMarkdown(text: string, related: NoteLinkTarget[] = []): SafeHtml {
+  // Escape the whole body first (via kerf's `html` text-hole escaping), then the
+  // block renderer parses markdown structure on the escaped text, inserting only
+  // trusted markup around it. Returning SafeHtml puts the trust boundary HERE —
+  // the single point that escapes every user value — so callers embed the result
+  // directly (`{renderNoteMarkdown(...)}`) with no escape hatch of their own. The
+  // one `raw()` below is that boundary: the string is assembled from leaves each
+  // escaped through `html`, so it is safe HTML by construction.
+  // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- single trusted-assembly point; every user value is escaped at the leaves via kerfjs/html
+  return raw(renderBlocks(html`${text}`.toString().split('\n'), 0, { related }));
 }

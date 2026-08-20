@@ -14,6 +14,34 @@ import { errorResponse, parseBody } from '../utils/parseBody.js';
  *  experimental `claude/channel` capability landed in 2.1.80). */
 const MIN_CLAUDE_VERSION = '2.1.80';
 
+interface ClaudeCheck { installed: boolean; version: string | null; meetsMinimum: boolean }
+
+// The settings dialog fetches `/channel/claude-check` on every open, and the
+// check spawns `claude --version` — a ~0.7s synchronous subprocess that was the
+// dominant cost of opening the dialog. The installed CLI version can't change
+// while the server runs, so cache the result per process: the first open pays
+// the spawn, every subsequent open is instant. A server restart re-checks.
+let claudeCheckCache: ClaudeCheck | null = null;
+
+function checkClaudeCli(): ClaudeCheck {
+  if (claudeCheckCache !== null) return claudeCheckCache;
+  try {
+    const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', timeout: 5000 });
+    if (result.status !== 0) {
+      claudeCheckCache = { installed: false, version: null, meetsMinimum: false };
+    } else {
+      // Extract version number (e.g., "claude v2.1.80" → "2.1.80")
+      const match = result.stdout.trim().match(/(\d+\.\d+\.\d+)/);
+      const ver = match !== null ? match[1] : null;
+      const meetsMinimum = ver !== null && compareVersions(ver, MIN_CLAUDE_VERSION) >= 0;
+      claudeCheckCache = { installed: true, version: ver, meetsMinimum };
+    }
+  } catch {
+    claudeCheckCache = { installed: false, version: null, meetsMinimum: false };
+  }
+  return claudeCheckCache;
+}
+
 export const channelApiRoutes = new Hono<AppEnv>();
 
 /** GET /channel/status — check if channel is enabled and connected */
@@ -62,20 +90,8 @@ channelApiRoutes.post('/trigger', async (c) => {
   return c.json({ ok: true } as const);
 });
 
-/** GET /channel/claude-check — check if Claude Code CLI is installed */
+/** GET /channel/claude-check — check if Claude Code CLI is installed (cached
+ *  per process; see `checkClaudeCli`). */
 channelApiRoutes.get('/claude-check', (c) => {
-  try {
-    const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', timeout: 5000 });
-    if (result.status !== 0) {
-      return c.json({ installed: false, version: null, meetsMinimum: false });
-    }
-    const version = result.stdout.trim();
-    // Extract version number (e.g., "claude v2.1.80" → "2.1.80")
-    const match = version.match(/(\d+\.\d+\.\d+)/);
-    const ver = match !== null ? match[1] : null;
-    const meetsMinimum = ver !== null && compareVersions(ver, MIN_CLAUDE_VERSION) >= 0;
-    return c.json({ installed: true, version: ver, meetsMinimum });
-  } catch {
-    return c.json({ installed: false, version: null, meetsMinimum: false });
-  }
+  return c.json(checkClaudeCli());
 });

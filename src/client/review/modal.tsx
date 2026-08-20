@@ -1,5 +1,6 @@
 import type { SafeHtml } from 'kerfjs';
 import { attr, delegate, mount, signal } from 'kerfjs';
+import { choice } from 'kerfjs/overlay';
 
 import {
   completeReview as apiCompleteReview,
@@ -14,10 +15,7 @@ import { reviewStore } from '../stores/index.js';
 import { SEND_TO_CLAUDE_CLOSE_MS, TOAST_DURATION_MS } from '../timing.js';
 
 const ACTIONS = {
-  cancelComplete: attr('data-action', 'cancel-complete'),
   modalDone: attr('data-action', 'modal-done'),
-  discardStale: attr('data-action', 'discard-stale'),
-  keepStale: attr('data-action', 'keep-stale'),
   sendToClaude: attr('data-action', 'send-to-claude'),
 } as const;
 
@@ -30,7 +28,6 @@ interface CompleteResult {
 }
 
 type ModalStage =
-  | { kind: 'stale-prompt'; totalStale: number }
   | { kind: 'completing' }
   | {
       kind: 'done';
@@ -68,13 +65,48 @@ function showCompleteModal(): void {
   let totalStale = 0;
   Object.keys(staleCounts).forEach(k => { totalStale += (staleCounts[k] ?? 0); });
 
-  const stage = signal<ModalStage>(
-    totalStale > 0 ? { kind: 'stale-prompt', totalStale } : { kind: 'completing' },
-  );
+  if (totalStale === 0) {
+    void completeReview(openCompletionModal({ kind: 'completing' }));
+    return;
+  }
+
+  // The stale decision is an N-way choice, so it's kerfjs/overlay's `choice()`
+  // (focus-trapped, Enter resolves the safe default 'keep', Escape / backdrop /
+  // dismissal resolves null) rather than a stage of the completion modal. Its
+  // buttons carry Glassbox's own `.btn` classes so they match the app.
+  void (async () => {
+    const pick = await choice<'cancel' | 'discard' | 'keep'>(staleMessage(totalStale), [
+      { value: 'cancel', label: 'Cancel', className: 'btn btn-sm' },
+      { value: 'discard', label: 'Discard All Stale', className: 'btn btn-sm btn-danger' },
+      { value: 'keep', label: 'Keep All & Complete', className: 'btn btn-sm btn-primary' },
+    ], { title: 'Stale Annotations', defaultValue: 'keep' });
+    if (pick === null || pick === 'cancel') return;
+
+    // Show the completion modal on "Completing..." while the stale resolution
+    // and the completion request run.
+    const stage = openCompletionModal({ kind: 'completing' });
+    try {
+      if (pick === 'discard') await deleteStaleAnnotations();
+      else await keepAllStaleAnnotations();
+    } catch (err: unknown) {
+      const what = pick === 'discard' ? 'Discarding stale annotations failed' : 'Keeping stale annotations failed';
+      stage.value = { kind: 'failed', message: failureMessage(what, err) };
+      return;
+    }
+    reviewStore.actions.update({ staleCounts: {} });
+    void completeReview(stage);
+  })();
+}
+
+/** Build + show the completion modal (completing → done/failed stages) and
+ *  return its `stage` signal so the caller can drive it. The stale decision is
+ *  handled separately by `choice()` before this is called. */
+function openCompletionModal(initialStage: ModalStage): ReturnType<typeof signal<ModalStage>> {
+  const stage = signal<ModalStage>(initialStage);
 
   const overlay = toElement(<div className="modal-overlay"><div className="modal"></div></div>);
   const modalEl = overlay.querySelector<HTMLElement>('.modal');
-  if (modalEl === null) return;
+  if (modalEl === null) return stage;
 
   let disposeMount: (() => void) | null = null;
   function close(): void {
@@ -84,39 +116,7 @@ function showCompleteModal(): void {
 
   disposeMount = mount(modalEl, () => renderStage(stage.value));
 
-  // Delegated handlers on the overlay — fire once per click regardless of
-  // which stage we're in, since the data-action attribute identifies the
-  // intent.
-
-  void delegate(overlay, 'click', ACTIONS.cancelComplete.selector, close);
   void delegate(overlay, 'click', ACTIONS.modalDone.selector, close);
-
-  void delegate(overlay, 'click', ACTIONS.discardStale.selector, () => {
-    void (async () => {
-      try {
-        await deleteStaleAnnotations();
-      } catch (err: unknown) {
-        stage.value = { kind: 'failed', message: failureMessage('Discarding stale annotations failed', err) };
-        return;
-      }
-      reviewStore.actions.update({ staleCounts: {} });
-      stage.value = { kind: 'completing' };
-      void completeReview(stage);
-    })();
-  });
-  void delegate(overlay, 'click', ACTIONS.keepStale.selector, () => {
-    void (async () => {
-      try {
-        await keepAllStaleAnnotations();
-      } catch (err: unknown) {
-        stage.value = { kind: 'failed', message: failureMessage('Keeping stale annotations failed', err) };
-        return;
-      }
-      reviewStore.actions.update({ staleCounts: {} });
-      stage.value = { kind: 'completing' };
-      void completeReview(stage);
-    })();
-  });
 
   void delegate(overlay, 'click', '.modal-copyable', (_e, el) => {
     const copyText = asEl(el).dataset.copy ?? '';
@@ -146,9 +146,14 @@ function showCompleteModal(): void {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   document.body.appendChild(overlay);
+  return stage;
+}
 
-  // Kick off the API call if we're past the stale prompt.
-  if (stage.value.kind === 'completing') void completeReview(stage);
+function staleMessage(totalStale: number): string {
+  return 'There ' + (totalStale === 1
+    ? 'is 1 stale annotation'
+    : `are ${String(totalStale)} stale annotations`) +
+    ' that could not be matched to the current diff. What would you like to do?';
 }
 
 function failureMessage(prefix: string, err: unknown): string {
@@ -201,7 +206,6 @@ async function completeReview(stage: ReturnType<typeof signal<ModalStage>>): Pro
 }
 
 function renderStage(s: ModalStage): SafeHtml {
-  if (s.kind === 'stale-prompt') return renderStalePrompt(s.totalStale);
   if (s.kind === 'completing') return <h3>Completing...</h3>;
   if (s.kind === 'failed') return renderFailed(s.message);
   return renderDone(s.result, s.aiCommand, s.channelConnected);
@@ -215,24 +219,6 @@ function renderFailed(message: string): SafeHtml {
       <p className="modal-label">The review is unchanged — close this dialog and try again.</p>
       <div className="modal-actions">
         <button className="btn btn-sm btn-primary" {...ACTIONS.modalDone.attrs}>Close</button>
-      </div>
-    </>
-  );
-}
-
-function renderStalePrompt(totalStale: number): SafeHtml {
-  const message = 'There ' + (totalStale === 1
-    ? 'is 1 stale annotation'
-    : `are ${String(totalStale)} stale annotations`) +
-    ' that could not be matched to the current diff. What would you like to do?';
-  return (
-    <>
-      <h3>Stale Annotations</h3>
-      <p>{message}</p>
-      <div className="modal-actions">
-        <button className="btn btn-sm" {...ACTIONS.cancelComplete.attrs}>Cancel</button>
-        <button className="btn btn-sm btn-danger" {...ACTIONS.discardStale.attrs}>Discard All Stale</button>
-        <button className="btn btn-sm btn-primary" {...ACTIONS.keepStale.attrs}>{'Keep All & Complete'}</button>
       </div>
     </>
   );

@@ -5,6 +5,9 @@ async function openSettings(page: import('@playwright/test').Page) {
   const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]').first();
   await settingsBtn.click();
   await expect(page.locator('.settings-dialog')).toBeVisible({ timeout: 5000 });
+  // Render-first (GB-1129) shows a spinner shell first, then the tabbed content
+  // once data loads — wait for the content so callers can interact immediately.
+  await expect(page.locator('[data-tab="general"]')).toBeVisible({ timeout: 5000 });
 }
 
 test.describe('Tab switching', () => {
@@ -318,5 +321,109 @@ test.describe('Close dialog', () => {
     // Reopen
     await openSettings(page);
     await expect(page.locator('.settings-dialog')).toBeVisible();
+  });
+});
+
+// GB-1129: opening the dialog must be instant — the modal + a spinner appear
+// immediately, and the tabbed content replaces the spinner once the (up to ~1s)
+// data fetch resolves. The dialog must never block on that fetch.
+test.describe('Render-first (no blocking on data)', () => {
+  test('shows the modal + spinner immediately, then swaps in the content', async ({ page }) => {
+    // Hold one of the dialog's endpoints open so the data Promise.all is still
+    // pending while we assert the shell is already on screen.
+    let release: (() => void) | null = null;
+    await page.route((url) => url.pathname === '/api/channel/claude-check', async (route) => {
+      await new Promise<void>((r) => { release = r; });
+      await route.fulfill({ json: { installed: false, version: null, meetsMinimum: false } });
+    });
+
+    await page.goto('/');
+    await page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]').first().click();
+
+    // Modal + spinner are visible before the held endpoint resolves.
+    await expect(page.locator('.settings-dialog')).toBeVisible({ timeout: 1000 });
+    await expect(page.locator('.settings-loading')).toBeVisible({ timeout: 1000 });
+    await expect(page.locator('[data-tab="general"]')).toHaveCount(0);
+
+    // Let the data finish loading; the spinner is replaced by the tabbed content.
+    release?.();
+    await expect(page.locator('[data-tab="general"]')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.settings-loading')).toHaveCount(0);
+
+    await page.unroute((url) => url.pathname === '/api/channel/claude-check');
+  });
+
+  test('can be dismissed with Escape while still loading', async ({ page }) => {
+    await page.route((url) => url.pathname === '/api/channel/claude-check', async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fulfill({ json: { installed: false, version: null, meetsMinimum: false } });
+    });
+
+    await page.goto('/');
+    await page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]').first().click();
+    await expect(page.locator('.settings-loading')).toBeVisible({ timeout: 1000 });
+
+    // Escape during loading closes the dialog and it does not reappear when the
+    // held endpoint later resolves.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.settings-dialog')).not.toBeVisible({ timeout: 1000 });
+    await page.waitForTimeout(1800);
+    await expect(page.locator('.settings-dialog')).not.toBeVisible();
+
+    await page.unroute((url) => url.pathname === '/api/channel/claude-check');
+  });
+
+  // GB-1131: the first open per session may spin while loading, but the data is
+  // cached, so a repeat open renders instantly with no spinner. Here the data
+  // endpoints are held OPEN on every call — the second open must still show
+  // content immediately (it can only do so from cache, not a live fetch).
+  test('a repeat open renders instantly from cache (no spinner)', async ({ page }) => {
+    const btn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]').first();
+
+    // First (cold) open: normal load, then close so the cache is populated.
+    await page.goto('/');
+    await btn.click();
+    await expect(page.locator('[data-tab="general"]')).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.settings-dialog')).not.toBeVisible({ timeout: 3000 });
+
+    // Now stall every settings endpoint. A live fetch would hang; a cached open
+    // does not touch the network for its initial render.
+    await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
+      await new Promise((r) => setTimeout(r, 3000));
+      await route.continue();
+    });
+
+    // Second open: content is present within a tight budget, and the spinner
+    // never shows — proof it came from cache, not the (now-stalled) fetch.
+    await btn.click();
+    await expect(page.locator('[data-tab="general"]')).toBeVisible({ timeout: 1000 });
+    await expect(page.locator('.settings-loading')).toHaveCount(0);
+
+    await page.unroute((url) => url.pathname.startsWith('/api/'));
+  });
+});
+
+// GB-1130: the dialog is pinned to the tallest tab's height, so switching tabs
+// never resizes it (shorter tabs get empty space at the bottom).
+test.describe('Stable height across tabs', () => {
+  test('dialog height does not change when switching tabs', async ({ page }) => {
+    await page.goto('/');
+    await openSettings(page);
+    const dialog = page.locator('.settings-dialog');
+
+    const tabIds: string[] = [...new Set(
+      await page.locator('[data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab') ?? '')),
+    )].filter((t) => t !== '');
+    expect(tabIds.length).toBeGreaterThan(1);
+
+    const heights: number[] = [];
+    for (const t of tabIds) {
+      await page.locator(`[data-tab="${t}"]`).click();
+      await expect(page.locator(`[data-tab="${t}"]`)).toHaveClass(/active/);
+      heights.push((await dialog.boundingBox())?.height ?? 0);
+    }
+    // Every tab yields the same dialog height (within sub-pixel rounding).
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
   });
 });

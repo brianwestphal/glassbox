@@ -15,7 +15,7 @@ interface SliceState {
   dragging: 'a' | 'b' | null;
 }
 
-export function initSliceTool(canvasEl: Element): void {
+export function initSliceTool(canvasEl: Element): (() => void) | undefined {
   const canvas = asEl(canvasEl);
   const wrap = canvas.querySelector<HTMLElement>('.image-zoom-wrap');
   const oldImg = canvas.querySelector<HTMLImageElement>('.image-layer-old');
@@ -38,7 +38,11 @@ export function initSliceTool(canvasEl: Element): void {
   handleA.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); ss.dragging = 'a'; });
   handleB.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); ss.dragging = 'b'; });
 
-  document.addEventListener('mousemove', (e) => {
+  // Document-level drag listeners (a drag continues outside the canvas). These
+  // accumulate on every image-diff render unless torn down, so they're removed
+  // by the returned teardown when the canvas leaves the DOM (see the
+  // `imperative()` wrapper at the call site).
+  const onMove = (e: MouseEvent): void => {
     if (!ss.dragging) return;
     const norm = screenToCanvas(e, canvas);
     const otherEdge = ss.dragging === 'a' ? getEdge(ss.bx, ss.by) : getEdge(ss.ax, ss.ay);
@@ -46,11 +50,19 @@ export function initSliceTool(canvasEl: Element): void {
     if (ss.dragging === 'a') { ss.ax = snapped.x; ss.ay = snapped.y; }
     else { ss.bx = snapped.x; ss.by = snapped.y; }
     updateSlice(ss);
-  });
+  };
+  const onUp = (): void => { ss.dragging = null; };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 
-  document.addEventListener('mouseup', () => { ss.dragging = null; });
+  const ro = new ResizeObserver(() => { updateSlice(ss); });
+  ro.observe(canvas);
 
-  new ResizeObserver(() => { updateSlice(ss); }).observe(canvas);
+  return () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    ro.disconnect();
+  };
 }
 
 function screenToCanvas(e: MouseEvent, canvas: HTMLElement): { x: number; y: number } {

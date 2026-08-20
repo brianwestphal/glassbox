@@ -253,6 +253,16 @@
   overflow: hidden;
 }
 
+// Shown immediately on open while the dialog's data loads (GB-1129), so the
+// modal appears the instant the button is clicked instead of blocking on the
+// fetch. Sized to roughly the real dialog so the swap doesn't jump much.
+.settings-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+}
+
 // Transient error shown when a settings save/remove request fails. Appended to
 // the overlay (above the dialog) so a re-render of the dialog body can't remove
 // it; auto-dismisses.

@@ -1,5 +1,7 @@
 import type { SafeHtml } from 'kerfjs';
-import { attr, delegate, mount, signal } from 'kerfjs';
+import { attr, delegate, signal } from 'kerfjs';
+import { delegateActions } from 'kerfjs/actions';
+import { confirm, overlay } from 'kerfjs/overlay';
 
 import type { ListThemesResp, ThemeSummary as ApiThemeSummary } from '../../api/index.js';
 import { createTheme, deleteTheme, getActiveTheme, listThemes } from '../../api/index.js';
@@ -20,43 +22,12 @@ type ThemeSummary = ApiThemeSummary;
 
 const SWATCH_KEYS = ['bg', 'text', 'accent', 'green', 'red'];
 
-function showDeleteConfirm(themeName: string, onConfirm: () => void): void {
-  const confirmOverlay = toElement(
-    <div className="modal-overlay">
-      <div className="modal" style="max-width:360px">
-        <h3>Delete Theme</h3>
-        <p>{`Delete "${themeName}"? This cannot be undone.`}</p>
-        <div className="modal-actions">
-          <button className="btn btn-sm" id="del-cancel">Cancel</button>
-          <button className="btn btn-sm btn-danger" id="del-confirm">Delete</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  confirmOverlay.querySelector('#del-cancel')?.addEventListener('click', () => { confirmOverlay.remove(); });
-  confirmOverlay.querySelector('#del-confirm')?.addEventListener('click', () => {
-    confirmOverlay.remove();
-    onConfirm();
-  });
-  confirmOverlay.addEventListener('click', (e) => {
-    if (e.target === confirmOverlay) confirmOverlay.remove();
-  });
-
-  document.body.appendChild(confirmOverlay);
-}
-
 export function showThemeManager(onThemeChanged?: () => void): void {
   void (async () => {
     const initial = await listThemes();
     const themesSignal = signal<ThemesResponse>(initial);
 
-    const overlay = toElement(<div className="modal-overlay"><div className="modal settings-dialog theme-manager-dialog"></div></div>);
-    const modalEl = overlay.querySelector<HTMLElement>('.modal');
-    if (modalEl === null) return;
-
     let contextMenuEl: HTMLElement | null = null;
-    let disposeMount: (() => void) | null = null;
 
     function removeContextMenu(): void {
       if (contextMenuEl !== null) {
@@ -65,12 +36,21 @@ export function showThemeManager(onThemeChanged?: () => void): void {
       }
     }
 
-    function close(): void {
-      document.removeEventListener('keydown', handleEscape);
-      removeContextMenu();
-      if (disposeMount !== null) disposeMount();
-      overlay.remove();
-    }
+    // The whole modal — backdrop, content mount, focus trap, and focus restore —
+    // is owned by kerfjs/overlay. We reuse Glassbox's `.modal-overlay` backdrop
+    // class and wrap the reactive list in the app's `.modal` surface. Escape is
+    // handled manually below so it can be two-level (close the context menu
+    // first, then the manager), so overlay() is set to backdrop dismissal only.
+    const handle = overlay(
+      () => (
+        <div className="modal settings-dialog theme-manager-dialog">
+          {renderManager(themesSignal.value)}
+        </div>
+      ),
+      { className: 'modal-overlay', dismiss: ['backdrop'], trap: true },
+    );
+
+    function close(): void { handle.close(); }
 
     function handleEscape(e: KeyboardEvent): void {
       if (contextMenuEl !== null) {
@@ -78,8 +58,16 @@ export function showThemeManager(onThemeChanged?: () => void): void {
         e.stopPropagation();
         return;
       }
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') handle.close();
     }
+    document.addEventListener('keydown', handleEscape);
+
+    // Tear down the manual keydown + any open context menu when the overlay
+    // closes by any path (backdrop click or a programmatic close()).
+    void handle.result.then(() => {
+      document.removeEventListener('keydown', handleEscape);
+      removeContextMenu();
+    });
 
     async function refresh(): Promise<void> {
       themesSignal.value = await listThemes();
@@ -142,22 +130,34 @@ export function showThemeManager(onThemeChanged?: () => void): void {
       // Delegate clicks within the transient menu — and stop propagation so the
       // outside-click handler below doesn't immediately dismiss it.
       menu.addEventListener('click', (e) => { e.stopPropagation(); });
-      void delegate(menu, 'click', CTX.edit.selector, () => {
-        removeContextMenu();
-        openEditor(themeId);
-      });
-      void delegate(menu, 'click', CTX.duplicate.selector, () => {
-        void (async () => {
+      // One delegated listener for the whole context-menu action table
+      // (kerfjs/actions `delegateActions`) — replaces three separate delegate()
+      // calls that each keyed on the same `data-ctx` attribute. The CTX specs
+      // above are the single source of truth for both the JSX attribute and the
+      // dispatch key (`.value`).
+      void delegateActions(menu, 'click', {
+        [CTX.edit.value]: () => {
           removeContextMenu();
-          await createTheme({ sourceId: themeId });
-          await refresh();
-          if (onThemeChanged !== undefined) onThemeChanged();
-        })();
-      });
-      void delegate(menu, 'click', CTX.delete.selector, () => {
-        removeContextMenu();
-        showDeleteConfirm(theme.name, () => {
+          openEditor(themeId);
+        },
+        [CTX.duplicate.value]: () => {
           void (async () => {
+            removeContextMenu();
+            await createTheme({ sourceId: themeId });
+            await refresh();
+            if (onThemeChanged !== undefined) onThemeChanged();
+          })();
+        },
+        [CTX.delete.value]: () => {
+          removeContextMenu();
+          void (async () => {
+            // Promise-based confirm from kerfjs/overlay (focus-trapped, Escape /
+            // backdrop dismiss, restore-focus) — replaces the hand-rolled
+            // overlay + three addEventListener() dismiss handlers.
+            const ok = await confirm(`Delete "${theme.name}"? This cannot be undone.`, {
+              title: 'Delete Theme', okText: 'Delete', cancelText: 'Cancel', danger: true,
+            });
+            if (!ok) return;
             const wasActive = themeId === themesSignal.value.activeId;
             await deleteTheme({ id: themeId });
             if (wasActive) {
@@ -168,38 +168,28 @@ export function showThemeManager(onThemeChanged?: () => void): void {
             await refresh();
             if (onThemeChanged !== undefined) onThemeChanged();
           })();
-        });
-      });
+        },
+      }, { attr: 'data-ctx' });
 
       dismissOnOutsideClick(menu, removeContextMenu);
     }
 
-    disposeMount = mount(modalEl, () => renderManager(themesSignal.value));
-
-    // Delegated handlers
-    void delegate(overlay, 'click', '#tm-close', close);
-    void delegate(overlay, 'click', '[data-click-use]', (_e, el) => {
+    // Delegated handlers on the overlay wrapper (`handle.el`). It is the mount
+    // root and persists across list re-renders, so delegation on it is stable.
+    void delegate(handle.el, 'click', '#tm-close', close);
+    void delegate(handle.el, 'click', '[data-click-use]', (_e, el) => {
       const id = asEl(el).dataset.clickUse ?? '';
       if (id !== '') void useTheme(id);
     });
-    void delegate(overlay, 'dblclick', '.theme-manager-item', (_e, el) => {
+    void delegate(handle.el, 'dblclick', '.theme-manager-item', (_e, el) => {
       const id = asEl(el).dataset.themeId ?? '';
       if (id !== '') openEditor(id);
     });
-    void delegate(overlay, 'click', '.tm-menu-btn', (e, btn) => {
+    void delegate(handle.el, 'click', '.tm-menu-btn', (e, btn) => {
       e.stopPropagation();
       const id = asEl(btn).dataset.menuId ?? '';
       if (id !== '') showContextMenu(id, asEl(btn));
     });
-
-    // Click outside the modal closes — direct listener on the overlay
-    // (overlay isn't inside a mount() tree).
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
-    });
-
-    document.addEventListener('keydown', handleEscape);
-    document.body.appendChild(overlay);
   })();
 }
 

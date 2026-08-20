@@ -48,6 +48,10 @@ test.describe('Completion modal stage machine', () => {
   }
 
   const modalTitle = (page: Page) => page.locator('.modal h3');
+  // The stale decision is a kerfjs/overlay choice() dialog, not a stage of the
+  // completion modal — its title/message/buttons live under `.kerf-choice`.
+  const staleTitle = (page: Page) => page.locator('.kerf-choice__title');
+  const staleDialog = (page: Page) => page.locator('.kerf-choice');
   const completeBtn = (page: Page) => page.locator('#complete-review');
   const reopenBtn = (page: Page) => page.locator('#reopen-review');
 
@@ -80,24 +84,24 @@ test.describe('Completion modal stage machine', () => {
     await openReview(page);
 
     await completeBtn(page).click();
-    await expect(modalTitle(page)).toHaveText('Stale Annotations');
-    await expect(page.locator('.modal')).toContainText('are 2 stale annotations');
+    await expect(staleTitle(page)).toHaveText('Stale Annotations');
+    await expect(staleDialog(page)).toContainText('are 2 stale annotations');
 
-    // Cancel: the modal closes and the review is NOT completed.
-    await page.locator('[data-action="cancel-complete"]').click();
-    await expect(page.locator('.modal-overlay')).not.toBeVisible();
+    // Cancel: the choice dialog closes and the review is NOT completed.
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(staleDialog(page)).not.toBeVisible();
     await expect(completeBtn(page)).toBeVisible();
     await expect(reopenBtn(page)).not.toBeVisible();
 
-    // Reopening the modal starts from a fresh stale-prompt, not a stale stage.
+    // Reopening the modal starts from a fresh stale prompt, not a stale stage.
     await completeBtn(page).click();
-    await expect(modalTitle(page)).toHaveText('Stale Annotations');
+    await expect(staleTitle(page)).toHaveText('Stale Annotations');
 
     // Discard all → the delete-all API fires → completion proceeds to done.
     const discardReq = page.waitForRequest(
       (r) => r.url().includes('/api/annotations/stale/delete-all') && r.method() === 'POST',
     );
-    await page.locator('[data-action="discard-stale"]').click();
+    await page.getByRole('button', { name: 'Discard All Stale' }).click();
     await discardReq;
     await expect(modalTitle(page)).toHaveText('Review Completed', { timeout: 10000 });
 
@@ -120,13 +124,13 @@ test.describe('Completion modal stage machine', () => {
     });
 
     await completeBtn(page).click();
-    await expect(modalTitle(page)).toHaveText('Stale Annotations');
-    await expect(page.locator('.modal')).toContainText('is 1 stale annotation');
+    await expect(staleTitle(page)).toHaveText('Stale Annotations');
+    await expect(staleDialog(page)).toContainText('is 1 stale annotation');
 
     const keepReq = page.waitForRequest(
       (r) => r.url().includes('/api/annotations/stale/keep-all') && r.method() === 'POST',
     );
-    await page.locator('[data-action="keep-stale"]').click();
+    await page.getByRole('button', { name: 'Keep All & Complete' }).click();
     await keepReq;
     await expect(modalTitle(page)).toHaveText('Review Completed', { timeout: 10000 });
 

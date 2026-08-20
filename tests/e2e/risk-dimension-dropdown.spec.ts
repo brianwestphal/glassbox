@@ -105,4 +105,19 @@ test.describe('GB-785: risk-dimension dropdown', () => {
     await expect(select).toBeVisible();
     await expect(select).toHaveValue('maintainability');
   });
+
+  // Covers the nested `data-action` dispatch: the risk badge
+  // (`show-risk-popover`) is a child of the row (`select-file`). The sidebar
+  // dispatches its whole click table through one `delegateActions` listener
+  // (kerfjs/actions), where nearest-action-wins means a badge click opens the
+  // popover instead of bubbling up to select the row. Previously uncovered.
+  test('clicking a risk badge opens its popover (nearest-action dispatch)', async ({ page }) => {
+    await page.goto('/');
+    const badge = page.locator('.risk-badge').first();
+    await expect(badge).toBeVisible({ timeout: 5000 });
+
+    await badge.click();
+    await expect(page.locator('.risk-popover')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.risk-popover-header')).toHaveText('Risk Assessment');
+  });
 });

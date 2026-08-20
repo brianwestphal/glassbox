@@ -1,3 +1,5 @@
+import { attach } from 'kerfjs/attach';
+
 import { ImageModeSchema, saveAIPreferences } from '../../../api/index.js';
 import { asEl } from '../../dom.js';
 import { diffViewStore } from '../../stores/index.js';
@@ -306,7 +308,11 @@ export function bindImageDiff(): void {
 
   if (hasComparison) {
     const sliceCanvas = container.querySelector('[data-panel="slice"] .image-visual-canvas');
-    if (sliceCanvas) initSliceTool(sliceCanvas);
+    // Bind the slice tool's lifecycle to its canvas (kerfjs/attach): its setup
+    // adds document-level drag listeners + a ResizeObserver, and the returned
+    // teardown drops them when the canvas leaves the DOM — which the diff-pane
+    // `remountOn` triggers on every file switch, so they no longer accumulate.
+    if (sliceCanvas) attach(sliceCanvas, () => initSliceTool(sliceCanvas));
   }
 
   // Image feedback (doc 23): general comments + drawn rectangle regions.
