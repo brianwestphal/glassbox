@@ -306,6 +306,30 @@ test.describe('Diff viewing: Toolbar', () => {
     await expect(langBtn).toBeVisible();
   });
 
+  test('language picker opens above the button and closes when a language is picked', async ({ page }) => {
+    await openModifiedFile(page);
+
+    const langBtn = page.locator('#language-btn');
+    await langBtn.click();
+
+    // Picker appears, anchored ABOVE the button (autoReposition { placement: 'top' }).
+    const popup = page.locator('.language-popup');
+    await expect(popup).toBeVisible({ timeout: 3000 });
+    const btnBox = await langBtn.boundingBox();
+    const popupBox = await popup.boundingBox();
+    expect(btnBox).not.toBeNull();
+    expect(popupBox).not.toBeNull();
+    if (btnBox !== null && popupBox !== null) {
+      // Bottom of the popup sits at or above the top of the button.
+      expect(popupBox.y + popupBox.height).toBeLessThanOrEqual(btnBox.y + 2);
+    }
+
+    // Picking a language dismisses the popup (previously a no-op `close()` left
+    // it open). Choose a concrete language so the toolbar label updates.
+    await popup.locator('.language-option[data-lang="rust"]').click();
+    await expect(popup).toHaveCount(0);
+  });
+
   test('unified button becomes active when clicked', async ({ page }) => {
     await openModifiedFile(page);
 

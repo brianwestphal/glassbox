@@ -169,6 +169,11 @@
 // Context menu
 // Context menu is rendered into document.body with position:fixed (see themeManager.tsx)
 .tm-context-menu {
+  // Body-appended overlay, positioned by popup.ts `positionAnchoredPopup`
+  // (which also sets `position: fixed`). z-index lives here, not inline, and
+  // must clear the theme-manager modal overlay (`.modal-overlay`, z-index 100).
+  position: fixed;
+  z-index: 10000;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);

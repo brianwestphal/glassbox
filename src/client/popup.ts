@@ -10,28 +10,34 @@
  * instead, because re-renders silently drop per-element listeners.
  */
 
-import { autoReposition } from 'kerfjs/overlay';
+import { type AnchorPositionOptions,autoReposition } from 'kerfjs/overlay';
 
-/** Fixed-position `el` directly below `anchor`, left-aligned (the shared
- *  popup placement), and KEEP it there as the page or any scroll container
- *  scrolls / resizes. Layering comes from the element's SCSS class — don't set
- *  inline z-index.
+/** Fixed-position `el` against `anchor` — directly below and left-aligned by
+ *  default (the shared popup placement) — and KEEP it there as the page or any
+ *  scroll container scrolls / resizes. Pass `options` to place elsewhere:
+ *  `{ placement: 'top' }` above the anchor, `{ align: 'end' }` to line the right
+ *  edges up, `{ gap }` for a different gap. Layering comes from the element's
+ *  SCSS class — don't set inline z-index.
  *
  *  Delegates to kerfjs/overlay's `autoReposition` (built on `positionAnchored`):
- *  it positions once immediately with the same below-and-left-aligned default —
- *  flipping above the anchor on bottom-viewport overflow and clamping
- *  horizontally into view — then re-runs on capture-phase `scroll` (so a scroll
- *  in any inner container, not just `window`, is caught) and `resize`, so the
- *  popup stays glued to a moving anchor instead of drifting away. It positions
- *  our own element (`position: fixed` + left/top), so the popups' existing SCSS
- *  is untouched; no overlay wrapper is introduced.
+ *  it positions once immediately per `options` — flipping to the opposite side on
+ *  viewport overflow and clamping horizontally into view — then re-runs on
+ *  capture-phase `scroll` (so a scroll in any inner container, not just
+ *  `window`, is caught) and `resize`, so the popup stays glued to a moving
+ *  anchor instead of drifting away. It positions our own element
+ *  (`position: fixed` + left/top), so the popups' existing SCSS is untouched; no
+ *  overlay wrapper is introduced.
  *
  *  Returns a disposer that removes the scroll/resize listeners. Callers MUST
  *  call it when the popup is dismissed (route every close path through it — a
  *  bare `el.remove()` would leak the listeners). Pairing it with
  *  {@link dismissOnOutsideClick}'s `onDismiss` is the intended wiring. */
-export function positionBelowAnchor(el: HTMLElement, anchor: HTMLElement, gapPx = 4): () => void {
-  return autoReposition(el, anchor, { gap: gapPx });
+export function positionAnchoredPopup(
+  el: HTMLElement,
+  anchor: HTMLElement,
+  options?: AnchorPositionOptions,
+): () => void {
+  return autoReposition(el, anchor, options);
 }
 
 /**

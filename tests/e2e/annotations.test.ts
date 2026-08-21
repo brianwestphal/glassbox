@@ -147,7 +147,7 @@ test.describe('Category reclassify', () => {
     await expect(page.locator('.reclassify-popup')).toBeVisible({ timeout: 3000 });
   });
 
-  // GB-1133: the picker is positioned by popup.ts `positionBelowAnchor`, which
+  // GB-1133: the picker is positioned by popup.ts `positionAnchoredPopup`, which
   // now uses kerfjs/overlay `autoReposition` — so the popup follows its anchor
   // as the diff scrolls instead of drifting away. Scrolls DOWN (content moves
   // up) so there's no bottom-viewport-overflow flip to reason about.

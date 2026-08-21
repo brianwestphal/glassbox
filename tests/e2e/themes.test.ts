@@ -186,7 +186,18 @@ test.describe('Theme system', () => {
     await firstMenuBtn.click();
 
     // Wait for context menu to appear
-    await expect(page.locator('.tm-context-menu')).toBeVisible({ timeout: 3000 });
+    const contextMenu = page.locator('.tm-context-menu');
+    await expect(contextMenu).toBeVisible({ timeout: 3000 });
+
+    // The menu is anchored right-aligned to the trigger (autoReposition
+    // { align: 'end' }): its right edge lines up with the button's right edge.
+    const btnBox = await firstMenuBtn.boundingBox();
+    const menuBox = await contextMenu.boundingBox();
+    expect(btnBox).not.toBeNull();
+    expect(menuBox).not.toBeNull();
+    if (btnBox !== null && menuBox !== null) {
+      expect(Math.abs((menuBox.x + menuBox.width) - (btnBox.x + btnBox.width))).toBeLessThanOrEqual(2);
+    }
 
     // Click "Duplicate"
     const duplicateItem = page.locator('.tm-menu-item', { hasText: 'Duplicate' });

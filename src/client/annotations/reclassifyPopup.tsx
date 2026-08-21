@@ -3,7 +3,7 @@ import { delegate, morph } from 'kerfjs';
 import { updateAnnotation } from '../../api/index.js';
 import { asEl, toElement } from '../dom.js';
 import { asCategory } from '../narrow.js';
-import { dismissOnOutsideClick, positionBelowAnchor } from '../popup.js';
+import { dismissOnOutsideClick, positionAnchoredPopup } from '../popup.js';
 import type { Annotation } from '../state.js';
 import { CATEGORIES } from '../state.js';
 import {
@@ -49,7 +49,7 @@ export function showCategoryPicker(
 ): void {
   dismissExistingPopups();
   const popup = renderPopup(current);
-  const stopReposition = positionBelowAnchor(popup, anchor);
+  const stopReposition = positionAnchoredPopup(popup, anchor);
   document.body.appendChild(popup);
 
   const dismiss = dismissOnOutsideClick(popup, () => {

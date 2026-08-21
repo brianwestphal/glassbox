@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2duefclhyfdoa3",
+          "message": {
+            "text": "The outline dropdown deliberately stays as-is — GB-1134's premise that it self-positions with bespoke inline styles is inaccurate for this popup.\n\nUnlike the theme context menu and language picker (body-appended, JS-positioned), this dropdown is appended to the sticky .outline-bar and positioned entirely by CSS: .outline-dropdown (0) is position: absolute; top: 100%; left: 0; right: 0 under the bar's positioning context. So it is already full-width-glued to its anchor and follows it on scroll with zero JS listeners — there is nothing to leak and no manual top/left math to replace.\n\nConverting it to autoReposition (body-append + fixed positioning) would regress it: it would lose the full-width match to the bar and add scroll/resize listeners for no gain. Left unchanged intentionally.",
+            "markdown": "The outline dropdown deliberately stays as-is — GB-1134's premise that it self-positions with bespoke inline styles is inaccurate for this popup.\n\nUnlike the theme context menu and language picker (body-appended, JS-positioned), this dropdown is appended to the sticky `.outline-bar` and positioned entirely by CSS: [`.outline-dropdown`](0) is `position: absolute; top: 100%; left: 0; right: 0` under the bar's positioning context. So it is already full-width-glued to its anchor and follows it on scroll with zero JS listeners — there is nothing to leak and no manual top/left math to replace.\n\nConverting it to `autoReposition` (body-append + fixed positioning) would *regress* it: it would lose the full-width match to the bar and add scroll/resize listeners for no gain. Left unchanged intentionally."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/diff/outline.tsx"
+                },
+                "region": {
+                  "startLine": 147,
+                  "endLine": 174,
+                  "snippet": {
+                    "text": "function showDropdown() {\n  document.querySelectorAll('.outline-dropdown').forEach(el => { el.remove(); });\n\n  const bar = document.getElementById('outline-bar');\n  const symbols = symbolsSignal.value;\n  if (bar === null || symbols.length === 0) return;\n\n  const dropdown = toElement(\n    <div className=\"outline-dropdown\">\n      {renderSymbolList(symbols, 0)}\n    </div>\n  );\n\n  // Dropdown sits outside the breadcrumb mount tree (appended to `bar` after\n  // the mount-managed children), so a single delegated listener on the\n  // dropdown root is stable. Item clicks navigate + close.\n  void delegate(dropdown, 'click', '.outline-item', (_e, el) => {\n    const line = parseInt(asEl(el).dataset.line ?? '0', 10);\n    if (line > 0) {\n      scrollToLine(line);\n      dropdown.remove();\n    }\n  });\n\n  bar.appendChild(dropdown);\n\n  dismissOnOutsideClick(dropdown, undefined, () => [bar.querySelector('.outline-breadcrumb')]);\n}"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/styles/_diff.scss"
+                },
+                "region": {
+                  "startLine": 170
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1134"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "75c55ec19eaef8b719fe9a9ac5aba696"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "b6308715d58dfab5ce8cf806cd648f836150fc3e",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { toElement } from '../dom.js';
-import { dismissOnOutsideClick, positionBelowAnchor } from '../popup.js';
+import { dismissOnOutsideClick, positionAnchoredPopup } from '../popup.js';
 import type { RiskFileScore } from '../state.js';
 import { riskColor } from './riskScore.js';
 
@@ -36,7 +36,7 @@ export function showRiskPopover(anchor: HTMLElement, score: RiskFileScore): void
     </div>
   );
 
-  const stopReposition = positionBelowAnchor(popover, anchor);
+  const stopReposition = positionAnchoredPopup(popover, anchor);
   document.body.appendChild(popover);
   activeDismiss = dismissOnOutsideClick(popover, () => {
     stopReposition();

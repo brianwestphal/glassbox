@@ -3,7 +3,7 @@ import { delegate, effect, mount, signal } from 'kerfjs';
 
 import { ImageModeSchema, saveAIPreferences } from '../../api/index.js';
 import { asEl, asInput, toElement } from '../dom.js';
-import { dismissOnOutsideClick } from '../popup.js';
+import { dismissOnOutsideClick, positionAnchoredPopup } from '../popup.js';
 import { diffViewStore } from '../stores/index.js';
 import { applyHighlighting, getLanguageList } from './highlight.js';
 import { updateToolbarLanguage } from './index.js';
@@ -94,7 +94,6 @@ function showLanguagePicker(btn: HTMLElement): void {
   const allLangs = getLanguageList();
   const popular = allLangs.filter(l => POPULAR_LANGS.has(l)).sort();
   const rest = allLangs.filter(l => !POPULAR_LANGS.has(l)).sort();
-  const rect = btn.getBoundingClientRect();
 
   // Per-modal-session signal for the filter input — same precedent as the
   // theme manager / settings dialog openers. The render fn below reads it,
@@ -108,12 +107,15 @@ function showLanguagePicker(btn: HTMLElement): void {
     </div>
   );
 
-  popup.style.position = 'fixed';
-  popup.style.bottom = String(window.innerHeight - rect.top + 4) + 'px';
-
   const listEl = popup.querySelector<HTMLElement>('.language-list');
   const filterInput = popup.querySelector<HTMLInputElement>('.language-filter');
   if (listEl === null || filterInput === null) return;
+
+  // Single tracked dismiss, assigned once the popup is wired up at the tail.
+  // Picking a language closes the popup through it; previously this called a
+  // bare `close()` that resolved to the global `window.close()` (a no-op in a
+  // normal tab), so choosing a language never closed the picker.
+  let dismissPopup: () => void = () => {};
 
   function selectLang(lang: string, auto: boolean) {
     diffViewStore.actions.update({
@@ -122,7 +124,7 @@ function showLanguagePicker(btn: HTMLElement): void {
     });
     applyHighlighting();
     updateToolbarLanguage();
-    close();
+    dismissPopup();
   }
 
   function renderPickerList(filter: string): SafeHtml {
@@ -186,13 +188,18 @@ function showLanguagePicker(btn: HTMLElement): void {
 
   document.body.appendChild(popup);
 
-  const popupWidth = popup.offsetWidth;
-  let left = rect.right - popupWidth;
-  if (left < 4) left = 4;
-  if (left + popupWidth > window.innerWidth - 4) left = window.innerWidth - popupWidth - 4;
-  popup.style.left = String(left) + 'px';
+  // Anchored above the button (right edges aligned), flipping below on
+  // top-viewport overflow and clamped horizontally into view. Replaces the
+  // bespoke bottom/left math; stays glued to the button on scroll / resize.
+  const stopReposition = positionAnchoredPopup(popup, btn, { placement: 'top', align: 'end' });
 
   filterInput.focus();
 
-  dismissOnOutsideClick(popup, () => { disposeMount(); });
+  // Route every close path through this one dismiss so nothing leaks: it drops
+  // the outside-click listener, the reposition scroll/resize listeners, and the
+  // list mount. selectLang() calls it via `dismissPopup`.
+  dismissPopup = dismissOnOutsideClick(popup, () => {
+    stopReposition();
+    disposeMount();
+  });
 }

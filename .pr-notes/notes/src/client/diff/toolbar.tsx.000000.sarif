@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mt2du86fjzjemihp",
+          "message": {
+            "text": "Fixed a latent bug while routing the language picker through a tracked dismiss: picking a language never closed the picker.\n\nThe old selectLang called a bare close() with no local binding, so it resolved to the global window.close() — a no-op for a normal (non-script-opened) tab. The picker only closed on an outside click. It went unnoticed because the e2e only asserted the toolbar button exists; it never opened the picker.\n\nNow selectLang calls dismissPopup, the single tracked dismiss assigned at the tail from dismissOnOutsideClick (also disposes the autoReposition scroll/resize listeners + the list mount). New e2e in diff-viewing.test.ts opens the picker, asserts it sits above the button, picks 'rust', and asserts it closes.",
+            "markdown": "Fixed a latent bug while routing the language picker through a tracked dismiss: picking a language never closed the picker.\n\nThe old `selectLang` called a bare `close()` with no local binding, so it resolved to the global `window.close()` — a no-op for a normal (non-script-opened) tab. The picker only closed on an outside click. It went unnoticed because the e2e only asserted the toolbar button *exists*; it never opened the picker.\n\nNow `selectLang` calls `dismissPopup`, the single tracked dismiss assigned at the tail from `dismissOnOutsideClick` (also disposes the autoReposition scroll/resize listeners + the list mount). New e2e in `diff-viewing.test.ts` opens the picker, asserts it sits above the button, picks 'rust', and asserts it closes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/diff/toolbar.tsx"
+                },
+                "region": {
+                  "startLine": 118,
+                  "endLine": 136,
+                  "snippet": {
+                    "text": "  let dismissPopup: () => void = () => {};\n\n  function selectLang(lang: string, auto: boolean) {\n    diffViewStore.actions.update({\n      highlightAuto: auto,\n      highlightLang: auto ? diffViewStore.state.value.detectedLang : lang,\n    });\n    applyHighlighting();\n    updateToolbarLanguage();\n    dismissPopup();\n  }\n\n  function renderPickerList(filter: string): SafeHtml {\n    const q = filter.toLowerCase();\n    const dv = diffViewStore.state.value;\n    if (q === '') {\n      const autoLabel = dv.detectedLang === 'plaintext' ? 'Plain Text' : dv.detectedLang;\n      return (\n        <>"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ]
+          },
+          "workItemUris": [
+            "GB-1134"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "acb707a571b6da74ec2c8d804c6ff199"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "b6308715d58dfab5ce8cf806cd648f836150fc3e",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

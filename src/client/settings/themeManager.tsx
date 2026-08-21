@@ -7,7 +7,7 @@ import type { ListThemesResp, ThemeSummary as ApiThemeSummary } from '../../api/
 import { createTheme, deleteTheme, getActiveTheme, listThemes } from '../../api/index.js';
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash, IconX } from '../../icons.js';
 import { asEl, toElement } from '../dom.js';
-import { dismissOnOutsideClick } from '../popup.js';
+import { dismissOnOutsideClick, positionAnchoredPopup } from '../popup.js';
 import { applyThemeColors, switchTheme } from '../themes.js';
 import { showThemeEditor } from './themeEditor.js';
 
@@ -28,8 +28,13 @@ export function showThemeManager(onThemeChanged?: () => void): void {
     const themesSignal = signal<ThemesResponse>(initial);
 
     let contextMenuEl: HTMLElement | null = null;
+    // Disposer for the open context menu's scroll/resize reposition listeners.
+    // Every close path routes through removeContextMenu() so they can't leak.
+    let stopContextMenuReposition: (() => void) | null = null;
 
     function removeContextMenu(): void {
+      stopContextMenuReposition?.();
+      stopContextMenuReposition = null;
       if (contextMenuEl !== null) {
         contextMenuEl.remove();
         contextMenuEl = null;
@@ -113,18 +118,12 @@ export function showThemeManager(onThemeChanged?: () => void): void {
         </div>
       );
 
-      // Render into document.body (not the modal) to avoid clipping.
-      const rect = anchorEl.getBoundingClientRect();
-      menu.style.position = 'fixed';
-      menu.style.zIndex = '10000';
-      menu.style.top = `${String(rect.bottom + 4)}px`;
-      menu.style.right = `${String(window.innerWidth - rect.right)}px`;
-
+      // Render into document.body (not the modal) to avoid clipping, then keep
+      // it glued below the trigger (right edges aligned), flipping above on
+      // bottom-viewport overflow. z-index comes from the `.tm-context-menu`
+      // SCSS class (it must sit above the theme-manager modal overlay).
       document.body.appendChild(menu);
-      const menuRect = menu.getBoundingClientRect();
-      if (menuRect.bottom > window.innerHeight) {
-        menu.style.top = `${String(rect.top - menuRect.height - 4)}px`;
-      }
+      stopContextMenuReposition = positionAnchoredPopup(menu, anchorEl, { align: 'end' });
       contextMenuEl = menu;
 
       // Delegate clicks within the transient menu — and stop propagation so the
