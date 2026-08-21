@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { coalesceAll, coalesceFile, listFilesWithNotes, loadReviewNotesForFile, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
+import { coalesceAll, coalesceFile, listFilesWithNotes, loadReviewNotesForFile, noteSourceForShardPath, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
 import type { ReviewNoteInput } from '../../../src/review-notes/types.js';
 
 let repo: string;
@@ -257,5 +257,22 @@ describe('listFilesWithNotes (GB-1136/GB-1137)', () => {
     writeReviewNote(repo, note({ file: 'src/a/b.ts', startLine: 2, endLine: 2 }));
     writeReviewNote(repo, note({ file: 'src/x.ts', startLine: 1, endLine: 1 }));
     expect(listFilesWithNotes(repo)).toEqual(['src/a/b.ts', 'src/x.ts']);
+  });
+});
+
+describe('noteSourceForShardPath (GB-1137)', () => {
+  it('maps a note shard path back to its source path', () => {
+    expect(noteSourceForShardPath('.pr-notes/notes/src/foo.ts.000000.sarif')).toBe('src/foo.ts');
+    expect(noteSourceForShardPath('.pr-notes/notes/a/b/c.tsx.000012.sarif')).toBe('a/b/c.tsx');
+  });
+
+  it('normalizes backslash paths (Windows diff paths)', () => {
+    expect(noteSourceForShardPath('.pr-notes\\notes\\src\\foo.ts.000000.sarif')).toBe('src/foo.ts');
+  });
+
+  it('returns null for a non-shard path', () => {
+    expect(noteSourceForShardPath('src/foo.ts')).toBeNull();
+    expect(noteSourceForShardPath('.pr-notes/artifacts/x.png')).toBeNull();
+    expect(noteSourceForShardPath('.pr-notes/notes/src/foo.ts')).toBeNull(); // no shard suffix
   });
 });

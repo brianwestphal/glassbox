@@ -586,12 +586,12 @@ export async function launchReview(args: {
     await addReviewFile(review.id, diff.filePath, JSON.stringify(diff), groundTruthScores.get(diff.filePath) ?? null);
   }
 
-  // Surface files that carry AI review notes (doc 20) but weren't part of the
-  // diff, as `unchanged` files so their notes stay reachable (GB-1137). Git
+  // Surface files whose AI review notes are part of THIS review's change set
+  // (a note shard in the diff) but whose own source wasn't changed, as
+  // `unchanged` files so those notes stay reachable (doc 20 §20.6, GB-1137). Git
   // review modes only — `--diff`/`--ground-truth` have no repo notes tree.
   if (mode.type !== 'diff' && mode.type !== 'ground-truth') {
-    const changed = new Set(diffs.map(d => d.filePath));
-    const noteOnly = collectNoteOnlyFiles(repoRoot, changed);
+    const noteOnly = collectNoteOnlyFiles(repoRoot, diffs);
     for (const { filePath, diff } of noteOnly) {
       await addReviewFile(review.id, filePath, JSON.stringify(diff), null);
     }

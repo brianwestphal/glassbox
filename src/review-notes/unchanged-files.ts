@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import { unchangedFileDiff } from '../git/parseDiffData.js';
 import type { FileDiff } from '../git/types.js';
-import { listFilesWithNotes } from './store.js';
+import { noteSourceForShardPath } from './store.js';
 
 /** A file surfaced in a review only because it carries AI review notes. */
 export interface NoteOnlyFile {
@@ -12,21 +12,37 @@ export interface NoteOnlyFile {
 }
 
 /**
- * Files that carry AI review notes (doc 20) but are NOT among the changed files,
- * so a review can still surface their notes (doc 20 §20.6, GB-1137). Each is
- * returned with an `unchanged` `FileDiff` whose single hunk is the whole current
- * file as context lines, so the notes anchor inline.
+ * Files whose AI review notes are part of *this review's* change set but whose
+ * own source wasn't changed — so the review can still surface those notes (doc
+ * 20 §20.6, GB-1137). Each is returned with an `unchanged` `FileDiff` whose
+ * single hunk is the whole current file as context lines, so the notes anchor
+ * inline.
  *
- * Skips: files already in `changedPaths`, the `.pr-notes/` note store itself,
- * and any note whose source file no longer exists or can't be read as text
- * (a since-deleted or binary file) — those are dropped rather than failing the
- * launch. Returns `[]` when the repo has no notes tree.
+ * The scope is deliberately the review's diff, NOT every file that has ever had
+ * a note on disk: an AI writes a note in the same changeset as the work, so the
+ * note shard (`.pr-notes/notes/<src>.NNNNNN.sarif`) appears in the diff exactly
+ * when its note belongs to this review. We map each such shard back to `<src>`
+ * and surface it if it wasn't itself changed.
+ *
+ * `diffs` is the review's full changed-file set. Skips: a shard that was deleted
+ * (the note is gone), a source already among the changed files, the `.pr-notes/`
+ * store itself, and a source that no longer exists or can't be read as text —
+ * dropped rather than failing the launch.
  */
-export function collectNoteOnlyFiles(repoRoot: string, changedPaths: Set<string>): NoteOnlyFile[] {
+export function collectNoteOnlyFiles(repoRoot: string, diffs: FileDiff[]): NoteOnlyFile[] {
+  const changed = new Set(diffs.map(d => d.filePath));
+  // Source paths whose note shard is added/modified in this review's diff.
+  const notedSources = new Set<string>();
+  for (const d of diffs) {
+    if (d.status === 'deleted') continue;
+    const src = noteSourceForShardPath(d.filePath);
+    if (src !== null) notedSources.add(src);
+  }
+
   const out: NoteOnlyFile[] = [];
-  for (const filePath of listFilesWithNotes(repoRoot)) {
-    if (changedPaths.has(filePath) || filePath.startsWith('.pr-notes/')) continue;
-    const abs = join(repoRoot, filePath);
+  for (const src of notedSources) {
+    if (changed.has(src) || src.startsWith('.pr-notes/')) continue;
+    const abs = join(repoRoot, src);
     if (!existsSync(abs)) continue;
     let content: string;
     try {
@@ -34,7 +50,7 @@ export function collectNoteOnlyFiles(repoRoot: string, changedPaths: Set<string>
     } catch {
       continue;
     }
-    out.push({ filePath, diff: unchangedFileDiff(filePath, content) });
+    out.push({ filePath: src, diff: unchangedFileDiff(src, content) });
   }
   return out;
 }

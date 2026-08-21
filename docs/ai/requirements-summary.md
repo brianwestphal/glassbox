@@ -815,11 +815,13 @@ inline, falling soft to the code block without one.
 **Sidebar surfacing shipped** (GB-1135/1136/1137): a note-bearing file gets a
 message icon in the file list (`listFilesWithNotes` scans `.pr-notes/notes/` →
 `notedFileIds` on `GET /api/files` + the initial `ReviewShell` paint,
-`IconMessageSquareText` across all sort modes); a file that has notes but wasn't
-in the diff is still shown as `unchanged` (a new `FileDiff` status) with the whole
-current file rendered as context so the notes anchor — `collectNoteOnlyFiles` in
-`src/review-notes/unchanged-files.ts`, injected at review creation in `cli.ts`,
-git modes only; and the committed `.pr-notes/` folder is collapsed by default on
+`IconMessageSquareText` across all sort modes); a file whose note shard is in
+THIS review's diff but whose source wasn't changed is still shown as `unchanged`
+(a new `FileDiff` status) with the whole current file rendered as context so the
+notes anchor — `collectNoteOnlyFiles` in `src/review-notes/unchanged-files.ts`
+(scoped to the review's own note changes via `noteSourceForShardPath`, not the
+whole on-disk `.pr-notes` tree), injected at review creation in `cli.ts`, git
+modes only; and the committed `.pr-notes/` folder is collapsed by default on
 a review's first visit (`noteStorageFolderKeys`, persisted so a manual expand
 sticks).
 

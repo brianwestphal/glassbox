@@ -318,16 +318,22 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
     the client as `notedFileIds` on `GET /api/files` (and passed to the initial
     server paint via `ReviewShell`). Demo mode has no on-disk notes, so it marks
     the files its synthetic `demoReviewNotes` covers instead.
-  - **Note-bearing-but-unchanged files still appear** *(GB-1137)* — A file that
-    has notes but was **not** part of the diff is still shown, labeled
-    `unchanged`, so its notes stay reachable. At review creation
-    (`collectNoteOnlyFiles`, called from `src/cli.ts`) each such file is added
-    with a synthetic `unchanged` `FileDiff` whose single hunk renders the whole
-    current file as context lines, so the notes anchor inline. Git review modes
-    only (`--diff` / `--ground-truth` have no repo notes tree); files already in
-    the diff, the `.pr-notes/` store itself, and notes for since-deleted or
-    unreadable files are skipped. `unchanged` was added to the `FileDiff` status
-    enum for this.
+  - **Note-bearing-but-unchanged files still appear** *(GB-1137)* — When a
+    review's **own change set** adds or changes a note about a file whose source
+    wasn't itself changed, that file is still shown, labeled `unchanged`, so the
+    note stays reachable. The scope is deliberately the review's diff, **not**
+    every file that has ever had a note on disk: an AI writes a note in the same
+    changeset as the work, so the note shard
+    (`.pr-notes/notes/<src>.NNNNNN.sarif`) appears in the diff exactly when its
+    note belongs to this review. `collectNoteOnlyFiles` (`src/review-notes/
+    unchanged-files.ts`, called from `src/cli.ts`) maps each note shard in the
+    diff back to its source (`noteSourceForShardPath`) and, if that source
+    wasn't changed, adds it with a synthetic `unchanged` `FileDiff` whose single
+    hunk renders the whole current file as context lines, so the notes anchor
+    inline. Git review modes only (`--diff` / `--ground-truth` have no repo notes
+    tree); deleted note shards, sources already in the diff, the `.pr-notes/`
+    store itself, and notes for since-deleted or unreadable files are skipped.
+    `unchanged` was added to the `FileDiff` status enum for this.
   - **`.pr-notes` folders collapsed by default** *(GB-1135)* — The committed
     SARIF files under `.pr-notes/` show as ordinary files, but their folder is
     **collapsed by default** so they don't clutter the tree. On a review's first

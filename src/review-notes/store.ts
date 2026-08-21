@@ -391,6 +391,23 @@ export function listFilesWithNotes(repoRoot: string): string[] {
   return [...sources].sort();
 }
 
+/** Forward-slash prefix of the on-disk notes tree (doc 20 §20.1). A literal —
+ *  not `NOTES_SUBDIR`, whose separator is OS-specific — because it's matched
+ *  against git diff paths, which are always forward-slashed. */
+const NOTES_PATH_PREFIX = '.pr-notes/notes/';
+
+/** Map a note shard's repo-relative path back to the source path it annotates,
+ *  or null if it isn't a note shard. The inverse of the store layout
+ *  (`.pr-notes/notes/<src>.NNNNNN.sarif` → `<src>`). Used to tell which files a
+ *  review's *own* note changes concern (doc 20 §20.6, GB-1137) — i.e. the note
+ *  shards that appear in the review's diff — rather than every file that has ever
+ *  had a note on disk. */
+export function noteSourceForShardPath(relPath: string): string | null {
+  const norm = relPath.replace(/\\/g, '/');
+  if (!norm.startsWith(NOTES_PATH_PREFIX) || !SHARD_RE.test(norm)) return null;
+  return norm.slice(NOTES_PATH_PREFIX.length).replace(SHARD_RE, '');
+}
+
 /** Coalesce every file with notes. Returns the total number removed. */
 export function coalesceAll(repoRoot: string): number {
   const root = join(repoRoot, NOTES_SUBDIR);
