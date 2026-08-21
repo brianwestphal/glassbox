@@ -427,3 +427,49 @@ test.describe('Stable height across tabs', () => {
     expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
   });
 });
+
+// GB-1132: the dialog is now owned by kerfjs/overlay, which adds a focus trap,
+// focus restore, and dialog ARIA over the previously hand-rolled modal.
+test.describe('Accessibility (kerfjs/overlay)', () => {
+  test('overlay wrapper is marked role=dialog / aria-modal', async ({ page }) => {
+    await page.goto('/');
+    await openSettings(page);
+    const overlay = page.locator('.modal-overlay');
+    await expect(overlay).toHaveAttribute('role', 'dialog');
+    await expect(overlay).toHaveAttribute('aria-modal', 'true');
+  });
+
+  test('focus is trapped inside the dialog (Tab does not escape)', async ({ page }) => {
+    await page.goto('/');
+    await openSettings(page);
+
+    // Tab through many stops; focus must never leave the overlay subtree.
+    for (let i = 0; i < 30; i++) {
+      await page.keyboard.press('Tab');
+      const insideOverlay = await page.evaluate(() => {
+        const active = document.activeElement;
+        const overlay = document.querySelector('.modal-overlay');
+        return active !== null && overlay !== null && overlay.contains(active);
+      });
+      expect(insideOverlay).toBe(true);
+    }
+  });
+
+  test('closing the dialog restores focus to the settings button', async ({ page }) => {
+    await page.goto('/');
+    const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]').first();
+    await settingsBtn.focus();
+    await settingsBtn.click();
+    await expect(page.locator('[data-tab="general"]')).toBeVisible({ timeout: 5000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.settings-dialog')).not.toBeVisible({ timeout: 3000 });
+
+    // overlay() restores focus to the element that was active when it opened.
+    const restored = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      return active !== null && active.matches('.settings-btn, [data-settings-btn], button[title*="Settings"]');
+    });
+    expect(restored).toBe(true);
+  });
+});

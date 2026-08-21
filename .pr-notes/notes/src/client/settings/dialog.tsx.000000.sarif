@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt29xz9dg8h9842k",
+          "message": {
+            "text": "Escape is a bubble-phase listener, not overlay()'s built-in capture-phase one, on purpose.\n\nThe settings dialog spawns child overlays (theme manager/editor), which are themselves kerfjs/overlay instances that close on their own capture-phase Escape + stopPropagation(). kerf keeps no global overlay stack, so two capture-phase Escape handlers on the same document target don't compose: empirically, with the settings dialog + theme manager stacked, a capture-phase Escape here closed the settings dialog and left the manager open (the exact opposite of what the user expects).\n\nA bubble-phase Escape composes correctly: while a child is open its capture handler stops propagation before the bubble phase, so this never fires; when the settings dialog is topmost, nothing intercepts and it closes normally. This is the same composition the pre-overlay hand-rolled dialog had. We still take overlay()'s focus trap (topmost trap wins, so a child keeps focus — verified) + focus restore + backdrop dismissal.",
+            "markdown": "Escape is a bubble-phase listener, not overlay()'s built-in capture-phase one, on purpose.\n\nThe settings dialog spawns child overlays (theme manager/editor), which are themselves kerfjs/overlay instances that close on their own capture-phase Escape + `stopPropagation()`. kerf keeps no global overlay stack, so two capture-phase Escape handlers on the same `document` target don't compose: empirically, with the settings dialog + theme manager stacked, a capture-phase Escape here closed the *settings* dialog and left the manager open (the exact opposite of what the user expects).\n\nA bubble-phase Escape composes correctly: while a child is open its capture handler stops propagation before the bubble phase, so this never fires; when the settings dialog is topmost, nothing intercepts and it closes normally. This is the same composition the pre-overlay hand-rolled dialog had. We still take overlay()'s focus trap (topmost trap wins, so a child keeps focus — verified) + focus restore + backdrop dismissal."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/dialog.tsx"
+                },
+                "region": {
+                  "startLine": 140,
+                  "endLine": 152,
+                  "snippet": {
+                    "text": "  // Escape is handled by our own BUBBLE-phase listener below, not overlay()'s\n  // built-in (capture-phase) one — the settings dialog spawns child overlays\n  // (theme manager/editor, both kerfjs/overlay), and those close on their own\n  // capture-phase Escape + `stopPropagation()`. A capture-phase Escape here\n  // would race the child's on the same `document` target and could close the\n  // settings dialog out from under an open child (GB-1132). A bubble-phase\n  // listener never fires while a child is open (the child's capture handler\n  // stops propagation first), and fires normally when the dialog is topmost —\n  // the same composition the pre-overlay hand-rolled dialog had. We keep\n  // overlay()'s focus trap (topmost trap wins, so a child keeps focus) + focus\n  // restore + backdrop dismissal.\n  const handle = overlay(() => content.value(), {\n    className: 'modal-overlay', dismiss: ['backdrop'], trap: true,"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1132"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "e9963da6657f5ff2c39d1d1efc0d6bc1"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mt29yafaojxnvipv",
+          "message": {
+            "text": "Inactive tab panels must render EMPTY, or focus escapes the dialog.\n\nkerfjs/overlay's focus trap collects focusables via querySelectorAll and filters only the hidden attribute — it does NOT skip display:none subtrees. Inactive settings panels are display:none via .settings-tab-panel (0), so if their controls were rendered, kerf's computed 'last focusable' would be a hidden control. The browser's native Tab order skips it, so after the last VISIBLE control Tab moves focus OUT of the dialog (kerf's boundary-wrap never triggers because active !== kerf's 'last').\n\nRendering {active ? tab.render(ctx) : null} keeps only visible controls in the trap's cycle. The empty panel div stays for the active-class toggle the e2e tab tests assert on, and a tab switch re-runs this render, so nothing is lost. Verified by the 'focus is trapped' e2e (30 Tabs never leave the overlay).",
+            "markdown": "Inactive tab panels must render EMPTY, or focus escapes the dialog.\n\nkerfjs/overlay's focus trap collects focusables via `querySelectorAll` and filters only the `hidden` attribute — it does NOT skip `display:none` subtrees. Inactive settings panels are `display:none` via [.settings-tab-panel](0), so if their controls were rendered, kerf's computed 'last focusable' would be a hidden control. The browser's native Tab order skips it, so after the last VISIBLE control Tab moves focus OUT of the dialog (kerf's boundary-wrap never triggers because active !== kerf's 'last').\n\nRendering `{active ? tab.render(ctx) : null}` keeps only visible controls in the trap's cycle. The empty panel div stays for the active-class toggle the e2e tab tests assert on, and a tab switch re-runs this render, so nothing is lost. Verified by the 'focus is trapped' e2e (30 Tabs never leave the overlay)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/dialog.tsx"
+                },
+                "region": {
+                  "startLine": 924,
+                  "endLine": 933,
+                  "snippet": {
+                    "text": "          // Only the active panel renders its interactive content. Inactive\n          // panels are `display:none` (so their controls aren't visible), but\n          // kerfjs/overlay's focus trap detects focusables by DOM query and does\n          // NOT skip `display:none` subtrees — leaving them rendered would put\n          // hidden controls in the trap's tab cycle and let focus escape the\n          // dialog (GB-1132). The empty panel div stays for the active-class\n          // toggle; a tab switch re-runs this render, so nothing is lost.\n          <div className={`settings-tab-panel${tab.id === activeTabId ? ' active' : ''}`} data-panel={tab.id}>\n            {tab.id === activeTabId ? tab.render(ctx) : null}\n          </div>"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/styles/_settings.scss"
+                },
+                "region": {
+                  "startLine": 355
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1132"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "b2930b99ff91e0f88e7b35b1af0eacf8"
+          }
+        },
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt29yh2qny5yrpby",
+          "message": {
+            "text": "The GB-1130 height pin is a signal read in the template, not an imperative style.\n\nUnder overlay() the .modal div is part of the mounted template (the wrapper is the mount root), so a modalEl.style.minHeight = ... set imperatively would be clobbered on the next child morph. Making min-height a signal the template reads means kerf's morph preserves it. The measurement loop runs while minHeight is null so each tab renders at natural height; the max is then written to the signal, re-rendering with the pin applied — same 'tallest tab wins, shorter tabs get bottom slack' behavior as before, just morph-safe.",
+            "markdown": "The GB-1130 height pin is a signal read in the template, not an imperative style.\n\nUnder overlay() the `.modal` div is part of the mounted template (the wrapper is the mount root), so a `modalEl.style.minHeight = ...` set imperatively would be clobbered on the next child morph. Making min-height a signal the template reads means kerf's morph preserves it. The measurement loop runs while `minHeight` is null so each tab renders at natural height; the max is then written to the signal, re-rendering with the pin applied — same 'tallest tab wins, shorter tabs get bottom slack' behavior as before, just morph-safe."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/dialog.tsx"
+                },
+                "region": {
+                  "startLine": 258,
+                  "endLine": 263,
+                  "snippet": {
+                    "text": "function renderSettingsModal(\n  shell: ModalShell,\n  keyStatus: KeyStatusResponse,\n  modelsData: ModelsResponse,\n  configData: ConfigResponse,\n  projectSettings: ProjectSettings,"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1132"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "2075624f4be7e4ba10bb4722bdc5cbaf"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "487ec3f51b32857f6cad499caa196006f322fca3",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import type { SafeHtml, Signal } from 'kerfjs';
-import { delegate, mount, signal } from 'kerfjs';
+import { delegate, signal } from 'kerfjs';
+import { overlay } from 'kerfjs/overlay';
 import { debounce } from 'kerfjs/timing';
 
 import type { DatabaseBackup, ListBackupsResp } from '../../api/db-backups.js';
@@ -122,44 +123,53 @@ const switchTheme = withInvalidate(rawSwitchTheme);
 export function showSettingsDialog(onClose?: () => void): void {
   resetPluginsTab(); // fresh plugin list per dialog session (doc 29, GB-1040)
 
-  // Show the modal shell IMMEDIATELY. With cached data it renders content at
-  // once; on a cold open (first per session) the spinner shows while the ~9
-  // endpoints load — we never block the modal's appearance on the fetch
-  // (GB-1129).
-  const overlay = toElement(
-    <div className="modal-overlay">
-      <div className="modal settings-dialog">
-        <div className="settings-loading"><span className="analysis-spinner"></span></div>
-      </div>
+  // The whole modal — `.modal-overlay` backdrop, the `.modal` content mount,
+  // Escape/backdrop dismissal, focus trap, and focus restore — is owned by
+  // kerfjs/overlay (GB-1132; matches themeEditor/completion-modal). The content
+  // is driven by a swappable render fn: it starts as the loading spinner and,
+  // when data arrives, `renderSettingsModal` swaps in the real shell render fn
+  // (which closes over the freshly-created non-null `ui` signal). Showing the
+  // modal never blocks on the ~9-endpoint fetch — with cached data the spinner
+  // is never seen; on a cold open it shows while we load (GB-1129).
+  const content = signal<() => SafeHtml>(() => (
+    <div className="modal settings-dialog">
+      <div className="settings-loading"><span className="analysis-spinner"></span></div>
     </div>
-  );
-  const foundModal = overlay.querySelector<HTMLElement>('.modal');
-  if (foundModal === null) return;
-  const modalEl: HTMLElement = foundModal; // non-null declared type, usable inside build()
+  ));
 
-  // Cleanup registry — `renderSettingsModal` appends the mount/poll/action
-  // teardowns once it takes over. `close()` runs them all (LIFO) and is safe to
-  // call whether the user dismisses during loading or after the UI is built.
+  // Escape is handled by our own BUBBLE-phase listener below, not overlay()'s
+  // built-in (capture-phase) one — the settings dialog spawns child overlays
+  // (theme manager/editor, both kerfjs/overlay), and those close on their own
+  // capture-phase Escape + `stopPropagation()`. A capture-phase Escape here
+  // would race the child's on the same `document` target and could close the
+  // settings dialog out from under an open child (GB-1132). A bubble-phase
+  // listener never fires while a child is open (the child's capture handler
+  // stops propagation first), and fires normally when the dialog is topmost —
+  // the same composition the pre-overlay hand-rolled dialog had. We keep
+  // overlay()'s focus trap (topmost trap wins, so a child keeps focus) + focus
+  // restore + backdrop dismissal.
+  const handle = overlay(() => content.value(), {
+    className: 'modal-overlay', dismiss: ['backdrop'], trap: true,
+  });
+  const close = (): void => { handle.close(); };
+
+  // Cleanup registry — `renderSettingsModal` appends its mount-adjacent teardowns
+  // (actions dispose, channel poll) once it takes over. overlay() owns the mount
+  // + node removal + focus restore; on any dismissal `handle.result` resolves,
+  // and we run our teardowns (LIFO) then notify. Safe whether the user dismisses
+  // during loading or after the UI is built.
   const teardowns: Array<() => void> = [];
-  let closed = false;
-  function close(): void {
-    if (closed) return;
-    closed = true;
-    while (teardowns.length > 0) teardowns.pop()?.();
-    overlay.remove();
-    if (onClose !== undefined) onClose();
-  }
   const onEsc = (e: KeyboardEvent): void => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onEsc);
   teardowns.push(() => { document.removeEventListener('keydown', onEsc); });
-  // Backdrop click closes; the dialog content's own clicks go through delegated
-  // handlers on the overlay and don't reach here as `e.target === overlay`.
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  document.body.appendChild(overlay);
+  void handle.result.then(() => {
+    while (teardowns.length > 0) teardowns.pop()?.();
+    if (onClose !== undefined) onClose();
+  });
 
   function build(data: SettingsData): void {
-    // Dismissed before the data arrived? `close()` detached the overlay.
-    if (!overlay.isConnected) return;
+    // Dismissed before the data arrived? overlay() detached the wrapper.
+    if (!handle.el.isConnected) return;
     const [keyStatus, modelsData, configData, projectSettings, themesData, channelCheck, channelStatus, difftoolStatus, backups] = data;
     const channelState: ChannelState = {
       enabled: channelStatus.enabled,
@@ -169,17 +179,17 @@ export function showSettingsDialog(onClose?: () => void): void {
       meetsMinimum: channelCheck.meetsMinimum,
     };
     renderSettingsModal(
-      { overlay, modalEl, close, registerTeardown: (fn) => { teardowns.push(fn); } },
+      { overlay: handle.el, setContent: (fn) => { content.value = fn; }, close, registerTeardown: (fn) => { teardowns.push(fn); } },
       keyStatus, modelsData, configData, projectSettings, themesData, channelState, difftoolStatus, backups,
     );
   }
 
   if (settingsCache !== null) {
-    // Repeat open: render instantly from cache. `build()` mounts over the
-    // spinner synchronously, so the spinner is never seen.
+    // Repeat open: render instantly from cache. `build()` swaps the real render
+    // fn over the spinner synchronously, so the spinner is never seen.
     build(settingsCache);
   } else {
-    // Cold open: the spinner (already in the DOM) shows while we fetch.
+    // Cold open: the spinner (already mounted) shows while we fetch.
     void (async () => {
       let data: SettingsData;
       try {
@@ -195,12 +205,16 @@ export function showSettingsDialog(onClose?: () => void): void {
   }
 }
 
-/** The already-shown modal shell + lifecycle hooks, handed to
+/** The already-shown overlay wrapper + lifecycle hooks, handed to
  *  `renderSettingsModal` so it populates the existing overlay (rather than
- *  creating its own) and registers its teardown into the shared `close()`. */
+ *  creating its own) and registers its teardown into the shared dismissal. */
 interface ModalShell {
+  /** The kerfjs/overlay wrapper (`.modal-overlay`); the mount root, stable
+   *  across re-renders — delegates and error toasts bind here. */
   overlay: HTMLElement;
-  modalEl: HTMLElement;
+  /** Swap the overlay's content render fn — used to replace the spinner with
+   *  the real settings shell once data has loaded. */
+  setContent: (fn: () => SafeHtml) => void;
   close: () => void;
   registerTeardown: (fn: () => void) => void;
 }
@@ -252,8 +266,14 @@ function renderSettingsModal(
   initialDifftoolStatus: DifftoolStatusResp,
   initialBackups: ListBackupsResp,
 ): void {
-  const { overlay, modalEl, close: closeDialog, registerTeardown } = shell;
+  const { overlay, setContent, close: closeDialog, registerTeardown } = shell;
   const isTauri = getTauriGlobal() !== undefined;
+
+  // GB-1130 height pin, GB-1132: under overlay() the `.modal` div is part of the
+  // mounted template, so an imperative `style.minHeight` would be clobbered on
+  // the next child morph. Instead min-height is a signal read in the template
+  // below, so morph preserves it. `null` = unmeasured/natural height.
+  const minHeight = signal<number | null>(null);
 
   // Per-dialog reactive state. Bumps to this signal drive the mount()
   // re-render. The signal lives in this closure (not in the global
@@ -305,8 +325,13 @@ function renderSettingsModal(
   }, CHANNEL_STATUS_POLL_MS);
   registerTeardown(() => { clearInterval(channelPoll); });
 
-  // Mount the reactive shell (replaces the loading spinner inside the modal).
-  const disposeMount = mount(modalEl, () => {
+  // Swap the reactive shell in over the loading spinner. overlay() owns the
+  // mount() (rooted at the wrapper), so we hand it a new content render fn
+  // rather than mounting ourselves. The fn reads `ui` + `minHeight`, so both a
+  // tab switch and the height pin below re-run it. The `.modal` div lives in the
+  // template now (the wrapper is the mount root), so its `min-height` is a
+  // signal read, not an imperative style.
+  const renderShellContent = (): SafeHtml => {
     const ctx = buildContext({ ui, isTauri, keyStatus, modelsData, themesData, projectSettings, channelState, actions });
     const visible = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
     const cur = ui.value;
@@ -316,18 +341,25 @@ function renderSettingsModal(
       // Defer the state correction so we don't write during a render.
       queueMicrotask(() => { setUi({ activeTab: activeId }); });
     }
-    return renderShell(visible, activeId, ctx);
-  });
-  registerTeardown(disposeMount);
+    const mh = minHeight.value;
+    return (
+      <div className="modal settings-dialog" style={mh !== null ? `min-height:${String(mh)}px` : undefined}>
+        {renderShell(visible, activeId, ctx)}
+      </div>
+    );
+  };
+  setContent(renderShellContent);
+
+  // The `.modal` element inside the wrapper — now rendered by the swap above.
+  const modalEl = overlay.querySelector<HTMLElement>('.modal');
 
   // GB-1130: pin the dialog to the TALLEST tab's height so switching tabs never
   // resizes it. Measure each tab once, synchronously — the mount re-renders on
   // the `setUi` write before the browser paints, so the intermediate tabs are
-  // never seen — take the max height, and set it as `min-height` on the dialog
-  // element itself (the mount ROOT, whose own style survives the child morphs;
-  // an inline style on the re-rendered `.settings-body` would be clobbered).
+  // never seen — take the max height, and set it as `min-height` via the signal
+  // read in the template above (which morph preserves across the child morphs).
   // Shorter tabs then get empty space at the bottom instead of shrinking.
-  {
+  if (modalEl !== null) {
     const ctx = buildContext({ ui, isTauri, keyStatus, modelsData, themesData, projectSettings, channelState, actions });
     const visibleTabs = TABS.filter(t => t.enabled === undefined || t.enabled(ctx));
     if (visibleTabs.length > 1) {
@@ -338,7 +370,7 @@ function renderSettingsModal(
         maxHeight = Math.max(maxHeight, modalEl.getBoundingClientRect().height);
       }
       setUi({ activeTab: original });
-      if (maxHeight > 0) modalEl.style.minHeight = `${String(Math.ceil(maxHeight))}px`;
+      if (maxHeight > 0) minHeight.value = Math.ceil(maxHeight);
     }
   }
 
@@ -841,8 +873,10 @@ function setupDelegates(args: {
   void delegate(overlay, 'click', '#check-updates-btn', (_e, btn) => {
     void handleCheckUpdates(asButton(btn), overlay);
   });
-  // Note: backdrop-click-to-close is wired in `showSettingsDialog` (it must work
-  // during the loading phase too, before this runs), so it's not repeated here.
+  // Note: backdrop-click dismissal and focus trap/restore are owned by
+  // kerfjs/overlay, and Escape by a bubble-phase listener — all configured in
+  // `showSettingsDialog`, so they're not wired here and already work during the
+  // loading phase before this runs.
 }
 
 async function handleCheckUpdates(btn: HTMLButtonElement, overlay: HTMLElement): Promise<void> {
@@ -887,8 +921,15 @@ function renderShell(visible: Tab[], activeTabId: string, ctx: TabContext): Safe
 
       <div className="settings-body">
         {visible.map(tab => (
+          // Only the active panel renders its interactive content. Inactive
+          // panels are `display:none` (so their controls aren't visible), but
+          // kerfjs/overlay's focus trap detects focusables by DOM query and does
+          // NOT skip `display:none` subtrees — leaving them rendered would put
+          // hidden controls in the trap's tab cycle and let focus escape the
+          // dialog (GB-1132). The empty panel div stays for the active-class
+          // toggle; a tab switch re-runs this render, so nothing is lost.
           <div className={`settings-tab-panel${tab.id === activeTabId ? ' active' : ''}`} data-panel={tab.id}>
-            {tab.render(ctx)}
+            {tab.id === activeTabId ? tab.render(ctx) : null}
           </div>
         ))}
       </div>
