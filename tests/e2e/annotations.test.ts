@@ -146,6 +146,59 @@ test.describe('Category reclassify', () => {
     // Reclassify popup should appear
     await expect(page.locator('.reclassify-popup')).toBeVisible({ timeout: 3000 });
   });
+
+  // GB-1133: the picker is positioned by popup.ts `positionBelowAnchor`, which
+  // now uses kerfjs/overlay `autoReposition` — so the popup follows its anchor
+  // as the diff scrolls instead of drifting away. Scrolls DOWN (content moves
+  // up) so there's no bottom-viewport-overflow flip to reason about.
+  test('reclassify picker tracks its badge when the diff scrolls (autoReposition)', async ({ page }) => {
+    await openFile(page, 'session');
+    const badge = page.locator('[data-action="reclassify"]').first();
+    await expect(badge).toBeVisible();
+    await badge.click();
+    await expect(page.locator('.reclassify-popup')).toBeVisible({ timeout: 3000 });
+
+    const readBoxes = () => page.evaluate(() => {
+      const b = document.querySelector('[data-action="reclassify"]')!.getBoundingClientRect();
+      const p = document.querySelector('.reclassify-popup')!.getBoundingClientRect();
+      return { badgeTop: b.top, pickerTop: p.top };
+    });
+
+    const before = await readBoxes();
+
+    // Scroll the nearest scrollable ancestor of the badge (fall back to window).
+    // Setting scrollTop fires a capture-phase scroll event, which drives
+    // autoReposition.
+    const scrolled = await page.evaluate(() => {
+      let el = document.querySelector('[data-action="reclassify"]')?.parentElement ?? null;
+      while (el !== null) {
+        const oy = getComputedStyle(el).overflowY;
+        if (el.scrollHeight > el.clientHeight && (oy === 'auto' || oy === 'scroll')) {
+          const prev = el.scrollTop;
+          el.scrollTop += 60;
+          if (el.scrollTop !== prev) return true;
+        }
+        el = el.parentElement;
+      }
+      const prevY = window.scrollY;
+      window.scrollBy(0, 60);
+      return window.scrollY !== prevY;
+    });
+    expect(scrolled).toBe(true);
+
+    // The badge moves synchronously with the scroll; the picker repositions on
+    // the scroll event autoReposition listens for, which can lag a frame or two
+    // under load — so poll until the badge has moved AND the picker has tracked
+    // it by the same delta (stayed glued), rather than reading once on a fixed
+    // timer. Old position-once behavior would leave pickerDelta ~0 forever and
+    // time out here.
+    await expect.poll(async () => {
+      const after = await readBoxes();
+      const badgeDelta = after.badgeTop - before.badgeTop;
+      const pickerDelta = after.pickerTop - before.pickerTop;
+      return Math.abs(badgeDelta) > 10 && Math.abs(pickerDelta - badgeDelta) < 2;
+    }, { timeout: 3000 }).toBe(true);
+  });
 });
 
 test.describe('Annotation UI elements', () => {

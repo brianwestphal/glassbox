@@ -10,20 +10,28 @@
  * instead, because re-renders silently drop per-element listeners.
  */
 
-import { positionAnchored } from 'kerfjs/overlay';
+import { autoReposition } from 'kerfjs/overlay';
 
 /** Fixed-position `el` directly below `anchor`, left-aligned (the shared
- *  popup placement). Layering comes from the element's SCSS class — don't set
+ *  popup placement), and KEEP it there as the page or any scroll container
+ *  scrolls / resizes. Layering comes from the element's SCSS class — don't set
  *  inline z-index.
  *
- *  Delegates to kerfjs/overlay's placement core (`positionAnchored`): same
- *  below-and-left-aligned default as before, but it now FLIPS above the anchor
- *  when the popup would overflow the bottom of the viewport and CLAMPS it
- *  horizontally into view — a free upgrade for all five popups that route
- *  through here. It positions our own element (`position: fixed` + left/top),
- *  so the popups' existing SCSS is untouched; no overlay wrapper is introduced. */
-export function positionBelowAnchor(el: HTMLElement, anchor: HTMLElement, gapPx = 4): void {
-  positionAnchored(el, anchor, { gap: gapPx });
+ *  Delegates to kerfjs/overlay's `autoReposition` (built on `positionAnchored`):
+ *  it positions once immediately with the same below-and-left-aligned default —
+ *  flipping above the anchor on bottom-viewport overflow and clamping
+ *  horizontally into view — then re-runs on capture-phase `scroll` (so a scroll
+ *  in any inner container, not just `window`, is caught) and `resize`, so the
+ *  popup stays glued to a moving anchor instead of drifting away. It positions
+ *  our own element (`position: fixed` + left/top), so the popups' existing SCSS
+ *  is untouched; no overlay wrapper is introduced.
+ *
+ *  Returns a disposer that removes the scroll/resize listeners. Callers MUST
+ *  call it when the popup is dismissed (route every close path through it — a
+ *  bare `el.remove()` would leak the listeners). Pairing it with
+ *  {@link dismissOnOutsideClick}'s `onDismiss` is the intended wiring. */
+export function positionBelowAnchor(el: HTMLElement, anchor: HTMLElement, gapPx = 4): () => void {
+  return autoReposition(el, anchor, { gap: gapPx });
 }
 
 /**

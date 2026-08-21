@@ -3,8 +3,14 @@ import { dismissOnOutsideClick, positionBelowAnchor } from '../popup.js';
 import type { RiskFileScore } from '../state.js';
 import { riskColor } from './riskScore.js';
 
+// The single currently-open risk popover's dismiss fn (removes the element,
+// its outside-click listener, AND the autoReposition scroll/resize listeners).
+// Reopening dismisses the previous one through here so nothing leaks — a bare
+// `.remove()` would strand the reposition listeners.
+let activeDismiss: (() => void) | null = null;
+
 export function showRiskPopover(anchor: HTMLElement, score: RiskFileScore): void {
-  document.querySelectorAll('.risk-popover').forEach(p => { p.remove(); });
+  activeDismiss?.();
 
   const dimensions = Object.entries(score.dimensionScores);
   const popover = toElement(
@@ -30,7 +36,10 @@ export function showRiskPopover(anchor: HTMLElement, score: RiskFileScore): void
     </div>
   );
 
-  positionBelowAnchor(popover, anchor);
+  const stopReposition = positionBelowAnchor(popover, anchor);
   document.body.appendChild(popover);
-  dismissOnOutsideClick(popover);
+  activeDismiss = dismissOnOutsideClick(popover, () => {
+    stopReposition();
+    activeDismiss = null;
+  });
 }

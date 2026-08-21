@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mt28aggys5igkgzl",
+          "message": {
+            "text": "positionBelowAnchor now returns a disposer that MUST be called on dismissal — a bare el.remove() leaks the autoReposition scroll/resize listeners. Switching from the one-shot positionAnchored to autoReposition (so popups follow a moving anchor) means the placement now owns capture-phase scroll + resize listeners. They are only removed by the returned disposer, so every caller has to route all its close paths through it. Both current callers do (riskPopover.tsx, reclassifyPopup.tsx funnel reopen / option-pick / outside-click through a single tracked dismiss). The project's heap-stability e2e (stability.test.ts) would catch a regression here.\n",
+            "markdown": "`positionBelowAnchor` now returns a disposer that MUST be called on dismissal — a bare `el.remove()` leaks the autoReposition scroll/resize listeners. Switching from the one-shot `positionAnchored` to `autoReposition` (so popups follow a moving anchor) means the placement now owns capture-phase `scroll` + `resize` listeners. They are only removed by the returned disposer, so every caller has to route **all** its close paths through it. Both current callers do (`riskPopover.tsx`, `reclassifyPopup.tsx` funnel reopen / option-pick / outside-click through a single tracked `dismiss`). The project's heap-stability e2e (`stability.test.ts`) would catch a regression here.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/popup.ts"
+                },
+                "region": {
+                  "startLine": 34,
+                  "endLine": 34,
+                  "snippet": {
+                    "text": "  return autoReposition(el, anchor, { gap: gapPx });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ]
+          },
+          "workItemUris": [
+            "GB-1133"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "9473e454add063fce1930b5657d77c9d"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "90f263df90f71526f736f3efed0ec7d7340eb4aa",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

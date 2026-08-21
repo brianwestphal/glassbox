@@ -24,7 +24,17 @@ function renderPopup(activeCategory: string): HTMLElement {
   );
 }
 
+// The single currently-open picker's dismiss fn (removes the element, its
+// outside-click listener, AND the autoReposition scroll/resize listeners).
+// Every close path — reopen, option pick, outside click — routes through it so
+// nothing leaks; a bare `.remove()` would strand the reposition listeners.
+let activeDismiss: (() => void) | null = null;
+
 function dismissExistingPopups(): void {
+  activeDismiss?.();
+  activeDismiss = null;
+  // Safety net for any untracked stray popup (defensive; the tracked dismiss
+  // above handles the normal case).
   document.querySelectorAll('.reclassify-popup').forEach(el => { el.remove(); });
 }
 
@@ -39,17 +49,23 @@ export function showCategoryPicker(
 ): void {
   dismissExistingPopups();
   const popup = renderPopup(current);
-  positionBelowAnchor(popup, anchor);
+  const stopReposition = positionBelowAnchor(popup, anchor);
   document.body.appendChild(popup);
+
+  const dismiss = dismissOnOutsideClick(popup, () => {
+    stopReposition();
+    activeDismiss = null;
+  });
+  activeDismiss = dismiss;
 
   void delegate(popup, 'click', '.reclassify-option', (e, opt) => {
     e.stopPropagation();
     const value = asEl(opt).dataset.value ?? '';
-    popup.remove();
+    // Route through dismiss (not a bare popup.remove()) so the reposition
+    // listeners are cleaned up along with the element + outside-click listener.
+    dismiss();
     onPick(value);
   });
-
-  dismissOnOutsideClick(popup);
 }
 
 /** Picker for an existing annotation row — saves via PATCH and updates the
