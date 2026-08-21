@@ -99,7 +99,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
           {renderEditor(isBuiltIn, editNameSignal.value, editColorsSignal.value)}
         </div>
       ),
-      { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true },
+      { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true, native: true },
     );
 
     const disposeLivePreview = effect(() => {

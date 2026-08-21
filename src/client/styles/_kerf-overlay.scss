@@ -5,7 +5,8 @@
 // button variables so any adoption inherits the app's look, matching the
 // hand-rolled `.modal-overlay` / `.modal` it replaces.
 
-.kerf-overlay {
+// Fallback (no native `<dialog>.showModal()`): full-screen flex + dim.
+.kerf-overlay:not(dialog) {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
@@ -15,13 +16,27 @@
   z-index: 100;
 }
 
+// Native hosting (kerf native:true → `<dialog>.showModal()`, GB-1143): reset the
+// UA dialog chrome so the inner `.kerf-confirm`/`.kerf-choice` is the box, and
+// dim via `::backdrop`. The dialog centers itself in the top layer.
+dialog.kerf-overlay {
+  max-width: none;
+  max-height: 100dvh;
+  border: none;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+dialog.kerf-overlay::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 .kerf-confirm {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  max-width: 360px;
-  width: 90%;
+  width: min(90vw, 360px);
 
   &__title { margin: 0 0 12px; font-size: 16px; }
   &__message { margin: 0 0 16px; color: var(--text-dim); font-size: 14px; }
@@ -62,8 +77,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  max-width: 360px;
-  width: 90%;
+  width: min(90vw, 360px);
 
   &__title { margin: 0 0 12px; font-size: 16px; }
   &__message { margin: 0 0 16px; color: var(--text-dim); font-size: 14px; }

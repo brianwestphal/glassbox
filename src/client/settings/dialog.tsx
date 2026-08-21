@@ -149,7 +149,7 @@ export function showSettingsDialog(onClose?: () => void): void {
   // overlay()'s focus trap (topmost trap wins, so a child keeps focus) + focus
   // restore + backdrop dismissal.
   const handle = overlay(() => content.value(), {
-    className: 'modal-overlay', dismiss: ['backdrop'], trap: true,
+    className: 'modal-overlay', dismiss: ['backdrop'], trap: true, native: true,
   });
   const close = (): void => { handle.close(); };
 

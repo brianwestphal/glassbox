@@ -52,7 +52,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
           {renderManager(themesSignal.value)}
         </div>
       ),
-      { className: 'modal-overlay', dismiss: ['backdrop'], trap: true },
+      { className: 'modal-overlay', dismiss: ['backdrop'], trap: true, native: true },
     );
 
     function close(): void { handle.close(); }
@@ -154,7 +154,7 @@ export function showThemeManager(onThemeChanged?: () => void): void {
             // backdrop dismiss, restore-focus) — replaces the hand-rolled
             // overlay + three addEventListener() dismiss handlers.
             const ok = await confirm(`Delete "${theme.name}"? This cannot be undone.`, {
-              title: 'Delete Theme', okText: 'Delete', cancelText: 'Cancel', danger: true,
+              title: 'Delete Theme', okText: 'Delete', cancelText: 'Cancel', danger: true, native: true,
             });
             if (!ok) return;
             const wasActive = themeId === themesSignal.value.activeId;

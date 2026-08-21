@@ -1,4 +1,8 @@
-.modal-overlay {
+// Fallback (engines without native `<dialog>.showModal()`): a full-screen flex
+// container that dims the page and centers the `.modal`. kerf's native:true
+// (GB-1143) feature-detects and falls back to a plain `<div class="modal-overlay">`
+// here, so this styling still applies then.
+.modal-overlay:not(dialog) {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
@@ -8,13 +12,31 @@
   z-index: 100;
 }
 
+// Native hosting (kerf native:true → `<dialog>.showModal()`, GB-1143): the
+// browser top layer owns stacking + document inerting, and the `<dialog>`
+// centers itself. Reset the UA dialog chrome (border/padding/background/max-*)
+// so the inner `.modal` remains the visible box, and move the page dim to the
+// `::backdrop` pseudo-element (kerf ships no CSS for either).
+dialog.modal-overlay {
+  max-width: none;
+  max-height: 100dvh;
+  border: none;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+dialog.modal-overlay::backdrop {
+  background: rgba(0,0,0,0.6);
+}
+
 .modal {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  max-width: 480px;
-  width: 90%;
+  // Viewport-relative (not `90%` of the parent) so it keeps its width inside a
+  // shrink-to-fit `<dialog>` (native) as well as the full-screen flex fallback.
+  width: min(90vw, 480px);
 
   h3 { margin-bottom: 12px; }
   p { margin-bottom: 16px; color: var(--text-dim); font-size: 14px; }

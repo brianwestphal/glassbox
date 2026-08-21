@@ -79,7 +79,7 @@ function showCompleteModal(): void {
       { value: 'cancel', label: 'Cancel', className: 'btn btn-sm' },
       { value: 'discard', label: 'Discard All Stale', className: 'btn btn-sm btn-danger' },
       { value: 'keep', label: 'Keep All & Complete', className: 'btn btn-sm btn-primary' },
-    ], { title: 'Stale Annotations', defaultValue: 'keep' });
+    ], { title: 'Stale Annotations', defaultValue: 'keep', native: true });
     if (pick === null || pick === 'cancel') return;
 
     // Show the completion modal on "Completing..." while the stale resolution
@@ -111,7 +111,7 @@ function openCompletionModal(initialStage: ModalStage): ReturnType<typeof signal
   // `stage` (completing → done/failed) re-runs the mount automatically.
   const handle = overlay(
     () => <div className="modal">{renderStage(stage.value)}</div>,
-    { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true },
+    { className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true, native: true },
   );
 
   // Delegated handlers on the overlay wrapper (`handle.el`) — the mount root,

@@ -1,6 +1,8 @@
 // --- Theme Editor ---
 
-.theme-editor-dialog { max-width: 520px; }
+// Wider than the base `.modal` (480px), so set width explicitly — the base's
+// `min(90vw, 480px)` would otherwise cap it below 520 (GB-1143).
+.theme-editor-dialog { width: min(90vw, 520px); }
 
 .theme-editor-body {
   padding: 12px 20px 20px;
