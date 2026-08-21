@@ -812,10 +812,12 @@ follow-up — **live diagram rendering** (Mermaid/Graphviz/PlantUML) — shipped
 via the doc-29 content plugins: `renderNoteArtifacts` dispatches diagram-source
 artifacts to an installed renderer and the diff shows the resulting inert SVG
 inline, falling soft to the code block without one.
-**Sidebar surfacing shipped** (GB-1135/1136/1137): a note-bearing file gets a
-message icon in the file list (`listFilesWithNotes` scans `.pr-notes/notes/` →
-`notedFileIds` on `GET /api/files` + the initial `ReviewShell` paint,
-`IconMessageSquareText` across all sort modes); a file whose note shard is in
+**Sidebar surfacing shipped** (GB-1135/1136/1137): a file whose review notes
+belong to THIS review gets a message icon in the file list (scoped via
+`notedSourcesInFiles`/`noteSourceForShardPath` — the review's own note shards
+mapped back to their sources, NOT every file with notes on disk → `notedFileIds`
+on `GET /api/files` + the initial `ReviewShell` paint, `IconMessageSquareText`
+across all sort modes); a file whose note shard is in
 THIS review's diff but whose source wasn't changed is still shown as `unchanged`
 (a new `FileDiff` status) with the whole current file rendered as context so the
 notes anchor — `collectNoteOnlyFiles` in `src/review-notes/unchanged-files.ts`

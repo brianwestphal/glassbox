@@ -77,7 +77,7 @@ glassbox/
 | `index.ts` | Aggregator. Re-exports every per-resource module (`export *`) so callers can `import { createAnnotation } from '../api/index.js'` AND get a flat `apis` namespace (`apis.createAnnotation({...})`) for discoverability. |
 | `annotations.ts` | Req/Resp types + callers for `/annotations/*` (create / update / delete / move / keep / stale-delete-all / stale-keep-all / list-all). |
 | `context.ts` | `GetContextLinesReq/Resp` + `getContextLines()` for hunk expansion. |
-| `files.ts` | `/files` list / detail / status / reveal / path / open-in-editor. The list response also carries `pluginRendered` (doc 29) and `notedFileIds` — ids of files that carry AI review notes, marked with a note icon in the sidebar (doc 20 §20.6 / GB-1136; demo-aware). |
+| `files.ts` | `/files` list / detail / status / reveal / path / open-in-editor. The list response also carries `pluginRendered` (doc 29) and `notedFileIds` — ids of files whose review notes belong to THIS review (their note shard is among the review's files, mapped back via `notedSourcesInFiles`/`noteSourceForShardPath`), marked with a note icon in the sidebar (doc 20 §20.6 / GB-1136; NOT files with only older unrelated notes; demo-aware). |
 | `outline.ts` | `/outline/:fileId` + `/symbol-definition` (go-to-definition). |
 | `image.ts` | `/image/:fileId/metadata` typed; per-side binary uses an `imageUrl()` URL builder (not a fetch). |
 | `project-settings.ts` | `.glassbox/settings.json` get/update (`appName`, plugin `disabledPlugins`). |

@@ -8,7 +8,7 @@ import { demoReviewNotes } from '../../demo.js';
 import { parseModeString } from '../../git/diff.js';
 import { groundTruthMetaByFileId } from '../../ground-truth/presentation.js';
 import { pluginRendersFile } from '../../plugins/fileView.js';
-import { listFilesWithNotes } from '../../review-notes/store.js';
+import { notedSourcesInFiles } from '../../review-notes/store.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
 import { errorResponse, parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -30,14 +30,15 @@ filesRoutes.get('/files', async (c) => {
   // Files a content plugin renders (doc 29, GB-1052) — the client shows the
   // Code/Rendered toggle for these. Cheap path pre-check; empty when no plugin.
   const pluginRendered = files.filter((f) => pluginRendersFile(f.file_path)).map((f) => f.id);
-  // Files that carry AI review notes (doc 20 §20.6, GB-1136) — marked with a
-  // note icon. Demo mode has no on-disk `.pr-notes`, so it consults the same
-  // synthetic notes the file view serves; a real review scans `.pr-notes/`.
-  const notedPaths = new Set(
-    getDemoMode() !== null
-      ? files.filter((f) => demoReviewNotes(f.file_path).length > 0).map((f) => f.file_path)
-      : listFilesWithNotes(c.get('repoRoot')),
-  );
+  // Files whose review notes belong to THIS review (doc 20 §20.6, GB-1136) —
+  // marked with a note icon. Scoped to the review's own note changes: a note
+  // shard is itself among the review's files, so `notedSourcesInFiles` maps them
+  // back to their sources. (Not every file that has notes on disk — a file with
+  // an older, unrelated note gets no icon.) Demo mode has no on-disk `.pr-notes`,
+  // so it consults the synthetic notes the file view serves.
+  const notedPaths = getDemoMode() !== null
+    ? new Set(files.filter((f) => demoReviewNotes(f.file_path).length > 0).map((f) => f.file_path))
+    : notedSourcesInFiles(files.map((f) => f.file_path));
   const notedFileIds = files.filter((f) => notedPaths.has(f.file_path)).map((f) => f.id);
   return c.json({
     files, annotationCounts, staleCounts,

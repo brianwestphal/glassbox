@@ -375,22 +375,6 @@ export function coalesceFile(repoRoot: string, file: string): number {
   return toRemove.length;
 }
 
-/** Every repo-relative source path that has at least one review note, recovered
- *  by stripping the `.NNNNNN.sarif` shard suffix off each note file under
- *  `.pr-notes/notes/` (docs/20 §20.1). Forward-slashed, sorted, de-duplicated.
- *  Powers surfacing note-bearing files in the sidebar even when they weren't
- *  changed (doc 20 §20.6, GB-1136/GB-1137). Cheap directory walk, no SARIF
- *  parse; returns `[]` when the notes tree is absent. */
-export function listFilesWithNotes(repoRoot: string): string[] {
-  const root = join(repoRoot, NOTES_SUBDIR);
-  if (!existsSync(root)) return [];
-  const sources = new Set<string>();
-  for (const entry of readdirSync(root, { recursive: true }) as string[]) {
-    if (SHARD_RE.test(entry)) sources.add(entry.replace(SHARD_RE, '').replace(/\\/g, '/'));
-  }
-  return [...sources].sort();
-}
-
 /** Forward-slash prefix of the on-disk notes tree (doc 20 §20.1). A literal —
  *  not `NOTES_SUBDIR`, whose separator is OS-specific — because it's matched
  *  against git diff paths, which are always forward-slashed. */
@@ -406,6 +390,21 @@ export function noteSourceForShardPath(relPath: string): string | null {
   const norm = relPath.replace(/\\/g, '/');
   if (!norm.startsWith(NOTES_PATH_PREFIX) || !SHARD_RE.test(norm)) return null;
   return norm.slice(NOTES_PATH_PREFIX.length).replace(SHARD_RE, '');
+}
+
+/** The set of source paths whose note shard appears among `filePaths` — i.e. the
+ *  files whose review notes belong to THIS review (doc 20 §20.6). A review's note
+ *  shards are themselves among its changed files, so passing the review's file
+ *  paths yields the sources with notes *in this review*. Used to scope the
+ *  sidebar note icon (GB-1136) to the review's own note changes, not every file
+ *  that has notes on disk. */
+export function notedSourcesInFiles(filePaths: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const p of filePaths) {
+    const src = noteSourceForShardPath(p);
+    if (src !== null) out.add(src);
+  }
+  return out;
 }
 
 /** Coalesce every file with notes. Returns the total number removed. */

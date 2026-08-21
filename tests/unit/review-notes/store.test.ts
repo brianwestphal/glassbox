@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { coalesceAll, coalesceFile, listFilesWithNotes, loadReviewNotesForFile, noteSourceForShardPath, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
+import { coalesceAll, coalesceFile, loadReviewNotesForFile, noteSourceForShardPath, notedSourcesInFiles, removeNote, updateNote, writeReviewNote } from '../../../src/review-notes/store.js';
 import type { ReviewNoteInput } from '../../../src/review-notes/types.js';
 
 let repo: string;
@@ -243,20 +243,19 @@ describe('artifacts (GB-898 / GB-911)', () => {
   });
 });
 
-describe('listFilesWithNotes (GB-1136/GB-1137)', () => {
-  it('returns [] when the repo has no notes tree', () => {
-    expect(listFilesWithNotes(repo)).toEqual([]);
+describe('notedSourcesInFiles (GB-1136)', () => {
+  it('maps a review’s note shards back to the sources they annotate', () => {
+    const set = notedSourcesInFiles([
+      'src/a.ts',
+      '.pr-notes/notes/src/a.ts.000000.sarif',
+      '.pr-notes/notes/src/b.ts.000000.sarif',
+      'README.md',
+    ]);
+    expect([...set].sort()).toEqual(['src/a.ts', 'src/b.ts']);
   });
 
-  it('lists each source path that has notes, sorted and de-duplicated across shards', () => {
-    mkdirSync(join(repo, 'src/a'), { recursive: true });
-    writeFileSync(join(repo, 'src/a/b.ts'), 'x\ny\n', 'utf-8');
-    // Two notes on the same file (same-anchor de-dup isn't the point; both write
-    // to that file's shard) plus a note on a second file.
-    writeReviewNote(repo, note({ file: 'src/a/b.ts', startLine: 1, endLine: 1 }));
-    writeReviewNote(repo, note({ file: 'src/a/b.ts', startLine: 2, endLine: 2 }));
-    writeReviewNote(repo, note({ file: 'src/x.ts', startLine: 1, endLine: 1 }));
-    expect(listFilesWithNotes(repo)).toEqual(['src/a/b.ts', 'src/x.ts']);
+  it('is empty when no note shard is present', () => {
+    expect(notedSourcesInFiles(['src/a.ts', 'README.md']).size).toBe(0);
   });
 });
 

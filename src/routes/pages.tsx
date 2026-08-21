@@ -22,7 +22,7 @@ import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
 import { renderNoteArtifacts } from '../plugins/artifacts.js';
 import { pluginRendersFile, renderPluginSvgSide } from '../plugins/fileView.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
-import { listFilesWithNotes, loadReviewNotesForFile } from '../review-notes/store.js';
+import { loadReviewNotesForFile, notedSourcesInFiles } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
 
 export const pageRoutes = new Hono<AppEnv>();
@@ -40,11 +40,9 @@ pageRoutes.get('/', async (c) => {
   // Files that carry AI review notes (doc 20 §20.6, GB-1136) get a note icon on
   // the initial paint (the client refreshes it from /api/files). Demo mode has
   // no on-disk `.pr-notes`, so it consults the synthetic demo notes instead.
-  const notedPaths = new Set(
-    getDemoMode() !== null
-      ? files.filter(f => demoReviewNotes(f.file_path).length > 0).map(f => f.file_path)
-      : listFilesWithNotes(c.get('repoRoot')),
-  );
+  const notedPaths = getDemoMode() !== null
+    ? new Set(files.filter(f => demoReviewNotes(f.file_path).length > 0).map(f => f.file_path))
+    : notedSourcesInFiles(files.map(f => f.file_path));
   const notedFileIds = new Set(files.filter(f => notedPaths.has(f.file_path)).map(f => f.id));
 
   // A difftool session (doc 19) is a transient viewing session, not a tracked
@@ -244,11 +242,9 @@ pageRoutes.get('/review/:reviewId', async (c) => {
     getAnnotationCountsForReview(reviewId),
   ]);
 
-  const notedPaths = new Set(
-    getDemoMode() !== null
-      ? files.filter(f => demoReviewNotes(f.file_path).length > 0).map(f => f.file_path)
-      : listFilesWithNotes(c.get('repoRoot')),
-  );
+  const notedPaths = getDemoMode() !== null
+    ? new Set(files.filter(f => demoReviewNotes(f.file_path).length > 0).map(f => f.file_path))
+    : notedSourcesInFiles(files.map(f => f.file_path));
   const notedFileIds = new Set(files.filter(f => notedPaths.has(f.file_path)).map(f => f.id));
 
   const footer = (

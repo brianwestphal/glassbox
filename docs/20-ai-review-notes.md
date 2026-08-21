@@ -309,15 +309,18 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   line rendering).
 - **Sidebar surfacing** *(shipped)* — Because notes live in committed files, the
   sidebar makes them findable:
-  - **Note icon on note-bearing files** *(GB-1136)* — A file that carries review
-    notes is marked in the file list with a message icon
-    (`IconMessageSquareText`), across every sort mode (folder / risk /
-    narrative). The set of note-bearing files is computed once server-side —
-    `listFilesWithNotes(repoRoot)` scans `.pr-notes/notes/` and strips the
-    `.NNNNNN.sarif` shard suffix to recover each source path — and delivered to
-    the client as `notedFileIds` on `GET /api/files` (and passed to the initial
-    server paint via `ReviewShell`). Demo mode has no on-disk notes, so it marks
-    the files its synthetic `demoReviewNotes` covers instead.
+  - **Note icon on files with notes in this review** *(GB-1136)* — A file whose
+    review notes belong to **this review** is marked in the file list with a
+    message icon (`IconMessageSquareText`), across every sort mode (folder / risk
+    / narrative). Scoped to the review's own note changes — **not** every file
+    that has notes on disk: a note shard is itself among the review's files, so
+    `notedSourcesInFiles` maps the shard paths back to their sources
+    (`noteSourceForShardPath`). The result is delivered to the client as
+    `notedFileIds` on `GET /api/files` (and passed to the initial server paint
+    via `ReviewShell`). So a changed file that has an older, unrelated note gets
+    **no** icon — though opening it still renders that older note (below). Demo
+    mode has no on-disk notes, so it marks the files its synthetic
+    `demoReviewNotes` covers instead.
   - **Note-bearing-but-unchanged files still appear** *(GB-1137)* — When a
     review's **own change set** adds or changes a note about a file whose source
     wasn't itself changed, that file is still shown, labeled `unchanged`, so the
