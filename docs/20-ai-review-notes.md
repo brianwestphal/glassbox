@@ -307,6 +307,21 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   `annotations`, rendered with a "↳ reply" tag and **nested directly beneath the
   note** it answers (an orphan reply — whose note isn't loaded — falls back to
   line rendering).
+- **Origin-commit provenance** *(shipped, GB-1142)* — Each note records the commit
+  it was authored against (SARIF `versionControlProvenance.revisionId`, written
+  from `HEAD` at authoring time, per-run so a shard accumulating notes from
+  several commits keeps each note's own commit). This is exposed on
+  `ReviewNoteView.origin` (`{ sha, shortSha, subject?, message? }`): the store
+  reads the sha, and `resolveNoteOrigins` (`src/review-notes/origin.ts`) fills the
+  subject + full message from git at render time (`getCommitInfo` in
+  `src/git/repo.ts`, cached per sha; unresolvable shas degrade to the short hash).
+  A **clickable provenance label** renders at the bottom of every note that has a
+  commit — `‹shortSha› ‹subject›` — and **expands to the full commit message** on
+  click (`NoteCommitLabel` in `diffView.tsx`; toggle delegated in
+  `client/diff/index.tsx`). It shows in both the inline and the context-reveal
+  (doc 32) note paths. *(A "open that commit as a review, jumping to the note's
+  line" button is deferred — it needs cross-review review-creation + a file+line
+  deep-link that don't exist yet — tracked separately.)*
 - **Sidebar surfacing** *(shipped)* — Because notes live in committed files, the
   sidebar makes them findable:
   - **Note icon on files with notes in this review** *(GB-1136)* — A file whose

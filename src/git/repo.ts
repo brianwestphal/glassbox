@@ -29,3 +29,20 @@ export function isGitRepo(cwd: string): boolean {
 export function getHeadCommit(cwd: string): string {
   return spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf-8', env: scrubbedGitEnv() }).stdout.trim();
 }
+
+/** Resolved short hash + subject + full message for a commit (docs/20 §20.6,
+ *  GB-1142). Returns null when the sha can't be resolved in this repo (a note
+ *  authored in a different clone, a shallow checkout, a bad/synthetic sha), so
+ *  the caller can fall back to showing the short sha alone. */
+export function getCommitInfo(cwd: string, sha: string): { shortSha: string; subject: string; message: string } | null {
+  // One call: `%h` (abbrev hash), a NUL, `%s` (subject), a NUL, `%B` (raw body).
+  // NUL separators so a subject/body containing our delimiter can't confuse the
+  // split. `-s` suppresses the diff.
+  const res = spawnSync('git', ['show', '-s', '--format=%h%x00%s%x00%B', sha], {
+    cwd, encoding: 'utf-8', env: scrubbedGitEnv(),
+  });
+  if (res.status !== 0 || typeof res.stdout !== 'string' || res.stdout === '') return null;
+  const parts = res.stdout.split('\0');
+  if (parts.length < 3) return null;
+  return { shortSha: parts[0].trim(), subject: parts[1].trim(), message: parts[2].trim() };
+}

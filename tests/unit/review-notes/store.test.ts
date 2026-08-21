@@ -3,6 +3,7 @@
  * per-shard record cap + roll-over, run-per-producer grouping, and lossless
  * read-modify-write.
  */
+import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -256,6 +257,32 @@ describe('notedSourcesInFiles (GB-1136)', () => {
 
   it('is empty when no note shard is present', () => {
     expect(notedSourcesInFiles(['src/a.ts', 'README.md']).size).toBe(0);
+  });
+});
+
+describe('origin commit (GB-1142)', () => {
+  it('exposes the authoring commit from SARIF provenance on the loaded note', () => {
+    // A real commit so writeReviewNote records HEAD as the note's provenance.
+    const g = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
+    g('init', '-q');
+    g('config', 'user.email', 't@t.com');
+    g('config', 'user.name', 't');
+    g('commit', '-q', '--allow-empty', '-m', 'seed');
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf-8' }).trim();
+
+    writeReviewNote(repo, note());
+    const loaded = loadReviewNotesForFile(repo, 'src/x.ts');
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].origin?.sha).toBe(head);
+    expect(loaded[0].origin?.shortSha).toBe(head.slice(0, 8));
+    // subject/message are resolved separately (resolveNoteOrigins), not by the store.
+    expect(loaded[0].origin?.subject).toBeUndefined();
+  });
+
+  it('omits origin when there is no git provenance (non-repo dir)', () => {
+    writeReviewNote(repo, note()); // repo is not a git repo here
+    const loaded = loadReviewNotesForFile(repo, 'src/x.ts');
+    expect(loaded[0].origin).toBeUndefined();
   });
 });
 

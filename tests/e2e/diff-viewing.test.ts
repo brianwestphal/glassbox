@@ -397,6 +397,24 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(plainRow.locator('.file-note-icon')).toHaveCount(0);
   });
 
+  // A note carrying origin-commit provenance shows a clickable label that
+  // expands to the full commit message (doc 20 §20.6, GB-1142).
+  test('a note shows its origin commit and expands the full message', async ({ page }) => {
+    await openModifiedFile(page);
+    const note = page.locator('.ai-note-row.ai-note-review[data-kind="rationale"]').first();
+    await expect(note).toBeVisible({ timeout: 5000 });
+    const label = note.locator('.ai-note-commit');
+    await expect(label).toBeVisible();
+    await expect(label.locator('.ai-note-commit-sha')).toHaveText('a1b2c3d');
+    await expect(label.locator('.ai-note-commit-subject')).toContainText('Move sessions');
+    // The full message is hidden until the label is clicked.
+    const message = note.locator('.ai-note-commit-message');
+    await expect(message).toBeHidden();
+    await label.click();
+    await expect(message).toBeVisible();
+    await expect(message).toContainText('24h TTL');
+  });
+
   // Demo mode serves illustrative `.pr-notes/` notes for session.ts: three
   // aligned notes plus one whose anchored code changed (rendered stale, P3).
   test('review notes render as distinct AI-authored rows in split mode', async ({ page }) => {

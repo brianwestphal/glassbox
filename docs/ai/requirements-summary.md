@@ -812,7 +812,14 @@ follow-up — **live diagram rendering** (Mermaid/Graphviz/PlantUML) — shipped
 via the doc-29 content plugins: `renderNoteArtifacts` dispatches diagram-source
 artifacts to an installed renderer and the diff shows the resulting inert SVG
 inline, falling soft to the code block without one.
-**Sidebar surfacing shipped** (GB-1135/1136/1137): a file whose review notes
+**Origin-commit provenance shipped** (GB-1142): each note records the commit it
+was authored against (SARIF `versionControlProvenance`, exposed on
+`ReviewNoteView.origin`); a clickable `‹shortSha› ‹subject›` label at the bottom
+of every note with a commit expands to the full commit message (`resolveNoteOrigins`
++ `getCommitInfo` resolve subject/message from git at render, cached per sha;
+`NoteCommitLabel` renders it). The "open that commit as a review, jumping to the
+note's line" button is deferred (needs cross-review creation + a file+line
+deep-link). **Sidebar surfacing shipped** (GB-1135/1136/1137): a file whose review notes
 belong to THIS review gets a message icon in the file list (scoped via
 `notedSourcesInFiles`/`noteSourceForShardPath` — the review's own note shards
 mapped back to their sources, NOT every file with notes on disk → `notedFileIds`

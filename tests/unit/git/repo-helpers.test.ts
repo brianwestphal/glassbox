@@ -19,7 +19,7 @@ vi.mock('child_process', () => ({
   spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
 }));
 
-const { getRepoRoot, getRepoName, isGitRepo, getHeadCommit } = await import('../../../src/git/repo.js');
+const { getRepoRoot, getRepoName, isGitRepo, getHeadCommit, getCommitInfo } = await import('../../../src/git/repo.js');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -74,5 +74,30 @@ describe('getHeadCommit', () => {
       ['rev-parse', 'HEAD'],
       expect.objectContaining({ cwd: '/some/repo', encoding: 'utf-8', env: { SCRUBBED: '1' } }),
     );
+  });
+});
+
+describe('getCommitInfo (GB-1142)', () => {
+  it('parses the NUL-separated %h/%s/%B format into shortSha/subject/message', () => {
+    spawnSyncMock.mockReturnValue({ stdout: 'a1b2c3d\x00Fix the thing\x00Fix the thing\n\nLonger body here.\n', status: 0 });
+
+    const info = getCommitInfo('/repo', 'a1b2c3ddeadbeef');
+
+    expect(info).toEqual({ shortSha: 'a1b2c3d', subject: 'Fix the thing', message: 'Fix the thing\n\nLonger body here.' });
+    expect(spawnSyncMock).toHaveBeenCalledWith(
+      'git',
+      ['show', '-s', '--format=%h%x00%s%x00%B', 'a1b2c3ddeadbeef'],
+      expect.objectContaining({ cwd: '/repo', encoding: 'utf-8', env: { SCRUBBED: '1' } }),
+    );
+  });
+
+  it('returns null when git fails (unknown/synthetic sha)', () => {
+    spawnSyncMock.mockReturnValue({ stdout: '', status: 128 });
+    expect(getCommitInfo('/repo', 'nope')).toBeNull();
+  });
+
+  it('returns null when stdout is malformed (missing separators)', () => {
+    spawnSyncMock.mockReturnValue({ stdout: 'just-a-hash\n', status: 0 });
+    expect(getCommitInfo('/repo', 'x')).toBeNull();
   });
 });

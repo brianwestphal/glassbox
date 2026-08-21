@@ -39,7 +39,10 @@ export function demoReviewNotes(filePath: string): ReviewNoteView[] {
     // The body carries a SARIF embedded link — `[text](0)` indexes `related` —
     // which renders as a jump-to-line link into the other changed file (doc 20
     // §20.6).
-    { guid: 'demo-note-rationale', line: 14, side: 'new', kind: 'rationale', body: '`createSession` is **async** now because session state moved from an in-process `Map` to [the Redis client](0); callers must `await` it.', confidence: 0.9, producer: 'Claude Code', related: [{ uri: 'src/db/redis.ts', line: 1 }] },
+    // Carries an origin commit (doc 20 §20.6, GB-1142): the provenance label
+    // shows `<shortSha> <subject>` and expands to the full message. Demo notes
+    // pre-fill subject/message (no real repo commit to resolve from git).
+    { guid: 'demo-note-rationale', line: 14, side: 'new', kind: 'rationale', body: '`createSession` is **async** now because session state moved from an in-process `Map` to [the Redis client](0); callers must `await` it.', confidence: 0.9, producer: 'Claude Code', related: [{ uri: 'src/db/redis.ts', line: 1 }], origin: { sha: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', shortSha: 'a1b2c3d', subject: 'Move sessions from an in-memory Map to Redis', message: 'Move sessions from an in-memory Map to Redis\n\nSession state now lives in Redis with a 24h TTL, so it survives restarts\nand scales across processes. createSession/validateSession become async,\nand a refresh token is added to the Session shape.' } },
     // The proof note carries two artifacts: mocked test output (always a code
     // block) and a Mermaid sequence diagram — with the mermaid content plugin
     // installed it renders inline as a diagram (doc 29); without it, the

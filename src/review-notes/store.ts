@@ -499,6 +499,13 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
     }
     for (const run of log.runs) {
       const producer = run.tool.driver.name;
+      // The commit the note was authored against — per-run SARIF provenance
+      // (docs/20 §20.6, GB-1142). `subject`/`message` are resolved from git later
+      // by `resolveNoteOrigins`; here we only carry the sha.
+      const revisionId = run.versionControlProvenance?.[0]?.revisionId;
+      const origin = typeof revisionId === 'string' && revisionId !== ''
+        ? { sha: revisionId, shortSha: revisionId.slice(0, 8) }
+        : undefined;
       for (const raw of run.results) {
         const r = raw as NoteResult;
         const region = r.locations?.[0]?.physicalLocation?.region;
@@ -517,6 +524,7 @@ export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNo
           snippet: region?.snippet?.text,
           related: readRelated(r),
           artifacts: readArtifacts(repoRoot, r),
+          ...(origin ? { origin } : {}),
         });
       }
     }

@@ -530,6 +530,58 @@
 }
 .ai-note-producer + .ai-note-reply-btn { margin-left: 8px; }
 
+// Origin-commit provenance label (doc 20 §20.6, GB-1142): the commit a note was
+// written for, at the bottom of the note; clicking expands the full message.
+.ai-note-commit-wrap {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.ai-note-commit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover { color: var(--text); }
+
+  svg { width: 12px; height: 12px; flex-shrink: 0; transition: transform 0.15s; }
+  &.expanded svg { transform: rotate(180deg); }
+}
+
+.ai-note-commit-sha {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.ai-note-commit-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-note-commit-message {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
 .ai-note-stale-actions {
   display: inline-flex;
   flex-shrink: 0;

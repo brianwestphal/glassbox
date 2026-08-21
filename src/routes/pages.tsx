@@ -21,6 +21,7 @@ import { groundTruthSideLabels, groundTruthStepNav } from '../ground-truth/prese
 import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
 import { renderNoteArtifacts } from '../plugins/artifacts.js';
 import { pluginRendersFile, renderPluginSvgSide } from '../plugins/fileView.js';
+import { resolveNoteOrigins } from '../review-notes/origin.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
 import { loadReviewNotesForFile, notedSourcesInFiles } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
@@ -171,6 +172,10 @@ pageRoutes.get('/file/:fileId', async (c) => {
     ? demoReviewNotes(file.file_path)
     : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
   const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff);
+  // Resolve each note's origin commit (subject + full message) from git for the
+  // provenance label (doc 20 §20.6, GB-1142). No-op for demo notes (they carry
+  // a synthetic subject) and for shas git can't resolve.
+  resolveNoteOrigins(c.get('repoRoot'), reviewNotes);
   // Offer each note's text/diagram-source artifact to installed content plugins;
   // a match renders it (inert SVG/HTML) in place of the code block (doc 29). A
   // no-op with no plugin installed, so the code-block fallback is unchanged.

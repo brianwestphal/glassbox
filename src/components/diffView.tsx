@@ -5,8 +5,8 @@ import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import type { GroundTruthStepNav } from '../ground-truth/presentation.js';
-import { IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
-import type { ReviewNoteView } from '../review-notes/view.js';
+import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
+import type { NoteOrigin, ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { formatDiffPct } from '../utils/diffScore.js';
@@ -403,6 +403,27 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNot
   );
 }
 
+/** Origin-commit provenance label for a review note (docs/20 §20.6, GB-1142):
+ *  a clickable `<shortSha> <subject>` line at the bottom of the note that
+ *  expands to the full commit message. The message toggles via a `delegate()`
+ *  handler on the diff container (`.ai-note-commit`). Shows the short hash alone
+ *  when git couldn't resolve the subject. */
+function NoteCommitLabel({ origin }: { origin: NoteOrigin }) {
+  const hasSubject = origin.subject !== undefined && origin.subject !== '';
+  const hasMessage = origin.message !== undefined && origin.message !== '';
+  return (
+    <div className="ai-note-commit-wrap">
+      <button type="button" className="ai-note-commit" data-note-commit={origin.sha}
+        title="Commit this note was written for — click to show the full message">
+        <IconChevronDown />
+        <span className="ai-note-commit-sha">{origin.shortSha}</span>
+        {hasSubject ? <span className="ai-note-commit-subject">{origin.subject}</span> : null}
+      </button>
+      {hasMessage ? <pre className="ai-note-commit-message" hidden>{origin.message}</pre> : null}
+    </div>
+  );
+}
+
 /** Server-render the review-note rows for a single line to an HTML string, for
  *  the context-expansion path (doc 20 §20.6, GB-1139): when the user expands a
  *  collapsed region, the `/context` route returns this markup and the client
@@ -484,6 +505,7 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
               ))}
             </div>
           ) : null}
+          {n.origin !== undefined ? <NoteCommitLabel origin={n.origin} /> : null}
         </div>
         {replies.length > 0 ? (
           <div className="annotation-row ai-note-replies">

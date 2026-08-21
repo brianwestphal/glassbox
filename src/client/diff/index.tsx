@@ -530,6 +530,18 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     row.querySelector('.ai-note-stale-actions')?.remove();
   });
 
+  // Toggle the origin-commit message of a review note (doc 20 §20.6, GB-1142):
+  // the provenance label expands to show the full commit message.
+  void delegate(container, 'click', '.ai-note-commit', (e, btn) => {
+    e.stopPropagation();
+    const el = asEl(btn);
+    const msg = el.parentElement?.querySelector('.ai-note-commit-message');
+    if (msg === null || msg === undefined) return;
+    const nowHidden = !msg.hasAttribute('hidden');
+    if (nowHidden) msg.setAttribute('hidden', ''); else msg.removeAttribute('hidden');
+    el.classList.toggle('expanded', !nowHidden);
+  });
+
   // Discard an outdated review note — remove it from `.pr-notes/` and the DOM.
   void delegate(container, 'click', '.ai-note-discard-btn', (e, btn) => {
     e.stopPropagation();

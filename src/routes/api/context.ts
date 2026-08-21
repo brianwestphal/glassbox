@@ -7,6 +7,7 @@ import { demoReviewNotes } from '../../demo.js';
 import { getModeFileContent, parseModeString } from '../../git/diff.js';
 import { renderNoteArtifacts } from '../../plugins/artifacts.js';
 import { reanchorNotesForRange, renderContextNotes } from '../../review-notes/context-notes.js';
+import { resolveNoteOrigins } from '../../review-notes/origin.js';
 import { loadReviewNotesForFile } from '../../review-notes/store.js';
 import type { AppEnv } from '../../types.js';
 import { parseQuery, requirePathParam } from '../../utils/parseBody.js';
@@ -48,6 +49,9 @@ contextRoutes.get('/context/:fileId', async (c) => {
   if (rawNotes.length > 0) {
     const anchored = reanchorNotesForRange(rawNotes, file.file_path, clampedStart, clampedEnd, lines);
     if (anchored.length > 0) {
+      // Resolve each note's origin commit for the provenance label (doc 20
+      // §20.6, GB-1142) so revealed notes match the inline ones.
+      resolveNoteOrigins(repoRoot, anchored);
       // Match the /file view: offer diagram-source artifacts to content plugins.
       await renderNoteArtifacts(anchored);
       const rendered = renderContextNotes(anchored, await getAnnotationsForFile(file.id));

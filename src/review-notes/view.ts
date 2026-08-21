@@ -43,6 +43,22 @@ export interface ReviewNoteView {
    *  text body when the artifact is text/diagram-source and readable; absent for
    *  binary, missing, or oversized artifacts (rendered as a reference instead). */
   artifacts?: ReviewNoteArtifact[];
+  /** The commit the note was authored against (SARIF `versionControlProvenance`,
+   *  docs/20 §20.6, GB-1142). `sha`/`shortSha` come straight from the note; the
+   *  `subject`/`message` are resolved from git at render time (`resolveNoteOrigins`)
+   *  — absent when the commit can't be resolved. Rendered as a clickable
+   *  provenance label under the note that expands to the full commit message. */
+  origin?: NoteOrigin;
+}
+
+/** Origin-commit provenance for a review note (docs/20 §20.6, GB-1142). */
+export interface NoteOrigin {
+  sha: string;
+  shortSha: string;
+  /** Commit subject (first line) — resolved from git; empty if unresolved. */
+  subject?: string;
+  /** Full commit message — resolved from git; absent if unresolved. */
+  message?: string;
 }
 
 export interface ReviewNoteArtifact {

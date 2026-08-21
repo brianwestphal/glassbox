@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2lhox00q7oa5vp",
+          "message": {
+            "text": "The commit sha is stored in the note (SARIF provenance); the human-readable subject/message are resolved from git at RENDER time, not stored.\n\nStoring the subject/message in the note file would duplicate git and go stale if the commit is amended/rebased. Instead loadReviewNotesForFile exposes only origin.sha/shortSha from versionControlProvenance, and this resolver fills subject/message via getCommitInfo (cached per sha) at the two render sites (the /file view and the /context reveal path). A sha git can't resolve (different clone, shallow checkout, demo's synthetic sha) degrades to the short hash alone rather than failing; demo notes pre-fill the subject so no git lookup is attempted.",
+            "markdown": "The commit sha is stored in the note (SARIF provenance); the human-readable subject/message are resolved from git at RENDER time, not stored.\n\nStoring the subject/message in the note file would duplicate git and go stale if the commit is amended/rebased. Instead `loadReviewNotesForFile` exposes only `origin.sha`/`shortSha` from `versionControlProvenance`, and this resolver fills `subject`/`message` via `getCommitInfo` (cached per sha) at the two render sites (the /file view and the /context reveal path). A sha git can't resolve (different clone, shallow checkout, demo's synthetic sha) degrades to the short hash alone rather than failing; demo notes pre-fill the subject so no git lookup is attempted."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/origin.ts"
+                },
+                "region": {
+                  "startLine": 12,
+                  "endLine": 12,
+                  "snippet": {
+                    "text": " * (e.g. demo notes) is left alone; a sha git can't resolve (bad/synthetic, or a"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1142"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "0c87601b9861a6d1caf532c1b23e0bcb"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "8c339064abc08d981b603bd2299c2609b271e7c6",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}
