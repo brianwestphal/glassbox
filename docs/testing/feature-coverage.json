@@ -2145,6 +2145,43 @@
         "tests/unit/plugins/reviewHooks.test.ts"
       ],
       "note": "Zero-hook no-op: a plugin without the hook is a no-op (notifyReviewCreated resolves undefined); the PLUGINS_ENABLED guard makes the whole path a no-op when disabled."
+    },
+    "FR-32.1": {
+      "tests": [
+        "tests/e2e/notes-reveal.test.ts",
+        "tests/integration/api/context-notes-routes.test.ts"
+      ],
+      "note": "Reveal on expansion (GB-1139): the /context endpoint returns server-rendered note rows for notes in the revealed range (integration test), and expanding a collapsed region surfaces the note at its line (e2e, both modes)."
+    },
+    "FR-32.2": {
+      "tests": [
+        "tests/e2e/notes-reveal.test.ts"
+      ],
+      "note": "Both diff modes: notes-reveal.test.ts runs the reveal in unified AND split, asserting in split the note row is full-width (closest('.split-col') === null) — it broke out of the two-column layout."
+    },
+    "FR-32.3": {
+      "tests": [
+        "tests/unit/review-notes/context-notes.test.ts",
+        "tests/integration/api/context-notes-routes.test.ts"
+      ],
+      "note": "Server-rendered rows: renderContextNotes emits the shared ReviewNoteRows markup (unit — html contains ai-note-row + body + nested reply), returned by /context (integration)."
+    },
+    "FR-32.4": {
+      "tests": [
+        "tests/unit/review-notes/context-notes.test.ts",
+        "tests/integration/api/context-notes-routes.test.ts"
+      ],
+      "note": "Range-scoped: reanchorNotesForRange keeps only notes whose (re-anchored) line is within [start,end] (unit — out-of-range dropped); the endpoint omits an out-of-range note (integration)."
+    },
+    "FR-32.5": {
+      "tests": [
+        "tests/unit/review-notes/context-notes.test.ts",
+        "tests/integration/api/context-notes-routes.test.ts"
+      ],
+      "note": "Stale hidden on reveal: reanchorNotesForRange drops a note whose snippet no longer matches, follows one that shifted, and keeps a snippet-less one (unit); the endpoint hides a stale note (integration)."
+    },
+    "NFR-32.1": {
+      "waived": "Reuse-not-duplication (doc 32): 'the client must not re-implement the note UI' is an architectural invariant, not a unit-assertable behavior. Enforced by construction — renderReviewNoteRowsHtml exposes the existing server ReviewNoteRows and the client splices its HTML (verified visually identical in notes-reveal.test.ts, which finds real .ai-note-row rows with reply/markdown handled by the shared delegation)."
     }
   }
 }

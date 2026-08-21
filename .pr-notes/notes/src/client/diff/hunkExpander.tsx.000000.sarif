@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2k41lx5yfs7jwn",
+          "message": {
+            "text": "Split-mode note reveal partitions the .split-columns block because a note row is full-width and cannot live inside a .split-col.\n\nA revealed note row must span both columns, but the separator being expanded sits INSIDE one .split-col of a .split-columns block that may hold other items. So expandSplitWithNotes partitions the block's two columns around the separator (before/after) and rebuilds the region as [before-columns] · [runs of context columns broken by full-width note rows] · [after-columns], then block.replaceWith(...). Unified needs none of this — a note row is a plain sibling after the line.\n\nVerified in a real browser (both modes): the revealed note renders full-width (closest('.split-col') === null) at its line. Falls back to the plain in-column splice if the DOM isn't the expected shape or there are no notes.",
+            "markdown": "Split-mode note reveal partitions the `.split-columns` block because a note row is full-width and cannot live inside a `.split-col`.\n\nA revealed note row must span both columns, but the separator being expanded sits INSIDE one `.split-col` of a `.split-columns` block that may hold other items. So `expandSplitWithNotes` partitions the block's two columns around the separator (before/after) and rebuilds the region as [before-columns] · [runs of context columns broken by full-width note rows] · [after-columns], then `block.replaceWith(...)`. Unified needs none of this — a note row is a plain sibling after the line.\n\nVerified in a real browser (both modes): the revealed note renders full-width (`closest('.split-col') === null`) at its line. Falls back to the plain in-column splice if the DOM isn't the expected shape or there are no notes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/diff/hunkExpander.tsx"
+                },
+                "region": {
+                  "startLine": 120,
+                  "endLine": 120,
+                  "snippet": {
+                    "text": "/** Expand a split-mode gap that contains review notes (doc 20 §20.6, GB-1139)."
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1139"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "6e383d499f96bc3c1a52979a4549dda6"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "1b1b49bdd3c4bf5eafd1618bbab0720c168584c6",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

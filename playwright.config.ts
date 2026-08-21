@@ -31,6 +31,13 @@ const DEMO_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-config-${process.pid}`);
 const PLUGIN_WORK_DIR = join(tmpdir(), `glassbox-e2e-plugin-${process.pid}`);
 const PLUGIN_CONFIG_DIR = join(tmpdir(), `glassbox-e2e-plugin-config-${process.pid}`);
 
+// The review-notes reveal E2E project (doc 20 §20.6, GB-1139) boots its own
+// `--diff` server against a file with a collapsed middle plus a committed
+// `.pr-notes/` note anchored inside that collapsed region — so "Show remaining
+// lines" surfacing previously-hidden notes is exercised end-to-end in BOTH
+// split and unified views (the tricky split column-break in particular).
+const NOTES_WORK_DIR = join(tmpdir(), `glassbox-e2e-notes-${process.pid}`);
+
 // Create the work dirs here (config eval runs before the webServers) rather than
 // via a shell `mkdir -p` in the webServer command — the CLI chdirs into
 // `--project-dir` before creating anything itself, so the dir must exist first.
@@ -40,6 +47,7 @@ mkdirSync(DIFF_WORK_DIR, { recursive: true });
 mkdirSync(GT_WORK_DIR, { recursive: true });
 mkdirSync(DEMO_CONFIG_DIR, { recursive: true });
 mkdirSync(PLUGIN_WORK_DIR, { recursive: true });
+mkdirSync(NOTES_WORK_DIR, { recursive: true });
 
 // Seed the `--diff` server's data dir with a fake retained pre-upgrade database
 // backup (doc 9 §9.1a), so the Settings → General "Database backups" section has
@@ -71,6 +79,11 @@ writeFileSync(join(DIFF_DB_QUARANTINE, 'base'), Buffer.alloc(2048));
 // **artifact** render path (doc 29 FR-29.2, the other integration point) is also
 // exercised: the fixture plugin renders the artifact to an inline inert SVG.
 cpSync(join(process.cwd(), 'tests/fixtures/plugin-diff-notes'), PLUGIN_WORK_DIR, { recursive: true });
+
+// Seed the notes-reveal server's project dir with the committed `.pr-notes/`
+// note (GB-1139), anchored to a line inside the fixture file's collapsed middle,
+// so expanding that region surfaces it.
+cpSync(join(process.cwd(), 'tests/fixtures/notes-reveal-project'), NOTES_WORK_DIR, { recursive: true });
 
 // Pre-install the fixture content plugin into the plugin server's isolated
 // GLASSBOX_CONFIG_DIR before it boots. Discovery loads it from `<config>/plugins/`
@@ -190,11 +203,20 @@ export default defineConfig({
         GLASSBOX_BUNDLED_PLUGINS_DIR: join(process.cwd(), 'tests/fixtures/plugin-bundle'),
       },
     },
+    {
+      // Review-notes reveal E2E server (doc 20 §20.6, GB-1139). Boots `--diff`
+      // against `tests/fixtures/notes-reveal/{old,new}` (a file with a collapsed
+      // middle) with the `.pr-notes/` note fixture copied into its project dir.
+      command: `npx tsx src/cli.ts --diff tests/fixtures/notes-reveal/old tests/fixtures/notes-reveal/new --no-open --strict-port --port 4188 --data-dir ${JSON.stringify(join(NOTES_WORK_DIR, '.glassbox'))} --project-dir ${JSON.stringify(NOTES_WORK_DIR)}`,
+      port: 4188,
+      reuseExistingServer: false,
+      timeout: 15000,
+    },
   ],
   projects: [
     {
       name: 'chromium',
-      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/, /plugin-render\.test\.ts$/, /plugin-manage\.test\.ts$/],
+      testIgnore: [/diff-mode\.test\.ts$/, /ground-truth\.test\.ts$/, /plugin-render\.test\.ts$/, /plugin-manage\.test\.ts$/, /notes-reveal\.test\.ts$/],
       use: { browserName: 'chromium' },
     },
     {
@@ -211,6 +233,11 @@ export default defineConfig({
       name: 'chromium-plugin',
       testMatch: /plugin-(render|manage)\.test\.ts$/,
       use: { browserName: 'chromium', baseURL: 'http://localhost:4187' },
+    },
+    {
+      name: 'chromium-notes',
+      testMatch: /notes-reveal\.test\.ts$/,
+      use: { browserName: 'chromium', baseURL: 'http://localhost:4188' },
     },
   ],
 });

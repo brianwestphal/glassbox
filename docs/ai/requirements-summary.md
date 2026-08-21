@@ -1111,6 +1111,25 @@ verified live end-to-end with a fixture plugin; a JSON-summary reference example
 is in the developer guide. The heavier bidirectional integration-backend tier is
 deferred (GB-1066).
 
+## 18o. Revealing review notes in the diff body (`32-review-note-reveal.md`) — **Shipped**
+
+A companion to §18c for one viewing case (GB-1139): a note anchored to a line
+inside a **collapsed** context region. Before this it existed in `.pr-notes/` but
+never rendered — the diff placed notes only on already-shown lines, and expanding
+a region revealed the code but not its notes. Now **`GET /context/:fileId`**
+returns server-rendered note rows for notes in the revealed range
+(`notes:[{line,html}]`), and `hunkExpander` splices them in — a sibling row after
+the line in **unified**, a partition of the `.split-columns` block (before ·
+full-width note · after) in **split** so the full-width note escapes the two
+columns. Server helpers `reanchorNotesForRange` (re-anchor against the revealed
+lines + range-scope + **drop stale**) and `renderContextNotes` (group + render
+with nested replies) live in `src/review-notes/context-notes.ts`; the shared
+`ReviewNoteRows` renderer is exposed as `renderReviewNoteRowsHtml`. Reveal is
+on-demand (not pre-expand); stale-hidden is **scoped to the reveal path** —
+in-diff stale notes keep the §20.3 "outdated" badge, and whether to hide those
+too is tracked as a follow-up. Unit + integration + a dedicated `chromium-notes`
+e2e (both split and unified).
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -1210,6 +1229,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/29-content-plugins.md` → §18l
 - `docs/30-plugin-ui-extensions.md` → §18m
 - `docs/31-plugin-lifecycle-hooks.md` → §18n
+- `docs/32-review-note-reveal.md` → §18o
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

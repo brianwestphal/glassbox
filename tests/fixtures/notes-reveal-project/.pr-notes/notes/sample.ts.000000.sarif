@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Reviewer",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2jsstz5piyf502",
+          "message": {
+            "text": "This middle line holds the meaningful value; note anchored here in a collapsed region (GB-1139 reveal-on-expand).",
+            "markdown": "This middle line holds the meaningful value; note anchored here in a collapsed region (GB-1139 reveal-on-expand)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "sample.ts"
+                },
+                "region": {
+                  "startLine": 20,
+                  "endLine": 20,
+                  "snippet": {
+                    "text": "  const answer = 42; // the meaningful middle line"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "ad64645d78df069b4661db9b3fcfb267"
+          }
+        }
+      ]
+    }
+  ]
+}

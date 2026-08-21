@@ -26,8 +26,21 @@ export const GetContextLinesQuerySchema = z.object({
   end: z.coerce.number().int().default(20),
 });
 
+/** A revealed line's review notes, server-rendered (doc 20 §20.6, GB-1139). The
+ *  client splices `html` into the diff after the line `line` when expanding a
+ *  collapsed region, so previously-hidden notes surface. `html` is the rendered
+ *  `.ai-note-row` markup (mode-independent — the client places it per view). */
+export const ContextNoteSchema = z.object({
+  line: z.number().int(),
+  html: z.string(),
+});
+export type ContextNote = z.infer<typeof ContextNoteSchema>;
+
 export const GetContextLinesRespSchema = z.object({
   lines: z.array(ContextLineSchema),
+  /** Notes anchored inside the revealed range, keyed by new-side line. Omitted
+   *  when none. Stale notes (snippet no longer matches) are excluded. */
+  notes: z.array(ContextNoteSchema).optional(),
 });
 export type GetContextLinesResp = z.infer<typeof GetContextLinesRespSchema>;
 

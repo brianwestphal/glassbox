@@ -1,8 +1,13 @@
 import { Hono } from 'hono';
 
 import { GetContextLinesQuerySchema } from '../../api/context.js';
-import { getReview, getReviewFile } from '../../db/queries.js';
+import { getAnnotationsForFile, getReview, getReviewFile } from '../../db/queries.js';
+import { getDemoMode } from '../../debug.js';
+import { demoReviewNotes } from '../../demo.js';
 import { getModeFileContent, parseModeString } from '../../git/diff.js';
+import { renderNoteArtifacts } from '../../plugins/artifacts.js';
+import { reanchorNotesForRange, renderContextNotes } from '../../review-notes/context-notes.js';
+import { loadReviewNotesForFile } from '../../review-notes/store.js';
 import type { AppEnv } from '../../types.js';
 import { parseQuery, requirePathParam } from '../../utils/parseBody.js';
 
@@ -30,5 +35,25 @@ contextRoutes.get('/context/:fileId', async (c) => {
   for (let i = clampedStart; i <= clampedEnd; i++) {
     lines.push({ num: i, content: allLines[i - 1] || '' });
   }
-  return c.json({ lines });
+
+  // Review notes anchored inside the revealed range (doc 20 §20.6, GB-1139):
+  // render them so "show remaining lines" surfaces previously-hidden notes.
+  // Stale notes (snippet no longer matches the revealed code) are excluded here
+  // — the "hide stale" choice for this reveal path. Demo mode serves synthetic
+  // notes; a real review reads `.pr-notes/`.
+  const rawNotes = getDemoMode() !== null
+    ? demoReviewNotes(file.file_path)
+    : loadReviewNotesForFile(repoRoot, file.file_path);
+  let notes: { line: number; html: string }[] | undefined;
+  if (rawNotes.length > 0) {
+    const anchored = reanchorNotesForRange(rawNotes, file.file_path, clampedStart, clampedEnd, lines);
+    if (anchored.length > 0) {
+      // Match the /file view: offer diagram-source artifacts to content plugins.
+      await renderNoteArtifacts(anchored);
+      const rendered = renderContextNotes(anchored, await getAnnotationsForFile(file.id));
+      if (rendered.length > 0) notes = rendered;
+    }
+  }
+
+  return c.json({ lines, ...(notes ? { notes } : {}) });
 });

@@ -403,6 +403,16 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNot
   );
 }
 
+/** Server-render the review-note rows for a single line to an HTML string, for
+ *  the context-expansion path (doc 20 §20.6, GB-1139): when the user expands a
+ *  collapsed region, the `/context` route returns this markup and the client
+ *  splices it in. The markup is identical to what `ReviewNoteRows` renders
+ *  inline, so revealed notes look exactly like in-diff notes (and the diff
+ *  container's `delegate()` handlers drive their Reply/Keep/Discard for free). */
+export function renderReviewNoteRowsHtml(notes: ReviewNoteView[], repliesByNote: Record<string, Annotation[]>): string {
+  return (<ReviewNoteRows notes={notes} repliesByNote={repliesByNote} />).toString();
+}
+
 /** AI-authored review notes (docs/20 §20.6) — rendered review-comment-style,
  *  full-width below their line, styled distinctly as AI-authored (the `ai-note-*`
  *  precedent shared with risk/narrative/guided notes) with a per-kind badge. */
