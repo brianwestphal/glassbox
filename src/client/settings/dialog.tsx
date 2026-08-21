@@ -137,31 +137,27 @@ export function showSettingsDialog(onClose?: () => void): void {
     </div>
   ));
 
-  // Escape is handled by our own BUBBLE-phase listener below, not overlay()'s
-  // built-in (capture-phase) one — the settings dialog spawns child overlays
-  // (theme manager/editor, both kerfjs/overlay), and those close on their own
-  // capture-phase Escape + `stopPropagation()`. A capture-phase Escape here
-  // would race the child's on the same `document` target and could close the
-  // settings dialog out from under an open child (GB-1132). A bubble-phase
-  // listener never fires while a child is open (the child's capture handler
-  // stops propagation first), and fires normally when the dialog is topmost —
-  // the same composition the pre-overlay hand-rolled dialog had. We keep
-  // overlay()'s focus trap (topmost trap wins, so a child keeps focus) + focus
-  // restore + backdrop dismissal.
+  // Escape + backdrop are handled by overlay() itself (GB-1147) now that the modal
+  // is a native `<dialog>` — Escape routes through `handle.close()` (proper
+  // teardown + focus restore). This replaces a div-overlay-era bubble-phase
+  // document listener whose stated goal (never close the settings dialog out from
+  // under an open child) it did not actually meet: nested overlays each install
+  // their own document-level Escape handling, so a single Escape can dismiss more
+  // than one level. That's true here too and is acceptable — Escape backs out of
+  // the settings flow and never leaves a dialog stuck. Clean per-level Escape
+  // (dismiss only the topmost) would need cancel-event-based handling per dialog;
+  // tracked as a follow-up.
   const handle = overlay(() => content.value(), {
-    className: 'modal-overlay', dismiss: ['backdrop'], trap: true, native: true,
+    className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true, native: true,
   });
   const close = (): void => { handle.close(); };
 
   // Cleanup registry — `renderSettingsModal` appends its mount-adjacent teardowns
   // (actions dispose, channel poll) once it takes over. overlay() owns the mount
-  // + node removal + focus restore; on any dismissal `handle.result` resolves,
-  // and we run our teardowns (LIFO) then notify. Safe whether the user dismisses
-  // during loading or after the UI is built.
+  // + node removal + focus restore; on any dismissal (Escape / backdrop / a
+  // programmatic close) `handle.result` resolves, and we run our teardowns (LIFO)
+  // then notify. Safe whether the user dismisses during loading or after build.
   const teardowns: Array<() => void> = [];
-  const onEsc = (e: KeyboardEvent): void => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onEsc);
-  teardowns.push(() => { document.removeEventListener('keydown', onEsc); });
   void handle.result.then(() => {
     while (teardowns.length > 0) teardowns.pop()?.();
     if (onClose !== undefined) onClose();
