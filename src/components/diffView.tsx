@@ -444,22 +444,17 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
         const replies = n.guid !== undefined ? repliesByNote[n.guid] ?? [] : [];
         return (
         <>
-        <div className={`ai-note-row ai-note-review${n.stale === true ? ' ai-note-stale' : ''}`}
-          data-kind={n.kind} data-note-id={n.guid}>
+        {/* Outdated (stale) notes are not rendered at all (doc 20 §20.3, GB-1140):
+            the render sites filter `n.stale`, so a note reaching here is current
+            relative to what's being reviewed. */}
+        <div className="ai-note-row ai-note-review" data-kind={n.kind} data-note-id={n.guid}>
           <div className="ai-note-item">
             <span className={`ai-note-label ai-note-label-${n.kind}`}>{REVIEW_NOTE_LABELS[n.kind] ?? n.kind}</span>
-            {n.stale === true ? <span className="ai-note-stale-tag" title="The code this note referred to has changed">outdated</span> : null}
             {/* A div, not a span: the body renders block-level markdown (doc 20 §20.6).
                 renderNoteMarkdown returns SafeHtml, so it embeds directly. */}
             <div className="ai-note-text">{renderNoteMarkdown(n.body, n.related)}</div>
             {n.producer !== undefined ? <span className="ai-note-producer">{n.producer}</span> : null}
             {n.guid !== undefined ? <button className="ai-note-reply-btn" data-line={String(n.line)}>Reply</button> : null}
-            {n.stale === true && n.guid !== undefined ? (
-              <span className="ai-note-stale-actions">
-                <button className="ai-note-keep-btn" title="Dismiss the outdated flag for now">Keep</button>
-                <button className="ai-note-discard-btn" title="Remove this note from .pr-notes/">Discard</button>
-              </span>
-            ) : null}
           </div>
           {n.artifacts !== undefined && n.artifacts.length > 0 ? (
             <div className="ai-note-artifacts">

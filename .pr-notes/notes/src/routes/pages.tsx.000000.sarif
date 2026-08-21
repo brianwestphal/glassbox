@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2m771b6pxbgwk4",
+          "message": {
+            "text": "Hiding stale notes is a simple .filter(n => !n.stale) because staleness is ALREADY relative to what's being reviewed — the maintainer's 'show it at an older commit' nuance falls out for free.\n\nreanchorReviewNotes(notes, finalDiff) flags a note stale by matching its authored snippet against finalDiff's content. For a --commit <sha> (or range) review, finalDiff is THAT commit's diff, so a note whose code still matches at that commit is NOT flagged stale → it renders as valid context 'as of the commit time'. At HEAD, where the code moved on, the same note IS flagged → hidden. So one unconditional filter satisfies both 'no need to show outdated notes' and 'but show them when reviewing an older commit before the change'. No commit-time comparison logic was needed. The context-reveal path (GB-1139) already filters the same way; the GB-907 outdated-badge + Keep/Discard UI was removed.",
+            "markdown": "Hiding stale notes is a simple `.filter(n => !n.stale)` because staleness is ALREADY relative to what's being reviewed — the maintainer's 'show it at an older commit' nuance falls out for free.\n\n`reanchorReviewNotes(notes, finalDiff)` flags a note stale by matching its authored snippet against `finalDiff`'s content. For a `--commit <sha>` (or range) review, finalDiff is THAT commit's diff, so a note whose code still matches at that commit is NOT flagged stale → it renders as valid context 'as of the commit time'. At HEAD, where the code moved on, the same note IS flagged → hidden. So one unconditional filter satisfies both 'no need to show outdated notes' and 'but show them when reviewing an older commit before the change'. No commit-time comparison logic was needed. The context-reveal path (GB-1139) already filters the same way; the GB-907 outdated-badge + Keep/Discard UI was removed."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/routes/pages.tsx"
+                },
+                "region": {
+                  "startLine": 173,
+                  "endLine": 173,
+                  "snippet": {
+                    "text": "    : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1140"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "245e6fa9c9a4822816e5f71ce557a52e"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "070d4f314cb1f41ce736f188c79a99f3648202fe",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

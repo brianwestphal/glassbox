@@ -49,9 +49,10 @@ notes. This document makes those notes reachable.
   all-context diff): a note that still matches follows its line and renders; a
   note whose saved snippet no longer matches the revealed code (no match nearby)
   is **not shown**. Staleness is detected by the same snippet re-anchoring used
-  elsewhere ([§20.3](20-ai-review-notes.md)). *(This "hide on reveal" is scoped to
-  the reveal path; whether in-diff stale notes should also be hidden instead of
-  badged "outdated" is tracked separately.)*
+  elsewhere ([§20.3](20-ai-review-notes.md)). *(Hiding stale notes is now the
+  behavior everywhere, not just on reveal — GB-1140 removed the in-diff "outdated"
+  badge + Keep/Discard so stale notes are hidden in the inline diff too;
+  see [§20.3](20-ai-review-notes.md).)*
 
 ## Implementation
 

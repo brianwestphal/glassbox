@@ -415,23 +415,24 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(message).toContainText('24h TTL');
   });
 
-  // Demo mode serves illustrative `.pr-notes/` notes for session.ts: three
-  // aligned notes plus one whose anchored code changed (rendered stale, P3).
-  test('review notes render as distinct AI-authored rows in split mode', async ({ page }) => {
+  // Demo mode serves 4 illustrative `.pr-notes/` notes for session.ts, one of
+  // which is outdated (its anchored code changed). Outdated notes are hidden
+  // (doc 20 §20.3, GB-1140), so 3 render and none carry an "outdated" flag.
+  test('review notes render as distinct AI-authored rows in split mode; outdated ones are hidden', async ({ page }) => {
     await openModifiedFile(page);
     const rows = page.locator('.ai-note-row.ai-note-review');
     await expect(rows.first()).toBeVisible({ timeout: 5000 });
-    // The notes render after the diff loads + the re-anchor pass; under parallel
-    // CPU contention (local default-parallel runs share one demo server) the
-    // 4th row can lag the first, so give the count assertion extra headroom.
-    await expect(rows).toHaveCount(4, { timeout: 10000 });
+    // 3 current notes render (the outdated 4th is filtered out).
+    await expect(rows).toHaveCount(3, { timeout: 10000 });
     // Per-kind badges + producer attribution.
     await expect(page.locator('.ai-note-label-rationale')).toBeVisible();
     await expect(page.locator('.ai-note-label-risk')).toBeVisible();
     await expect(page.locator('.ai-note-producer').first()).toHaveText('Claude Code');
-    // The re-anchored note whose code changed is flagged outdated (P3).
-    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1, { timeout: 10000 });
-    await expect(page.locator('.ai-note-stale-tag')).toHaveText('outdated');
+    // Nothing outdated is shown any more.
+    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(0);
+    await expect(page.locator('.ai-note-stale-tag')).toHaveCount(0);
+    // The stale demo note (guid demo-note-stale) specifically is not rendered.
+    await expect(page.locator('.ai-note-row[data-note-id="demo-note-stale"]')).toHaveCount(0);
   });
 
   // A note body is markdown and may carry block structure (doc 20 §20.6,
@@ -468,35 +469,13 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(page.locator('.diff-view')).toHaveAttribute('data-file-path', /redis\.ts/, { timeout: 5000 });
   });
 
-  test('review notes also render in unified mode', async ({ page }) => {
+  test('review notes also render in unified mode (outdated hidden)', async ({ page }) => {
     await openModifiedFile(page);
     await page.locator('[data-diff-mode="unified"]').click();
     await expect(page.locator('.diff-table-unified')).toBeVisible();
     await expect(page.locator('.ai-note-row.ai-note-review').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4, { timeout: 10000 });
-    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(1, { timeout: 10000 });
-  });
-
-  test('Keep dismisses the outdated flag on a stale review note (GB-907)', async ({ page }) => {
-    await openModifiedFile(page);
-    const staleRow = page.locator('.ai-note-row.ai-note-stale');
-    await expect(staleRow).toBeVisible({ timeout: 5000 });
-
-    await staleRow.locator('.ai-note-keep-btn').click();
-    // The flag and its actions are gone, but the note itself remains.
+    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3, { timeout: 10000 });
     await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(0);
-    await expect(page.locator('.ai-note-stale-tag')).toHaveCount(0);
-    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(4);
-  });
-
-  test('Discard removes an outdated review note (GB-907)', async ({ page }) => {
-    await openModifiedFile(page);
-    const staleRow = page.locator('.ai-note-row.ai-note-stale');
-    await expect(staleRow).toBeVisible({ timeout: 5000 });
-
-    await staleRow.locator('.ai-note-discard-btn').click();
-    await expect(page.locator('.ai-note-row.ai-note-stale')).toHaveCount(0);
-    await expect(page.locator('.ai-note-row.ai-note-review')).toHaveCount(3);
   });
 
   test('a review note renders an image artifact served from the artifact route (GB-911)', async ({ page }) => {

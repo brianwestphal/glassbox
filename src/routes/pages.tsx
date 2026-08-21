@@ -171,7 +171,13 @@ pageRoutes.get('/file/:fileId', async (c) => {
   const rawNotes = getDemoMode() !== null
     ? demoReviewNotes(file.file_path)
     : loadReviewNotesForFile(c.get('repoRoot'), file.file_path);
-  const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff);
+  // Hide notes flagged outdated relative to what's being reviewed (doc 20 §20.3,
+  // GB-1140): "no need to show outdated pr notes." Staleness is computed against
+  // `finalDiff`, so this is inherently relative to the reviewed content — a note
+  // reviewed at an older commit where its code still matches is NOT flagged, so
+  // it still shows as valid context "as of the commit time"; only a note stale
+  // relative to the reviewed content is dropped.
+  const reviewNotes = reanchorReviewNotes(rawNotes, finalDiff).filter(n => n.stale !== true);
   // Resolve each note's origin commit (subject + full message) from git for the
   // provenance label (doc 20 §20.6, GB-1142). No-op for demo notes (they carry
   // a synthetic subject) and for shas git can't resolve.

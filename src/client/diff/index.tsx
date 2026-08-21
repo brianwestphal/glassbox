@@ -2,7 +2,7 @@ import { delegate, delegateCapture, effect, raw, signal } from 'kerfjs';
 import { resource } from 'kerfjs/async';
 import { remountOn } from 'kerfjs/remount';
 
-import { discardReviewNote, moveAnnotation, revealFile } from '../../api/index.js';
+import { moveAnnotation, revealFile } from '../../api/index.js';
 import { hydrateAttachments } from '../annotations/attachments.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
@@ -519,16 +519,9 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     void navigateToLocation(filePath, line);
   });
 
-  // Keep an outdated (stale) review note — dismiss its flag for this session
-  // (doc 20 §20.3, GB-907). Re-anchoring re-evaluates it on the next load.
-  void delegate(container, 'click', '.ai-note-keep-btn', (e, btn) => {
-    e.stopPropagation();
-    const row = asEl(btn).closest('.ai-note-row');
-    if (row === null) return;
-    row.classList.remove('ai-note-stale');
-    row.querySelector('.ai-note-stale-tag')?.remove();
-    row.querySelector('.ai-note-stale-actions')?.remove();
-  });
+  // Outdated (stale) review notes are hidden entirely (doc 20 §20.3, GB-1140),
+  // so there is no in-diff Keep/Discard flow anymore — a note is removed from
+  // `.pr-notes/` via `glassbox note remove` / `coalesce` (producer side).
 
   // Toggle the origin-commit message of a review note (doc 20 §20.6, GB-1142):
   // the provenance label expands to show the full commit message.
@@ -540,17 +533,6 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const nowHidden = !msg.hasAttribute('hidden');
     if (nowHidden) msg.setAttribute('hidden', ''); else msg.removeAttribute('hidden');
     el.classList.toggle('expanded', !nowHidden);
-  });
-
-  // Discard an outdated review note — remove it from `.pr-notes/` and the DOM.
-  void delegate(container, 'click', '.ai-note-discard-btn', (e, btn) => {
-    e.stopPropagation();
-    const row = asEl(btn).closest('.ai-note-row');
-    if (row === null) return;
-    const guid = row.getAttribute('data-note-id') ?? '';
-    const file = container.querySelector('.diff-view')?.getAttribute('data-file-path') ?? '';
-    row.remove(); // optimistic — the row goes regardless of the on-disk result
-    if (guid !== '' && file !== '') void discardReviewNote({ guid, file });
   });
 
   // Drag-and-drop annotation onto a different line

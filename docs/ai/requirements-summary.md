@@ -771,16 +771,19 @@ views (`view.ts`), and `DiffView` server-renders them full-width below
 their line (flow-broken like annotations so split columns stay aligned),
 styled distinctly as AI-authored with a per-kind badge. **P3 (re-anchor)
 shipped**: `reanchorReviewNotes` re-matches each note's authored snippet
-against the current diff at load (moves shifted notes, flags vanished
-ones stale with an "outdated" badge). **P5 (analysis-feed) shipped**:
+against the reviewed diff at load (moves shifted notes, flags vanished
+ones stale); **stale notes are hidden** from the display (GB-1140, below).
+**P5 (analysis-feed) shipped**:
 `format.ts` folds notes into the analysis prompt (an "Author review
 notes" section in `runAnalysisBatch`, informing risk/narrative/guided)
 and into the `latest-review.md` export. **Threading shipped**: a reviewer
 can Reply to a note (the row carries its `guid` + a Reply button); the
 reply is a human annotation linked by a nullable `reply_to_note_id`
-column, tagged "↳ reply". **Stale keep/discard shipped**: an outdated
-note offers Keep (dismiss the flag) / Discard (`DELETE
-/api/review-notes/:guid` → `removeNote`). **Reply nesting shipped**:
+column, tagged "↳ reply". **Stale notes hidden** (GB-1140): an outdated
+note (stale relative to the reviewed content) is not shown — the former
+in-diff "outdated" badge + Keep/Discard were removed; `removeNote` /
+`DELETE /api/review-notes/:guid` remain as an API (discard is now
+producer-side via `glassbox note remove`). **Reply nesting shipped**:
 replies render nested directly beneath their note (orphans fall back to
 line rendering). **Markdown bodies shipped**: note bodies (review notes +
 the risk/narrative/guided AI notes) render via a safe, escape-first
@@ -1132,10 +1135,11 @@ columns. Server helpers `reanchorNotesForRange` (re-anchor against the revealed
 lines + range-scope + **drop stale**) and `renderContextNotes` (group + render
 with nested replies) live in `src/review-notes/context-notes.ts`; the shared
 `ReviewNoteRows` renderer is exposed as `renderReviewNoteRowsHtml`. Reveal is
-on-demand (not pre-expand); stale-hidden is **scoped to the reveal path** —
-in-diff stale notes keep the §20.3 "outdated" badge, and whether to hide those
-too is tracked as a follow-up. Unit + integration + a dedicated `chromium-notes`
-e2e (both split and unified).
+on-demand (not pre-expand); stale notes are hidden **everywhere** (GB-1140
+removed the in-diff "outdated" badge + Keep/Discard, so the inline diff hides
+them too — relative to the reviewed content, so an older commit still shows a
+note). Unit + integration + a dedicated `chromium-notes` e2e (both split and
+unified).
 
 ## 19. Implementation-status snapshot
 

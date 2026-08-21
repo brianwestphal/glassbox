@@ -130,31 +130,30 @@ describe('DiffView', () => {
     expect(html).toContain('orphan reply'); // still rendered, just on its line
   });
 
-  it('marks a stale review note as outdated (GB-897)', () => {
+  // GB-1140: outdated notes are hidden by the render sites (pages.tsx / the
+  // context route filter `n.stale`), and DiffView itself no longer renders the
+  // "outdated" badge or the Keep/Discard controls. If a stale note is ever
+  // handed to DiffView it renders as a plain note — no badge, no stale styling.
+  it('does not render an outdated badge or stale styling for a review note (GB-1140)', () => {
     const html = DiffView({
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
       annotations: [], mode: 'unified',
       reviewNotes: [{ line: 1, side: 'new', kind: 'risk', body: 'no longer applies', stale: true }],
     }).toString();
-    expect(html).toContain('ai-note-stale');
-    expect(html).toContain('outdated');
+    expect(html).not.toContain('ai-note-stale');
+    expect(html).not.toContain('outdated');
+    // The note body is still rendered (filtering happens at the caller, not here).
+    expect(html).toContain('no longer applies');
   });
 
-  it('offers Keep/Discard only on a stale note that has a guid (GB-907)', () => {
-    const stale = DiffView({
+  it('renders no Keep/Discard controls (GB-1140 removed them)', () => {
+    const html = DiffView({
       file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
       annotations: [], mode: 'unified',
       reviewNotes: [{ guid: 'g1', line: 1, side: 'new', kind: 'risk', body: 'old', stale: true }],
     }).toString();
-    expect(stale).toContain('ai-note-keep-btn');
-    expect(stale).toContain('ai-note-discard-btn');
-
-    const fresh = DiffView({
-      file: makeFile(), diff: makeDiff({ hunks: [makeHunk([makeLine('add', 1, 'code')])] }),
-      annotations: [], mode: 'unified',
-      reviewNotes: [{ guid: 'g1', line: 1, side: 'new', kind: 'risk', body: 'current' }],
-    }).toString();
-    expect(fresh).not.toContain('ai-note-keep-btn');
+    expect(html).not.toContain('ai-note-keep-btn');
+    expect(html).not.toContain('ai-note-discard-btn');
   });
 
   it('escapes a note body so markup cannot break rendering (GB-896)', () => {

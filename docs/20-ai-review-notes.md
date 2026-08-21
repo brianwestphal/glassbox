@@ -140,14 +140,19 @@ another AI) an optimized way to consume it.
 - **Content fingerprint** — Each note shall carry `partialFingerprints` derived
   from the normalized anchored text, so it can be re-located after surrounding
   edits shift line numbers.
-- **Re-match through the existing stale machinery** *(shipped, P3)* — When
-  Glassbox loads notes against the current tree, it re-anchors them using the
-  same match-or-mark-stale logic it applies to human annotations
-  (`reanchorReviewNotes`, mirroring `src/review-update.ts`): a matched note
-  renders at its current line; an unmatchable note is flagged stale and rendered
-  with an "outdated" badge plus **Keep** / **Discard** controls — Keep dismisses
-  the flag for the session, Discard removes the note from `.pr-notes/` via
-  `DELETE /api/review-notes/:guid` (the `removeNote` store op).
+- **Re-match through the existing stale machinery** *(shipped, P3; visibility
+  changed by GB-1140)* — When Glassbox loads notes against the reviewed content,
+  it re-anchors them using the same match-or-mark-stale logic it applies to human
+  annotations (`reanchorReviewNotes`, mirroring `src/review-update.ts`): a matched
+  note renders at its current line; a note whose authored text can no longer be
+  found (stale relative to what's being reviewed) is **not rendered at all**
+  (GB-1140). Because staleness is judged against the *reviewed* diff, this is
+  relative: reviewing an older commit (or a range whose base precedes the change
+  that outdated a note) still shows the note as valid context "as of the commit
+  time" — it simply isn't flagged stale there. There is therefore no in-diff
+  "outdated" badge or Keep/Discard control; a note is removed from `.pr-notes/`
+  producer-side (`glassbox note remove` / `coalesce`). (The `removeNote` store op
+  and its `DELETE /api/review-notes/:guid` endpoint remain available as an API.)
 
 ### 20.4 Authoring
 
@@ -433,12 +438,14 @@ Implementation is expected to proceed in slices, each tracked as its own ticket:
   §20.6.)
 - **P3** *(shipped)* — Anchor durability: `reanchorReviewNotes`
   (`src/review-notes/reanchor.ts`) re-matches each note's authored text against
-  the current diff at load time (the same content-near-the-line approach the
-  human-annotation stale matcher uses) — a note whose line shifted is moved, one
-  whose text is gone is flagged `stale` and rendered with an "outdated" badge.
-  The note's authored snippet is carried on the view. A reviewer can **Keep** a
-  stale note (dismiss the flag) or **Discard** it (`DELETE
-  /api/review-notes/:guid` → `removeNote`, deleting it from `.pr-notes/`).
+  the reviewed diff at load time (the same content-near-the-line approach the
+  human-annotation stale matcher uses) — a note whose line shifted is moved, and
+  one whose text is gone (stale relative to what's being reviewed) is dropped
+  from the display (GB-1140; see §20.3 — since staleness is relative to the
+  reviewed content, an older commit still shows the note). The note's authored
+  snippet is carried on the view for the match. (The former in-diff "outdated"
+  badge + Keep/Discard were removed with GB-1140; `removeNote` /
+  `DELETE /api/review-notes/:guid` remain as an API.)
 - **P4** *(shipped)* — Artifact attachment (`--artifact` → SARIF
   `result.attachments`), inline code-block rendering of text/diagram-source
   artifacts, `<img>` rendering of image artifacts via a path-contained serving
