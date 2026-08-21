@@ -2182,6 +2182,32 @@
     },
     "NFR-32.1": {
       "waived": "Reuse-not-duplication (doc 32): 'the client must not re-implement the note UI' is an architectural invariant, not a unit-assertable behavior. Enforced by construction — renderReviewNoteRowsHtml exposes the existing server ReviewNoteRows and the client splices its HTML (verified visually identical in notes-reveal.test.ts, which finds real .ai-note-row rows with reply/markdown handled by the shared delegation)."
+    },
+    "FR-33.1": {
+      "tests": [
+        "tests/e2e/settings.test.ts",
+        "tests/e2e/themes.test.ts",
+        "tests/e2e/review-completion.test.ts"
+      ],
+      "note": "Native modal hosting (GB-1143): the settings 'overlay is a native modal dialog' e2e asserts the wrapper is a <dialog> that is open + :modal (implicit ARIA), and the focus-trap test asserts Tab never reaches an outside control; themes + review-completion exercise the other native surfaces open/close."
+    },
+    "FR-33.2": {
+      "tests": [
+        "tests/e2e/settings.test.ts"
+      ],
+      "note": "Centering + backdrop + dismissal (GB-1143): the 'clicking the backdrop removes the dialog' e2e clicks a viewport corner (outside the centered dialog) and asserts dismissal — which only passes if the dialog is centered (the reset-defeated margin:auto restored) and the ::backdrop click dismisses."
+    },
+    "FR-33.3": {
+      "tests": [
+        "tests/e2e/themes.test.ts"
+      ],
+      "note": "Child popup inside the dialog (GB-1143): the themes duplicate + delete e2e open the theme manager's context menu (appended to handle.el, not body) over the native modal and click Edit/Duplicate/Delete — impossible if the menu were body-appended (document-inerted)."
+    },
+    "NFR-33.1": {
+      "waived": "Safe fallback (doc 33): native hosting is feature-detected by kerf; the .<class>:not(dialog) div-overlay styling is the fallback. Can't be asserted without an engine lacking <dialog>.showModal() (Playwright's Chromium supports it); the fallback CSS is inert where native applies."
+    },
+    "NFR-33.2": {
+      "waived": "Desktop webview verification (doc 33): the decisive Tauri/WKWebView visual pass is manual (npm run tauri:dev). Automated coverage is Chromium-only (exercises the native path + catches gross regressions); the desktop screenshot pass is tracked as a follow-up before merge."
     }
   }
 }

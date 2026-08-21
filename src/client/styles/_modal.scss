@@ -18,6 +18,10 @@
 // so the inner `.modal` remains the visible box, and move the page dim to the
 // `::backdrop` pseudo-element (kerf ships no CSS for either).
 dialog.modal-overlay {
+  // Re-center: the app reset (`* { margin: 0 }`) zeroes the UA `margin: auto`
+  // that centers a modal `<dialog>`, so it'd otherwise park at the top-left.
+  inset: 0;
+  margin: auto;
   max-width: none;
   max-height: 100dvh;
   border: none;

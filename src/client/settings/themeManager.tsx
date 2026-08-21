@@ -118,11 +118,14 @@ export function showThemeManager(onThemeChanged?: () => void): void {
         </div>
       );
 
-      // Render into document.body (not the modal) to avoid clipping, then keep
-      // it glued below the trigger (right edges aligned), flipping above on
-      // bottom-viewport overflow. z-index comes from the `.tm-context-menu`
-      // SCSS class (it must sit above the theme-manager modal overlay).
-      document.body.appendChild(menu);
+      // Append INTO the overlay element (`handle.el`), not `document.body`
+      // (GB-1143): with `native: true` the manager is a native `<dialog>` opened
+      // via `showModal()`, which inerts everything OUTSIDE it — a body-appended
+      // menu would be non-interactive. Living inside the dialog keeps it in the
+      // top layer + interactive. `position: fixed` still anchors it to the
+      // trigger in viewport coords, and the dialog's `overflow: visible` (see
+      // `_modal.scss`) means it isn't clipped. Works in the div-fallback too.
+      handle.el.appendChild(menu);
       stopContextMenuReposition = positionAnchoredPopup(menu, anchorEl, { align: 'end' });
       contextMenuEl = menu;
 

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2nrzp4u5e4cbba",
+          "message": {
+            "text": "inset:0; margin:auto is required on the native <dialog> because the app reset (* { margin: 0 }, _base.scss) zeroes the UA margin: auto that centers a modal dialog. Without it the dialog parked at the top-left (0,0) — caught via a getBoundingClientRect check in a headless-Chromium diagnostic (rect x/y were 0 in a 1200-wide viewport; after the fix, x=360=(1200-480)/2). The :not(dialog) fallback keeps the div-overlay centering for engines without <dialog>.showModal().",
+            "markdown": "`inset:0; margin:auto` is required on the native `<dialog>` because the app reset (`* { margin: 0 }`, _base.scss) zeroes the UA `margin: auto` that centers a modal dialog. Without it the dialog parked at the top-left (0,0) — caught via a getBoundingClientRect check in a headless-Chromium diagnostic (rect x/y were 0 in a 1200-wide viewport; after the fix, x=360=(1200-480)/2). The `:not(dialog)` fallback keeps the div-overlay centering for engines without <dialog>.showModal()."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/styles/_modal.scss"
+                },
+                "region": {
+                  "startLine": 28,
+                  "endLine": 28,
+                  "snippet": {
+                    "text": "  padding: 0;"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1143"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "98781402ac5cf063d733f421ce41eb1e"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "7d087ab7d9a6cf5338b2662ea165b87445ca720e",
+          "branch": "gb-1143-native-overlays"
+        }
+      ]
+    }
+  ]
+}

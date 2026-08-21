@@ -1141,6 +1141,21 @@ them too — relative to the reviewed content, so an older commit still shows a
 note). Unit + integration + a dedicated `chromium-notes` e2e (both split and
 unified).
 
+## 18p. Native modal overlay hosting (`33-native-overlay-hosting.md`) — **Branch-only (kerf 4.3.0-beta.1); not on main**
+
+GB-1143: the 6 modal surfaces (settings dialog, theme manager, theme editor,
+completion modal, `confirm()`, `choice()`) pass **`native: true`** so kerf hosts
+them in a native `<dialog>.showModal()` — browser top-layer stacking + real
+document inerting; ARIA implicit. CSS rework (`_modal.scss`/`_kerf-overlay.scss`):
+dim → `.<class>::backdrop`, UA `<dialog>` chrome reset, `inset:0; margin:auto`
+restored (the `* { margin:0 }` reset defeats UA centering), inner widths
+`min(90vw, Npx)` (they collapse inside a shrink-to-fit dialog); `.<class>:not(dialog)`
+retains the div fallback. The theme-manager context menu is appended to the dialog
+(`handle.el`) not `document.body`, since a native modal inerts outside content.
+Chromium-verified (behavior e2e + screenshots incl. a centering-rect check); the
+**Tauri/WKWebView visual pass is manual + outstanding**. Lives on
+`gb-1143-native-overlays`; merges to main only once kerf 4.3.0 is stable.
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -1241,6 +1256,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/30-plugin-ui-extensions.md` → §18m
 - `docs/31-plugin-lifecycle-hooks.md` → §18n
 - `docs/32-review-note-reveal.md` → §18o
+- `docs/33-native-overlay-hosting.md` → §18p
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets

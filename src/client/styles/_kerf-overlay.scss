@@ -20,6 +20,9 @@
 // UA dialog chrome so the inner `.kerf-confirm`/`.kerf-choice` is the box, and
 // dim via `::backdrop`. The dialog centers itself in the top layer.
 dialog.kerf-overlay {
+  // Re-center: the app reset (`* { margin: 0 }`) zeroes the UA `margin: auto`.
+  inset: 0;
+  margin: auto;
   max-width: none;
   max-height: 100dvh;
   border: none;

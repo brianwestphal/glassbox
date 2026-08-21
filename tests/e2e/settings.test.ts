@@ -299,14 +299,15 @@ test.describe('Close dialog', () => {
     await expect(page.locator('.settings-dialog')).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('clicking the overlay removes the dialog', async ({ page }) => {
+  test('clicking the backdrop removes the dialog', async ({ page }) => {
     await page.goto('/');
     await openSettings(page);
 
-    // Click the overlay (the parent of .settings-dialog)
-    const overlay = page.locator('.modal-overlay');
-    // Click at the edge of the overlay (outside the dialog)
-    await overlay.click({ position: { x: 5, y: 5 } });
+    // Native mode (GB-1143): the overlay is a shrink-to-fit `<dialog>` centered
+    // in the viewport, so a backdrop click is a viewport corner (outside the
+    // dialog box) — clicking the overlay's own (5,5) would land inside it. The
+    // click on the ::backdrop targets the dialog, which kerf dismisses.
+    await page.mouse.click(5, 5);
     await expect(page.locator('.settings-dialog')).not.toBeVisible({ timeout: 3000 });
   });
 
@@ -431,27 +432,42 @@ test.describe('Stable height across tabs', () => {
 // GB-1132: the dialog is now owned by kerfjs/overlay, which adds a focus trap,
 // focus restore, and dialog ARIA over the previously hand-rolled modal.
 test.describe('Accessibility (kerfjs/overlay)', () => {
-  test('overlay wrapper is marked role=dialog / aria-modal', async ({ page }) => {
+  test('the overlay is a native modal dialog (implicit role=dialog / aria-modal)', async ({ page }) => {
     await page.goto('/');
     await openSettings(page);
-    const overlay = page.locator('.modal-overlay');
-    await expect(overlay).toHaveAttribute('role', 'dialog');
-    await expect(overlay).toHaveAttribute('aria-modal', 'true');
+    // Native mode (GB-1143): kerf hosts the modal in a real `<dialog>` opened
+    // with `.showModal()`, so the ARIA (role=dialog + aria-modal) is IMPLICIT —
+    // kerf doesn't (and shouldn't) set the explicit attributes. Assert the
+    // native equivalent: it's a `<dialog>` element that is open and `:modal`.
+    const native = await page.locator('.modal-overlay').evaluate((el) => ({
+      tag: el.tagName,
+      open: (el as HTMLDialogElement).open,
+      isModal: el.matches(':modal'),
+    }));
+    expect(native.tag).toBe('DIALOG');
+    expect(native.open).toBe(true);
+    expect(native.isModal).toBe(true);
   });
 
-  test('focus is trapped inside the dialog (Tab does not escape)', async ({ page }) => {
+  test('focus is trapped inside the dialog (Tab never reaches an outside control)', async ({ page }) => {
     await page.goto('/');
     await openSettings(page);
 
-    // Tab through many stops; focus must never leave the overlay subtree.
+    // Native mode (GB-1143): the modal `<dialog>` inerts the rest of the document,
+    // so Tab can never reach an interactive element OUTSIDE the dialog. On wrap
+    // (Tab past the last focusable) Chromium's native modal parks focus on
+    // `<body>` for one step before cycling back to the first control — a benign
+    // neutral holder, not an escape to app content. So the guarantee is: every
+    // Tab lands either inside the dialog or on the bare `<body>`, never on a
+    // focusable app control outside the modal.
     for (let i = 0; i < 30; i++) {
       await page.keyboard.press('Tab');
-      const insideOverlay = await page.evaluate(() => {
+      const contained = await page.evaluate(() => {
         const active = document.activeElement;
         const overlay = document.querySelector('.modal-overlay');
-        return active !== null && overlay !== null && overlay.contains(active);
+        return active === document.body || (active !== null && overlay !== null && overlay.contains(active));
       });
-      expect(insideOverlay).toBe(true);
+      expect(contained).toBe(true);
     }
   });
 

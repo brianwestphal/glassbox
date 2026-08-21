@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "warning",
+          "guid": "mt2nrzubla0rk7tt",
+          "message": {
+            "text": "The context menu MUST be appended to the dialog element (handle.el), not document.body, when the manager is a native modal. showModal() inerts everything OUTSIDE the dialog, so a body-appended menu is non-interactive — Playwright caught it as 'dialog subtree intercepts pointer events'. Living inside the dialog keeps it in the top-layer + clickable; position:fixed still anchors it to the trigger and the dialog's overflow:visible prevents clipping. Any future popup opened over a native modal must follow the same rule (doc 33 FR-33.3).",
+            "markdown": "The context menu MUST be appended to the dialog element (`handle.el`), not `document.body`, when the manager is a native modal. `showModal()` inerts everything OUTSIDE the dialog, so a body-appended menu is non-interactive — Playwright caught it as 'dialog subtree intercepts pointer events'. Living inside the dialog keeps it in the top-layer + clickable; `position:fixed` still anchors it to the trigger and the dialog's `overflow:visible` prevents clipping. Any future popup opened over a native modal must follow the same rule (doc 33 FR-33.3)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/themeManager.tsx"
+                },
+                "region": {
+                  "startLine": 121,
+                  "endLine": 121,
+                  "snippet": {
+                    "text": "      // Append INTO the overlay element (`handle.el`), not `document.body`"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "risk"
+            ]
+          },
+          "workItemUris": [
+            "GB-1143"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "7e6e589b70fb0c0fadcac4d0da5710f8"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "7d087ab7d9a6cf5338b2662ea165b87445ca720e",
+          "branch": "gb-1143-native-overlays"
+        }
+      ]
+    }
+  ]
+}
