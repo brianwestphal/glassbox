@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2ggzfkcigxxbak",
+          "message": {
+            "text": "Empty file = zero lines, not one. ''.split('\\n') returns [''] (one empty segment), which would render a spurious blank line; the content === '' guard returns zero lines instead. A single trailing newline ('a\\n') is a two-line file, so the final empty segment is popped — but a genuine trailing blank line ('a\\n\\n') is preserved. Unit-tested in parseDiffData.test.ts.",
+            "markdown": "Empty file = zero lines, not one. `''.split('\\n')` returns `['']` (one empty segment), which would render a spurious blank line; the `content === ''` guard returns zero lines instead. A single trailing newline (`'a\\n'`) is a two-line file, so the final empty segment is popped — but a genuine trailing blank line (`'a\\n\\n'`) is preserved. Unit-tested in parseDiffData.test.ts."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/git/parseDiffData.ts"
+                },
+                "region": {
+                  "startLine": 30,
+                  "endLine": 40,
+                  "snippet": {
+                    "text": "    oldNum: i + 1,\n    newNum: i + 1,\n    content: text,\n  }));\n  return {\n    filePath,\n    oldPath: null,\n    status: 'unchanged',\n    hunks: lines.length === 0\n      ? []\n      : [{ oldStart: 1, oldCount: lines.length, newStart: 1, newCount: lines.length, lines }],"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "assumption"
+            ]
+          },
+          "workItemUris": [
+            "GB-1137"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "53d975e870cccef4277506dd8a7f3dd1"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "6aaa2762fbd4812c2f13159e205327aceb5a2178",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

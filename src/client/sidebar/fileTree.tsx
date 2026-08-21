@@ -9,5 +9,6 @@ export async function loadFiles(): Promise<void> {
     staleCounts: data.staleCounts,
     groundTruth: data.groundTruth ?? {},
     pluginRendered: new Set(data.pluginRendered ?? []),
+    notedFileIds: new Set(data.notedFileIds ?? []),
   });
 }

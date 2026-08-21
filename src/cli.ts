@@ -11,6 +11,7 @@ import type { ReviewMode } from "./git/diff.js";
 import { getFileDiffs, getHeadCommit, getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from "./git/diff.js";
 import { ensureGlassboxGitignored } from "./git/gitignore.js";
 import { acquireLock } from "./lock.js";
+import { collectNoteOnlyFiles } from "./review-notes/unchanged-files.js";
 import { updateReviewDiffs } from "./review-update.js";
 import { startServer } from "./server.js";
 import { ensureSkills } from "./skills.js";
@@ -583,6 +584,18 @@ export async function launchReview(args: {
   // Add files (with the ground-truth perceptual score when present, doc 26 P2)
   for (const diff of diffs) {
     await addReviewFile(review.id, diff.filePath, JSON.stringify(diff), groundTruthScores.get(diff.filePath) ?? null);
+  }
+
+  // Surface files that carry AI review notes (doc 20) but weren't part of the
+  // diff, as `unchanged` files so their notes stay reachable (GB-1137). Git
+  // review modes only — `--diff`/`--ground-truth` have no repo notes tree.
+  if (mode.type !== 'diff' && mode.type !== 'ground-truth') {
+    const changed = new Set(diffs.map(d => d.filePath));
+    const noteOnly = collectNoteOnlyFiles(repoRoot, changed);
+    for (const { filePath, diff } of noteOnly) {
+      await addReviewFile(review.id, filePath, JSON.stringify(diff), null);
+    }
+    if (noteOnly.length > 0) console.log(`Including ${noteOnly.length} unchanged file(s) with review notes.`);
   }
 
   console.log(`Review ${review.id} created.`);

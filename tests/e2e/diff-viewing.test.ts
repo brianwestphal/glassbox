@@ -385,6 +385,18 @@ test.describe('Diff viewing: Unified mode char diff', () => {
 });
 
 test.describe('AI-authored review notes (doc 20 P2)', () => {
+  // The sidebar marks a file that carries AI review notes with a note icon
+  // (doc 20 §20.6, GB-1136). Demo mode has notes only for session.ts.
+  test('a file with review notes shows a note icon in the sidebar', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#progress-summary')).toHaveText(/files reviewed/, { timeout: 5000 });
+    const notedRow = page.locator('.file-item', { has: page.locator('.file-name', { hasText: 'session.ts' }) });
+    await expect(notedRow.locator('.file-note-icon')).toBeVisible({ timeout: 5000 });
+    // A file without notes has no icon.
+    const plainRow = page.locator('.file-item', { has: page.locator('.file-name', { hasText: 'redis.ts' }) });
+    await expect(plainRow.locator('.file-note-icon')).toHaveCount(0);
+  });
+
   // Demo mode serves illustrative `.pr-notes/` notes for session.ts: three
   // aligned notes plus one whose anchored code changed (rendered stale, P3).
   test('review notes render as distinct AI-authored rows in split mode', async ({ page }) => {

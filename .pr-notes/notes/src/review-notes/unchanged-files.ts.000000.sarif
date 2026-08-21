@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2ggsj3zykhumj5",
+          "message": {
+            "text": "An unchanged note-bearing file is shown by synthesizing an unchanged FileDiff whose single hunk is the WHOLE current file as context lines, so its notes anchor at their exact lines with zero special-casing downstream.\n\nRendering the full file as context (rather than only windows around each note) means the existing /file/:id path, reanchorReviewNotes, and DiffView all work unchanged — the file just reads as an all-context diff. Skips are deliberate: files already in the diff (avoid duplicate rows), the .pr-notes/ store itself (never surface note storage as a reviewable file), and notes whose source file is gone or unreadable/binary (dropped, never fail the launch). Git modes only — --diff/--ground-truth have no repo notes tree.",
+            "markdown": "An unchanged note-bearing file is shown by synthesizing an `unchanged` FileDiff whose single hunk is the WHOLE current file as context lines, so its notes anchor at their exact lines with zero special-casing downstream.\n\nRendering the full file as context (rather than only windows around each note) means the existing `/file/:id` path, `reanchorReviewNotes`, and `DiffView` all work unchanged — the file just reads as an all-context diff. Skips are deliberate: files already in the diff (avoid duplicate rows), the `.pr-notes/` store itself (never surface note storage as a reviewable file), and notes whose source file is gone or unreadable/binary (dropped, never fail the launch). Git modes only — `--diff`/`--ground-truth` have no repo notes tree."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-notes/unchanged-files.ts"
+                },
+                "region": {
+                  "startLine": 24,
+                  "endLine": 46,
+                  "snippet": {
+                    "text": " */\nexport function collectNoteOnlyFiles(repoRoot: string, changedPaths: Set<string>): NoteOnlyFile[] {\n  const out: NoteOnlyFile[] = [];\n  for (const filePath of listFilesWithNotes(repoRoot)) {\n    if (changedPaths.has(filePath) || filePath.startsWith('.pr-notes/')) continue;\n    const abs = join(repoRoot, filePath);\n    if (!existsSync(abs)) continue;\n    let content: string;\n    try {\n      content = readFileSync(abs, 'utf-8');\n    } catch {\n      continue;\n    }\n    out.push({ filePath, diff: unchangedFileDiff(filePath, content) });\n  }\n  return out;\n}\n"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1137"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "1b2234135509d57b2be9ff179751aef1"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "6aaa2762fbd4812c2f13159e205327aceb5a2178",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

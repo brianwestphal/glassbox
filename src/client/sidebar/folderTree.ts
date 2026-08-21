@@ -54,6 +54,19 @@ function compressFolderTree(node: TreeNode): void {
   }
 }
 
+/** Top-level folder keys — in the sidebar's compressed `folderPath` format
+ *  (see `treeNodeJsx`) — for the `.pr-notes` note-storage tree. Used to collapse
+ *  those folders by default so the committed SARIF files don't clutter the file
+ *  list (GB-1135). A `.pr-notes` tree always roots at the repo top, so it is a
+ *  direct child of the tree root whose (possibly compressed) name begins with
+ *  `.pr-notes`. */
+export function noteStorageFolderKeys(files: ReviewFile[]): string[] {
+  const tree = buildFolderTree(files);
+  return tree.children
+    .filter(c => c.name === '.pr-notes' || c.name.startsWith('.pr-notes/'))
+    .map(c => c.name);
+}
+
 /** Order a folder's files most-different-first by perceptual difference score
  *  (doc 26 P2), then by path. Files without a score (every non-ground-truth
  *  review) sort by path, so this is a no-op outside ground-truth mode. */

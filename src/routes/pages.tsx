@@ -22,7 +22,7 @@ import { IconChevronLeft, IconChevronRight, IconReveal } from '../icons.js';
 import { renderNoteArtifacts } from '../plugins/artifacts.js';
 import { pluginRendersFile, renderPluginSvgSide } from '../plugins/fileView.js';
 import { reanchorReviewNotes } from '../review-notes/reanchor.js';
-import { loadReviewNotesForFile } from '../review-notes/store.js';
+import { listFilesWithNotes, loadReviewNotesForFile } from '../review-notes/store.js';
 import type { AppEnv } from '../types.js';
 
 export const pageRoutes = new Hono<AppEnv>();
@@ -36,6 +36,16 @@ pageRoutes.get('/', async (c) => {
     getReviewFiles(reviewId),
     getAnnotationCountsForReview(reviewId),
   ]);
+
+  // Files that carry AI review notes (doc 20 §20.6, GB-1136) get a note icon on
+  // the initial paint (the client refreshes it from /api/files). Demo mode has
+  // no on-disk `.pr-notes`, so it consults the synthetic demo notes instead.
+  const notedPaths = new Set(
+    getDemoMode() !== null
+      ? files.filter(f => demoReviewNotes(f.file_path).length > 0).map(f => f.file_path)
+      : listFilesWithNotes(c.get('repoRoot')),
+  );
+  const notedFileIds = new Set(files.filter(f => notedPaths.has(f.file_path)).map(f => f.id));
 
   // A difftool session (doc 19) is a transient viewing session, not a tracked
   // review to export: it offers a session-ending "Done" instead of "Complete".
@@ -53,7 +63,7 @@ pageRoutes.get('/', async (c) => {
 
   const html = (
     <Layout title={`Glassbox - ${review.repo_name}`} reviewId={reviewId} difftool={isDifftool}>
-      <ReviewShell reviewId={reviewId} review={review} files={files} annotationCounts={annotationCounts} staleCounts={{}} footer={footer} />
+      <ReviewShell reviewId={reviewId} review={review} files={files} annotationCounts={annotationCounts} staleCounts={{}} notedFileIds={notedFileIds} footer={footer} />
     </Layout>
   );
 
@@ -234,6 +244,13 @@ pageRoutes.get('/review/:reviewId', async (c) => {
     getAnnotationCountsForReview(reviewId),
   ]);
 
+  const notedPaths = new Set(
+    getDemoMode() !== null
+      ? files.filter(f => demoReviewNotes(f.file_path).length > 0).map(f => f.file_path)
+      : listFilesWithNotes(c.get('repoRoot')),
+  );
+  const notedFileIds = new Set(files.filter(f => notedPaths.has(f.file_path)).map(f => f.id));
+
   const footer = (
     <>
       {review.status === 'completed' ? (
@@ -248,7 +265,7 @@ pageRoutes.get('/review/:reviewId', async (c) => {
 
   const html = (
     <Layout title={`Glassbox - ${review.repo_name}`} reviewId={reviewId}>
-      <ReviewShell reviewId={reviewId} review={review} files={files} annotationCounts={annotationCounts} staleCounts={{}} footer={footer} />
+      <ReviewShell reviewId={reviewId} review={review} files={files} annotationCounts={annotationCounts} staleCounts={{}} notedFileIds={notedFileIds} footer={footer} />
     </Layout>
   );
 

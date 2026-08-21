@@ -35,6 +35,9 @@ export const ListFilesRespSchema = z.object({
    *  the Code/Rendered toggle and routes the Rendered view through the image
    *  viewer for these, like an SVG file. */
   pluginRendered: z.array(z.string()).optional(),
+  /** Ids of files that carry AI review notes (doc 20 §20.6, GB-1136) — the
+   *  sidebar marks them with a note icon. Omitted/empty when none. */
+  notedFileIds: z.array(z.string()).optional(),
   annotationCounts: z.record(z.string(), z.number()),
   staleCounts: z.record(z.string(), z.number()),
   /** Keyed by review-file id; omitted/empty for non-ground-truth reviews. */

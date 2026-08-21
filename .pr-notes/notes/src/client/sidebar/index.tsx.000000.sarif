@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt2ggsdmc5d4q5mq",
+          "message": {
+            "text": "First-visit seed-and-persist, so a default-collapsed .pr-notes folder the user later expands stays expanded.\n\nThe collapse model is binary set-membership with an empty default (all expanded). A naive \"always add .pr-notes to the collapsed set on load\" would re-collapse the folder every load, overriding the user's manual expand. Instead we seed the defaults ONLY when there is no stored state for this review (stored === null, i.e. the first visit) and saveCollapsedFolders() immediately — so from then on the stored set is authoritative and a later expand persists normally. Existing reviews with saved state are untouched (they keep whatever the user had).",
+            "markdown": "First-visit seed-and-persist, so a default-collapsed `.pr-notes` folder the user later expands stays expanded.\n\nThe collapse model is binary set-membership with an empty default (all expanded). A naive \"always add `.pr-notes` to the collapsed set on load\" would re-collapse the folder every load, overriding the user's manual expand. Instead we seed the defaults ONLY when there is no stored state for this review (`stored === null`, i.e. the first visit) and `saveCollapsedFolders()` immediately — so from then on the stored set is authoritative and a later expand persists normally. Existing reviews with saved state are untouched (they keep whatever the user had)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/sidebar/index.tsx"
+                },
+                "region": {
+                  "startLine": 236,
+                  "endLine": 256,
+                  "snippet": {
+                    "text": "function restoreCollapsedFolders(): void {\n  try {\n    const stored = localStorage.getItem(storageKey());\n    if (stored === null) {\n      // First visit to this review: collapse the `.pr-notes` note-storage\n      // folders by default (GB-1135) so the committed SARIF files don't clutter\n      // the tree. Persist immediately so a later manual expand sticks instead of\n      // being re-seeded on the next load.\n      const defaults = noteStorageFolderKeys(folderModeFiles());\n      if (defaults.length > 0) {\n        diffViewStore.actions.update({ collapsedFolders: new Set(defaults) });\n        saveCollapsedFolders();\n      }\n      return;\n    }\n    const parsed: unknown = JSON.parse(stored);\n    // Validate the shape rather than trusting it — keep only the strings.\n    if (!Array.isArray(parsed)) return;\n    const folders = parsed.filter((x): x is string => typeof x === 'string');\n    diffViewStore.actions.update({ collapsedFolders: new Set(folders) });\n  } catch { /* localStorage unavailable or malformed JSON */ }"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1135"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "18ed69c5c349bdc909501fc075b00d59"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "6aaa2762fbd4812c2f13159e205327aceb5a2178",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

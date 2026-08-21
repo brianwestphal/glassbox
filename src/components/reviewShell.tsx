@@ -11,6 +11,10 @@ interface ReviewShellProps {
   files: ReviewFile[];
   annotationCounts: Record<string, number>;
   staleCounts: Record<string, number>;
+  /** Ids of files that carry AI review notes (doc 20 §20.6, GB-1136) — marked
+   *  with a note icon on the initial server paint (the client refreshes it from
+   *  `/api/files`). Defaults to none. */
+  notedFileIds?: Set<string>;
   footer: SafeHtml;
 }
 
@@ -20,7 +24,7 @@ interface ReviewShellProps {
  * footer (Complete vs. Reopen + a "back to current review" link), so we
  * pass the footer in as a prop and keep all the shell markup in one place.
  */
-export function ReviewShell({ reviewId, review, files, annotationCounts, staleCounts, footer }: ReviewShellProps): SafeHtml {
+export function ReviewShell({ reviewId, review, files, annotationCounts, staleCounts, notedFileIds, footer }: ReviewShellProps): SafeHtml {
   return (
     <div className="review-app" data-review-id={reviewId}>
       <div id="update-banner" className="update-banner" style="display:none">
@@ -39,7 +43,7 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
           <div className="file-filter">
             <input type="text" className="file-filter-input" id="file-filter" placeholder="Filter files..." />
           </div>
-          <FileList files={files} annotationCounts={annotationCounts} staleCounts={staleCounts} />
+          <FileList files={files} annotationCounts={annotationCounts} staleCounts={staleCounts} notedFileIds={notedFileIds} />
           <div className="sidebar-share" id="sidebar-share"></div>
           <div className="sidebar-footer">
             {footer}

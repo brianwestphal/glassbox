@@ -3,10 +3,12 @@ import { resolve } from 'path';
 
 import { SetFileStatusBodySchema } from '../../api/files.js';
 import { getAnnotationCountsForReview, getAnnotationsForFile, getReview, getReviewFile, getReviewFiles, getStaleCountsForReview, updateFileStatus } from '../../db/queries.js';
-import { debugLog } from '../../debug.js';
+import { debugLog, getDemoMode } from '../../debug.js';
+import { demoReviewNotes } from '../../demo.js';
 import { parseModeString } from '../../git/diff.js';
 import { groundTruthMetaByFileId } from '../../ground-truth/presentation.js';
 import { pluginRendersFile } from '../../plugins/fileView.js';
+import { listFilesWithNotes } from '../../review-notes/store.js';
 import type { AppEnv } from '../../types.js';
 import { openOS } from '../../utils/openOS.js';
 import { errorResponse, parseBody, requirePathParam } from '../../utils/parseBody.js';
@@ -28,10 +30,20 @@ filesRoutes.get('/files', async (c) => {
   // Files a content plugin renders (doc 29, GB-1052) — the client shows the
   // Code/Rendered toggle for these. Cheap path pre-check; empty when no plugin.
   const pluginRendered = files.filter((f) => pluginRendersFile(f.file_path)).map((f) => f.id);
+  // Files that carry AI review notes (doc 20 §20.6, GB-1136) — marked with a
+  // note icon. Demo mode has no on-disk `.pr-notes`, so it consults the same
+  // synthetic notes the file view serves; a real review scans `.pr-notes/`.
+  const notedPaths = new Set(
+    getDemoMode() !== null
+      ? files.filter((f) => demoReviewNotes(f.file_path).length > 0).map((f) => f.file_path)
+      : listFilesWithNotes(c.get('repoRoot')),
+  );
+  const notedFileIds = files.filter((f) => notedPaths.has(f.file_path)).map((f) => f.id);
   return c.json({
     files, annotationCounts, staleCounts,
     ...(groundTruth ? { groundTruth } : {}),
     ...(pluginRendered.length > 0 ? { pluginRendered } : {}),
+    ...(notedFileIds.length > 0 ? { notedFileIds } : {}),
   });
 });
 

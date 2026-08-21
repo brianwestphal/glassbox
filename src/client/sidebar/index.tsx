@@ -6,11 +6,12 @@ import { RiskDimensionSchema, saveAIPreferences } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
 import { asEl, asElement, asInput, asSelect, toElement } from '../dom.js';
 import type { SortMode } from '../state.js';
-import { aiStore, diffViewStore, reviewStore, visibleFileOrder } from '../stores/index.js';
+import { aiStore, diffViewStore, folderModeFiles, reviewStore, visibleFileOrder } from '../stores/index.js';
 import { FILTER_DEBOUNCE_MS } from '../timing.js';
 import { ACTIONS } from './actions.js';
 import { bindFileContextMenu } from './contextMenu.js';
 import { fileListJsx } from './fileListView.js';
+import { noteStorageFolderKeys } from './folderTree.js';
 import { showRiskPopover } from './riskPopover.js';
 import { sortControlJsx } from './sortControl.js';
 import { switchSortMode } from './sortMode.js';
@@ -235,7 +236,18 @@ function saveCollapsedFolders(): void {
 function restoreCollapsedFolders(): void {
   try {
     const stored = localStorage.getItem(storageKey());
-    if (stored === null) return;
+    if (stored === null) {
+      // First visit to this review: collapse the `.pr-notes` note-storage
+      // folders by default (GB-1135) so the committed SARIF files don't clutter
+      // the tree. Persist immediately so a later manual expand sticks instead of
+      // being re-seeded on the next load.
+      const defaults = noteStorageFolderKeys(folderModeFiles());
+      if (defaults.length > 0) {
+        diffViewStore.actions.update({ collapsedFolders: new Set(defaults) });
+        saveCollapsedFolders();
+      }
+      return;
+    }
     const parsed: unknown = JSON.parse(stored);
     // Validate the shape rather than trusting it — keep only the strings.
     if (!Array.isArray(parsed)) return;

@@ -33,7 +33,10 @@ export type DiffHunk = z.infer<typeof DiffHunkSchema>;
 export const FileDiffSchema = z.object({
   filePath: z.string().default(''),
   oldPath: z.string().nullable().default(null),
-  status: z.enum(['added', 'modified', 'deleted', 'renamed']).default('modified'),
+  // `unchanged` marks a file present in the review only because it carries AI
+  // review notes (doc 20 §20.6, GB-1137) — it was not part of the diff, and its
+  // hunks show the whole current file as context so the notes anchor inline.
+  status: z.enum(['added', 'modified', 'deleted', 'renamed', 'unchanged']).default('modified'),
   hunks: z.array(DiffHunkSchema).default([]),
   isBinary: z.boolean().default(false),
 });

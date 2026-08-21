@@ -139,6 +139,17 @@
   &.modified { color: var(--yellow); background: rgba(249,226,175,0.1); }
   &.deleted { color: var(--red); background: rgba(243,139,168,0.1); }
   &.renamed { color: var(--purple); background: rgba(203,166,247,0.1); }
+  // A file present only because it carries AI review notes (doc 20, GB-1137).
+  &.unchanged { color: var(--text-dim); background: rgba(127,127,127,0.12); }
+}
+
+// Note icon marking a file that has AI review notes (doc 20 §20.6, GB-1136).
+.file-note-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.85;
 }
 
 .annotation-count {

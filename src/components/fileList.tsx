@@ -1,6 +1,6 @@
 import type { ReviewFile } from '../db/queries.js';
 import { parseDiffData } from '../git/diff.js';
-import { IconChevronDown } from '../icons.js';
+import { IconChevronDown, IconMessageSquareText } from '../icons.js';
 
 interface TreeNode {
   name: string;
@@ -55,10 +55,11 @@ function hasStale(node: TreeNode, staleCounts: Record<string, number>): boolean 
   return false;
 }
 
-function TreeView({ node, depth, annotationCounts, staleCounts }: {
+function TreeView({ node, depth, annotationCounts, staleCounts, notedFileIds }: {
   node: TreeNode; depth: number;
   annotationCounts: Record<string, number>;
   staleCounts: Record<string, number>;
+  notedFileIds: Set<string>;
 }) {
   const sortedChildren = [...node.children].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -76,7 +77,7 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
               {stale ? <span className="stale-dot"></span> : null}
             </div>
             <div className="folder-content">
-              <TreeView node={child} depth={depth + 1} annotationCounts={annotationCounts} staleCounts={staleCounts} />
+              <TreeView node={child} depth={depth + 1} annotationCounts={annotationCounts} staleCounts={staleCounts} notedFileIds={notedFileIds} />
             </div>
           </div>
         );
@@ -90,6 +91,7 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
           <div className="file-item" data-file-id={f.id} style={`padding-left:${16 + depth * 12}px`}>
             <span className={`status-dot ${f.status}`}></span>
             <span className="file-name" title={f.file_path}>{fileName}</span>
+            {notedFileIds.has(f.id) ? <span className="file-note-icon" title="Has AI review notes"><IconMessageSquareText /></span> : null}
             <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>
             {stale > 0 ? <span className="stale-dot"></span> : null}
             {count > 0 ? <span className="annotation-count">{count}</span> : null}
@@ -100,17 +102,18 @@ function TreeView({ node, depth, annotationCounts, staleCounts }: {
   );
 }
 
-export function FileList({ files, annotationCounts, staleCounts }: {
+export function FileList({ files, annotationCounts, staleCounts, notedFileIds }: {
   files: ReviewFile[];
   annotationCounts: Record<string, number>;
   staleCounts: Record<string, number>;
+  notedFileIds?: Set<string>;
 }) {
   const tree = buildFileTree(files);
 
   return (
     <div className="file-list">
       <div className="file-list-items">
-        <TreeView node={tree} depth={0} annotationCounts={annotationCounts} staleCounts={staleCounts} />
+        <TreeView node={tree} depth={0} annotationCounts={annotationCounts} staleCounts={staleCounts} notedFileIds={notedFileIds ?? new Set()} />
       </div>
     </div>
   );

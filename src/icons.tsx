@@ -35,6 +35,12 @@ export function IconReveal(): SafeHtml {
   return <svg {...S12}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 11 15 14"/></svg>;
 }
 
+/** Message-square-text icon (lucide) — marks a file that carries AI review
+ *  notes (doc 20 §20.6, GB-1136). */
+export function IconMessageSquareText(): SafeHtml {
+  return <svg {...S12}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/></svg>;
+}
+
 /** Maximize icon (lucide) — open an image-diff side full-screen in the lightbox (doc 24/25). */
 export function IconMaximize(): SafeHtml {
   return <svg {...S14}><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>;

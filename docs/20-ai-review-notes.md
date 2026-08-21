@@ -307,6 +307,33 @@ Authoring shall support a combined live-plus-coalesce flow (not either/or):
   `annotations`, rendered with a "↳ reply" tag and **nested directly beneath the
   note** it answers (an orphan reply — whose note isn't loaded — falls back to
   line rendering).
+- **Sidebar surfacing** *(shipped)* — Because notes live in committed files, the
+  sidebar makes them findable:
+  - **Note icon on note-bearing files** *(GB-1136)* — A file that carries review
+    notes is marked in the file list with a message icon
+    (`IconMessageSquareText`), across every sort mode (folder / risk /
+    narrative). The set of note-bearing files is computed once server-side —
+    `listFilesWithNotes(repoRoot)` scans `.pr-notes/notes/` and strips the
+    `.NNNNNN.sarif` shard suffix to recover each source path — and delivered to
+    the client as `notedFileIds` on `GET /api/files` (and passed to the initial
+    server paint via `ReviewShell`). Demo mode has no on-disk notes, so it marks
+    the files its synthetic `demoReviewNotes` covers instead.
+  - **Note-bearing-but-unchanged files still appear** *(GB-1137)* — A file that
+    has notes but was **not** part of the diff is still shown, labeled
+    `unchanged`, so its notes stay reachable. At review creation
+    (`collectNoteOnlyFiles`, called from `src/cli.ts`) each such file is added
+    with a synthetic `unchanged` `FileDiff` whose single hunk renders the whole
+    current file as context lines, so the notes anchor inline. Git review modes
+    only (`--diff` / `--ground-truth` have no repo notes tree); files already in
+    the diff, the `.pr-notes/` store itself, and notes for since-deleted or
+    unreadable files are skipped. `unchanged` was added to the `FileDiff` status
+    enum for this.
+  - **`.pr-notes` folders collapsed by default** *(GB-1135)* — The committed
+    SARIF files under `.pr-notes/` show as ordinary files, but their folder is
+    **collapsed by default** so they don't clutter the tree. On a review's first
+    visit the client seeds the collapsed-folder set with the `.pr-notes` tree's
+    top folder key (`noteStorageFolderKeys`) and persists it, so a later manual
+    expand still sticks (it isn't re-seeded on the next load).
 
 ### 20.7 Cross-tool integration (Hot Sheet and other orchestrators)
 

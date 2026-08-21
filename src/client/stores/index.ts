@@ -27,6 +27,9 @@ interface ReviewState {
   /** Ids of files a content plugin renders (doc 29, GB-1052) — these get the
    *  Code/Rendered toggle and route the Rendered view through the image viewer. */
   pluginRendered: Set<string>;
+  /** Ids of files that carry AI review notes (doc 20 §20.6, GB-1136) — the
+   *  sidebar marks them with a note icon. */
+  notedFileIds: Set<string>;
 }
 
 export const reviewStore = defineStore({
@@ -39,6 +42,7 @@ export const reviewStore = defineStore({
     filterText: '',
     groundTruth: {},
     pluginRendered: new Set<string>(),
+    notedFileIds: new Set<string>(),
   }),
   actions: (set, get) => ({
     update: (partial: Partial<ReviewState>) => { set({ ...get(), ...partial }); },
