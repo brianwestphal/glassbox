@@ -6,10 +6,8 @@ kerf 4.3 added an opt-in `native: true` that hosts a modal surface in a real
 native `<dialog>` opened with `.showModal()` instead of a plain `<div>` overlay.
 This document defines Glassbox's adoption of native hosting (GB-1143).
 
-> **Status:** implemented on the `gb-1143-native-overlays` branch against kerf
-> **4.3.0-beta.1**. It does **not** ship on `main` until kerf 4.3.0 is stable
-> (don't put a beta framework version on main). The final **Tauri desktop
-> webview** visual pass is outstanding (see NFR-33.2).
+> **Status:** shipped (GB-1143 / GB-1145) on kerf **4.3.0** (stable). Verified in
+> Chromium (Playwright e2e + screenshots) and in the **Tauri desktop webview**.
 
 ## Motivation
 
@@ -58,15 +56,14 @@ genuinely modal. Both matter most in the Tauri desktop webview.
   engine without `<dialog>.showModal()` the same surfaces render as `<div>`
   overlays, and the `.<class>:not(dialog)` styling (full-screen flex + dim)
   applies. No behavior is lost, only the top-layer/inerting upgrade.
-- **NFR-33.2 — Desktop webview verification (manual).** The decisive check is the
-  Tauri desktop webview (WKWebView on macOS), where native dialogs matter and
-  where any UA-style regression would show. This is a manual `npm run tauri:dev`
-  screenshot pass; automated coverage is Chromium (Playwright) only, which
-  exercises the native path and catches gross CSS/behavior regressions.
+- **NFR-33.2 — Desktop webview verification (manual, done).** The decisive check
+  is the Tauri desktop webview (WKWebView on macOS), where native dialogs matter
+  and where any UA-style regression would show — **verified** there (GB-1145).
+  Automated coverage is Chromium (Playwright) only, which exercises the native
+  path and catches gross CSS/behavior regressions.
 
 ## Maintenance triggers
 
 Update this document when a modal surface's `native` flag changes, when the
 `<dialog>`/`::backdrop` CSS contract changes, or when a new body-appended popup
-is opened over a native modal (it must follow FR-33.3). Remove the beta/branch
-status note when kerf 4.3.0 is stable and this lands on `main`.
+is opened over a native modal (it must follow FR-33.3).

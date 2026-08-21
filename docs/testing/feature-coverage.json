@@ -2207,7 +2207,7 @@
       "waived": "Safe fallback (doc 33): native hosting is feature-detected by kerf; the .<class>:not(dialog) div-overlay styling is the fallback. Can't be asserted without an engine lacking <dialog>.showModal() (Playwright's Chromium supports it); the fallback CSS is inert where native applies."
     },
     "NFR-33.2": {
-      "waived": "Desktop webview verification (doc 33): the decisive Tauri/WKWebView visual pass is manual (npm run tauri:dev). Automated coverage is Chromium-only (exercises the native path + catches gross regressions); the desktop screenshot pass is tracked as a follow-up before merge."
+      "waived": "Desktop webview verification (doc 33): the decisive Tauri/WKWebView visual pass is manual (npm run tauri:dev) — done + confirmed working (GB-1145). Automated coverage is Chromium-only (exercises the native path + catches gross regressions)."
     }
   }
 }

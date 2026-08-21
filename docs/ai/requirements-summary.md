@@ -1141,7 +1141,7 @@ them too — relative to the reviewed content, so an older commit still shows a
 note). Unit + integration + a dedicated `chromium-notes` e2e (both split and
 unified).
 
-## 18p. Native modal overlay hosting (`33-native-overlay-hosting.md`) — **Branch-only (kerf 4.3.0-beta.1); not on main**
+## 18p. Native modal overlay hosting (`33-native-overlay-hosting.md`) — **Shipped (kerf 4.3.0)**
 
 GB-1143: the 6 modal surfaces (settings dialog, theme manager, theme editor,
 completion modal, `confirm()`, `choice()`) pass **`native: true`** so kerf hosts
@@ -1152,9 +1152,8 @@ restored (the `* { margin:0 }` reset defeats UA centering), inner widths
 `min(90vw, Npx)` (they collapse inside a shrink-to-fit dialog); `.<class>:not(dialog)`
 retains the div fallback. The theme-manager context menu is appended to the dialog
 (`handle.el`) not `document.body`, since a native modal inerts outside content.
-Chromium-verified (behavior e2e + screenshots incl. a centering-rect check); the
-**Tauri/WKWebView visual pass is manual + outstanding**. Lives on
-`gb-1143-native-overlays`; merges to main only once kerf 4.3.0 is stable.
+Verified in Chromium (behavior e2e + screenshots incl. a centering-rect check)
+**and in the Tauri desktop webview** (GB-1145). Shipped on kerf 4.3.0.
 
 ## 19. Implementation-status snapshot
 
