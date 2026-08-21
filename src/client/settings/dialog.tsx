@@ -139,14 +139,12 @@ export function showSettingsDialog(onClose?: () => void): void {
 
   // Escape + backdrop are handled by overlay() itself (GB-1147) now that the modal
   // is a native `<dialog>` — Escape routes through `handle.close()` (proper
-  // teardown + focus restore). This replaces a div-overlay-era bubble-phase
-  // document listener whose stated goal (never close the settings dialog out from
-  // under an open child) it did not actually meet: nested overlays each install
-  // their own document-level Escape handling, so a single Escape can dismiss more
-  // than one level. That's true here too and is acceptable — Escape backs out of
-  // the settings flow and never leaves a dialog stuck. Clean per-level Escape
-  // (dismiss only the topmost) would need cancel-event-based handling per dialog;
-  // tracked as a follow-up.
+  // teardown + focus restore). This replaced a div-overlay-era bubble-phase
+  // document listener. Because kerf's native path dismisses on the dialog's own
+  // `cancel` event (which the UA fires only on the TOPMOST modal dialog), a
+  // single Escape dismisses only the topmost surface — a stacked child overlay
+  // (theme manager / editor) closes alone, the settings dialog underneath stays
+  // (GB-1148).
   const handle = overlay(() => content.value(), {
     className: 'modal-overlay', dismiss: ['escape', 'backdrop'], trap: true, native: true,
   });

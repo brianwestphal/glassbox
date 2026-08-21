@@ -57,22 +57,41 @@ export function showThemeManager(onThemeChanged?: () => void): void {
 
     function close(): void { handle.close(); }
 
-    function handleEscape(e: KeyboardEvent): void {
-      if (contextMenuEl !== null) {
-        removeContextMenu();
-        e.stopPropagation();
-        return;
-      }
-      if (e.key === 'Escape') handle.close();
+    // Escape handling — routed so a single Escape dismisses only the TOPMOST
+    // surface (GB-1148). With `native: true` the manager is a native <dialog>,
+    // and the UA fires the `cancel` event ONLY on the topmost modal dialog, so
+    // this never fires while a child overlay (the theme editor, or a
+    // delete-confirm) is stacked on top — Escape then closes that child alone.
+    // We intercept `cancel` (rather than passing `dismiss: ['escape']`) so we
+    // can do the two-level close: an open context menu is dismissed first, and a
+    // second Escape closes the manager. `preventDefault()` stops the UA's own
+    // close so the close routes through kerf (teardown + focus restore).
+    // A document-level keydown was used before, but it fired regardless of which
+    // dialog was topmost, so one Escape leaked into the surface underneath.
+    const dialogEl = handle.el instanceof HTMLDialogElement ? handle.el : null;
+    if (dialogEl !== null) {
+      const onCancel = (e: Event): void => {
+        e.preventDefault();
+        if (contextMenuEl !== null) { removeContextMenu(); return; }
+        handle.close();
+      };
+      dialogEl.addEventListener('cancel', onCancel);
+      void handle.result.then(() => { dialogEl.removeEventListener('cancel', onCancel); });
+    } else {
+      // Div fallback (no <dialog>.showModal() support): there is no `cancel`
+      // event and no top-layer topmost semantics, so fall back to a
+      // document-level keydown (the pre-native behavior).
+      const handleEscape = (e: KeyboardEvent): void => {
+        if (contextMenuEl !== null) { removeContextMenu(); e.stopPropagation(); return; }
+        if (e.key === 'Escape') handle.close();
+      };
+      document.addEventListener('keydown', handleEscape);
+      void handle.result.then(() => { document.removeEventListener('keydown', handleEscape); });
     }
-    document.addEventListener('keydown', handleEscape);
 
-    // Tear down the manual keydown + any open context menu when the overlay
-    // closes by any path (backdrop click or a programmatic close()).
-    void handle.result.then(() => {
-      document.removeEventListener('keydown', handleEscape);
-      removeContextMenu();
-    });
+    // Drop any open context menu when the overlay closes by any path
+    // (backdrop click or a programmatic close()).
+    void handle.result.then(() => { removeContextMenu(); });
 
     async function refresh(): Promise<void> {
       themesSignal.value = await listThemes();

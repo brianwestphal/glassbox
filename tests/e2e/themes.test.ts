@@ -306,4 +306,73 @@ test.describe('Theme system', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.theme-editor-dialog')).not.toBeVisible({ timeout: 3000 });
   });
+
+  // GB-1148: with native <dialog> overlays a single Escape must dismiss only the
+  // TOPMOST surface. Before the fix, the theme manager's document-level keydown
+  // listener fired regardless of which dialog was topmost, so one Escape leaked
+  // into the surface underneath — closing two levels at once.
+  test('Escape closes only the topmost overlay (settings ← theme manager)', async ({ page }) => {
+    await page.goto('/');
+    const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]');
+    await settingsBtn.first().click();
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-tab="general"]').click();
+    await page.locator('#manage-themes-btn').click();
+    await expect(page.locator('.theme-manager-dialog')).toBeVisible({ timeout: 5000 });
+
+    // One Escape: the theme manager (topmost) closes, the settings dialog stays.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.theme-manager-dialog')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).toBeVisible();
+
+    // A second Escape then backs out of the settings dialog itself.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('Escape closes only the topmost overlay (manager ← theme editor)', async ({ page }) => {
+    await page.goto('/');
+    const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]');
+    await settingsBtn.first().click();
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-tab="general"]').click();
+    await page.locator('#manage-themes-btn').click();
+    await expect(page.locator('.theme-manager-dialog')).toBeVisible({ timeout: 5000 });
+    await page.locator('.theme-manager-item').first().dblclick();
+    await expect(page.locator('.theme-editor-dialog')).toBeVisible({ timeout: 5000 });
+
+    // One Escape closes only the editor; the manager and settings both remain.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.theme-editor-dialog')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.theme-manager-dialog')).toBeVisible();
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).toBeVisible();
+  });
+
+  // GB-1148: the theme manager keeps a two-level Escape — an open row context
+  // menu is dismissed first (the manager stays), and only a second Escape closes
+  // the manager. The context menu is a plain <div> inside the dialog, so this is
+  // handled by intercepting the dialog's own `cancel` event.
+  test('Escape dismisses the theme-manager context menu before the manager', async ({ page }) => {
+    await page.goto('/');
+    const settingsBtn = page.locator('.settings-btn, [data-settings-btn], button[title*="Settings"]');
+    await settingsBtn.first().click();
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-tab="general"]').click();
+    await page.locator('#manage-themes-btn').click();
+    await expect(page.locator('.theme-manager-dialog')).toBeVisible({ timeout: 5000 });
+
+    // Open a row's actions context menu.
+    await page.locator('.theme-manager-item .tm-menu-btn').first().click();
+    await expect(page.locator('.tm-context-menu')).toBeVisible({ timeout: 3000 });
+
+    // First Escape: only the context menu closes; the manager stays open.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.tm-context-menu')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.theme-manager-dialog')).toBeVisible();
+
+    // Second Escape: the manager closes, the settings dialog stays.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.theme-manager-dialog')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.settings-dialog:not(.theme-manager-dialog):not(.theme-editor-dialog)')).toBeVisible();
+  });
 });

@@ -35,7 +35,17 @@ genuinely modal. Both matter most in the Tauri desktop webview.
   `.modal`/`.kerf-confirm`/`.kerf-choice` is the visible box, and inner box
   widths are viewport-relative (`min(90vw, Npx)`) so they don't collapse inside a
   shrink-to-fit dialog. A click on the backdrop (outside the dialog box)
-  dismisses, and Tab focus is contained to the dialog.
+  dismisses, and Tab focus is contained to the dialog. **Escape dismisses only
+  the topmost overlay:** kerf's native path hooks the dialog's own `cancel`
+  event, which the UA fires on the topmost modal dialog alone, so a single Escape
+  closes just the frontmost surface and leaves a stacked parent (e.g. the
+  settings dialog under the theme manager) open (GB-1148). A surface that needs a
+  two-level Escape — the theme manager, whose row context menu is a plain `<div>`
+  inside the dialog rather than its own dialog — intercepts that `cancel` to
+  dismiss the inner popup first, then closes on a second Escape. A document-level
+  keydown listener must not be used for Escape on a native modal: it fires
+  regardless of stacking order and leaks the dismissal into the surface
+  underneath.
 
 ## 33.2 Body-appended child popups over a native modal
 

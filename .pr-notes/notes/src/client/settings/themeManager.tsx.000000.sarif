@@ -64,6 +64,82 @@
           "branch": "gb-1143-native-overlays"
         }
       ]
+    },
+    {
+      "tool": {
+        "driver": {
+          "name": "Claude (glassbox integrator)",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt3leukhqa89hy5n",
+          "message": {
+            "text": "Escape must dismiss only the topmost overlay, so it hooks the native <dialog>'s cancel event, not a document-level keydown.\n\nWhy the old approach leaked two levels\nThe manager previously registered a document-level keydown Escape handler. A document listener fires regardless of which dialog is topmost, so it closed the manager during the keydown phase; the UA then ran Escape's default action and fired cancel on the now-topmost dialog underneath (the settings dialog, or the theme editor), closing a second level from one keypress (GB-1148).\n\nWhy cancel fixes it\nFor a modal <dialog>, the UA fires cancel only on the topmost one. kerf's native overlay path dismisses on exactly this event (see the sibling dialogs (0)), so listening for cancel here is stacking-correct by construction — a child overlay on top absorbs the Escape and this handler never runs.\n\nWhy intercept cancel instead of dismiss: ['escape']\nThe manager needs a two-level Escape: its row context menu is a plain <div> inside the dialog (not its own dialog), so the first Escape must close that popup and keep the manager open. preventDefault() stops the UA's own close so, when we do close, it routes through handle.close() (kerf teardown + focus restore). The dismiss: ['escape'] shortcut can't express the popup-first step.\n\nThe <div> fallback branch keeps the document-keydown path: without <dialog>.showModal() there is no cancel event and no top-layer stacking semantics for it to respect anyway.\n\nVerified by three e2e cases in tests/e2e/themes.test.ts (settings←manager, manager←editor, context-menu←manager).\n",
+            "markdown": "Escape must dismiss only the topmost overlay, so it hooks the native `<dialog>`'s `cancel` event, not a document-level `keydown`.\n\n### Why the old approach leaked two levels\nThe manager previously registered a `document`-level `keydown` Escape handler. A document listener fires **regardless of which dialog is topmost**, so it closed the manager during the keydown phase; the UA then ran Escape's default action and fired `cancel` on the *now-topmost* dialog underneath (the settings dialog, or the theme editor), closing a second level from one keypress (GB-1148).\n\n### Why `cancel` fixes it\nFor a modal `<dialog>`, the UA fires `cancel` **only on the topmost** one. kerf's native overlay path dismisses on exactly this event (see [the sibling dialogs](0)), so listening for `cancel` here is stacking-correct by construction — a child overlay on top absorbs the Escape and this handler never runs.\n\n### Why intercept `cancel` instead of `dismiss: ['escape']`\nThe manager needs a two-level Escape: its row context menu is a plain `<div>` inside the dialog (not its own dialog), so the first Escape must close that popup and keep the manager open. `preventDefault()` stops the UA's own close so, when we do close, it routes through `handle.close()` (kerf teardown + focus restore). The `dismiss: ['escape']` shortcut can't express the popup-first step.\n\nThe `<div>` fallback branch keeps the document-`keydown` path: without `<dialog>.showModal()` there is no `cancel` event and no top-layer stacking semantics for it to respect anyway.\n\nVerified by three e2e cases in `tests/e2e/themes.test.ts` (settings←manager, manager←editor, context-menu←manager).\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/themeManager.tsx"
+                },
+                "region": {
+                  "startLine": 66,
+                  "endLine": 88,
+                  "snippet": {
+                    "text": "    // can do the two-level close: an open context menu is dismissed first, and a\n    // second Escape closes the manager. `preventDefault()` stops the UA's own\n    // close so the close routes through kerf (teardown + focus restore).\n    // A document-level keydown was used before, but it fired regardless of which\n    // dialog was topmost, so one Escape leaked into the surface underneath.\n    const dialogEl = handle.el instanceof HTMLDialogElement ? handle.el : null;\n    if (dialogEl !== null) {\n      const onCancel = (e: Event): void => {\n        e.preventDefault();\n        if (contextMenuEl !== null) { removeContextMenu(); return; }\n        handle.close();\n      };\n      dialogEl.addEventListener('cancel', onCancel);\n      void handle.result.then(() => { dialogEl.removeEventListener('cancel', onCancel); });\n    } else {\n      // Div fallback (no <dialog>.showModal() support): there is no `cancel`\n      // event and no top-layer topmost semantics, so fall back to a\n      // document-level keydown (the pre-native behavior).\n      const handleEscape = (e: KeyboardEvent): void => {\n        if (contextMenuEl !== null) { removeContextMenu(); e.stopPropagation(); return; }\n        if (e.key === 'Escape') handle.close();\n      };\n      document.addEventListener('keydown', handleEscape);"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/settings/dialog.tsx"
+                },
+                "region": {
+                  "startLine": 150
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1148"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "0c13b21a40663e9bf3fdf80e93a566a2"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "7ab698d6f47339d1729e0859e73e4922c028416a",
+          "branch": "main"
+        }
+      ]
     }
   ]
 }
