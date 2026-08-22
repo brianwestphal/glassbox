@@ -51,7 +51,8 @@ const gitDiff = vi.hoisted(() => ({
 vi.mock('../../../src/git/diff.js', () => gitDiff);
 
 const ensureGlassboxGitignored = vi.hoisted(() => vi.fn(() => ({ changed: false })));
-vi.mock('../../../src/git/gitignore.js', () => ({ ensureGlassboxGitignored }));
+const ensureGlassboxGitignoredWithNotice = vi.hoisted(() => vi.fn());
+vi.mock('../../../src/git/gitignore.js', () => ({ ensureGlassboxGitignored, ensureGlassboxGitignoredWithNotice }));
 
 vi.mock('../../../src/lock.js', () => ({ acquireLock: vi.fn() }));
 
@@ -334,7 +335,9 @@ describe('runDifftoolServe', () => {
 
     // Data dir was created and wired up
     expect(setDataDir).toHaveBeenCalledWith(dataDir);
-    expect(ensureGlassboxGitignored).toHaveBeenCalledWith(dataDir);
+    // GB-1155: the difftool-serve path routes through the notice-printing helper
+    // (so a first-time difftool launch prints the FR-27.8 .gitignore notice).
+    expect(ensureGlassboxGitignoredWithNotice).toHaveBeenCalledWith(dataDir);
     // Stale blobs from a hard-killed previous session are cleared up front
     expect(clearImageBlobs).toHaveBeenCalledWith(dataDir);
     expect(dbQueries.createReview).toHaveBeenCalledWith(process.cwd(), 'git difftool', 'difftool');
@@ -476,7 +479,6 @@ describe('main', () => {
     dbQueries.createReview.mockResolvedValue({ id: 'diff-rev' });
     dbQueries.addReviewFile.mockResolvedValue({});
     vi.mocked(ensureSkills).mockReturnValueOnce(['Claude Code']);
-    ensureGlassboxGitignored.mockReturnValueOnce({ changed: true });
 
     await runMain('--diff', a, b, '--data-dir', tmp, '--no-open', '--ai-service-test');
 
@@ -484,8 +486,10 @@ describe('main', () => {
     expect(dbQueries.createReview).toHaveBeenCalledWith(
       process.cwd(), 'before.txt ↔ after.txt', 'uncommitted', '', '');
     expect(acquireLock).toHaveBeenCalled();
+    // GB-1155: the launch routes gitignore handling through the notice-printing
+    // helper; the notice itself is unit-tested in gitignore.test.ts.
+    expect(ensureGlassboxGitignoredWithNotice).toHaveBeenCalled();
     const out = logged(logSpy);
-    expect(out).toContain('Updated .gitignore');
     expect(out).toContain('AI tool skills created/updated for: Claude Code');
     expect(out).toContain('AI service test mode enabled');
   });
