@@ -14,7 +14,7 @@ vi.mock('../../../src/git/repo.js', () => ({
   isGitRepo: (cwd: string) => isGitRepoMock(cwd),
 }));
 
-const { computeGitignore, ensureGlassboxGitignored, GLASSBOX_GITIGNORE_LINES } = await import(
+const { computeGitignore, ensureGlassboxGitignored, ensureGlassboxGitignoredWithNotice, GITIGNORE_UPDATE_NOTICE, GLASSBOX_GITIGNORE_LINES } = await import(
   '../../../src/git/gitignore.js'
 );
 
@@ -152,5 +152,45 @@ describe('ensureGlassboxGitignored', () => {
     expect(changed).toBe(false);
     expect(isGitRepoMock).not.toHaveBeenCalled();
     expect(writeFileSyncMock).not.toHaveBeenCalled();
+  });
+});
+
+// FR-27.8: every launch path that writes `.glassbox/` prints a one-line notice
+// when it changes `.gitignore`. Both the main review path and the difftool-serve
+// path now route through this single helper (GB-1155), so testing it covers both.
+describe('ensureGlassboxGitignoredWithNotice (FR-27.8)', () => {
+  it('prints the notice when .gitignore was changed', () => {
+    isGitRepoMock.mockReturnValue(true);
+    existsSyncMock.mockReturnValue(false); // no file -> change needed
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    ensureGlassboxGitignoredWithNotice('/repo/.glassbox');
+
+    expect(writeFileSyncMock).toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(GITIGNORE_UPDATE_NOTICE);
+    log.mockRestore();
+  });
+
+  it('stays silent when no change was needed', () => {
+    isGitRepoMock.mockReturnValue(true);
+    existsSyncMock.mockReturnValue(true);
+    readFileSyncMock.mockReturnValue(`node_modules/\n${BLOCK}\n`); // already up to date
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    ensureGlassboxGitignoredWithNotice('/repo/.glassbox');
+
+    expect(writeFileSyncMock).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('stays silent outside a git repo (no notice, no write)', () => {
+    isGitRepoMock.mockReturnValue(false);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    ensureGlassboxGitignoredWithNotice('/somewhere/.glassbox');
+
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 });

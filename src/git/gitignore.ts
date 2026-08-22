@@ -114,3 +114,18 @@ export function ensureGlassboxGitignored(glassboxDir: string): { changed: boolea
   if (changed) writeFileSync(gitignorePath, content, 'utf-8');
   return { changed };
 }
+
+/** The one-line notice printed when a launch modifies `.gitignore` (FR-27.8). */
+export const GITIGNORE_UPDATE_NOTICE =
+  'Updated .gitignore to exclude .glassbox/ (keeping settings.json tracked).';
+
+/**
+ * Ensure `.glassbox/` is gitignored and print the FR-27.8 notice when the file
+ * was changed. Every launch path that writes `.glassbox/` into a repo (the main
+ * review path AND the difftool-serve path) goes through this, so the notice is
+ * consistent and can't be forgotten on one path.
+ */
+export function ensureGlassboxGitignoredWithNotice(glassboxDir: string): void {
+  const { changed } = ensureGlassboxGitignored(glassboxDir);
+  if (changed) console.log(GITIGNORE_UPDATE_NOTICE);
+}

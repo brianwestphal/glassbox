@@ -9,7 +9,7 @@ import { setAIServiceTest, setDebug, setDemoMode } from "./debug.js";
 import { DEMO_SCENARIOS, setupDemoReview } from "./demo.js";
 import type { ReviewMode } from "./git/diff.js";
 import { getFileDiffs, getHeadCommit, getModeArgs, getModeString, getRepoName, getRepoRoot, isGitRepo } from "./git/diff.js";
-import { ensureGlassboxGitignored } from "./git/gitignore.js";
+import { ensureGlassboxGitignoredWithNotice } from "./git/gitignore.js";
 import { acquireLock } from "./lock.js";
 import { collectNoteOnlyFiles } from "./review-notes/unchanged-files.js";
 import { updateReviewDiffs } from "./review-update.js";
@@ -278,8 +278,8 @@ export async function runDifftoolServe(
   mkdirSync(dataDir, { recursive: true });
   setDataDir(dataDir);
   // A difftool session also writes `.glassbox/` into the repo — keep it
-  // gitignored automatically (doc 27).
-  ensureGlassboxGitignored(dataDir);
+  // gitignored automatically (doc 27), printing the FR-27.8 notice on change.
+  ensureGlassboxGitignoredWithNotice(dataDir);
   // Clear any image blobs left by a previous session that was hard-killed
   // (e.g. desktop window force-close) before it could run teardown (GB-863).
   clearImageBlobs(dataDir);
@@ -457,8 +457,7 @@ export async function main() {
   // Keep `.glassbox/` out of version control automatically (doc 27), while
   // leaving the per-project `settings.json` tracked. No-ops outside a git repo
   // and when the user has opted out via a commented rule.
-  const gitignore = ensureGlassboxGitignored(dataDir);
-  if (gitignore.changed) console.log("Updated .gitignore to exclude .glassbox/ (keeping settings.json tracked).");
+  ensureGlassboxGitignoredWithNotice(dataDir);
 
   // Check for updates (once per day, or if --check-for-updates is passed)
   await checkForUpdates(forceUpdateCheck);

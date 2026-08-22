@@ -1696,7 +1696,7 @@
       "tests": [
         "tests/unit/git/gitignore.test.ts"
       ],
-      "note": "Notify on change: computeGitignore returns a `changed` flag (true when it writes, false when already canonical) that gates the launch-time notice."
+      "note": "Notify on change: `ensureGlassboxGitignoredWithNotice` prints the FR-27.8 notice only when `.gitignore` was changed (asserted: prints on change, silent when up-to-date, silent outside a repo). Both the main review path and the difftool-serve path route through this single helper (GB-1155), so both launch paths are covered."
     },
     "7.6": {
       "tests": [
