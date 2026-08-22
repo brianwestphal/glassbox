@@ -397,6 +397,36 @@ test.describe('Image feedback follow-ups', () => {
     expect(Math.abs(drawn.width - (x1 - x0))).toBeLessThan(6);
     expect(Math.abs(drawn.height - (y1 - y0))).toBeLessThan(6);
   });
+
+  // GB-1161 transition: the per-canvas WeakMap ZoomState accumulates (zoom + pan)
+  // then resets cleanly. Zoom in + pan yields a non-identity transform on the
+  // wrap; zooming back out to base (clamped to MIN_ZOOM=1) returns it to identity
+  // with NO residual pan (applyZoom emits '' at zoom<=1) — the accumulate→reset
+  // edge a single zoom-from-clean test can't see.
+  test('zoom in + pan then zoom back out returns the canvas to identity (GB-1161)', async ({ page }) => {
+    await openImageDiff(page);
+    await showDifference(page);
+    const wrap = page.locator('[data-panel="difference"] .image-zoom-wrap');
+    const canvas = page.locator('[data-panel="difference"] .image-visual-canvas');
+    const zoomIn = page.locator('.diff-toolbar-image [data-zoom-action="in"]');
+    const zoomOut = page.locator('.diff-toolbar-image [data-zoom-action="out"]');
+
+    await zoomIn.click();
+    await zoomIn.click();
+    const cbox = await canvas.boundingBox();
+    if (!cbox) throw new Error('canvas has no box');
+    await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(cbox.x + cbox.width / 2 + 40, cbox.y + cbox.height / 2 + 30, { steps: 6 });
+    await page.mouse.up();
+    // Non-identity while zoomed + panned (a translate+scale matrix).
+    await expect.poll(() => wrap.evaluate(el => getComputedStyle(el).transform)).not.toBe('none');
+
+    // Zoom back out past the base — MIN_ZOOM clamps at 1, so the transform resets
+    // to identity with no leftover pan.
+    for (let i = 0; i < 6; i++) await zoomOut.click();
+    await expect.poll(() => wrap.evaluate(el => getComputedStyle(el).transform)).toBe('none');
+  });
 });
 
 // GB-941 — SVG rendered view zooms as a vector (re-rasterizes) instead of

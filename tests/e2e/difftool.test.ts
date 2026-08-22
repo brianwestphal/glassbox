@@ -126,6 +126,14 @@ test('accumulates appended files live, then "Done" ends the session (doc 19)', a
   // FileDiff flows through the normal diff view).
   await expect(page.locator('#diff-container')).not.toBeEmpty({ timeout: 5_000 });
 
+  // GB-1161 transition: auto-select-first fires ONLY ONCE. Capture the selected
+  // file, then append a 5th file — a later poll must NOT re-select (the
+  // `currentFileId === null` guard suppresses it), so the shown file is unchanged.
+  const selectedPath = await page.locator('.diff-view .file-path').first().textContent();
+  await append('src/zeta.ts', '', 'export const zeta = 1;\n');
+  await expect(page.locator('.file-item')).toHaveCount(5, { timeout: 5_000 });
+  await expect(page.locator('.diff-view .file-path').first()).toHaveText(selectedPath ?? '');
+
   // GB-863 — the image route serves the appended binary from the on-disk blob
   // store (a difftool session has no git refs / working tree to re-read).
   const img = await page.request.get(`${BASE}/api/image/${imageFileId}/new`);
@@ -137,4 +145,8 @@ test('accumulates appended files live, then "Done" ends the session (doc 19)', a
   // shows a terminal overlay, then the detached server exits on its own.
   await page.locator('#difftool-done').click();
   await expect(page.locator('#difftool-ended-overlay')).toBeVisible({ timeout: 5_000 });
+  // GB-1161 transition: end-of-session shows EXACTLY ONE overlay — the
+  // `sessionEnded` guard means the Done click and the subsequent failed poll (as
+  // the detached server tears down) don't each add one.
+  await expect(page.locator('#difftool-ended-overlay')).toHaveCount(1);
 });
