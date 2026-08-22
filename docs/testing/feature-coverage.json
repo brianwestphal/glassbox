@@ -2214,13 +2214,14 @@
         "tests/unit/review-notes/note-open-commit.test.ts",
         "tests/e2e/diff-viewing.test.ts"
       ],
-      "note": "Open-commit button on the origin-commit label (GB-1144): the unit test renders renderReviewNoteRowsHtml and asserts the .ai-note-open-commit button with data-open-commit/-file/-line (and no button when the note has no origin); the diff-viewing e2e asserts the button is visible with those attributes on the demo note."
+      "note": "Open-commit button on the origin-commit label (GB-1144): the unit test renders renderReviewNoteRowsHtml and asserts the .ai-note-open-commit button with data-open-commit/-file/-line (and no button when the note has no origin); the diff-viewing e2e asserts the button is visible with those attributes on the demo note. The success e2e clicks Open commit (route mocked to succeed) and asserts the client navigates to /review/<id> with the note's ?file=&line= deep-link."
     },
     "FR-34.2": {
       "tests": [
-        "tests/integration/review-open/commit-review.test.ts"
+        "tests/integration/review-open/commit-review.test.ts",
+        "tests/integration/api/from-commit-route.test.ts"
       ],
-      "note": "Runtime commit-review creation (GB-1144): the integration test drives openCommitReview against a real temp git repo + the in-memory DB — creates a review with the commit's changed files, reuses the in-progress review on a second open (incl. via an abbreviated sha, proving full-sha canonicalization de-dupes), and throws CommitNotFoundError (route → 404) for an unknown sha."
+      "note": "Runtime commit-review creation (GB-1144/GB-1149): the helper integration test drives openCommitReview against a real temp git repo (create, reuse in-progress AND completed, abbreviated-sha canonicalization, CommitNotFoundError); the route integration test covers the POST /api/reviews/from-commit wiring — parseBody, 200 success shape, reuse, 404 for a bad sha, 400 for an empty sha."
     },
     "FR-34.3": {
       "tests": [

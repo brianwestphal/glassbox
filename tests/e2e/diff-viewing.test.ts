@@ -440,6 +440,33 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     });
   });
 
+  // The success browser glue (click → POST /reviews/from-commit → navigate to the
+  // new review with a ?file=&line= deep-link). The demo sha isn't a real commit,
+  // so mock the route to succeed; this exercises the client's fetch→
+  // window.location.assign path end-to-end without a git-repo fixture (the
+  // server route + creation are covered by from-commit-route.test.ts). Doc 34.
+  test('Open commit navigates to the new review with the note\'s file+line deep-link', async ({ page }) => {
+    await openModifiedFile(page);
+    await page.route('**/api/reviews/from-commit**', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ reviewId: 'stub-commit-review', fileCount: 1, created: true }),
+    }));
+    // The stub review id won't resolve server-side; intercept its page so the
+    // assertion is about the URL the client navigated to, not a 404 body.
+    await page.route('**/review/stub-commit-review*', route => route.fulfill({
+      status: 200, contentType: 'text/html', body: '<!doctype html><title>stub</title>',
+    }));
+
+    const openBtn = page.locator('.ai-note-row.ai-note-review[data-kind="rationale"] .ai-note-open-commit').first();
+    await expect(openBtn).toBeVisible({ timeout: 5000 });
+    await openBtn.click();
+
+    await page.waitForURL(
+      /\/review\/stub-commit-review\?file=src%2Fauth%2Fsession\.ts&line=14$/,
+      { timeout: 5000 },
+    );
+  });
+
   // A `?file=&line=` deep-link selects that file (overriding auto-select-first)
   // and cleans the query out of the URL afterward (doc 34, FR-34.3).
   test('a ?file=&line= deep-link selects that file and cleans the URL', async ({ page }) => {

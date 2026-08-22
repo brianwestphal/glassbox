@@ -13,7 +13,7 @@ import { setupTestDb, teardownTestDb } from '../../helpers/db.js';
 vi.mock('../../../src/db/connection.js', () => ({ getDb: vi.fn() }));
 
 import { getDb } from '../../../src/db/connection.js';
-import { getReviewFiles } from '../../../src/db/queries.js';
+import { getReviewFiles, updateReviewStatus } from '../../../src/db/queries.js';
 import { CommitNotFoundError, openCommitReview } from '../../../src/review-open/commit-review.js';
 
 function git(repo: string, args: string): string {
@@ -67,8 +67,16 @@ describe('openCommitReview (doc 34)', () => {
   it('resolves an abbreviated sha the same as the full one', async () => {
     const short = sha.slice(0, 8);
     const res = await openCommitReview(repo, short);
-    // Same commit → same in-progress review is reused.
+    // Same commit → the same existing review is reused.
     expect(res.created).toBe(false);
+  });
+
+  it('reuses even a COMPLETED review of the same commit rather than creating a fresh one (GB-1149)', async () => {
+    const first = await openCommitReview(repo, sha);
+    await updateReviewStatus(first.reviewId, 'completed');
+    const second = await openCommitReview(repo, sha);
+    expect(second.created).toBe(false);
+    expect(second.reviewId).toBe(first.reviewId);
   });
 
   it('throws CommitNotFoundError for an unknown sha', async () => {

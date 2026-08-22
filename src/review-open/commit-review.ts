@@ -10,7 +10,7 @@
  * plus the note-only files of doc 20 §20.6), and de-dupes via
  * `getLatestInProgressReview` so re-opening the same commit reuses the record.
  */
-import { addReviewFile, createReview, getLatestInProgressReview, getReviewFiles } from '../db/queries.js';
+import { addReviewFile, createReview, getLatestReviewByMode, getReviewFiles } from '../db/queries.js';
 import { getFileDiffs, getModeArgs, getModeString } from '../git/diff.js';
 import { getRepoName, resolveCommitSha } from '../git/repo.js';
 import type { ReviewMode } from '../git/types.js';
@@ -45,10 +45,13 @@ export async function openCommitReview(repoRoot: string, sha: string): Promise<O
   const modeStr = getModeString(mode);
   const modeArgs = getModeArgs(mode);
 
-  // Reuse an in-progress review for the exact same commit (same mode string), so
-  // repeated jumps to a commit land on the same review rather than piling up
-  // duplicates. Matches `launchReview`'s in-progress reuse.
-  const existing = await getLatestInProgressReview(repoRoot, modeStr, modeArgs);
+  // Reuse ANY existing review for the exact same commit (same mode string),
+  // in-progress OR completed, so repeated jumps to a commit land on the same
+  // review rather than piling up duplicates. Reusing a completed one is safe
+  // here (unlike `launchReview`, which only reuses in-progress): the reviewed
+  // sha is immutable, so the commit's diff never changes between opens — the
+  // user can reopen the completed review from the toolbar if they want (GB-1149).
+  const existing = await getLatestReviewByMode(repoRoot, modeStr, modeArgs);
   if (existing !== undefined) {
     const files = await getReviewFiles(existing.id);
     return { reviewId: existing.id, fileCount: files.length, created: false };

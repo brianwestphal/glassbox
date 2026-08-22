@@ -97,6 +97,23 @@ export async function getLatestInProgressReview(repoPath: string, mode: string, 
   return parseRow(ReviewSchema, result.rows[0]);
 }
 
+/** Latest review for a repo + mode (+ optional args), regardless of status.
+ *  Used to de-dupe on-demand commit reviews (doc 34): re-opening the same commit
+ *  reuses even a *completed* review rather than piling up duplicates. Safe for a
+ *  commit review because the reviewed sha is immutable, so its diff never
+ *  changes between opens. */
+export async function getLatestReviewByMode(repoPath: string, mode: string, modeArgs?: string): Promise<Review | undefined> {
+  const db = await getDb();
+  const result = await db.query(
+    `SELECT * FROM reviews
+     WHERE repo_path = $1 AND mode = $2
+     AND ($3::text IS NULL OR mode_args = $3)
+     ORDER BY created_at DESC LIMIT 1`,
+    [repoPath, mode, modeArgs ?? null]
+  );
+  return parseRow(ReviewSchema, result.rows[0]);
+}
+
 // --- Review Files ---
 
 export async function addReviewFile(reviewId: string, filePath: string, diffData: string, differenceScore: number | null = null): Promise<ReviewFile> {

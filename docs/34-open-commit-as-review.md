@@ -31,8 +31,11 @@ deep-link into any review.
   `openCommitReview` in `src/review-open/commit-review.ts`. The sha is
   canonicalized to its full 40-char form (`resolveCommitSha`) before building the
   mode string, so opening the same commit via different spellings (short vs full)
-  de-dupes to one review; an in-progress review for that commit is reused rather
-  than duplicated. An unresolvable sha returns **404** (`CommitNotFoundError`).
+  de-dupes to one review; any existing review for that commit — **in-progress or
+  completed** — is reused rather than duplicated (`getLatestReviewByMode`, GB-1149;
+  safe because the reviewed sha is immutable so the diff never changes between
+  opens, and the user can reopen a completed one from the toolbar). An
+  unresolvable sha returns **404** (`CommitNotFoundError`).
   This is the only route that creates a review — the CLI is otherwise the sole
   creator. The created review is a normal review: it appears in Review History.
 
