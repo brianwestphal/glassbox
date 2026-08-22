@@ -1,6 +1,6 @@
 import type { SafeHtml, Signal } from 'kerfjs';
 import { delegate, signal } from 'kerfjs';
-import { overlay } from 'kerfjs/overlay';
+import { confirm, overlay } from 'kerfjs/overlay';
 import { debounce } from 'kerfjs/timing';
 
 import type { DatabaseBackup, ListBackupsResp } from '../../api/db-backups.js';
@@ -25,7 +25,7 @@ import {
   updateProjectSettings as rawUpdateProjectSettings,
 } from '../../api/index.js';
 import { IconX } from '../../icons.js';
-import { asButton, asEl, asInput, asSelect, toElement } from '../dom.js';
+import { asButton, asEl, asInput, asSelect } from '../dom.js';
 import { invalidateGuidedAnalysis } from '../guided.js';
 import { asKeyStorage, asPlatform } from '../narrow.js';
 import { triggerShare } from '../share.js';
@@ -214,39 +214,17 @@ interface ModalShell {
 }
 
 /**
- * Confirm deleting a retained database backup.
- *
- * Mirrors the theme-manager confirm rather than using `window.confirm`, which
- * does not render inside the Tauri webview.
+ * Confirm deleting a retained database backup — via kerfjs/overlay's `confirm()`
+ * (native <dialog>, focus trap + restore, Escape/backdrop dismiss), replacing a
+ * hand-rolled `.modal-overlay`. Not `window.confirm`, which doesn't render in the
+ * Tauri webview. The backup name is folded into the message (the picker's
+ * separate code-block paragraph is dropped for the flat confirm body).
  */
-function showDeleteBackupConfirm(name: string, onConfirm: () => void): void {
-  const confirmOverlay = toElement(
-    <div className="modal-overlay">
-      <div className="modal" style="max-width:420px">
-        <h3>Delete Database Backup</h3>
-        <p>
-          Delete this backup of your review database? Your current reviews are not affected — but
-          this removes the copy kept from before the upgrade, and it cannot be undone.
-        </p>
-        <p><code>{name}</code></p>
-        <div className="modal-actions">
-          <button className="btn btn-sm" id="backup-del-cancel">Cancel</button>
-          <button className="btn btn-sm btn-danger" id="backup-del-confirm">Delete</button>
-        </div>
-      </div>
-    </div>
+function showDeleteBackupConfirm(name: string): Promise<boolean> {
+  return confirm(
+    `Delete the database backup "${name}"? Your current reviews are not affected — but this removes the copy kept from before the upgrade, and it cannot be undone.`,
+    { title: 'Delete Database Backup', okText: 'Delete', cancelText: 'Cancel', danger: true, native: true },
   );
-
-  confirmOverlay.querySelector('#backup-del-cancel')?.addEventListener('click', () => { confirmOverlay.remove(); });
-  confirmOverlay.querySelector('#backup-del-confirm')?.addEventListener('click', () => {
-    confirmOverlay.remove();
-    onConfirm();
-  });
-  confirmOverlay.addEventListener('click', (e) => {
-    if (e.target === confirmOverlay) confirmOverlay.remove();
-  });
-
-  document.body.appendChild(confirmOverlay);
 }
 
 function renderSettingsModal(
@@ -760,21 +738,20 @@ function setupDelegates(args: {
   void delegate(overlay, 'click', '[data-delete-backup]', (_e, btn) => {
     const name = asEl(btn).dataset.deleteBackup;
     if (name === undefined) return;
-    showDeleteBackupConfirm(name, () => {
-      void (async () => {
-        try {
-          await deleteDatabaseBackup(name);
-        } catch {
-          showToast('Could not delete the backup');
-          return;
-        }
-        // Re-read from the server rather than filtering locally, so the list
-        // reflects what is actually on disk.
-        const fresh = await listDatabaseBackups();
-        setUi({ dbBackups: fresh.backups, dbQuarantined: fresh.quarantined });
-        showToast('Backup deleted');
-      })();
-    });
+    void (async () => {
+      if (!(await showDeleteBackupConfirm(name))) return;
+      try {
+        await deleteDatabaseBackup(name);
+      } catch {
+        showToast('Could not delete the backup');
+        return;
+      }
+      // Re-read from the server rather than filtering locally, so the list
+      // reflects what is actually on disk.
+      const fresh = await listDatabaseBackups();
+      setUi({ dbBackups: fresh.backups, dbQuarantined: fresh.quarantined });
+      showToast('Backup deleted');
+    })();
   });
   // Reveal a preserved directory in the OS file manager. The only action
   // offered for quarantined unreadable data (doc 9 §9.5) — it may be the user's

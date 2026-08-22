@@ -15,10 +15,10 @@
  *    server tears down (the browser-mode equivalent of closing the window).
  */
 import { delegate } from 'kerfjs';
+import { overlay } from 'kerfjs/overlay';
 
 import { endDifftool, pollDifftool } from '../../api/index.js';
 import { selectFile } from '../diff/selection.js';
-import { toElement } from '../dom.js';
 import { reviewStore, visibleFileOrder } from '../stores/index.js';
 import { DIFFTOOL_SESSION_POLL_MS } from '../timing.js';
 
@@ -94,13 +94,18 @@ function onSessionEnded(): void {
 
 function showEndedOverlay(): void {
   if (document.getElementById('difftool-ended-overlay') !== null) return;
-  const overlay = toElement(
-    <div className="modal-overlay" id="difftool-ended-overlay">
-      <div className="modal">
+  // Terminal info overlay via kerfjs/overlay (native <dialog>): no dismiss —
+  // the session is over, the only action is to close the tab. `onSessionEnded`
+  // already guarantees this runs once (the `sessionEnded` guard), and the
+  // getElementById check above is belt-and-braces. The id lives on the inner
+  // `.modal` so it stays queryable.
+  overlay(
+    () => (
+      <div className="modal" id="difftool-ended-overlay">
         <h3>Review session ended</h3>
         <p>The <code>git difftool</code> session is complete. You can close this tab.</p>
       </div>
-    </div>,
+    ),
+    { className: 'modal-overlay', native: true },
   );
-  document.body.appendChild(overlay);
 }

@@ -166,6 +166,27 @@ uninstall flow. The items below remain manual (the paths the e2e doesn't drive):
   zoom/comparison-mode pointer interaction on a plugin-rendered file, which reuses
   the shared image-viewer gestures already in the manual plan above.)*
 
+## Confirmation dialogs migrated to kerfjs/overlay (doc 33, GB-1160)
+
+These three surfaces were migrated from hand-rolled `.modal-overlay` DOM to
+kerfjs/overlay's `confirm()` / `overlay()` (native `<dialog>`, focus trap + focus
+restore, Escape/backdrop dismiss). The `confirm()`/`overlay()` mechanism itself is
+already e2e-covered (the theme-manager delete confirm in `themes.test.ts`; the
+difftool session-ended overlay `#difftool-ended-overlay` in `difftool.test.ts`).
+What remains manual is each surface's own wiring, because seeding its trigger
+state isn't available in the demo e2e server:
+
+- **Review history deletes (doc 1 FR-1.4)** — on `/history` with more than the
+  current review present, "Delete this review", "Delete all completed", and
+  "Delete ALL" each open a native danger-confirm; **Cancel** dismisses (no delete),
+  **Delete** removes the row / reloads. Escape/backdrop dismiss. *(The demo server
+  seeds only the current review, so no delete buttons render — hence manual.)*
+- **Delete database backup (doc 9 §9.1a)** — Settings → the "Database backups"
+  section (only shown when a pre-PG-upgrade backup exists) → **Delete** opens the
+  native danger-confirm naming the backup; Delete removes it + toasts "Backup
+  deleted", Cancel/Escape dismiss. *(Requires a retained pre-upgrade backup on
+  disk, which the e2e environment never has.)*
+
 ## Automated Coverage Summary
 
 - **Content-plugin render paths (doc 29 FR-29.2 / FR-29.13, GB-1043)** — the
