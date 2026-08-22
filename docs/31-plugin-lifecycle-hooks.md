@@ -73,7 +73,8 @@ accepts a content-less registration (doc 29 FR-29.11).
 
 Shipped (GB-1065): the contract (`ReviewHooks` on `PluginRegistration`, the
 `ReviewHookInfo` / `AnnotationHookInfo` shapes), the fail-soft dispatchers
-(`notifyReviewCreated` / `notifyReviewCompleted` in `src/plugins/index.ts`), and
+(`notifyReviewCreated` / `notifyReviewCompleted` in `src/plugins/hooks.ts`,
+re-exported from `src/plugins/index.ts`), and
 both wiring points (`server.ts` after plugin load; the completion route after
 export). Unit-tested (`tests/unit/plugins/reviewHooks.test.ts`) and verified live
 end-to-end with a fixture plugin. A worked example (a hook that writes a JSON

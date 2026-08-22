@@ -359,7 +359,7 @@ Glassbox — **without Glassbox running any capturer itself**.
   via `pngjs`/`jpeg-js`; `comparePerceptual` runs `pixelmatch` at YIQ threshold
   0.1 → difference score; `isIdentical`). Formatting helpers shared by server +
   client live in `src/utils/diffScore.ts` (`formatDiffPct`, `diffScoreLevel`).
-- **Storage:** `review_files.difference_score REAL` (DDL in `src/db/schema.ts`,
+- **Storage:** `review_files.difference_score REAL` (DDL in `src/db/ddl.ts`,
   migration in `src/db/connection.ts`, `ReviewFileSchema`, `addReviewFile` param).
   Computed once at launch in `src/cli.ts` (ground-truth branch) and flows to the
   client via the existing `/api/files`.

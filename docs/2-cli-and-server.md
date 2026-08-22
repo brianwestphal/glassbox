@@ -129,6 +129,7 @@ The server shall expose these route groups:
 | DELETE | `/api/review/:id` | Delete a past review (not the current one) |
 | POST | `/api/reviews/delete-completed` | Bulk delete all completed reviews |
 | POST | `/api/reviews/delete-all` | Bulk delete all reviews except the current one |
+| POST | `/api/reviews/from-commit` | Open a commit as a review at runtime — create or reuse a `commit:<sha>` review (doc 34). The only review-creating route |
 
 ### 2.9 API Endpoints — Files and Annotations
 

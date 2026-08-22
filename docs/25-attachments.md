@@ -86,7 +86,7 @@ for which UI surfaces are wired today.
 
 ## Implementation pointers
 
-- DB: `attachments` table in `src/db/schema.ts`; row schema `AttachmentSchema` in
+- DB: `attachments` table (DDL in `src/db/ddl.ts`); row schema `AttachmentSchema` in
   `src/db/schemas.ts`; queries in `src/db/attachment-queries.ts`. Annotation
   delete cleans up files (`deleteAnnotation` in `src/db/queries.ts`).
 - Storage: `src/attachments/store.ts` (`writeAttachmentFile` / `sanitizeFilename`
