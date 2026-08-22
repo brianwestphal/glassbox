@@ -57,6 +57,30 @@ describe('apple-foundation bridge (doc 22)', () => {
       await isAppleFoundationAvailable();
       expect(mockProbe).toHaveBeenCalledTimes(1);
     });
+
+    // GB-1158: the NEGATIVE result is cached too (fail-then-never-recover). A
+    // false/throwing probe sets `availabilityCache` to false, so a subsequent
+    // call returns false WITHOUT re-probing — even if the platform would now
+    // report available. Pinning this transition (the positive-cache test alone
+    // left the negative branch of the cache unasserted).
+    it('caches a false probe result and never re-probes (fail-then-never-recover)', async () => {
+      mockProbe.mockResolvedValue({ available: false, reason: 'appleIntelligenceNotEnabled' });
+      expect(await isAppleFoundationAvailable()).toBe(false);
+
+      // A later probe would now say available — but the cache short-circuits it.
+      mockProbe.mockResolvedValue({ available: true });
+      expect(await isAppleFoundationAvailable()).toBe(false);
+      expect(mockProbe).toHaveBeenCalledTimes(1);
+    });
+
+    it('caches a thrown probe as unavailable and never re-probes', async () => {
+      mockProbe.mockRejectedValue(new Error('spawn fail'));
+      expect(await isAppleFoundationAvailable()).toBe(false);
+
+      mockProbe.mockResolvedValue({ available: true });
+      expect(await isAppleFoundationAvailable()).toBe(false);
+      expect(mockProbe).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('inference', () => {
