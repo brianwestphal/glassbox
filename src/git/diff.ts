@@ -4,6 +4,7 @@ import { basename, dirname, join, resolve } from 'path';
 import { z } from 'zod';
 
 import { debugLog } from '../debug.js';
+import { sanitizeRelPath } from '../utils/relPath.js';
 import { parseDiff } from './parseDiff.js';
 import { getRepoRoot } from './repo.js';
 import { git } from './spawn.js';
@@ -150,11 +151,7 @@ export function diffRawContent(displayPath: string, oldContent: Buffer, newConte
   // Normalize to a forward-slash relative path and neutralize absolute /
   // parent-escaping segments so we only ever write inside the temp tree
   // (doc 14, FR-14.3 — never trust an externally supplied path).
-  const rel = displayPath
-    .replace(/\\/g, '/')
-    .replace(/^\/+/, '')
-    .replace(/(^|\/)\.\.(?=\/|$)/g, '$1_');
-  const safeRel = rel === '' ? 'file' : rel;
+  const safeRel = sanitizeRelPath(displayPath);
 
   const work = mkdtempSync(join(tmpdir(), 'glassbox-difftool-append-'));
   const rootA = join(work, 'a');

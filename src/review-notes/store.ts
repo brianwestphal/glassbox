@@ -20,6 +20,7 @@ import { dirname, join } from 'path';
 
 import { generateId } from '../db/ids.js';
 import { isLfsPointer } from '../utils/lfs.js';
+import { escapesRepo, sanitizeRelPath } from '../utils/relPath.js';
 import type { SarifLog, SarifRun } from './sarif.js';
 import { buildResult, emptyLog, newRun, noteMessage, SarifLogShapeSchema } from './sarif.js';
 import type { NoteKind, RelatedLocation, ReviewNoteInput } from './types.js';
@@ -29,17 +30,6 @@ import { IMAGE_ARTIFACT_RE } from './view.js';
 
 const NOTES_SUBDIR = join('.pr-notes', 'notes');
 const SHARD_RE = /\.(\d{6})\.sarif$/;
-
-/** Normalize a repo-relative path: forward slashes, no leading slash, and any
- *  parent-escaping segment neutralized so a note can only ever write inside
- *  `.pr-notes/`. */
-function sanitizeRel(file: string): string {
-  const rel = file
-    .replace(/\\/g, '/')
-    .replace(/^\/+/, '')
-    .replace(/(^|\/)\.\.(?=\/|$)/g, '$1_');
-  return rel === '' ? 'file' : rel;
-}
 
 function shardPath(repoRoot: string, safeRel: string, index: number): string {
   return join(repoRoot, NOTES_SUBDIR, `${safeRel}.${String(index).padStart(6, '0')}.sarif`);
@@ -139,7 +129,7 @@ export function writeReviewNote(repoRoot: string, input: ReviewNoteInput, opts: 
   path: string; guid: string;
 } {
   const cap = opts.cap ?? DEFAULT_SHARD_CAP;
-  const safeRel = sanitizeRel(input.file);
+  const safeRel = sanitizeRelPath(input.file);
   const producer = input.producer ?? DEFAULT_PRODUCER;
 
   const vcs = {
@@ -228,8 +218,8 @@ const LFS_FILTER_LINE = '.pr-notes/artifacts/** filter=lfs diff=lfs merge=lfs -t
 function hashArtifacts(repoRoot: string, artifacts: string[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const uri of artifacts) {
+    if (escapesRepo(uri)) continue;
     const safe = uri.replace(/\\/g, '/').replace(/^\/+/, '');
-    if (/(^|\/)\.\.(\/|$)/.test(safe)) continue;
     try {
       const abs = join(repoRoot, safe);
       const stat = statSync(abs);
@@ -278,7 +268,7 @@ function persistOrDelete(path: string, log: SarifLog): void {
 /** Remove a note by guid. Searches the file's shards if `file` is given, else
  *  every shard. Returns true if a note was removed. */
 export function removeNote(repoRoot: string, guid: string, file?: string): boolean {
-  const paths = file !== undefined ? listShardPaths(repoRoot, sanitizeRel(file)) : allShardPaths(repoRoot);
+  const paths = file !== undefined ? listShardPaths(repoRoot, sanitizeRelPath(file)) : allShardPaths(repoRoot);
   for (const path of paths) {
     const log = readLog(path);
     for (const run of log.runs) {
@@ -295,7 +285,7 @@ export function removeNote(repoRoot: string, guid: string, file?: string): boole
 
 /** Apply a patch to a note by guid (anchor is immutable). Returns true if found. */
 export function updateNote(repoRoot: string, guid: string, patch: NotePatch, file?: string): boolean {
-  const paths = file !== undefined ? listShardPaths(repoRoot, sanitizeRel(file)) : allShardPaths(repoRoot);
+  const paths = file !== undefined ? listShardPaths(repoRoot, sanitizeRelPath(file)) : allShardPaths(repoRoot);
   for (const path of paths) {
     const log = readLog(path);
     for (const run of log.runs) {
@@ -338,7 +328,7 @@ function noteKey(r: NoteResult): string {
  * a separate, AI-driven concern — tracked as its own follow-up.)
  */
 export function coalesceFile(repoRoot: string, file: string): number {
-  const paths = listShardPaths(repoRoot, sanitizeRel(file));
+  const paths = listShardPaths(repoRoot, sanitizeRelPath(file));
   const logs = paths.map(path => ({ path, log: readLog(path) }));
 
   interface Ref { logIdx: number; runIdx: number; resultIdx: number; key: string }
@@ -436,8 +426,8 @@ const ARTIFACT_MAX_BYTES = 20_000;
  *  §20.5 P4). Returns undefined for a missing, oversized, binary, or
  *  path-escaping artifact — the renderer then shows a reference instead. */
 function readArtifactText(repoRoot: string, uri: string): string | undefined {
+  if (escapesRepo(uri)) return undefined; // never read outside the repo
   const safe = uri.replace(/\\/g, '/').replace(/^\/+/, '');
-  if (/(^|\/)\.\.(\/|$)/.test(safe)) return undefined; // never read outside the repo
   try {
     const abs = join(repoRoot, safe);
     const stat = statSync(abs);
@@ -488,7 +478,7 @@ function readArtifacts(repoRoot: string, result: NoteResult): ReviewNoteArtifact
 }
 
 export function loadReviewNotesForFile(repoRoot: string, file: string): ReviewNoteView[] {
-  const safeRel = sanitizeRel(file);
+  const safeRel = sanitizeRelPath(file);
   const out: ReviewNoteView[] = [];
   for (const path of listShardPaths(repoRoot, safeRel)) {
     let log: SarifLog;
