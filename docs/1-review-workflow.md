@@ -40,7 +40,7 @@ Requirements for the core review lifecycle — creating, conducting, resuming, a
 - **Browsable history** — The system shall maintain a browsable history of all reviews for the current repository.
 - **View past reviews** — Users shall be able to view past reviews (read-only or reopened).
 - **Delete individual** — Users shall be able to delete individual past reviews.
-- **Bulk delete** — Users shall be able to bulk-delete all completed reviews.
+- **Bulk delete** — Users shall be able to bulk-delete completed reviews ("Delete Completed"), and to delete all reviews except the current one ("Delete All"). See the Review Management endpoints in doc [2](2-cli-and-server.md) §2.8.
 
 ## Non-Functional Requirements
 

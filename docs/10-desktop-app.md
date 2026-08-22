@@ -9,6 +9,7 @@ Requirements for the Tauri desktop application and platform distribution.
 - The desktop app shall wrap the Node.js server in a native window using Tauri v2.
 - The window title shall display the project name, configurable via `.glassbox/settings.json` (`appName` field), defaulting to "Glassbox — {folder name}."
 - On macOS, each project shall get its own Dock/Cmd+Tab identity via a stub `.app` bundle.
+- The app shall provide a native application menu bar, including an **Edit ▸ Find** item bound to `Cmd/Ctrl+F` — it emits a `menu-find` event that opens the in-diff find bar (`src-tauri/src/lib.rs`).
 
 ### 10.2 Sidecar Management
 
@@ -19,11 +20,13 @@ Requirements for the Tauri desktop application and platform distribution.
 
 ### 10.3 Launch Flows
 
-The desktop app shall support three launch flows:
+The desktop app shall support these launch flows:
 
 - **Direct app launch** (no `--project-dir`) — show welcome/setup screen with CLI installation wizard.
 - **CLI launch** (macOS) — the CLI wrapper starts the Node server in the terminal context (for JIT/filesystem access), creates a stub `.app`, and passes the server URL via temp file to the Tauri binary.
 - **Direct binary launch** with `--project-dir` — spawn the sidecar directly and navigate to it when ready.
+
+Beyond opening a review window, the CLI wrapper also **forwards other CLI invocations straight to the sidecar** rather than opening a window — the standalone `note` and `ground-truth` subcommands, the browser/demo modes (`--browser`, `--demo:*`), and the direct-comparison / difftool modes (`--diff` doc [18](18-direct-comparison.md), `--difftool-serve` doc [19](19-difftool-integration.md)). So "launch a review window" is one of several things the installed `glassbox` binary does.
 
 ### 10.4 CLI Installation
 
