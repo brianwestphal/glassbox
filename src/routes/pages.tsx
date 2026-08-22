@@ -240,9 +240,12 @@ pageRoutes.get('/review/:reviewId', async (c) => {
   const reviewId = c.req.param('reviewId');
   const currentReviewId = c.get('reviewId');
 
-  // If viewing the current review, redirect to /
+  // If viewing the current review, redirect to / — preserving any query string
+  // (e.g. a `?file=&line=` deep-link, doc 34) so it isn't lost when the opened
+  // commit review happens to be the current one.
   if (reviewId === currentReviewId) {
-    return c.redirect('/');
+    const qs = new URL(c.req.url).search;
+    return c.redirect(`/${qs}`);
   }
 
   const review = await getReview(reviewId);

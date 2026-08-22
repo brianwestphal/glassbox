@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Claude (glassbox integrator)",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt3mxytbgw6kdy4n",
+          "message": {
+            "text": "The sha is canonicalized to its full 40-char form before building the commit:<sha> mode string, so opening the same commit twice reuses one review instead of piling up duplicates.\n\nWhy\nDe-dup keys on the review's mode string (getLatestInProgressReview(repoRoot, modeStr, modeArgs)), and getModeString({type:'commit',sha}) embeds the raw sha verbatim. The Open-commit button carries whatever sha the note's SARIF provenance recorded — often abbreviated. Without canonicalization, commit:a1b2c3d and commit:a1b2c3d4e5f6… are different mode strings, so the same commit opened via a short vs full sha (or two different-length notes) would each mint a separate review. Resolving to the canonical full sha first (resolveCommitSha (0), a single git rev-parse --verify <sha>^{commit}) makes the mode string stable regardless of input spelling.\n\nBonus\nThe same rev-parse --verify doubles as existence validation — a bad/synthetic sha returns null → CommitNotFoundError → the route's 404 → the client's fail-soft toast — so a note authored in a different clone (or the demo's synthetic sha) can't create an empty, confusing review.\n\nCovered by the integration test's abbreviated-sha case (tests/integration/review-open/commit-review.test.ts): opening the full sha then an 8-char prefix reuses the same review (created:false).\n",
+            "markdown": "The sha is canonicalized to its full 40-char form before building the `commit:<sha>` mode string, so opening the same commit twice reuses one review instead of piling up duplicates.\n\n### Why\nDe-dup keys on the review's `mode` string (`getLatestInProgressReview(repoRoot, modeStr, modeArgs)`), and `getModeString({type:'commit',sha})` embeds the **raw** sha verbatim. The Open-commit button carries whatever sha the note's SARIF provenance recorded — often abbreviated. Without canonicalization, `commit:a1b2c3d` and `commit:a1b2c3d4e5f6…` are different mode strings, so the same commit opened via a short vs full sha (or two different-length notes) would each mint a **separate** review. Resolving to the canonical full sha first ([`resolveCommitSha`](0), a single `git rev-parse --verify <sha>^{commit}`) makes the mode string stable regardless of input spelling.\n\n### Bonus\nThe same `rev-parse --verify` doubles as existence validation — a bad/synthetic sha returns null → `CommitNotFoundError` → the route's 404 → the client's fail-soft toast — so a note authored in a different clone (or the demo's synthetic sha) can't create an empty, confusing review.\n\nCovered by the integration test's abbreviated-sha case (`tests/integration/review-open/commit-review.test.ts`): opening the full sha then an 8-char prefix reuses the same review (`created:false`).\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/review-open/commit-review.ts"
+                },
+                "region": {
+                  "startLine": 34,
+                  "endLine": 52,
+                  "snippet": {
+                    "text": "export async function openCommitReview(repoRoot: string, sha: string): Promise<OpenCommitReviewResult> {\n  // Validate + canonicalize the sha before doing any work: a bad ref would\n  // otherwise silently produce an empty diff and a confusing empty review, and\n  // canonicalizing to the full 40-char sha makes the `commit:<sha>` mode string\n  // stable so opening the same commit via different spellings reuses one review.\n  const fullSha = resolveCommitSha(repoRoot, sha);\n  if (fullSha === null) {\n    throw new CommitNotFoundError(`Commit not found: ${sha}`);\n  }\n\n  const mode: ReviewMode = { type: 'commit', sha: fullSha };\n  const modeStr = getModeString(mode);\n  const modeArgs = getModeArgs(mode);\n\n  // Reuse an in-progress review for the exact same commit (same mode string), so\n  // repeated jumps to a commit land on the same review rather than piling up\n  // duplicates. Matches `launchReview`'s in-progress reuse.\n  const existing = await getLatestInProgressReview(repoRoot, modeStr, modeArgs);\n  if (existing !== undefined) {"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/git/repo.ts"
+                },
+                "region": {
+                  "startLine": 38
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1144"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "79283f06716a423667f68a02f311ed7a"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "900e2b2d407a9d61f4add53f23461799e116fbbf",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

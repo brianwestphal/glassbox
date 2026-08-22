@@ -30,6 +30,19 @@ export function getHeadCommit(cwd: string): string {
   return spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf-8', env: scrubbedGitEnv() }).stdout.trim();
 }
 
+/** Canonical full 40-char sha for a commit-ish (doc 34, GB-1144). Returns null
+ *  when it doesn't resolve to a commit in this repo. Used to normalize a note's
+ *  origin sha (which may be short) before building a `commit:<sha>` review mode,
+ *  so opening the same commit via different spellings de-dupes to one review. */
+export function resolveCommitSha(cwd: string, sha: string): string | null {
+  const res = spawnSync('git', ['rev-parse', '--verify', '--quiet', `${sha}^{commit}`], {
+    cwd, encoding: 'utf-8', env: scrubbedGitEnv(),
+  });
+  if (res.status !== 0 || typeof res.stdout !== 'string') return null;
+  const out = res.stdout.trim();
+  return out === '' ? null : out;
+}
+
 /** Resolved short hash + subject + full message for a commit (docs/20 §20.6,
  *  GB-1142). Returns null when the sha can't be resolved in this repo (a note
  *  authored in a different clone, a shallow checkout, a bad/synthetic sha), so

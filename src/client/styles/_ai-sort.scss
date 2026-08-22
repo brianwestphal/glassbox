@@ -562,6 +562,26 @@
   color: var(--accent);
 }
 
+// "Open commit" button on a note's origin-commit label (doc 34, GB-1144):
+// opens the commit as its own review, jumping to the note's line.
+.ai-note-open-commit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover { color: var(--accent); }
+  &:disabled { opacity: 0.5; cursor: default; }
+
+  svg { width: 12px; height: 12px; flex-shrink: 0; }
+}
+
 .ai-note-commit-subject {
   overflow: hidden;
   text-overflow: ellipsis;

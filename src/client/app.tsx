@@ -9,8 +9,9 @@ import {
 } from "../api/index.js";
 import { IconGear, IconRefresh } from "../icons.js";
 import { initDebug } from "./api.js";
+import { parseDeepLink } from "./diff/deepLink.js";
 import { bindFind } from "./diff/find.js";
-import { bindGoToDefinition } from "./diff/goToDefinition.js";
+import { bindGoToDefinition, navigateToLocation } from "./diff/goToDefinition.js";
 import { initDiffView, invalidateDiffCache, setRawDiffContent, updateNavFilePath } from "./diff/index.js";
 import { getVisibleScrollLine, navBack, navForward, navUpdateScroll, setNavigating } from "./diff/navStack.js";
 import { selectFile } from "./diff/selection.js";
@@ -202,10 +203,17 @@ async function init() {
   await loadFiles();
   initSidebar();
 
-  // Auto-select the first file if none is selected
+  // A `?file=&line=` deep-link (doc 34, GB-1144) jumps to a specific file+line
+  // after the diff view is ready — e.g. the "open this commit as a review" jump
+  // lands on the note's line. When present, skip the auto-select-first below so
+  // there's no flash of the wrong file; the jump itself happens after
+  // `initDiffView()` (the diff mount must exist for `navigateToLocation`).
+  const deepLink = parseDeepLink(window.location.search);
+
+  // Auto-select the first file if none is selected (and no deep-link overrides it)
   const review = reviewStore.state.value;
   const order = visibleFileOrder.value;
-  if (review.currentFileId === null && order.length > 0) {
+  if (deepLink === null && review.currentFileId === null && order.length > 0) {
     void selectFile(order[0]);
   }
 
@@ -226,6 +234,15 @@ async function init() {
   }
 
   initDiffView();
+
+  // Honor the `?file=&line=` deep-link now that the diff mount exists. Clean the
+  // query out of the URL afterward so a later manual reload doesn't force the
+  // jump again and the address bar stays tidy.
+  if (deepLink !== null) {
+    void navigateToLocation(deepLink.file, deepLink.line);
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+
   bindToolbar();
   bindFind();
   bindGoToDefinition();

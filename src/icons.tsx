@@ -41,6 +41,11 @@ export function IconMessageSquareText(): SafeHtml {
   return <svg {...S12}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/></svg>;
 }
 
+/** External-link icon (lucide) — open a note's origin commit as a full review (doc 34). */
+export function IconExternalLink(): SafeHtml {
+  return <svg {...S12}><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/></svg>;
+}
+
 /** Maximize icon (lucide) — open an image-diff side full-screen in the lightbox (doc 24/25). */
 export function IconMaximize(): SafeHtml {
   return <svg {...S14}><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>;

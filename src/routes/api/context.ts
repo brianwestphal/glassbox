@@ -54,7 +54,7 @@ contextRoutes.get('/context/:fileId', async (c) => {
       resolveNoteOrigins(repoRoot, anchored);
       // Match the /file view: offer diagram-source artifacts to content plugins.
       await renderNoteArtifacts(anchored);
-      const rendered = renderContextNotes(anchored, await getAnnotationsForFile(file.id));
+      const rendered = renderContextNotes(anchored, await getAnnotationsForFile(file.id), file.file_path);
       if (rendered.length > 0) notes = rendered;
     }
   }

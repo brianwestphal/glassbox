@@ -19,7 +19,7 @@ vi.mock('child_process', () => ({
   spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
 }));
 
-const { getRepoRoot, getRepoName, isGitRepo, getHeadCommit, getCommitInfo } = await import('../../../src/git/repo.js');
+const { getRepoRoot, getRepoName, isGitRepo, getHeadCommit, getCommitInfo, resolveCommitSha } = await import('../../../src/git/repo.js');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -99,5 +99,31 @@ describe('getCommitInfo (GB-1142)', () => {
   it('returns null when stdout is malformed (missing separators)', () => {
     spawnSyncMock.mockReturnValue({ stdout: 'just-a-hash\n', status: 0 });
     expect(getCommitInfo('/repo', 'x')).toBeNull();
+  });
+});
+
+describe('resolveCommitSha (GB-1144)', () => {
+  it('returns the canonical full sha, running rev-parse --verify on <sha>^{commit}', () => {
+    const full = '1234567890abcdef1234567890abcdef12345678';
+    spawnSyncMock.mockReturnValue({ stdout: `${full}\n`, status: 0 });
+
+    const sha = resolveCommitSha('/repo', 'abbrev12');
+
+    expect(sha).toBe(full);
+    expect(spawnSyncMock).toHaveBeenCalledWith(
+      'git',
+      ['rev-parse', '--verify', '--quiet', 'abbrev12^{commit}'],
+      expect.objectContaining({ cwd: '/repo', encoding: 'utf-8', env: { SCRUBBED: '1' } }),
+    );
+  });
+
+  it('returns null when the ref does not resolve (non-zero status)', () => {
+    spawnSyncMock.mockReturnValue({ stdout: '', status: 1 });
+    expect(resolveCommitSha('/repo', 'nope')).toBeNull();
+  });
+
+  it('returns null when stdout is empty despite a zero status', () => {
+    spawnSyncMock.mockReturnValue({ stdout: '\n', status: 0 });
+    expect(resolveCommitSha('/repo', 'x')).toBeNull();
   });
 });

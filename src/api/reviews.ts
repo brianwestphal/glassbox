@@ -53,6 +53,16 @@ export type DeleteCompletedReviewsResp = z.infer<typeof DeleteCompletedReviewsRe
 export const DeleteAllReviewsRespSchema = z.object({ deleted: z.number() });
 export type DeleteAllReviewsResp = z.infer<typeof DeleteAllReviewsRespSchema>;
 
+/** Open a commit as a review at runtime (doc 34, GB-1144). */
+export const OpenCommitReviewReqSchema = z.object({ sha: z.string().min(1) });
+export type OpenCommitReviewReq = z.infer<typeof OpenCommitReviewReqSchema>;
+export const OpenCommitReviewRespSchema = z.object({
+  reviewId: z.string(),
+  fileCount: z.number(),
+  created: z.boolean(),
+});
+export type OpenCommitReviewResp = z.infer<typeof OpenCommitReviewRespSchema>;
+
 export async function listReviews(): Promise<ListReviewsResp> {
   return apiCall(ListReviewsRespSchema, '/reviews');
 }
@@ -83,4 +93,8 @@ export async function deleteCompletedReviews(): Promise<DeleteCompletedReviewsRe
 
 export async function deleteAllReviews(): Promise<DeleteAllReviewsResp> {
   return apiCall(DeleteAllReviewsRespSchema, '/reviews/delete-all', { method: 'POST' });
+}
+
+export async function createReviewFromCommit(req: OpenCommitReviewReq): Promise<OpenCommitReviewResp> {
+  return apiCall(OpenCommitReviewRespSchema, '/reviews/from-commit', { method: 'POST', body: req });
 }

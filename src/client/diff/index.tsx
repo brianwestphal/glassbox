@@ -2,13 +2,14 @@ import { delegate, delegateCapture, effect, raw, signal } from 'kerfjs';
 import { resource } from 'kerfjs/async';
 import { remountOn } from 'kerfjs/remount';
 
-import { moveAnnotation, revealFile } from '../../api/index.js';
+import { createReviewFromCommit, moveAnnotation, revealFile } from '../../api/index.js';
 import { hydrateAttachments } from '../annotations/attachments.js';
 import { bindAnnotationEvents } from '../annotations/events.js';
 import { bindCreateFormEvents, showAnnotationForm } from '../annotations/form.js';
 import { asEl, asElement } from '../dom.js';
 import { openLightbox } from '../lightbox.js';
 import { aiStore, diffViewStore, dragStore, reviewStore } from '../stores/index.js';
+import { showToast } from '../toast.js';
 import { renderAINotes } from './aiNotes.js';
 import { navigateToLocation } from './goToDefinition.js';
 import { applyHighlighting, detectLanguage } from './highlight.js';
@@ -533,6 +534,33 @@ function setupDelegatedHandlers(container: HTMLElement): void {
     const nowHidden = !msg.hasAttribute('hidden');
     if (nowHidden) msg.setAttribute('hidden', ''); else msg.removeAttribute('hidden');
     el.classList.toggle('expanded', !nowHidden);
+  });
+
+  // Open a review note's origin commit as its own review, jumping to the note's
+  // file+line (doc 34, GB-1144). POSTs to create/reuse a `commit:<sha>` review,
+  // then navigates to it with a `?file=&line=` deep-link the target page honors.
+  void delegate(container, 'click', '.ai-note-open-commit', (e, btn) => {
+    e.stopPropagation();
+    const el = asEl(btn);
+    const sha = el.dataset.openCommit ?? '';
+    const file = el.dataset.openFile ?? '';
+    const line = el.dataset.openLine ?? '';
+    if (sha === '') return;
+    if (el.hasAttribute('disabled')) return;
+    el.setAttribute('disabled', '');
+    void (async () => {
+      try {
+        const res = await createReviewFromCommit({ sha });
+        const params = new URLSearchParams();
+        if (file !== '') params.set('file', file);
+        if (line !== '') params.set('line', line);
+        const query = params.toString();
+        window.location.assign(`/review/${res.reviewId}${query !== '' ? `?${query}` : ''}`);
+      } catch {
+        el.removeAttribute('disabled');
+        showToast('Could not open this commit as a review.');
+      }
+    })();
   });
 
   // Drag-and-drop annotation onto a different line

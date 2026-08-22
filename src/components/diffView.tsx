@@ -5,7 +5,7 @@ import type { Annotation,ReviewFile } from '../db/queries.js';
 import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import type { GroundTruthStepNav } from '../ground-truth/presentation.js';
-import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
+import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconExternalLink, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
 import type { NoteOrigin, ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
@@ -71,9 +71,9 @@ export function DiffView({ file, diff, annotations, mode, reviewNotes = [], imag
       ) : diff.isBinary ? (
         <div className="hunk-separator">Binary file</div>
       ) : (diff.status === 'added' || diff.status === 'deleted' || mode === 'unified') ? (
-        <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} />
+        <UnifiedDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} filePath={diff.filePath} />
       ) : (
-        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} />
+        <SplitDiff hunks={diff.hunks} annotationsByLine={annotationsByLine} reviewNotesByLine={reviewNotesByLine} repliesByNote={repliesByNote} filePath={diff.filePath} />
       )}
     </div>
   );
@@ -115,8 +115,8 @@ function getReviewNotes(pair: LinePair, reviewNotesByLine: Record<string, Review
   return pair.right ? reviewNotesByLine[`${pair.right.newNum}:new`] ?? [] : [];
 }
 
-function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote }: {
-  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>; repliesByNote: Record<string, Annotation[]>;
+function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote, filePath }: {
+  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>; repliesByNote: Record<string, Annotation[]>; filePath: string;
 }) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
@@ -181,7 +181,7 @@ function SplitDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote 
                 </div>
               </div>
               {group.annotations.length > 0 ? <AnnotationRows annotations={group.annotations} /> : null}
-              {group.reviewNotes.length > 0 ? <ReviewNoteRows notes={group.reviewNotes} repliesByNote={repliesByNote} /> : null}
+              {group.reviewNotes.length > 0 ? <ReviewNoteRows notes={group.reviewNotes} repliesByNote={repliesByNote} filePath={filePath} /> : null}
             </div>
           );
         }
@@ -354,8 +354,8 @@ function buildUnifiedCharDiffs(lines: DiffLine[]): Map<DiffLine, DiffSegment[]> 
   return result;
 }
 
-function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote }: {
-  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>; repliesByNote: Record<string, Annotation[]>;
+function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNote, filePath }: {
+  hunks: DiffHunk[]; annotationsByLine: Record<string, Annotation[]>; reviewNotesByLine: Record<string, ReviewNoteView[]>; repliesByNote: Record<string, Annotation[]>; filePath: string;
 }) {
   const lastHunk = hunks[hunks.length - 1] as DiffHunk | undefined;
   const tailStart = lastHunk ? lastHunk.newStart + lastHunk.newCount : 1;
@@ -389,7 +389,7 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNot
                   <span className="code">{segments ? renderSegments(segments) : renderLineContent(line.content)}</span>
                 </div>
                 {anns.length > 0 ? <AnnotationRows annotations={anns} /> : null}
-                {notes.length > 0 ? <ReviewNoteRows notes={notes} repliesByNote={repliesByNote} /> : null}
+                {notes.length > 0 ? <ReviewNoteRows notes={notes} repliesByNote={repliesByNote} filePath={filePath} /> : null}
               </div>
             );
           })}
@@ -408,7 +408,7 @@ function UnifiedDiff({ hunks, annotationsByLine, reviewNotesByLine, repliesByNot
  *  expands to the full commit message. The message toggles via a `delegate()`
  *  handler on the diff container (`.ai-note-commit`). Shows the short hash alone
  *  when git couldn't resolve the subject. */
-function NoteCommitLabel({ origin }: { origin: NoteOrigin }) {
+function NoteCommitLabel({ origin, filePath, line }: { origin: NoteOrigin; filePath: string; line: number }) {
   const hasSubject = origin.subject !== undefined && origin.subject !== '';
   const hasMessage = origin.message !== undefined && origin.message !== '';
   return (
@@ -418,6 +418,15 @@ function NoteCommitLabel({ origin }: { origin: NoteOrigin }) {
         <IconChevronDown />
         <span className="ai-note-commit-sha">{origin.shortSha}</span>
         {hasSubject ? <span className="ai-note-commit-subject">{origin.subject}</span> : null}
+      </button>
+      {/* Open this commit as its own review, jumping to the note's file+line
+          (doc 34, GB-1144). Carries the sha + the note's location for the
+          `.ai-note-open-commit` delegate in diff/index.tsx. */}
+      <button type="button" className="ai-note-open-commit" data-open-commit={origin.sha}
+        data-open-file={filePath} data-open-line={String(line)}
+        title="Open this commit as a review, jumping to this note's line">
+        <IconExternalLink />
+        <span>Open commit</span>
       </button>
       {hasMessage ? <pre className="ai-note-commit-message" hidden>{origin.message}</pre> : null}
     </div>
@@ -430,14 +439,14 @@ function NoteCommitLabel({ origin }: { origin: NoteOrigin }) {
  *  splices it in. The markup is identical to what `ReviewNoteRows` renders
  *  inline, so revealed notes look exactly like in-diff notes (and the diff
  *  container's `delegate()` handlers drive their Reply/Keep/Discard for free). */
-export function renderReviewNoteRowsHtml(notes: ReviewNoteView[], repliesByNote: Record<string, Annotation[]>): string {
-  return (<ReviewNoteRows notes={notes} repliesByNote={repliesByNote} />).toString();
+export function renderReviewNoteRowsHtml(notes: ReviewNoteView[], repliesByNote: Record<string, Annotation[]>, filePath: string): string {
+  return (<ReviewNoteRows notes={notes} repliesByNote={repliesByNote} filePath={filePath} />).toString();
 }
 
 /** AI-authored review notes (docs/20 §20.6) — rendered review-comment-style,
  *  full-width below their line, styled distinctly as AI-authored (the `ai-note-*`
  *  precedent shared with risk/narrative/guided notes) with a per-kind badge. */
-function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; repliesByNote: Record<string, Annotation[]> }) {
+function ReviewNoteRows({ notes, repliesByNote, filePath }: { notes: ReviewNoteView[]; repliesByNote: Record<string, Annotation[]>; filePath: string }) {
   return (
     <>
       {notes.map(n => {
@@ -500,7 +509,7 @@ function ReviewNoteRows({ notes, repliesByNote }: { notes: ReviewNoteView[]; rep
               ))}
             </div>
           ) : null}
-          {n.origin !== undefined ? <NoteCommitLabel origin={n.origin} /> : null}
+          {n.origin !== undefined ? <NoteCommitLabel origin={n.origin} filePath={filePath} line={n.line} /> : null}
         </div>
         {replies.length > 0 ? (
           <div className="annotation-row ai-note-replies">

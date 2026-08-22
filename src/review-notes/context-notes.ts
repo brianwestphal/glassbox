@@ -51,6 +51,7 @@ export function reanchorNotesForRange(
 export function renderContextNotes(
   anchored: ReviewNoteView[],
   annotations: Annotation[],
+  filePath: string,
 ): ContextNoteHtml[] {
   if (anchored.length === 0) return [];
   const loaded = new Set(anchored.map(n => n.guid).filter((g): g is string => g !== undefined));
@@ -68,5 +69,5 @@ export function renderContextNotes(
   }
   return [...byLine.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([line, ns]) => ({ line, html: renderReviewNoteRowsHtml(ns, repliesByNote) }));
+    .map(([line, ns]) => ({ line, html: renderReviewNoteRowsHtml(ns, repliesByNote, filePath) }));
 }

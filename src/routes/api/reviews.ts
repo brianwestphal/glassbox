@@ -1,13 +1,15 @@
 import { Hono } from 'hono';
 
+import { OpenCommitReviewReqSchema } from '../../api/reviews.js';
 import { deleteReview, getAnnotationsForReview, getReview, listReviews, updateReviewStatus } from '../../db/queries.js';
 import { deleteReviewExport, generateReviewExport } from '../../export/generate.js';
 import { runOnCompleteHook } from '../../export/on-complete-hook.js';
 import { getFileDiffs, getHeadCommit, parseModeString } from '../../git/diff.js';
 import { notifyReviewCompleted } from '../../plugins/index.js';
+import { CommitNotFoundError, openCommitReview } from '../../review-open/commit-review.js';
 import { updateReviewDiffs } from '../../review-update.js';
 import type { AppEnv } from '../../types.js';
-import { errorResponse, requirePathParam } from '../../utils/parseBody.js';
+import { errorResponse, parseBody, requirePathParam } from '../../utils/parseBody.js';
 import { resolveReviewId } from '../../utils/resolveReviewId.js';
 
 export const reviewsRoutes = new Hono<AppEnv>();
@@ -78,6 +80,24 @@ reviewsRoutes.post('/review/refresh', async (c) => {
     stale: result.stale,
     fileCount: diffs.length,
   });
+});
+
+// Open a commit as a review at runtime (doc 34, GB-1144). Creates — or reuses —
+// a `commit:<sha>` review for the given sha in this server's repo and returns
+// its id, so a review note's origin-commit label can jump into that commit's
+// full context. Reviews are otherwise only created by the CLI; this is the one
+// route that creates one.
+reviewsRoutes.post('/reviews/from-commit', async (c) => {
+  const parsed = await parseBody(c, OpenCommitReviewReqSchema);
+  if (!parsed.ok) return parsed.response;
+  const repoRoot = c.get('repoRoot');
+  try {
+    const result = await openCommitReview(repoRoot, parsed.data.sha);
+    return c.json(result);
+  } catch (err) {
+    if (err instanceof CommitNotFoundError) return errorResponse(c, err.message, 404);
+    throw err;
+  }
 });
 
 reviewsRoutes.delete('/review/:id', async (c) => {

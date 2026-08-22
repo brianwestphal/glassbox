@@ -415,6 +415,39 @@ test.describe('AI-authored review notes (doc 20 P2)', () => {
     await expect(message).toContainText('24h TTL');
   });
 
+  // The origin-commit label also offers an "Open commit" button that opens the
+  // commit as its own review, jumping to the note's line (doc 34, GB-1144). The
+  // demo note's origin sha is synthetic (not a real commit here), so this
+  // exercises the fail-soft path: a toast, and no navigation away (NFR-34.1).
+  // The intentional 404 from the from-commit route logs a resource-load
+  // console.error, which is expected here (allowlisted below).
+  test.describe('open commit — fail-soft', () => {
+    test.use({ allowedPageErrors: [/Failed to load resource.*404/] });
+    test('a note offers "Open commit" and fails soft when the commit is unresolvable', async ({ page }) => {
+      await openModifiedFile(page);
+      const note = page.locator('.ai-note-row.ai-note-review[data-kind="rationale"]').first();
+      await expect(note).toBeVisible({ timeout: 5000 });
+      const openBtn = note.locator('.ai-note-open-commit');
+      await expect(openBtn).toBeVisible();
+      await expect(openBtn).toHaveAttribute('data-open-commit', 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
+      await expect(openBtn).toHaveAttribute('data-open-file', 'src/auth/session.ts');
+      await expect(openBtn).toHaveAttribute('data-open-line', '14');
+
+      await openBtn.click();
+      await expect(page.locator('.app-toast')).toContainText('Could not open', { timeout: 5000 });
+      // Still on the current review — the failed open didn't navigate away.
+      await expect(page.locator('.diff-view')).toBeVisible();
+    });
+  });
+
+  // A `?file=&line=` deep-link selects that file (overriding auto-select-first)
+  // and cleans the query out of the URL afterward (doc 34, FR-34.3).
+  test('a ?file=&line= deep-link selects that file and cleans the URL', async ({ page }) => {
+    await page.goto('/?file=src/auth/session.ts&line=14');
+    await expect(page.locator('.diff-view .file-path')).toHaveText('src/auth/session.ts', { timeout: 5000 });
+    await expect.poll(() => new URL(page.url()).search).toBe('');
+  });
+
   // Demo mode serves 4 illustrative `.pr-notes/` notes for session.ts, one of
   // which is outdated (its anchored code changed). Outdated notes are hidden
   // (doc 20 §20.3, GB-1140), so 3 render and none carry an "outdated" flag.

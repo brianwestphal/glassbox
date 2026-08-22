@@ -2208,6 +2208,32 @@
     },
     "NFR-33.2": {
       "waived": "Desktop webview verification (doc 33): the decisive Tauri/WKWebView visual pass is manual (npm run tauri:dev) — done + confirmed working (GB-1145). Automated coverage is Chromium-only (exercises the native path + catches gross regressions)."
+    },
+    "FR-34.1": {
+      "tests": [
+        "tests/unit/review-notes/note-open-commit.test.ts",
+        "tests/e2e/diff-viewing.test.ts"
+      ],
+      "note": "Open-commit button on the origin-commit label (GB-1144): the unit test renders renderReviewNoteRowsHtml and asserts the .ai-note-open-commit button with data-open-commit/-file/-line (and no button when the note has no origin); the diff-viewing e2e asserts the button is visible with those attributes on the demo note."
+    },
+    "FR-34.2": {
+      "tests": [
+        "tests/integration/review-open/commit-review.test.ts"
+      ],
+      "note": "Runtime commit-review creation (GB-1144): the integration test drives openCommitReview against a real temp git repo + the in-memory DB — creates a review with the commit's changed files, reuses the in-progress review on a second open (incl. via an abbreviated sha, proving full-sha canonicalization de-dupes), and throws CommitNotFoundError (route → 404) for an unknown sha."
+    },
+    "FR-34.3": {
+      "tests": [
+        "tests/unit/client/deepLink.test.ts",
+        "tests/e2e/diff-viewing.test.ts"
+      ],
+      "note": "File+line deep-link (GB-1144): parseDeepLink unit test pins the parsing rules (no file → null, line defaults/decoding); the diff-viewing e2e navigates to /?file=&line= and asserts the deep-linked file is selected and the query is cleaned from the URL."
+    },
+    "NFR-34.1": {
+      "tests": [
+        "tests/e2e/diff-viewing.test.ts"
+      ],
+      "note": "Fail-soft, in-place (GB-1144): the diff-viewing e2e clicks Open commit on the demo note (synthetic sha → 404) and asserts a 'Could not open' toast with no navigation away (the diff view stays)."
     }
   }
 }

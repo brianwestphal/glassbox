@@ -415,7 +415,9 @@ Graceful shutdown: Tauri's `RunEvent::Exit` kills the sidecar process group
 
 Reviews: `GET /reviews`, `GET /review`, `POST /review/complete`,
 `POST /review/reopen`, `POST /review/refresh`, `DELETE /review/:id`,
-`POST /reviews/delete-completed`, `POST /reviews/delete-all`.
+`POST /reviews/delete-completed`, `POST /reviews/delete-all`,
+`POST /reviews/from-commit` (open a commit as a review at runtime — the only
+review-creating route, doc 34 / GB-1144 → `src/review-open/commit-review.ts`).
 
 Files: `GET /files`, `GET /files/:fileId`, `PATCH /files/:fileId/status`, `POST /files/:fileId/reveal`, `GET /files/:fileId/path`, `POST /files/:fileId/open`.
 
@@ -904,6 +906,7 @@ two documents intentionally overlap.
 | Add a diff mode/view | `src/client/diff/` (new module), wire into `src/client/diff/index.tsx` (mount + delegates) and `toolbar.tsx`. Server rendering lives in `src/components/diffView.tsx`. |
 | Add a new image diff mode | `src/components/imageDiff.tsx` + `src/client/diff/imageDiff/` (`index.ts` orchestration, `zoom.ts`, `sliceTool.ts`, `metadata.tsx`). |
 | Tweak go-to-definition | `src/outline/parser.ts` (regex rules) and `src/client/diff/goToDefinition.tsx` (wiring). |
+| Open a commit as a review / file+line deep-link | `src/review-open/commit-review.ts` (`openCommitReview` — runtime review creation, `resolveCommitSha` in `src/git/repo.ts` canonicalizes the sha), `POST /api/reviews/from-commit` (`routes/api/reviews.ts` + `src/api/reviews.ts`), the button in `NoteCommitLabel` (`src/components/diffView.tsx`) + its `.ai-note-open-commit` delegate (`src/client/diff/index.tsx`), and the `?file=&line=` deep-link (`src/client/diff/deepLink.ts` `parseDeepLink` → `navigateToLocation`, honored in `app.tsx`). Doc 34 / GB-1144. |
 | Add a SCSS partial | Create `src/client/styles/_thing.scss`, `@use` it from `src/client/styles.scss`. |
 | Add client state | `src/client/stores/index.ts` — pick the matching store (`reviewStore` / `diffViewStore` / `aiStore` / `dragStore`) or add a new one. Types in `state.ts`. |
 | Add a Tauri command | `src-tauri/src/lib.rs` (`#[tauri::command]` + `invoke_handler`). Call from `src/client/tauri.ts`. **Also** register it in `src-tauri/build.rs` (`AppManifest::new().commands([...])`) and grant the generated `allow-<cmd>` (kebab-case) in `src-tauri/capabilities/remote-localhost.json` — the frontend is served over `http://localhost:*`, a "remote" origin, and Tauri 2.11 rejects ungranted app commands there with `<cmd> not allowed. Plugin not found`. |

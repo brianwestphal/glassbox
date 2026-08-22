@@ -1155,6 +1155,22 @@ retains the div fallback. The theme-manager context menu is appended to the dial
 Verified in Chromium (behavior e2e + screenshots incl. a centering-rect check)
 **and in the Tauri desktop webview** (GB-1145). Shipped on kerf 4.3.0.
 
+## 18q. Open a commit as a review (`34-open-commit-as-review.md`) — **Shipped**
+
+GB-1144, the follow-on to doc 20 §20.6's origin-commit label: an **Open commit**
+button (`.ai-note-open-commit`) on a review note opens the note's origin commit
+as its own review, jumping to the note's file+line. Two new capabilities:
+(1) **runtime review creation** — `POST /api/reviews/from-commit` → `openCommitReview`
+(`src/review-open/commit-review.ts`) reuses `launchReview`'s create-and-populate
+body + de-dupes via `getLatestInProgressReview`, canonicalizing the sha to full
+40-char (`resolveCommitSha`) so short/full spellings map to one review; unknown
+sha → 404. The **only** route that creates a review; created reviews are normal
+(show in history). (2) **file+line deep-link** — a review page honors `?file=&line=`
+(`parseDeepLink` → `navigateToLocation`), overriding auto-select-first, then cleans
+the query; the `/review/:id`→`/` redirect preserves it. Fail-soft + in-place
+(toast on failure, `window.location.assign`, no second window — identical in
+browser + Tauri).
+
 ## 19. Implementation-status snapshot
 
 Every requirements doc 1–18 is **Shipped**: review workflow,
@@ -1256,6 +1272,7 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/31-plugin-lifecycle-hooks.md` → §18n
 - `docs/32-review-note-reveal.md` → §18o
 - `docs/33-native-overlay-hosting.md` → §18p
+- `docs/34-open-commit-as-review.md` → §18q
 - `docs/ARCHITECTURE.md` — system-level architecture narrative
 - `docs/tauri-architecture.md` — Tauri sidecar deep dive
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets
