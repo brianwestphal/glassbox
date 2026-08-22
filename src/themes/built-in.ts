@@ -30,6 +30,14 @@ export interface ThemeColors {
   'gutter-text': string;
 }
 
+/** View `ThemeColors` as a plain string→string map for keyed iteration (swatch
+ *  loops, live-preview color edits). Every `ThemeColors` value is a string, so
+ *  this is a safe widening — centralizes what were repeated `as unknown as`
+ *  casts at the call sites. */
+export function themeColorsToRecord(colors: ThemeColors): Record<string, string> {
+  return colors as unknown as Record<string, string>;
+}
+
 export interface BuiltInTheme {
   id: string;
   name: string;

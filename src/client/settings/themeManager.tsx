@@ -6,6 +6,7 @@ import { confirm, overlay } from 'kerfjs/overlay';
 import type { ListThemesResp, ThemeSummary as ApiThemeSummary } from '../../api/index.js';
 import { createTheme, deleteTheme, getActiveTheme, listThemes } from '../../api/index.js';
 import { IconCopy, IconEdit, IconMoreHorizontal, IconTrash, IconX } from '../../icons.js';
+import { themeColorsToRecord } from '../../themes/built-in.js';
 import { asEl, toElement } from '../dom.js';
 import { dismissOnOutsideClick, positionAnchoredPopup } from '../popup.js';
 import { applyThemeColors, switchTheme } from '../themes.js';
@@ -221,7 +222,7 @@ function renderItem(t: ThemeSummary, activeId: string): SafeHtml {
       <div className="theme-manager-info" data-click-use={t.id}>
         <div className="theme-manager-swatches">
           {SWATCH_KEYS.map(k => (
-            <span className="theme-swatch" style={`background:${(t.colors as unknown as Record<string, string>)[k] ?? '#888'}`}></span>
+            <span className="theme-swatch" style={`background:${themeColorsToRecord(t.colors)[k] ?? '#888'}`}></span>
           ))}
         </div>
         <span className="theme-manager-name">{t.name}</span>

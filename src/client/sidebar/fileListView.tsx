@@ -127,6 +127,17 @@ function riskListJsx(): SafeHtml {
   );
 }
 
+/** Trailing stale-count + annotation-count badges, shared by every file-row
+ *  renderer (risk / narrative / flat / ground-truth / tree). */
+function FileRowBadges({ count, staleCount }: { count: number; staleCount: number }): SafeHtml {
+  return (
+    <>
+      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
+      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+    </>
+  );
+}
+
 function riskRowJsx(
   score: RiskFileScore,
   ai: typeof aiStore.state.value,
@@ -152,8 +163,7 @@ function riskRowJsx(
       <span className="file-name" title={score.filePath}>{fileName}</span>
       <span className="file-path-dim" title={score.filePath}>{dir}</span>
       {noteIconJsx(score.reviewFileId)}
-      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
-      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+      <FileRowBadges count={count} staleCount={staleCount} />
     </div>
   );
 }
@@ -189,8 +199,7 @@ function narrativeRowJsx(item: NarrativeFileOrder, review: typeof reviewStore.st
       <span className="file-name" title={item.filePath}>{fileName}</span>
       <span className="file-path-dim" title={item.filePath}>{dir}</span>
       {noteIconJsx(item.reviewFileId)}
-      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
-      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+      <FileRowBadges count={count} staleCount={staleCount} />
     </div>
   );
 }
@@ -207,8 +216,7 @@ function flatRowJsx(file: typeof reviewStore.state.value['files'][number], revie
       <span className="file-name" title={file.file_path}>{fileName}</span>
       <span className="file-path-dim" title={file.file_path}>{dir}</span>
       {noteIconJsx(file.id)}
-      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
-      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+      <FileRowBadges count={count} staleCount={staleCount} />
     </div>
   );
 }
@@ -289,8 +297,7 @@ function groundTruthRowJsx(
       {score !== null && score !== undefined
         ? <span className={`diff-badge diff-${diffScoreLevel(score)}`} title="Perceptual difference from the expected image">{formatDiffPct(score)}</span>
         : null}
-      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
-      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+      <FileRowBadges count={count} staleCount={staleCount} />
     </div>
   );
 }
@@ -366,8 +373,7 @@ function fileRowJsx(f: typeof reviewStore.state.value['files'][number], depth: n
       {score !== null && score !== undefined
         ? <span className={`diff-badge diff-${diffScoreLevel(score)}`} title="Perceptual difference from the expected image">{formatDiffPct(score)}</span>
         : <span className={`file-status ${diff?.status ?? ''}`}>{diff?.status ?? ''}</span>}
-      {staleCount > 0 ? <span className="stale-count" title={`${String(staleCount)} stale annotation${staleCount === 1 ? '' : 's'}`}>{staleCount}</span> : null}
-      {count > 0 ? <span className="annotation-count">{count}</span> : null}
+      <FileRowBadges count={count} staleCount={staleCount} />
     </div>
   );
 }

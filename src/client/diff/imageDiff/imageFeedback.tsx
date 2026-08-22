@@ -371,6 +371,43 @@ export function initImageFeedback(container: HTMLElement): void {
     return regions.some((r) => r.id === id) ? id : null;
   }
 
+  // Save the general (whole-image) composer's text. On failure, restore the
+  // composer so the typed comment isn't silently lost (GB-1082): re-render, then
+  // put the text and category back.
+  function saveGeneralComment(): void {
+    const input = panel.querySelector<HTMLTextAreaElement>('[data-role="general-input"]');
+    const text = input?.value.trim() ?? '';
+    if (text === '') return;
+    const category = generalCategory;
+    generalCategory = DEFAULT_CATEGORY;
+    void addComment(text, category).then(renderAll).catch(() => {
+      showToast('Saving the comment failed — your text was kept');
+      generalCategory = category;
+      renderAll();
+      const restored = panel.querySelector<HTMLTextAreaElement>('[data-role="general-input"]');
+      if (restored !== null) restored.value = text;
+    });
+  }
+
+  // Save the pending drawn-region composer's text (same restore-on-failure).
+  function savePendingRegion(): void {
+    const input = panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]');
+    const text = input?.value.trim() ?? '';
+    if (text === '' || pending === null) return;
+    const region = pending;
+    const category = pendingCategory;
+    pending = null;
+    pendingCategory = DEFAULT_CATEGORY;
+    void addComment(text, category, region).then(renderAll).catch(() => {
+      showToast('Saving the region comment failed — your text was kept');
+      pending = region;
+      pendingCategory = category;
+      renderAll();
+      const restored = panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]');
+      if (restored !== null) restored.value = text;
+    });
+  }
+
   panel.addEventListener('click', (e) => {
     const target = e.target;
     // `Element`, not `HTMLElement`: a click lands on the `<svg>`/`<path>` inside
@@ -387,36 +424,9 @@ export function initImageFeedback(container: HTMLElement): void {
     if (action === 'toggle-draw') {
       setDrawMode(!drawMode);
     } else if (action === 'add-general') {
-      const input = panel.querySelector<HTMLTextAreaElement>('[data-role="general-input"]');
-      const text = input?.value.trim() ?? '';
-      if (text === '') return;
-      const category = generalCategory;
-      generalCategory = DEFAULT_CATEGORY;
-      // On failure, restore the composer so the typed comment isn't silently
-      // lost (GB-1082): re-render, then put the text and category back.
-      void addComment(text, category).then(renderAll).catch(() => {
-        showToast('Saving the comment failed — your text was kept');
-        generalCategory = category;
-        renderAll();
-        const restored = panel.querySelector<HTMLTextAreaElement>('[data-role="general-input"]');
-        if (restored !== null) restored.value = text;
-      });
+      saveGeneralComment();
     } else if (action === 'save-pending') {
-      const input = panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]');
-      const text = input?.value.trim() ?? '';
-      if (text === '' || pending === null) return;
-      const region = pending;
-      const category = pendingCategory;
-      pending = null;
-      pendingCategory = DEFAULT_CATEGORY;
-      void addComment(text, category, region).then(renderAll).catch(() => {
-        showToast('Saving the region comment failed — your text was kept');
-        pending = region;
-        pendingCategory = category;
-        renderAll();
-        const restored = panel.querySelector<HTMLTextAreaElement>('[data-role="pending-input"]');
-        if (restored !== null) restored.value = text;
-      });
+      savePendingRegion();
     } else if (action === 'cancel-pending') {
       pending = null;
       pendingCategory = DEFAULT_CATEGORY;

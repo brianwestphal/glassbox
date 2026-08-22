@@ -6,7 +6,7 @@ import type { DiffHunk, DiffLine,FileDiff } from '../git/diff.js';
 import { isImageFile, isSvgFile } from '../git/image.js';
 import type { GroundTruthStepNav } from '../ground-truth/presentation.js';
 import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronsUpDown, IconCornerDownRight, IconEdit, IconExternalLink, IconGripVertical, IconPaperclip, IconReveal, IconTrash } from '../icons.js';
-import type { NoteOrigin, ReviewNoteView } from '../review-notes/view.js';
+import type { NoteOrigin, ReviewNoteArtifact, ReviewNoteView } from '../review-notes/view.js';
 import { REVIEW_NOTE_LABELS } from '../review-notes/view.js';
 import { charDiff, type DiffSegment } from '../utils/charDiff.js';
 import { formatDiffPct } from '../utils/diffScore.js';
@@ -443,6 +443,66 @@ export function renderReviewNoteRowsHtml(notes: ReviewNoteView[], repliesByNote:
   return (<ReviewNoteRows notes={notes} repliesByNote={repliesByNote} filePath={filePath} />).toString();
 }
 
+/** The paperclip + uri label shared by every artifact rendering. */
+function ArtifactLabel({ uri }: { uri: string }) {
+  return <summary className="ai-note-artifact-label"><IconPaperclip /><span>{uri}</span></summary>;
+}
+
+/** A single review-note proof artifact (docs/20 §20.5), dispatched by kind via
+ *  early return (was a 5-way nested ternary): a plugin-rendered SVG or HTML
+ *  diagram, inline text content, an image served from the artifact route, or a
+ *  bare reference when nothing is inlineable. */
+function NoteArtifact({ artifact: a }: { artifact: ReviewNoteArtifact }) {
+  if (a.renderedSvg !== undefined) {
+    return (
+      <details className="ai-note-artifact" open>
+        <ArtifactLabel uri={a.uri} />
+        <div className="ai-note-artifact-imgwrap">
+          {/* kerf 1.0+ screens `data:image/svg+xml` out of src (an SVG *document* can
+              script; an SVG in an <img> cannot — no script execution, no external
+              loads, the GB-932 rationale). The SVG is plugin-rendered from trusted
+              opt-in-installed code (doc 29 §29.6) and encodeURIComponent leaves no
+              quote to break out of the attribute, so raw() is the documented opt-out. */}
+          <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
+            // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- trusted plugin SVG (opt-in install; doc 29 §29.6), inert in <img> context (NFR-29.2)
+            src={raw(`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`)} />
+        </div>
+      </details>
+    );
+  }
+  if (a.renderedHtml !== undefined) {
+    return (
+      <details className="ai-note-artifact" open>
+        <ArtifactLabel uri={a.uri} />
+        {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-rendered HTML is trusted (opt-in install; doc 29 FR-29.15) and required to be inert (NFR-29.2) */}
+        <div className="ai-note-artifact-rendered">{raw(a.renderedHtml)}</div>
+      </details>
+    );
+  }
+  if (a.content !== undefined) {
+    return (
+      <details className="ai-note-artifact">
+        <ArtifactLabel uri={a.uri} />
+        <pre className="ai-note-artifact-content"><code>{a.content}</code></pre>
+      </details>
+    );
+  }
+  if (a.isImage === true) {
+    return (
+      <details className="ai-note-artifact">
+        <ArtifactLabel uri={a.uri} />
+        <div className="ai-note-artifact-imgwrap">
+          <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
+            data-artifact-uri={a.uri} title="Drag to mark a region, or click to view full screen"
+            src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
+          <div className="ai-note-artifact-region-overlay" data-artifact-uri={a.uri}></div>
+        </div>
+      </details>
+    );
+  }
+  return <div className="ai-note-artifact ai-note-artifact-ref ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></div>;
+}
+
 /** AI-authored review notes (docs/20 §20.6) — rendered review-comment-style,
  *  full-width below their line, styled distinctly as AI-authored (the `ai-note-*`
  *  precedent shared with risk/narrative/guided notes) with a per-kind badge. */
@@ -467,46 +527,7 @@ function ReviewNoteRows({ notes, repliesByNote, filePath }: { notes: ReviewNoteV
           </div>
           {n.artifacts !== undefined && n.artifacts.length > 0 ? (
             <div className="ai-note-artifacts">
-              {n.artifacts.map(a => (
-                a.renderedSvg !== undefined ? (
-                  <details className="ai-note-artifact" open>
-                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
-                    <div className="ai-note-artifact-imgwrap">
-                      {/* kerf 1.0+ screens `data:image/svg+xml` out of src (an SVG *document* can
-                          script; an SVG in an <img> cannot — no script execution, no external
-                          loads, the GB-932 rationale). The SVG is plugin-rendered from trusted
-                          opt-in-installed code (doc 29 §29.6) and encodeURIComponent leaves no
-                          quote to break out of the attribute, so raw() is the documented opt-out. */}
-                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
-                        // eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- trusted plugin SVG (opt-in install; doc 29 §29.6), inert in <img> context (NFR-29.2)
-                        src={raw(`data:image/svg+xml;utf8,${encodeURIComponent(a.renderedSvg)}`)} />
-                    </div>
-                  </details>
-                ) : a.renderedHtml !== undefined ? (
-                  <details className="ai-note-artifact" open>
-                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
-                    {/* eslint-disable-next-line kerfjs/no-raw-with-dynamic-arg -- plugin-rendered HTML is trusted (opt-in install; doc 29 FR-29.15) and required to be inert (NFR-29.2) */}
-                    <div className="ai-note-artifact-rendered">{raw(a.renderedHtml)}</div>
-                  </details>
-                ) : a.content !== undefined ? (
-                  <details className="ai-note-artifact">
-                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
-                    <pre className="ai-note-artifact-content"><code>{a.content}</code></pre>
-                  </details>
-                ) : a.isImage === true ? (
-                  <details className="ai-note-artifact">
-                    <summary className="ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></summary>
-                    <div className="ai-note-artifact-imgwrap">
-                      <img className="ai-note-artifact-img" loading="lazy" alt={a.uri} draggable="false"
-                        data-artifact-uri={a.uri} title="Drag to mark a region, or click to view full screen"
-                        src={`/api/review-notes/artifact?file=${encodeURIComponent(a.uri)}`} />
-                      <div className="ai-note-artifact-region-overlay" data-artifact-uri={a.uri}></div>
-                    </div>
-                  </details>
-                ) : (
-                  <div className="ai-note-artifact ai-note-artifact-ref ai-note-artifact-label"><IconPaperclip /><span>{a.uri}</span></div>
-                )
-              ))}
+              {n.artifacts.map(a => <NoteArtifact artifact={a} />)}
             </div>
           ) : null}
           {n.origin !== undefined ? <NoteCommitLabel origin={n.origin} filePath={filePath} line={n.line} /> : null}

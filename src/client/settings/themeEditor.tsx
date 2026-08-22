@@ -4,6 +4,7 @@ import { overlay } from 'kerfjs/overlay';
 
 import { editTheme, listThemes } from '../../api/index.js';
 import { IconX } from '../../icons.js';
+import { themeColorsToRecord } from '../../themes/built-in.js';
 import { asEl, asInput } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
 
@@ -75,14 +76,14 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
     const baseThemeId = theme.builtIn ? theme.id : (theme.baseTheme ?? 'dark');
     const baseTheme = listData.themes.find(t => t.id === baseThemeId);
     const baseColors: Record<string, string> = baseTheme
-      ? { ...baseTheme.colors as unknown as Record<string, string> }
-      : { ...theme.colors as unknown as Record<string, string> };
+      ? { ...themeColorsToRecord(baseTheme.colors) }
+      : { ...themeColorsToRecord(theme.colors) };
 
     // Live edit state lives in signals. The `editColorsSignal` drives both
     // the live preview (an `effect()` that pushes CSS custom properties to
     // `document.documentElement`) AND the `mount()` render of the form
     // below — every color change reactively updates both.
-    const editColorsSignal = signal<Record<string, string>>({ ...theme.colors as unknown as Record<string, string> });
+    const editColorsSignal = signal<Record<string, string>>({ ...themeColorsToRecord(theme.colors) });
     const editNameSignal = signal(theme.name);
     let dirty = false;
     let currentThemeId = themeId;
