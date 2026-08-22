@@ -325,6 +325,36 @@ test.describe('Close dialog', () => {
   });
 });
 
+// Native `<dialog>` hosting (GB-1143) brought two UA-default regressions the
+// reset didn't cover: the browser paints a focus ring on the dialog element
+// (GB-1150), and `dialog { color: CanvasText }` overrode the modal's inherited
+// theme text — the un-colored title went low-contrast (GB-1151). Pin both.
+test.describe('Native dialog chrome (GB-1150 / GB-1151)', () => {
+  test('the dialog has no focus ring and a theme-colored title', async ({ page }) => {
+    await page.goto('/');
+    await openSettings(page);
+
+    // GB-1150: the <dialog> wrapper must not paint a focus outline.
+    const outlineStyle = await page.locator('dialog.modal-overlay')
+      .evaluate(el => getComputedStyle(el).outlineStyle);
+    expect(outlineStyle).toBe('none');
+
+    // GB-1151: the header title must render in the theme text color, not the UA
+    // CanvasText the native <dialog> would otherwise impose. Compare against a
+    // probe element painted with `var(--text)` so it's theme-independent.
+    const { titleColor, themeTextColor } = await page.evaluate(() => {
+      const title = document.querySelector('.settings-header h3');
+      const probe = document.createElement('span');
+      probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text');
+      document.body.appendChild(probe);
+      const themeTextColor = getComputedStyle(probe).color;
+      probe.remove();
+      return { titleColor: title ? getComputedStyle(title).color : '', themeTextColor };
+    });
+    expect(titleColor).toBe(themeTextColor);
+  });
+});
+
 // GB-1129: opening the dialog must be instant — the modal + a spinner appear
 // immediately, and the tabbed content replaces the spinner once the (up to ~1s)
 // data fetch resolves. The dialog must never block on that fetch.

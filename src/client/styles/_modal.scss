@@ -28,6 +28,11 @@ dialog.modal-overlay {
   padding: 0;
   background: transparent;
   overflow: visible;
+  // The UA focuses the `<dialog>` on `showModal()` and paints a focus ring on
+  // the element itself — visible around the whole modal box (GB-1150). Focus is
+  // trapped inside the dialog and the inner controls keep their own
+  // `:focus-visible`, so suppress the ring on the container.
+  outline: none;
 }
 dialog.modal-overlay::backdrop {
   background: rgba(0,0,0,0.6);
@@ -35,6 +40,12 @@ dialog.modal-overlay::backdrop {
 
 .modal {
   background: var(--bg-surface);
+  // The UA stylesheet sets `dialog { color: CanvasText }` (a near-black in a
+  // light color-scheme), which the modal's un-colored text — the `.settings-header
+  // h3` title especially — would otherwise inherit as low-contrast (GB-1151). The
+  // `<div>`-overlay fallback inherited the body color and didn't have this; set
+  // it explicitly so both hosting paths render theme-colored text.
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;

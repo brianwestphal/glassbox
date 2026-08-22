@@ -29,6 +29,9 @@ dialog.kerf-overlay {
   padding: 0;
   background: transparent;
   overflow: visible;
+  // Suppress the UA focus ring on the `<dialog>` itself (GB-1150) — focus is
+  // trapped inside and inner controls keep their own `:focus-visible`.
+  outline: none;
 }
 dialog.kerf-overlay::backdrop {
   background: rgba(0, 0, 0, 0.6);
@@ -36,6 +39,9 @@ dialog.kerf-overlay::backdrop {
 
 .kerf-confirm {
   background: var(--bg-surface);
+  // Restore theme text color: the UA `dialog { color: CanvasText }` would
+  // otherwise make the un-colored `__title` low-contrast in native hosting (GB-1151).
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
@@ -77,6 +83,8 @@ dialog.kerf-overlay::backdrop {
 // styled here — the buttons keep the app's exact button styling.
 .kerf-choice {
   background: var(--bg-surface);
+  // Restore theme text color (see `.kerf-confirm`) — UA `dialog { color: CanvasText }` (GB-1151).
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;

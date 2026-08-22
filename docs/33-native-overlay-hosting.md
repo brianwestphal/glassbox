@@ -34,7 +34,13 @@ genuinely modal. Both matter most in the Tauri desktop webview.
   chrome (border/padding/background/max-*) is reset so the inner
   `.modal`/`.kerf-confirm`/`.kerf-choice` is the visible box, and inner box
   widths are viewport-relative (`min(90vw, Npx)`) so they don't collapse inside a
-  shrink-to-fit dialog. A click on the backdrop (outside the dialog box)
+  shrink-to-fit dialog. Two further UA defaults are reset that a `<div>` overlay
+  never imposed (GB-1150 / GB-1151): the `<dialog>`'s **focus ring** (the browser
+  focuses the element on `showModal()` and paints an outline around the whole
+  modal — `outline: none` on the wrapper, focus lives on the inner controls), and
+  its **text color** — the UA `dialog { color: CanvasText }` would override the
+  inherited theme text and wash out an un-colored title, so the inner box sets
+  `color: var(--text)` explicitly. A click on the backdrop (outside the dialog box)
   dismisses, and Tab focus is contained to the dialog. **Escape dismisses only
   the topmost overlay:** kerf's native path hooks the dialog's own `cancel`
   event, which the UA fires on the topmost modal dialog alone, so a single Escape
