@@ -4,7 +4,7 @@
   --bg-hover: #2d2d44;
   --bg-active: #363652;
   --text: #cdd6f4;
-  --text-dim: #8888aa;
+  --text-dim: #9494b8; // GB-1164: was #8888aa (~4.4:1 on --bg-surface); now clears WCAG AA on bg + surface
   --text-bright: #ffffff;
   --accent: #89b4fa;
   --accent-hover: #74a8fc;

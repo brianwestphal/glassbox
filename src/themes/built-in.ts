@@ -74,7 +74,10 @@ const dark: ThemeColors = {
   'bg-hover': '#2d2d44',
   'bg-active': '#363652',
   'text': '#cdd6f4',
-  'text-dim': '#8888aa',
+  // GB-1164: nudged lighter from #8888aa so dim text clears WCAG AA (4.5:1) on
+  // both --bg (5.6:1) and --bg-surface (5.2:1); the old value was ~4.4:1 on the
+  // surface (settings/modals/cards). Still a muted lavender-gray.
+  'text-dim': '#9494b8',
   'text-bright': '#ffffff',
   'accent': '#89b4fa',
   'accent-hover': '#74a8fc',
