@@ -10,6 +10,11 @@
 
   &:hover { background: var(--bg-hover); }
   &.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  // A disabled button reads as disabled (GB-1173) — e.g. the annotation Save
+  // button until the textarea has content. `pointer-events: none` also suppresses
+  // the hover background change across variants (.btn-primary etc.).
+  &:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
 }
 
 .btn-sm { padding: 3px 10px; font-size: 12px; }

@@ -79,6 +79,15 @@
   svg { width: 12px; height: 12px; }
 }
 
+// Subtle "which line this note anchors to" label on the create form (GB-1173) —
+// the form is inline at the line, but this makes the target explicit next to the
+// category badge.
+.annotation-form-anchor {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .annotation-text {
   flex: 1;
   color: var(--text);

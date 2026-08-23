@@ -17,7 +17,12 @@ export function bindCreateFormEvents(diffContainer: HTMLElement): void {
   void delegate(diffContainer, 'input', '.annotation-form-container[data-form-key] textarea', (_e, textarea) => {
     const cur = editFormSignal.value;
     if (cur === null || cur.formKey === null) return;
-    setEditForm({ ...cur, content: asTextarea(textarea).value });
+    const value = asTextarea(textarea).value;
+    setEditForm({ ...cur, content: value });
+    // Disable Save until there's non-whitespace content (saveNewAnnotation already
+    // no-ops on empty, but the button should reflect that). GB-1173.
+    const saveBtn = asTextarea(textarea).closest('.annotation-form-container')?.querySelector<HTMLButtonElement>('.annotation-save-btn');
+    if (saveBtn !== null && saveBtn !== undefined) saveBtn.disabled = value.trim() === '';
   });
 
   void delegate(diffContainer, 'keydown', '.annotation-form-container[data-form-key] textarea', (e) => {
@@ -60,12 +65,14 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
   const container = toElement(
     <div className="annotation-form-container" data-form-key={formKey} data-line={String(lineNumber)} data-side={side}>
       <div className={`annotation-form${replyToNoteId !== undefined ? ' annotation-form-reply' : ''}`}>
-        {replyToNoteId !== undefined ? <span className="annotation-reply-tag"><IconCornerDownRight /> replying to AI note</span> : null}
+        {replyToNoteId !== undefined
+          ? <span className="annotation-reply-tag"><IconCornerDownRight /> replying to AI note</span>
+          : <span className="annotation-form-anchor">Line {String(lineNumber)}</span>}
         {buildCategoryBadge(defaultCategory)}
-        <textarea placeholder={replyToNoteId !== undefined ? 'Reply to this note...' : 'Enter your annotation...'} autoFocus></textarea>
+        <textarea placeholder={replyToNoteId !== undefined ? 'Reply to this note…' : "Describe the issue and what you'd expect instead…"} autoFocus></textarea>
         <div className="annotation-form-actions">
           <button className="btn btn-sm cancel-btn">Cancel</button>
-          <button className="btn btn-sm btn-primary annotation-save-btn">Save</button>
+          <button className="btn btn-sm btn-primary annotation-save-btn" disabled>Save</button>
         </div>
       </div>
     </div>
