@@ -1,9 +1,18 @@
 import type { Review } from '../db/queries.js';
-import { IconTrash16 } from '../icons.js';
+import { IconChevronRight, IconTrash16 } from '../icons.js';
 import { formatReviewMode } from '../utils/formatReviewMode.js';
 
 function titleCase(s: string): string {
   return s.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Human-readable created-at (was a raw ISO string). PGLite returns a Date at
+ *  runtime; the app is local + single-user, so the server's local time is the
+ *  user's. Falls back to the raw value if it can't be parsed. */
+function formatTimestamp(v: string): string {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[]; currentReviewId: string }) {
@@ -32,13 +41,17 @@ export function ReviewHistory({ reviews, currentReviewId }: { reviews: Review[];
                       <span className={`status-badge ${r.status}`} style="margin-left:8px">{titleCase(r.status)}</span>
                     </h3>
                     <div className="meta">
-                      ID: {r.id} | Created: {/* The `Review` type says `created_at: string`, but PGLite
-                        actually returns a `Date` from `timestamp` columns at
-                        runtime, which the kerf JSX runtime rejects. The
-                        explicit String() coercion is intentional. */
+                      {/* The `Review` type says `created_at: string`, but PGLite
+                          returns a `Date` from `timestamp` columns at runtime, so
+                          coerce before formatting. The raw internal id is no
+                          longer shown (GB-1167 — it's noise); it stays on
+                          `data-review-id` for the delete/open handlers. */
                         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion
-                        String(r.created_at)}
+                        `Created ${formatTimestamp(String(r.created_at))}`}
                     </div>
+                    {!isCurrent ? (
+                      <span className="history-open-hint" aria-hidden="true">Open <IconChevronRight /></span>
+                    ) : null}
                     {!isCurrent ? (
                       <button className="delete-review-btn" data-delete-id={r.id} title="Delete review"><IconTrash16 /></button>
                     ) : null}

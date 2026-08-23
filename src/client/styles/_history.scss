@@ -38,6 +38,23 @@ body:has(.history-page) { overflow: auto; }
   }
 
   &:hover .delete-review-btn { opacity: 1; }
+
+  // Persistent "opens a review" affordance on past-review rows (GB-1167) — the
+  // whole card is a link but nothing signaled it before. Dim by default,
+  // accent on hover (see the link hover rule below).
+  .history-open-hint {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: color 0.15s;
+
+    svg { width: 14px; height: 14px; }
+  }
 }
 
 .bulk-actions {
@@ -74,4 +91,5 @@ body:has(.history-page) { overflow: auto; }
     border-color: var(--accent);
     background: var(--bg-hover);
   }
+  &:hover .history-open-hint { color: var(--accent); }
 }
