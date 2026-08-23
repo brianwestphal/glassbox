@@ -5,7 +5,7 @@ import { aiStore } from '../stores/index.js';
 import { ACTIONS } from './actions.js';
 
 const RISK_DIMENSIONS: Array<[string, string]> = [
-  ['aggregate', 'Aggregate'],
+  ['aggregate', 'Overall'], // GB-1174: plainer than "Aggregate" (value unchanged)
   ['security', 'Security'],
   ['correctness', 'Correctness'],
   ['error-handling', 'Error Handling'],

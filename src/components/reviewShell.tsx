@@ -96,12 +96,12 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
             <div className="diff-toolbar-image" style="display:none">
               <div className="diff-toolbar-left">
                 <div className="segmented-control">
-                  <button className="segment" data-image-mode="metadata">Metadata</button>
+                  <button className="segment" data-image-mode="metadata" title="Compare image metadata (dimensions, file size, format)">Metadata</button>
                   <button className="segment" data-image-mode="a" title="Show only the A (old) image">A</button>
                   <button className="segment" data-image-mode="b" title="Show only the B (new) image">B</button>
-                  <button className="segment active" data-image-mode="side-by-side">Side by Side</button>
-                  <button className="segment" data-image-mode="difference">Difference</button>
-                  <button className="segment" data-image-mode="slice">Slice</button>
+                  <button className="segment active" data-image-mode="side-by-side" title="Show both images next to each other">Side by Side</button>
+                  <button className="segment" data-image-mode="difference" title="Highlight the pixels that changed">Difference</button>
+                  <button className="segment" data-image-mode="slice" title="Drag a slider to reveal old vs. new">Slice</button>
                   <button className="segment" data-image-mode="image" style="display:none">Image</button>
                 </div>
                 {/* Orientation sub-option, shown only while Side by Side is active (doc 24). */}
