@@ -378,11 +378,12 @@
 }
 
 .settings-heading {
+  // GB-1168: section headings render Title Case (as authored in markup —
+  // "Guided Review", "Claude Channel") to match the General tab's headings and
+  // read better than ALL CAPS. Was `text-transform: uppercase`.
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .settings-beta-badge {
