@@ -28,14 +28,13 @@ function renderDifftoolSection(ctx: TabContext): SafeHtml {
               : <>Not registered.</>}
           </span>
           <div className="settings-difftool-actions">
-            <button className="btn btn-sm" id="difftool-register-btn">
-              {conflictTool !== null ? <>Replace <code>{conflictTool}</code></> : 'Register'}
-            </button>
+            <button className="btn btn-sm" id="difftool-register-btn">Set Glassbox as git difftool</button>
           </div>
         </div>
       )}
       <p className="settings-hint">
         Lets you run <code>git difftool --dir-diff &lt;range&gt;</code> from any repo and review the change set in Glassbox.
+        {conflictTool !== null ? <> This updates your Git <code>diff.tool</code> setting; you can unregister anytime.</> : null}
       </p>
     </div>
   );
