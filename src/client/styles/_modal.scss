@@ -64,6 +64,9 @@ dialog.modal-overlay::backdrop {
 }
 
 .modal-copyable {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--accent);
@@ -74,17 +77,35 @@ dialog.modal-overlay::backdrop {
   margin-bottom: 16px;
   cursor: pointer;
   position: relative;
-  word-break: break-all;
   transition: border-color 0.15s;
 
   &:hover { border-color: var(--accent); }
+  &:hover .modal-copyable-icon { color: var(--accent); }
 
+  // The value scrolls horizontally instead of breaking mid-filename (the old
+  // `word-break: break-all` split paths like ".../latest-revi ew.md"). GB-1166.
+  .modal-copyable-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none; // Firefox — the box is click-to-copy, so hide the bar
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  // Visible copy affordance (was hover-title only). Swaps to a green "Copied!"
+  // confirmation on click.
+  .modal-copyable-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--text-dim);
+    svg { width: 14px; height: 14px; }
+  }
+
+  &.copied .modal-copyable-icon { display: none; }
   &.copied::after {
     content: 'Copied!';
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
+    flex-shrink: 0;
     font-size: 11px;
     color: var(--green);
     font-family: var(--font-sans);

@@ -10,6 +10,7 @@ import {
   reopenReview,
   triggerChannel,
 } from '../../api/index.js';
+import { IconCopy } from '../../icons.js';
 import { asButton, asEl, toElement } from '../dom.js';
 import { reviewStore } from '../stores/index.js';
 import { SEND_TO_CLAUDE_CLOSE_MS, TOAST_DURATION_MS } from '../timing.js';
@@ -229,9 +230,15 @@ function renderDone(
     <>
       <h3>Review Completed</h3>
       <p className="modal-label">Review exported to:</p>
-      <div className="modal-copyable" data-copy={result.exportPath} title="Click to copy">{result.exportPath}</div>
+      <div className="modal-copyable" data-copy={result.exportPath} title="Copy to clipboard">
+        <span className="modal-copyable-text">{result.exportPath}</span>
+        <span className="modal-copyable-icon" aria-hidden="true"><IconCopy /></span>
+      </div>
       <p className="modal-label">Tell your AI tool:</p>
-      <div className="modal-copyable" data-copy={aiCommand} title="Click to copy">{aiCommand}</div>
+      <div className="modal-copyable" data-copy={aiCommand} title="Copy to clipboard">
+        <span className="modal-copyable-text">{aiCommand}</span>
+        <span className="modal-copyable-icon" aria-hidden="true"><IconCopy /></span>
+      </div>
       {result.hook?.ran === true && (
         result.hook.ok
           ? <p className="modal-label" style="color:var(--green)">Ran the on-complete hook</p>
