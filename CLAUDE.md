@@ -334,7 +334,7 @@ The client uses **kerfjs** for state, render, and event delegation. Follow these
 
 When a feature touches DOM state that should survive re-renders (input focus + value, contenteditable cursor, `<details open>` state), kerf preserves these automatically during morph — you don't need to manage them imperatively. See kerfjs §4.4.
 
-**kerf is on 4.3.0** (GB-1143/GB-1145). The bump from 4.2.0 is backward-compatible; 4.3 brings a `positionAnchored` fix (helps our anchored popups, `src/client/popup.ts`), transparent `moveBefore()` state-preserving keyed morphs, and the opt-in `kerfjs/overlay` `native: true` now adopted for the app's modal surfaces (doc 33). The 4.2 specifics below still hold.
+**kerf is on 4.4.0** (GB-1162). The bump from 4.3.0 is **purely additive** — 4.4.0 = 4.3.0 plus a new opt-in `kerfjs/router` subpath and nothing else (verified by diffing the package `exports`); Glassbox doesn't use it (server-rendered, full-page navigation, no SPA routing), so no code changed. The earlier 4.3.0 notes still hold: the bump from 4.2.0 was backward-compatible; 4.3 brought a `positionAnchored` fix (helps our anchored popups, `src/client/popup.ts`), transparent `moveBefore()` state-preserving keyed morphs, and the opt-in `kerfjs/overlay` `native: true` adopted for the app's modal surfaces (doc 33). The 4.2 specifics below still hold.
 
 **kerf 4.2 specifics** (upgraded from 4.1, which came from 3.0, 2.0, and 0.16):
 
