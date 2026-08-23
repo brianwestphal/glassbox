@@ -177,7 +177,7 @@ function renderEditor(isBuiltIn: boolean, editName: string, editColors: Record<s
     <>
       <div className="settings-header">
         <h3>{headerText}</h3>
-        <button className="settings-close" id="te-close"><IconX /></button>
+        <button className="settings-close" id="te-close" title="Close" aria-label="Close"><IconX /></button>
       </div>
       <div className="theme-editor-body">
         {!isBuiltIn && (

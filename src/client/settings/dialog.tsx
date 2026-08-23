@@ -878,7 +878,7 @@ function renderShell(visible: Tab[], activeTabId: string, ctx: TabContext): Safe
     <>
       <div className="settings-header">
         <h3>Settings</h3>
-        <button className="settings-close" id="settings-close"><IconX /></button>
+        <button className="settings-close" id="settings-close" title="Close" aria-label="Close"><IconX /></button>
       </div>
 
       <div className="settings-tabs">

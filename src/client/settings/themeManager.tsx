@@ -242,7 +242,7 @@ function renderManager(data: ThemesResponse): SafeHtml {
     <>
       <div className="settings-header">
         <h3>Manage Themes</h3>
-        <button className="settings-close" id="tm-close"><IconX /></button>
+        <button className="settings-close" id="tm-close" title="Close" aria-label="Close"><IconX /></button>
       </div>
       <div className="theme-manager-body">
         <div className="theme-manager-list">
