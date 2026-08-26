@@ -22,7 +22,7 @@
   --diff-remove-border: rgba(243, 139, 168, 0.3);
   --diff-context-bg: transparent;
   --gutter-bg: #1a1a2e;
-  --gutter-text: #555577;
+  --gutter-text: #8282a6; // GB-1184: was #555577 (2.40:1 line numbers); now clears WCAG AA (4.62:1)
   --sidebar-w: 300px;
   --radius: 6px;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;

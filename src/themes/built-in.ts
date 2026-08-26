@@ -95,7 +95,7 @@ const dark: ThemeColors = {
   'diff-remove-border': 'rgba(243, 139, 168, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#1a1a2e',
-  'gutter-text': '#555577',
+  'gutter-text': '#8282a6',
 };
 
 // --- Light — GitHub Light-inspired ---
@@ -110,9 +110,9 @@ const light: ThemeColors = {
   'text-bright': '#000000',
   'accent': '#0969da',
   'accent-hover': '#0550ae',
-  'green': '#1a7f37',
+  'green': '#197b35',
   'red': '#cf222e',
-  'yellow': '#9a6700',
+  'yellow': '#906000',
   'orange': '#bc4c00',
   'blue': '#0969da',
   'purple': '#8250df',
@@ -124,7 +124,7 @@ const light: ThemeColors = {
   'diff-remove-border': 'rgba(207, 34, 46, 0.25)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#f6f8fa',
-  'gutter-text': '#8b949e',
+  'gutter-text': '#67707b',
 };
 
 // --- High Contrast Dark — WCAG AAA ---
@@ -211,7 +211,7 @@ const dracula: ThemeColors = {
   'diff-remove-border': 'rgba(255, 85, 85, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#21222c',
-  'gutter-text': '#6272a4',
+  'gutter-text': '#7f8cb5',
 };
 
 // --- Tokyo Night ---
@@ -240,7 +240,7 @@ const tokyoNight: ThemeColors = {
   'diff-remove-border': 'rgba(247, 118, 142, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#16172a',
-  'gutter-text': '#3b4261',
+  'gutter-text': '#7982ad',
 };
 
 // --- One Dark Pro ---
@@ -269,7 +269,7 @@ const oneDarkPro: ThemeColors = {
   'diff-remove-border': 'rgba(224, 108, 117, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#23272e',
-  'gutter-text': '#495162',
+  'gutter-text': '#8690a5',
 };
 
 // --- Solarized Dark ---
@@ -298,7 +298,7 @@ const solarizedDark: ThemeColors = {
   'diff-remove-border': 'rgba(220, 50, 47, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#002028',
-  'gutter-text': '#4a6568',
+  'gutter-text': '#688e92',
 };
 
 // --- Solarized Light ---
@@ -327,7 +327,7 @@ const solarizedLight: ThemeColors = {
   'diff-remove-border': 'rgba(220, 50, 47, 0.25)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#eee8d5',
-  'gutter-text': '#93a1a1',
+  'gutter-text': '#5b6969',
 };
 
 // --- Monokai ---
@@ -356,7 +356,7 @@ const monokai: ThemeColors = {
   'diff-remove-border': 'rgba(249, 38, 114, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#222218',
-  'gutter-text': '#575848',
+  'gutter-text': '#8c8d74',
 };
 
 // --- Nord ---
@@ -385,7 +385,7 @@ const nord: ThemeColors = {
   'diff-remove-border': 'rgba(191, 97, 106, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#2a303c',
-  'gutter-text': '#5b6578',
+  'gutter-text': '#929bac',
 };
 
 // --- Gruvbox Dark ---
@@ -414,7 +414,7 @@ const gruvboxDark: ThemeColors = {
   'diff-remove-border': 'rgba(251, 73, 52, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#232323',
-  'gutter-text': '#665c54',
+  'gutter-text': '#968a80',
 };
 
 // --- Gruvbox Light ---
@@ -443,7 +443,7 @@ const gruvboxLight: ThemeColors = {
   'diff-remove-border': 'rgba(157, 0, 6, 0.25)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#f2e5bc',
-  'gutter-text': '#928374',
+  'gutter-text': '#6e6256',
 };
 
 // --- GitHub Dark ---
@@ -472,7 +472,7 @@ const githubDark: ThemeColors = {
   'diff-remove-border': 'rgba(248, 81, 73, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#0a0e14',
-  'gutter-text': '#484f58',
+  'gutter-text': '#747f8d',
 };
 
 // --- Rosé Pine ---
@@ -501,7 +501,7 @@ const rosePine: ThemeColors = {
   'diff-remove-border': 'rgba(235, 111, 146, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#16141f',
-  'gutter-text': '#524f67',
+  'gutter-text': '#837f9d',
 };
 
 // --- Ayu Dark ---
@@ -530,7 +530,7 @@ const ayuDark: ThemeColors = {
   'diff-remove-border': 'rgba(217, 87, 87, 0.3)',
   'diff-context-bg': 'transparent',
   'gutter-bg': '#080a10',
-  'gutter-text': '#3d424d',
+  'gutter-text': '#717a8e',
 };
 
 export const BUILT_IN_THEMES: BuiltInTheme[] = [
