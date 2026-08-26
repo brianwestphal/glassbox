@@ -69,4 +69,31 @@ describe('reanchorReviewNotes', () => {
     const [n] = reanchorReviewNotes([note({ line: 7, snippet: 'dup();' })], diff);
     expect(n.line).toBe(9); // distance 2 vs 5
   });
+
+  // GB-1139 Windows regression: a file checked out with CRLF yields `"code\r"`
+  // line content, which must still match the LF-authored `"code"` snippet — else
+  // every note goes stale on Windows (this broke the notes-reveal e2e there).
+  it('matches CRLF diff content against an LF-authored snippet (aligned)', () => {
+    const diff = diffWithNewLines([{ newNum: 5, content: 'const x = 1;\r' }]);
+    const [n] = reanchorReviewNotes([note({ line: 5, snippet: 'const x = 1;' })], diff);
+    expect(n.line).toBe(5);
+    expect(n.stale).toBeUndefined();
+  });
+
+  it('matches CRLF diff content when re-anchoring to a shifted line', () => {
+    const diff = diffWithNewLines([
+      { newNum: 5, content: 'inserted();\r' },
+      { newNum: 8, content: 'const x = 1;\r' },
+    ]);
+    const [n] = reanchorReviewNotes([note({ line: 5, snippet: 'const x = 1;' })], diff);
+    expect(n.line).toBe(8);
+    expect(n.stale).toBe(false);
+  });
+
+  it('matches a CRLF-authored snippet against LF content (symmetric)', () => {
+    const diff = diffWithNewLines([{ newNum: 5, content: 'const x = 1;' }]);
+    const [n] = reanchorReviewNotes([note({ line: 5, snippet: 'const x = 1;\r\nmore' })], diff);
+    expect(n.line).toBe(5);
+    expect(n.stale).toBeUndefined();
+  });
 });

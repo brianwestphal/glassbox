@@ -18,18 +18,25 @@ import type { ReviewNoteView } from './view.js';
 
 const MATCH_RADIUS = 50;
 
+// The stored snippet is LF-authored, but a file checked out on Windows (no
+// `.gitattributes` forcing LF) yields CRLF content — so a revealed line reads as
+// `"code\r"` and would never string-equal the `"code"` anchor, silently marking
+// every note stale on Windows (GB-1139 reveal path + inline anchoring). Compare
+// with the trailing carriage return stripped from both sides.
+const stripCr = (s: string): string => s.replace(/\r$/, '');
+
 export function reanchorReviewNotes(notes: ReviewNoteView[], diff: FileDiff): ReviewNoteView[] {
   // Current new-side content, by line number.
   const byLine = new Map<number, string>();
   for (const hunk of diff.hunks) {
     for (const line of hunk.lines) {
-      if (line.newNum !== null) byLine.set(line.newNum, line.content);
+      if (line.newNum !== null) byLine.set(line.newNum, stripCr(line.content));
     }
   }
 
   return notes.map((note) => {
     if (note.snippet === undefined || note.snippet === '') return note;
-    const anchor = note.snippet.split('\n')[0];
+    const anchor = stripCr(note.snippet.split('\n')[0]);
 
     const current = byLine.get(note.line);
     if (current === anchor) return note; // still aligned
