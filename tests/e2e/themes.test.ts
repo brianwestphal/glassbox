@@ -30,9 +30,11 @@ test.describe('Theme system', () => {
     const count = await options.count();
     expect(count).toBeGreaterThanOrEqual(6);
 
-    // Verify the known built-in theme names are present
+    // Verify the known built-in theme names are present. WCAG-AA-compliant
+    // themes carry a trailing " (AA)" marker in the label (GB-1185), so strip it
+    // before matching the base name.
     const optionTexts = await options.allTextContents();
-    const names = optionTexts.map(t => t.trim());
+    const names = optionTexts.map(t => t.trim().replace(/ \(AA\)$/, ''));
     expect(names).toContain('Dark');
     expect(names).toContain('Light');
     expect(names).toContain('High Contrast Dark');

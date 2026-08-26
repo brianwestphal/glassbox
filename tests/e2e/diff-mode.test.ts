@@ -162,16 +162,19 @@ test.describe('--diff direct-comparison mode (doc 18)', () => {
     await expect(row.locator('.settings-backup-date')).toHaveText(/^Saved \d/);
 
     // Deleting is confirmed first — the backup is the user's only fallback.
+    // The confirm is kerfjs/overlay's native confirm() (GB-1143): a `.kerf-confirm`
+    // dialog with `[data-confirm="cancel"|"ok"]` buttons, not the old hand-rolled
+    // `.modal-overlay` / `#backup-del-*` markup.
     await row.locator('[data-delete-backup]').click();
-    const confirm = page.locator('.modal-overlay').filter({ hasText: 'Delete Database Backup' });
+    const confirm = page.locator('.kerf-confirm').filter({ hasText: 'Delete Database Backup' });
     await expect(confirm).toBeVisible({ timeout: 3000 });
 
     // Cancelling must leave it in place.
-    await confirm.locator('#backup-del-cancel').click();
+    await confirm.locator('button[data-confirm="cancel"]').click();
     await expect(row).toHaveCount(1);
 
     await row.locator('[data-delete-backup]').click();
-    await page.locator('#backup-del-confirm').click();
+    await page.locator('.kerf-confirm button[data-confirm="ok"]').click();
 
     // The list is re-read from the server, so an empty result means the
     // directory is really gone — and the whole section stops rendering.
