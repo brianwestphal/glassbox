@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt9ekutvt19gvm3p",
+          "message": {
+            "text": "Line-number gutter contrast was raised to WCAG AA across all 16 themes (here + each theme in src/themes/built-in.ts), but the sidebar file-status label colors were only fixed for Dark/Light — a deliberate asymmetry.\n\ngutter-text styles only the line-number gutter, so lightening it per theme is safe: it doesn't touch any theme's syntax-highlighting brand palette. The failing values were pervasive and intentional (as low as 1.80:1); each was nudged the smallest hue-preserving amount to clear ~4.6:1, keeping line numbers subtle-but-legible.\n\nThe status-label colors, by contrast, reuse the shared --yellow/--green syntax tokens. Darkening those in brand-replica themes (Solarized, Gruvbox) would shift their whole palette off-spec, so those themes' failing badges were left for a follow-up (GB-1185) that fixes them without breaking palette fidelity. Guarded by tests/unit/themes/theme-contrast.test.ts.\n",
+            "markdown": "Line-number gutter contrast was raised to WCAG AA across all 16 themes (here + each theme in `src/themes/built-in.ts`), but the sidebar file-status label colors were only fixed for Dark/Light — a deliberate asymmetry.\n\n`gutter-text` styles **only** the line-number gutter, so lightening it per theme is safe: it doesn't touch any theme's syntax-highlighting brand palette. The failing values were pervasive and intentional (as low as 1.80:1); each was nudged the smallest hue-preserving amount to clear ~4.6:1, keeping line numbers subtle-but-legible.\n\nThe status-label colors, by contrast, reuse the shared `--yellow`/`--green` **syntax** tokens. Darkening those in brand-replica themes (Solarized, Gruvbox) would shift their whole palette off-spec, so those themes' failing badges were left for a follow-up (GB-1185) that fixes them without breaking palette fidelity. Guarded by `tests/unit/themes/theme-contrast.test.ts`.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/styles/_variables.scss"
+                },
+                "region": {
+                  "startLine": 25,
+                  "endLine": 25,
+                  "snippet": {
+                    "text": "  --gutter-text: #8282a6; // GB-1184: was #555577 (2.40:1 line numbers); now clears WCAG AA (4.62:1)"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1184"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "07928765f71c0c886b025d06f67e49ca"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "13d9510426fe22d5cc7a4e04314e71b07e5de345",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}
