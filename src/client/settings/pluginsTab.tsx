@@ -263,6 +263,10 @@ function pluginRow(p: PluginInfo): SafeHtml {
             <input type="checkbox" data-plugin-toggle="project" data-plugin-id={p.id} checked={!p.projectDisabled} disabled={p.globalDisabled} />
             <span>Enabled (this project)</span>
           </label>
+          {/* Make the precedence legible right where the greyed box appears (GB-1181). */}
+          {p.globalDisabled && (
+            <p className="plugin-toggle-hint">Off for all projects — this overrides the per-project setting.</p>
+          )}
         </div>
       )}
       {p.status !== 'error' && preferencesJsx(p)}
@@ -350,8 +354,9 @@ function renderPluginsTab(): SafeHtml {
       <h3>Content plugins</h3>
       <p className="settings-hint">
         Plugins render specialized content types (e.g. diagrams). Installed plugins are enabled by
-        default; disable one for this project or for all projects. A globally-disabled plugin can't
-        be enabled per project.
+        default. You can disable one for all projects or just this project — the all-projects
+        setting wins, so a plugin that's off for all projects can't be turned back on for a single
+        project.
       </p>
       {list === null ? (
         <p className="settings-hint">Loading…</p>

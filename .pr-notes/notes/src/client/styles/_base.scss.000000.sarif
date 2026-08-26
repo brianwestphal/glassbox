@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt9comzw1lwkjtum",
+          "message": {
+            "text": "Global :focus-visible ring lives here so every focusable control inherits one visible keyboard-focus indicator — Glassbox is keyboard-driven (j/k nav, Cmd+Enter), so this is load-bearing, not cosmetic.\n\nTwo non-obvious specificity details make it actually show:\n\n- Components that previously killed the outline with a bare &:focus { outline: none } had to change, because :focus-visible also matches on keyboard focus, and a class-level :focus rule (higher specificity) would win and re-hide the ring. They now scope the suppression to &:focus:not(:focus-visible) (see the settings-select rule here (0)) — mouse focus stays clean, keyboard focus keeps the ring.\n- .segment and .settings-tab use an inset ring (outline-offset: -2px) because their container has overflow: hidden; a positive offset would be clipped at the group edge.\n\nGuarded by a conventions test that fails if any SCSS reintroduces &:focus { outline: none } without the :not(:focus-visible) companion.\n",
+            "markdown": "Global `:focus-visible` ring lives here so every focusable control inherits one visible keyboard-focus indicator — Glassbox is keyboard-driven (j/k nav, Cmd+Enter), so this is load-bearing, not cosmetic.\n\nTwo non-obvious specificity details make it actually show:\n\n- Components that previously killed the outline with a bare `&:focus { outline: none }` had to change, because `:focus-visible` *also* matches on keyboard focus, and a class-level `:focus` rule (higher specificity) would win and re-hide the ring. They now scope the suppression to `&:focus:not(:focus-visible)` (see the settings-select rule [here](0)) — mouse focus stays clean, keyboard focus keeps the ring.\n- `.segment` and `.settings-tab` use an inset ring (`outline-offset: -2px`) because their container has `overflow: hidden`; a positive offset would be clipped at the group edge.\n\nGuarded by a conventions test that fails if any SCSS reintroduces `&:focus { outline: none }` without the `:not(:focus-visible)` companion.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/styles/_base.scss"
+                },
+                "region": {
+                  "startLine": 16,
+                  "endLine": 19,
+                  "snippet": {
+                    "text": ":focus-visible {\n  outline: 2px solid var(--accent);\n  outline-offset: 2px;\n}"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/client/styles/_settings.scss"
+                },
+                "region": {
+                  "startLine": 470
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1177"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "e2196fa03ae046b37f0afc14f03a0536"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "a982784a17407133fa9e6bc9934951ab923dfb1b",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

@@ -19,16 +19,18 @@ export function sortControlJsx(): SafeHtml {
   return (
     <div className="sort-mode-bar">
       <div className="segmented-control sort-mode-control">
+        {/* Icon-only controls: aria-label gives assistive tech an explicit
+            accessible name matching the tooltip (GB-1182). */}
         <button className={`segment sort-segment${ai.sortMode === 'folder' ? ' active' : ''}`}
-          data-sort-mode="folder" title="Group by folder">
+          data-sort-mode="folder" title="Group by folder" aria-label="Group files by folder">
           <IconFolder />
         </button>
         <button className={`segment sort-segment${ai.sortMode === 'risk' ? ' active' : ''}`}
-          data-sort-mode="risk" title="Sort by risk">
+          data-sort-mode="risk" title="Sort by risk" aria-label="Sort files by AI risk score">
           <IconShield />
         </button>
         <button className={`segment sort-segment${ai.sortMode === 'narrative' ? ' active' : ''}`}
-          data-sort-mode="narrative" title="Reading order">
+          data-sort-mode="narrative" title="Reading order" aria-label="Sort files in narrative reading order">
           <IconBook />
         </button>
       </div>
@@ -37,7 +39,7 @@ export function sortControlJsx(): SafeHtml {
           {...ACTIONS.toggleRiskScores.attrs} title="Show risk scores">
           Score
         </button>
-        <select className="sort-dimension-select" {...ACTIONS.setRiskDimension.attrs}>
+        <select className="sort-dimension-select" aria-label="Risk dimension to sort by" {...ACTIONS.setRiskDimension.attrs}>
           {RISK_DIMENSIONS.map(([value, label]) => (
             <option value={value} selected={value === ai.riskSortDimension}>{label}</option>
           ))}

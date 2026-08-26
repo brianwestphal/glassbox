@@ -71,6 +71,7 @@ export function showAnnotationForm(afterEl: HTMLElement, lineNumber: number, sid
         {buildCategoryBadge(defaultCategory)}
         <textarea placeholder={replyToNoteId !== undefined ? 'Reply to this note…' : "Describe the issue and what you'd expect instead…"} autoFocus></textarea>
         <div className="annotation-form-actions">
+          <span className="annotation-form-hint">Cmd/Ctrl+Enter to save · Esc to cancel</span>
           <button className="btn btn-sm cancel-btn">Cancel</button>
           <button className="btn btn-sm btn-primary annotation-save-btn" disabled>Save</button>
         </div>

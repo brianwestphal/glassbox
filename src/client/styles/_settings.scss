@@ -343,6 +343,10 @@
 
   &:hover { color: var(--text); }
 
+  // Inset ring (GB-1177) so it sits cleanly inside the tab strip rather than
+  // overlapping neighboring tabs (2px gap) or the dialog's top edge.
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
   &.active {
     color: var(--accent);
     border-bottom-color: var(--accent);
@@ -463,7 +467,10 @@
   font-size: 13px;
   cursor: pointer;
 
-  &:focus { outline: none; border-color: var(--accent); }
+  &:focus { border-color: var(--accent); }
+  // Keep the UA outline suppressed for mouse focus, but let the keyboard
+  // `:focus-visible` ring from _base.scss show through (GB-1177).
+  &:focus:not(:focus-visible) { outline: none; }
 }
 
 .settings-input {
@@ -477,7 +484,10 @@
   font-size: 12px;
   margin-top: 8px;
 
-  &:focus { outline: none; border-color: var(--accent); }
+  &:focus { border-color: var(--accent); }
+  // Keep the UA outline suppressed for mouse focus, but let the keyboard
+  // `:focus-visible` ring from _base.scss show through (GB-1177).
+  &:focus:not(:focus-visible) { outline: none; }
   &::placeholder { color: var(--text-dim); }
 }
 
@@ -759,6 +769,14 @@
   padding-left: 19px;
 }
 .settings-checkbox-disabled { opacity: 0.5; }
+// Precedence hint under the plugin scope checkboxes (GB-1181). flex-basis:100%
+// forces it onto its own line below the two toggles in the wrapping flex row.
+.plugin-toggle-hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
 .plugin-install {
   margin-top: 16px;
 

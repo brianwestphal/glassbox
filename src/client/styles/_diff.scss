@@ -467,9 +467,10 @@
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  outline: none;
 
   &:focus { border-color: var(--accent); }
+  // Keyboard focus keeps the _base.scss ring; only mouse focus drops it (GB-1177).
+  &:focus:not(:focus-visible) { outline: none; }
 }
 
 .find-match-count {
@@ -547,6 +548,10 @@
     color: var(--bg);
   }
 
+  // Inset ring (GB-1177): the parent .segmented-control has overflow:hidden, so
+  // a positive-offset outline would be clipped at the group edge.
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
   & + .segment { border-left: 1px solid var(--border); }
 }
 
@@ -590,8 +595,9 @@
   border-bottom: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: 12px;
-  outline: none;
 
+  // Keyboard focus keeps the _base.scss ring; only mouse focus drops it (GB-1177).
+  &:focus:not(:focus-visible) { outline: none; }
   &::placeholder { color: var(--text-dim); }
 }
 

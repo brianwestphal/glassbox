@@ -633,11 +633,13 @@ export function updateToolbarLanguage(): void {
   const btn = document.getElementById('language-btn');
   if (btn === null) return;
   const dv = diffViewStore.state.value;
+  // "Syntax:" prefix disambiguates this button (GB-1178): "Auto (typescript)"
+  // alone read as a possible review/edit mode rather than syntax highlighting.
   if (dv.highlightAuto) {
     const detected = dv.detectedLang === 'plaintext' ? 'Plain Text' : dv.detectedLang;
-    btn.textContent = 'Auto (' + detected + ')';
+    btn.textContent = 'Syntax: ' + detected + ' (auto)';
   } else {
-    btn.textContent = dv.highlightLang === 'plaintext' ? 'Plain Text' : dv.highlightLang;
+    btn.textContent = 'Syntax: ' + (dv.highlightLang === 'plaintext' ? 'Plain Text' : dv.highlightLang);
   }
 }
 

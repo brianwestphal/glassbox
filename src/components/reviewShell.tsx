@@ -90,7 +90,7 @@ export function ReviewShell({ reviewId, review, files, annotationCounts, staleCo
                 <button className="toolbar-btn" id="whitespace-toggle">Ignore Whitespace</button>
               </div>
               <div className="diff-toolbar-right">
-                <button className="toolbar-btn" id="language-btn">Plain Text</button>
+                <button className="toolbar-btn" id="language-btn">Syntax: Plain Text</button>
               </div>
             </div>
             <div className="diff-toolbar-image" style="display:none">

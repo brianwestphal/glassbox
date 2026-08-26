@@ -433,10 +433,9 @@
   font-family: inherit;
   font-size: 13px;
 
-  &:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
+  &:focus { border-color: var(--accent); }
+  // Keyboard focus keeps the _base.scss ring; only mouse focus drops it (GB-1177).
+  &:focus:not(:focus-visible) { outline: none; }
 }
 
 .image-feedback-list {

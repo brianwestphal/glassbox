@@ -262,3 +262,34 @@ describe('smoke scripts bind an overridable, pre-checked port', () => {
     expect(new Set(vars).size).toBe(SMOKE_SCRIPTS.length);
   });
 });
+
+describe('keyboard focus visibility (GB-1177)', () => {
+  // Glassbox is a keyboard-driven desktop app (j/k nav, Cmd+Enter to save), so a
+  // visible focus ring is load-bearing. Regression guard: the global
+  // `:focus-visible` outline must stay in _base.scss, and no component may kill
+  // the outline on a bare `:focus` without restoring it for `:focus-visible`.
+  it('_base.scss defines a global :focus-visible outline using --accent', () => {
+    const base = read(join('src', 'client', 'styles', '_base.scss'));
+    const block = /:focus-visible\s*\{[^}]*\}/.exec(base);
+    expect(block, '_base.scss must define a :focus-visible rule').not.toBeNull();
+    expect(block![0]).toMatch(/outline:/);
+    expect(block![0]).toContain('var(--accent)');
+  });
+
+  it('no SCSS suppresses the outline on a bare :focus without a :focus-visible companion', () => {
+    const dir = join(ROOT, 'src', 'client', 'styles');
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.scss'))) {
+      const src = readFileSync(join(dir, f), 'utf8');
+      // `&:focus { outline: none }` (no :not(:focus-visible) guard) hides the
+      // keyboard ring, since :focus-visible also matches on keyboard focus.
+      const bad = /&:focus\s*\{[^}]*outline:\s*none/g;
+      const matches = src.match(bad) ?? [];
+      for (const m of matches) {
+        expect(
+          m.includes(':not(:focus-visible)'),
+          `${f}: "${m.trim()}" kills the keyboard focus ring — scope it to :focus:not(:focus-visible) or use :focus-visible`,
+        ).toBe(true);
+      }
+    }
+  });
+});

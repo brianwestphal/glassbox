@@ -8,6 +8,16 @@ body {
   overflow: hidden;
 }
 
+// Consistent keyboard-focus ring (GB-1177). `:focus-visible` fires only for
+// keyboard / assistive-tech focus, not mouse clicks, so pointer users never see
+// a ring. Uses `--accent` so it themes correctly across Dark / Light / High
+// Contrast. Individual components (segments, tabs, selects, sidebar rows) refine
+// the offset below, but every focusable control inherits this floor.
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .review-app {
   display: flex;
   flex-direction: column;

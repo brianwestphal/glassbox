@@ -43,7 +43,10 @@
   font-family: var(--font-sans);
   cursor: pointer;
 
-  &:focus { outline: none; border-color: var(--accent); }
+  &:focus { border-color: var(--accent); }
+  // Keep the UA outline suppressed for mouse focus, but let the keyboard
+  // `:focus-visible` ring from _base.scss show through (GB-1177).
+  &:focus:not(:focus-visible) { outline: none; }
 }
 
 // --- Risk Badge ---

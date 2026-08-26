@@ -287,10 +287,9 @@
     font-size: 13px;
     resize: vertical;
 
-    &:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
+    &:focus { border-color: var(--accent); }
+    // Keyboard focus keeps the _base.scss ring; only mouse focus drops it (GB-1177).
+    &:focus:not(:focus-visible) { outline: none; }
   }
 }
 
@@ -305,4 +304,13 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+// Keyboard-shortcut hint (GB-1178): sits at the left of the action row and
+// pushes Cancel/Save to the right. Muted so it stays secondary to the buttons.
+.annotation-form-hint {
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--text-dim);
 }
