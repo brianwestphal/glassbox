@@ -81,6 +81,7 @@ Each theme shall define the following color groups (no font customization):
 
 - The settings dialog shall include theme selection in the **General** tab.
 - Theme selection shall use a dropdown listing all available themes (built-in first, then custom, separated by a divider).
+- Themes that meet WCAG AA contrast everywhere shall be suffixed with **"(AA)"** in the dropdown, with a hint explaining the marker (see FR-15.11).
 - A **Manage Themes** button shall open the theme manager dialog.
 - Changing the theme in the dropdown shall apply immediately (auto-save, no confirmation needed).
 
@@ -90,6 +91,7 @@ Each theme shall define the following color groups (no font customization):
 - The theme manager shall display all themes in a list with:
   - Theme name
   - Badge indicating "Built-in" or "Custom"
+  - An **"AA"** badge on themes that meet WCAG AA contrast everywhere (see FR-15.11)
   - Color preview swatches (showing a few key colors: bg, text, accent, green, red)
 - Available actions:
   - **Duplicate** — Available for all themes. Creates a copy named `"<name> (Copy)"`.
@@ -156,6 +158,8 @@ Custom theme files (`~/.glassbox/themes/<id>.json`) shall use the following form
 
 - High contrast themes shall meet WCAG 2.1 Level AAA contrast ratios (7:1 for normal text, 4.5:1 for large text).
 - The theme editor color picker shall use the browser's native `<input type="color">` for accessibility.
+- Each theme shall carry a **`wcagAA`** flag (in the `/themes` list response) indicating whether **every audited text pair** clears WCAG AA (4.5:1 for normal text). The flag shall be **derived from the theme's own colors** (`isThemeWcagAA` in `src/themes/contrast.ts`), never hand-maintained, so the "(AA)" / "AA" markers cannot advertise compliance a theme lacks. Audited pairs: primary and muted text on both background levels, links/accent on background, line numbers, and the four sidebar file-status labels on their tinted pills.
+- The built-in themes meeting WCAG AA are **Dark, Light, High Contrast Dark, and High Contrast Light** (2 light + 2 dark). The remaining built-in themes replicate a specific palette (e.g. Dracula, Solarized, Nord, Gruvbox) whose namesake colors are not all AA; these are kept faithful to their source and left unmarked rather than re-tuned. This compliant set is pinned by `tests/unit/themes/theme-contrast.test.ts` so it cannot drift silently.
 
 ### 15.12 Compatibility
 

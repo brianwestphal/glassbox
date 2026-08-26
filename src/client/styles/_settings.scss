@@ -152,6 +152,9 @@
   flex-shrink: 0;
 
   &.active { color: var(--green); border: 1px solid var(--green); opacity: 0.7; }
+  // WCAG-AA marker (GB-1185): accent-colored to read as informational, distinct
+  // from the green "Active" state.
+  &.aa { color: var(--accent); border: 1px solid var(--accent); opacity: 0.8; }
 }
 
 .theme-manager-section-label {

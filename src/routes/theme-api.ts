@@ -12,6 +12,7 @@ import {
   deleteCustomTheme, generateThemeId, getActiveThemeColors, getActiveThemeId,
   getAllThemes, resolveTheme, saveCustomTheme, setActiveThemeId,
 } from '../themes/config.js';
+import { isThemeWcagAA } from '../themes/contrast.js';
 import type { AppEnv } from '../types.js';
 import { errorResponse, parseBody, requireSlugParam } from '../utils/parseBody.js';
 
@@ -28,6 +29,7 @@ themeApiRoutes.get('/', (c) => {
       builtIn: t.builtIn,
       ...(t.builtIn ? {} : { baseTheme: t.baseTheme }),
       colors: t.colors,
+      wcagAA: isThemeWcagAA(t.colors),
     })),
     activeId,
   });

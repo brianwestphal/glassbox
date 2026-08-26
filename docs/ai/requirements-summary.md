@@ -602,6 +602,13 @@ semantic (green, red, yellow, orange, blue, purple, teal), border,
 diff (add/remove bg + border), gutter (bg + text). No font
 customization.
 
+Each theme carries a **`wcagAA`** flag (GB-1185) derived from its own colors
+(`isThemeWcagAA` in `src/themes/contrast.ts`), shown as a **"(AA)"** suffix in
+the dropdown and an **"AA"** badge in the theme manager. Only **Dark, Light,
+High Contrast Dark/Light** clear WCAG AA on every audited text pair; the
+brand-replica themes stay faithful to their namesake palettes (not all AA) and
+are left unmarked. The compliant set is pinned by a test so it can't drift.
+
 Settings → General has the dropdown + **Manage Themes**. Theme manager
 shows name, built-in/custom badge, swatches; actions: Duplicate (all),
 Edit (auto-copy built-ins), Rename/Delete (custom only). Theme editor

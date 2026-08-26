@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILT_IN_THEMES } from '../../../src/themes/built-in.js';
+import { isThemeWcagAA, themeContrastFailures } from '../../../src/themes/contrast.js';
 
 function toRgb(hex: string): [number, number, number] {
   let h = hex.replace('#', '');
@@ -54,6 +55,32 @@ describe('theme contrast (WCAG AA)', () => {
       const bg = over(color, 0.1, light.colors.bg);
       const r = contrast(color, bg);
       expect(r, `light .file-status ${key} ${color} = ${r.toFixed(2)}`).toBeGreaterThanOrEqual(AA);
+    }
+  });
+});
+
+describe('WCAG-AA theme set (GB-1185)', () => {
+  // The picker's "AA" marker is derived from `isThemeWcagAA`. Pin the exact
+  // compliant set so the label can't silently drift: a theme edit that drops a
+  // labeled theme below AA — or one that lifts another theme to AA without
+  // updating the marketing/marker expectations — fails here and forces a
+  // conscious decision. Brand-replica themes (Dracula, Solarized, …) copy their
+  // namesake palettes, which aren't AA, and are intentionally NOT in this set.
+  const EXPECTED_AA = ['dark', 'light', 'high-contrast-dark', 'high-contrast-light'];
+
+  it('exactly the expected built-in themes report WCAG AA', () => {
+    const actual = BUILT_IN_THEMES.filter((t) => isThemeWcagAA(t.colors)).map((t) => t.id).sort();
+    expect(actual).toEqual([...EXPECTED_AA].sort());
+  });
+
+  it('each AA-flagged theme has zero audited contrast failures', () => {
+    for (const id of EXPECTED_AA) {
+      const theme = BUILT_IN_THEMES.find((t) => t.id === id)!;
+      const fails = themeContrastFailures(theme.colors);
+      expect(
+        fails,
+        `${theme.name} is flagged AA but fails: ${fails.map((f) => `${f.label} ${f.ratio.toFixed(2)}`).join(', ')}`,
+      ).toEqual([]);
     }
   });
 });

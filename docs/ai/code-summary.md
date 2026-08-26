@@ -204,6 +204,7 @@ See §6 for the schema itself.
 |------|---------|
 | `built-in.ts` | `BUILT_IN_THEMES` array and `ThemeColors` type. Lists all color variables (backgrounds, text, accent, semantic, diff, gutter, border). |
 | `config.ts` | Active theme persistence (`~/.glassbox/config.json`), custom theme CRUD in `~/.glassbox/themes/*.json`, auto-copy-on-edit for built-ins. |
+| `contrast.ts` | WCAG contrast helpers + `isThemeWcagAA(colors)` (GB-1185). Derives each theme's `wcagAA` flag (in the `/themes` response) from its own colors so the picker's "(AA)"/"AA" markers can't misreport; the compliant set is pinned by `tests/unit/themes/theme-contrast.test.ts`. |
 
 ### `src/export/`
 

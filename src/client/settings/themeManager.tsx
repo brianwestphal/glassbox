@@ -226,6 +226,8 @@ function renderItem(t: ThemeSummary, activeId: string): SafeHtml {
           ))}
         </div>
         <span className="theme-manager-name">{t.name}</span>
+        {/* Marks themes that clear WCAG AA contrast everywhere (GB-1185). */}
+        {t.wcagAA && <span className="theme-manager-badge aa" title="Meets WCAG AA contrast on all text">AA</span>}
         {isActive && <span className="theme-manager-badge active">Active</span>}
       </div>
       <button className="btn btn-xs btn-icon tm-menu-btn" data-menu-id={t.id} title="Actions">

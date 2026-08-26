@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mt9jwq0nvnag1wfk",
+          "message": {
+            "text": "The picker's \"AA\" marker is derived from each theme's own colors (isThemeWcagAA), computed at the /themes route (here (0)) — never a hand-maintained boolean. This is deliberate: a curated flag would drift the moment someone tweaks a palette, and the marker would then lie about compliance. Deriving it means the badge is always true to the actual contrast.\n\nThe audited pair set (primary/muted text on both bg levels, links, line numbers, the four file-status labels on their tints) is the definition of \"AA\" for a theme here. tests/unit/themes/theme-contrast.test.ts pins the exact resulting set — Dark, Light, High Contrast ×2 — so a future edit that drops a labeled theme below AA, or lifts a brand theme into it, fails the test and forces a conscious update rather than silently changing what the UI advertises.\n\nBrand-replica themes (Dracula, Solarized, Nord, …) copy their namesake palettes, which aren't AA; they're intentionally left unmarked rather than de-branded to pass.\n",
+            "markdown": "The picker's \"AA\" marker is **derived** from each theme's own colors (`isThemeWcagAA`), computed at the `/themes` route ([here](0)) — never a hand-maintained boolean. This is deliberate: a curated flag would drift the moment someone tweaks a palette, and the marker would then lie about compliance. Deriving it means the badge is always true to the actual contrast.\n\nThe audited pair set (primary/muted text on both bg levels, links, line numbers, the four file-status labels on their tints) is the definition of \"AA\" for a theme here. `tests/unit/themes/theme-contrast.test.ts` pins the exact resulting set — Dark, Light, High Contrast ×2 — so a future edit that drops a labeled theme below AA, or lifts a brand theme into it, fails the test and forces a conscious update rather than silently changing what the UI advertises.\n\nBrand-replica themes (Dracula, Solarized, Nord, …) copy their namesake palettes, which aren't AA; they're intentionally left unmarked rather than de-branded to pass.\n"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/themes/contrast.ts"
+                },
+                "region": {
+                  "startLine": 62,
+                  "endLine": 72,
+                  "snippet": {
+                    "text": "    { label: 'text on surface', fg: c.text, bg: c['bg-surface'] },\n    { label: 'muted text on bg', fg: c['text-dim'], bg: c.bg },\n    { label: 'muted text on surface', fg: c['text-dim'], bg: c['bg-surface'] },\n    { label: 'link/accent on bg', fg: c.accent, bg: c.bg },\n    { label: 'line numbers', fg: c['gutter-text'], bg: c['gutter-bg'] },\n  ];\n  for (const [status, [pastel, token]] of Object.entries(STATUS_TINT)) {\n    pairs.push({ label: `status: ${status}`, fg: c[token], bg: compositeOver(pastel, 0.1, c['bg-surface']) });\n  }\n  return pairs.map((p) => ({ label: p.label, ratio: contrastRatio(p.fg, p.bg) }));\n}"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "relatedLocations": [
+            {
+              "id": 0,
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/routes/theme-api.ts"
+                },
+                "region": {
+                  "startLine": 32
+                }
+              }
+            }
+          ],
+          "workItemUris": [
+            "GB-1185"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "3e0e37dc5020794ea14a35661a8ecdb0"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "9be026575daf3c2c36f64509e717e463ae05022b",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

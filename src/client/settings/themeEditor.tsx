@@ -5,6 +5,7 @@ import { overlay } from 'kerfjs/overlay';
 import { editTheme, listThemes } from '../../api/index.js';
 import { IconX } from '../../icons.js';
 import { themeColorsToRecord } from '../../themes/built-in.js';
+import { isThemeWcagAA } from '../../themes/contrast.js';
 import { asEl, asInput } from '../dom.js';
 import { applyThemeColors } from '../themes.js';
 
@@ -124,7 +125,7 @@ export function showThemeEditor(themeId: string, onDone?: () => void): void {
       });
       if (result.copied) {
         currentThemeId = result.theme.id;
-        theme = result.theme;
+        theme = { ...result.theme, wcagAA: isThemeWcagAA(result.theme.colors) };
       }
       dirty = false;
     }

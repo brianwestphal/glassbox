@@ -115,7 +115,7 @@ const light: ThemeColors = {
   'yellow': '#906000',
   'orange': '#bc4c00',
   'blue': '#0969da',
-  'purple': '#8250df',
+  'purple': '#7f4cde', // GB-1185: was #8250df; renamed-status label cleared AA (4.46 -> 4.67)
   'teal': '#0e7c6b',
   'border': '#d0d7de',
   'diff-add-bg': 'rgba(26, 127, 55, 0.08)',

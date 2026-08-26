@@ -50,6 +50,10 @@ export const ThemeSummarySchema = z.object({
   builtIn: z.boolean(),
   baseTheme: z.string().optional(),
   colors: ThemeColorsSchema,
+  /** Whether every audited text pair clears WCAG AA (GB-1185). Derived
+   *  server-side from the theme's own colors via `isThemeWcagAA`, so the
+   *  picker's "AA" marker can never claim compliance a theme doesn't have. */
+  wcagAA: z.boolean(),
 });
 export type ThemeSummary = z.infer<typeof ThemeSummarySchema>;
 
