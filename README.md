@@ -4,6 +4,13 @@
 
 ### Stop hoping your AI got it right. Review the diff, leave precise feedback, and let AI fix it — in one loop.
 
+<p>
+  <a href="https://www.npmjs.com/package/glassbox"><img src="https://img.shields.io/npm/v/glassbox.svg" alt="npm version" /></a>
+  <a href="https://github.com/brianwestphal/glassbox/releases"><img src="https://img.shields.io/github/v/release/brianwestphal/glassbox?label=desktop%20app" alt="Latest desktop app release" /></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg" alt="Node.js 20 or newer" />
+  <img src="https://img.shields.io/npm/l/glassbox.svg" alt="MIT license" />
+</p>
+
 <br>
 
 **Glassbox** is a local, browser-based code review tool built for the AI coding workflow. You review the changes your AI made, annotate what's wrong (or right), and export structured feedback that AI tools can read and act on instantly.
@@ -85,32 +92,43 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 
 ## Features
 
+### Diffs & viewing
+
 - **Split and unified diffs** with syntax-colored add/remove/context lines
-- **Line-level annotations** — click any line to add feedback with a category
 - **Image and SVG diffs** — binary images and SVGs render in a **side-by-side** layout (with a left/right or over/under toggle), a **difference overlay**, a **swipeable slice tool**, single-side **A / B focus** modes, and pixel-precision synced zoom/pan. SVGs offer a *Code* / *Rendered* toggle so you can review either the source or the live-rendered output.
-- **Comment on images** — leave a general comment on any image, or **draw a rectangle region** to anchor feedback to a specific spot (per A/B side), just like a line annotation.
-- **Ground-truth image comparison** — `glassbox --ground-truth <manifest>` compares an **actual** render against an **expected** one (a design spec, a reference, or a previous baseline — even outside the repo), scores the perceptual difference, sorts most-changed-first, and lets you **promote** a new actual to the baseline. Great for catching visual regressions.
-- **Attach files to any comment** — drag, paste, or browse to attach screenshots, logs, or any file to a line comment, image comment, or note reply. Image attachments show a thumbnail and open in a lightbox; the export lists each file's path so your AI tool can read it.
 - **Compare any two paths** — `glassbox --diff <A> <B>` reviews two arbitrary files or two arbitrary folders by path — no git repository required.
-- **Drag and drop** annotations to different lines
-- **Double-click** to edit, click the category badge to reclassify
+- **Ground-truth image comparison** — `glassbox --ground-truth <manifest>` compares an **actual** render against an **expected** one (a design spec, a reference, or a previous baseline — even outside the repo), scores the perceptual difference, sorts most-changed-first, and lets you **promote** a new actual to the baseline. Great for catching visual regressions.
+- **Content plugins** — opt-in renderers turn diagram source (Graphviz, PlantUML, Mermaid) into pictures: diagram files diff like images, and diagram artifacts on AI review notes render inline
+- **Go-to-definition and a nav stack** — click any symbol to jump to its definition, with back/forward through your trail
 - **Collapsible folder tree** in the sidebar with file filter
-- **Right-click any file** in the sidebar — reveal in your file manager, copy its path, open it in your editor, or mark it reviewed
 - **Resizable sidebar** and word wrap toggle
 - **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
-- **Go-to-definition and a nav stack** — click any symbol to jump to its definition, with back/forward through your trail
 - **Themes** — thirteen built-in themes (Dark, Light, High Contrast Dark/Light, Dracula, Tokyo Night, One Dark Pro, Solarized Dark/Light, Monokai, Nord, Gruvbox Dark/Light), plus a custom theme editor with live preview
+
+### Annotations & feedback
+
+- **Line-level annotations** — click any line to add feedback with a category
+- **Comment on images** — leave a general comment on any image, or **draw a rectangle region** to anchor feedback to a specific spot (per A/B side), just like a line annotation.
+- **Attach files to any comment** — drag, paste, or browse to attach screenshots, logs, or any file to a line comment, image comment, or note reply. Image attachments show a thumbnail and open in a lightbox; the export lists each file's path so your AI tool can read it.
+- **Drag and drop** annotations to different lines
+- **Double-click** to edit, click the category badge to reclassify
+- **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
+- **Structured export** — markdown output with file paths, line numbers, categories, and instructions for AI consumption
+
+### AI assistance (optional)
+
+- **AI review notes** — render the generating AI's line-anchored rationale and proof, committed alongside the code in `.pr-notes/`, right in the diff — and reply to any note inline
+- **AI-powered analysis** — risk scoring, narrative reading order, and guided review, powered by cloud, local (Ollama / LM Studio), or on-device (Apple) models
+
+### Workflow & data
+
+- **Right-click any file** in the sidebar — reveal in your file manager, copy its path, open it in your editor, or mark it reviewed
 - **Session persistence** — reviews survive restarts, pick up where you left off
 - **Smart review reuse** — re-running `glassbox` on the same commit updates diffs in place and migrates annotations to their new line positions
-- **Stale annotation detection** — comments that can't be matched to the updated diff are flagged with a visual indicator
 - **Review history** — browse, reopen, or delete past reviews
-- **Structured export** — markdown output with file paths, line numbers, categories, and instructions for AI consumption
-- **Content plugins** — opt-in renderers turn diagram source (Graphviz, PlantUML, Mermaid) into pictures: diagram files diff like images, and diagram artifacts on AI review notes render inline
 - **Automatic .gitignore** — keeps `.glassbox/` out of version control for you at launch, while leaving the per-project `.glassbox/settings.json` tracked
 - **Auto port selection** — if the default port is busy, it finds an open one
 - **Fully local** — no network calls (unless you opt into AI features), no accounts, no telemetry. Your code stays on your machine.
-- **AI review notes** _(optional)_ — render the generating AI's line-anchored rationale and proof, committed alongside the code in `.pr-notes/`, right in the diff — and reply to any note inline
-- **AI-powered analysis** _(optional)_ — risk scoring, narrative reading order, and guided review, powered by cloud, local (Ollama / LM Studio), or on-device (Apple) models
 
 ---
 
