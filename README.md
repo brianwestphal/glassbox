@@ -103,7 +103,7 @@ Then you run `glassbox` again. Your previous annotations carry forward — match
 - **Collapsible folder tree** in the sidebar with file filter
 - **Resizable sidebar** and word wrap toggle
 - **Keyboard navigation** — `j`/`k` to move between files, `Cmd+Enter` to save
-- **Themes** — thirteen built-in themes (Dark, Light, High Contrast Dark/Light, Dracula, Tokyo Night, One Dark Pro, Solarized Dark/Light, Monokai, Nord, Gruvbox Dark/Light), plus a custom theme editor with live preview
+- **Themes** — sixteen built-in themes (Dark, Light, High Contrast Dark/Light, Dracula, Tokyo Night, One Dark Pro, Solarized Dark/Light, Monokai, Nord, Gruvbox Dark/Light, GitHub Dark, Rosé Pine, Ayu Dark) — the ones that meet WCAG AA contrast are marked — plus a custom theme editor with live preview
 
 ### Annotations & feedback
 

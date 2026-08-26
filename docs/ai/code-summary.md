@@ -738,7 +738,7 @@ Scripts (`package.json`):
   scene changes cut and only the loop seam crossfades. Scans up from the start
   port (default 4188, `DEMO_PORT`-overridable) for the first truly-free one via
   the shared `scripts/lib/freePort.ts` (`nextFreePort`), so a squatter on the
-  default doesn't wedge the run. `domotion-svg` is pinned to 0.22.2 and forced to
+  default doesn't wedge the run. `domotion-svg` is pinned to 0.24.0 and forced to
   embedded-font text mode (`setRenderTextMode`). Must run outside the command
   sandbox (Chromium). Unit-tested by `tests/unit/demo-popin.test.ts`.
 - `release` — version bump + publish stable (see `scripts/release.sh`). Release notes are drafted by [`gitgist`](https://github.com/brianwestphal/gitgist) (devDependency) over a `<base>..HEAD` range, then edited in `$EDITOR`.
