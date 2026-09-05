@@ -351,9 +351,18 @@ async function main(): Promise<void> {
     // === 1. Risk triage ===================================================
     await page.click('button[data-sort-mode="risk"]');
     await page.waitForSelector('.risk-badge', { timeout: 12000 });
-    await page.waitForTimeout(700);
-    const browseHit = await sidebarHit(page, BROWSE_FILE);
+    // Wait for analysis to FULLY settle before measuring the cursor target or
+    // capturing this frame. While scores stream in, the risk-sorted list keeps
+    // reordering and the "Analyzing…" progress banner comes and goes — both
+    // shift sidebar rows. A hit measured mid-stream then points at the wrong row
+    // once the frame is composited (the cursor appeared to click `auth.ts` while
+    // the click actually opened `redis.ts`). Waiting for a stable list — no
+    // `.analysis-loading-inline` banner (risk AND guided) — keeps the measured
+    // position and the captured frame in agreement.
+    await page.waitForSelector('.analysis-loading-inline', { state: 'detached', timeout: 20000 });
+    await page.waitForTimeout(300);
     await debugShot(page, 'risk');
+    const browseHit = await sidebarHit(page, BROWSE_FILE);
     // First live-app window: a LAYERED pop-in over the launch terminal — the app
     // sits on top (cut entry) and the terminal fades out behind it (GB-1016). Its
     // OWN transition is the exit to the browse beat: a `cut`, not a crossfade —

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mtozqxf85b6x2to5",
+          "message": {
+            "text": "Wait for analysis to settle before measuring the browse cursor target, so the composited cursor lands on the file the click actually opens.\n\nIn risk sort mode the sidebar re-sorts as mock scores stream in, and the .analysis-loading-inline banner appears/disappears — both shift row positions. Measuring browseHit (the redis.ts row center) mid-stream froze a coordinate that, once the frame was composited against the settled list, pointed at a different row (auth.ts). Waiting for .analysis-loading-inline to detach gives a stable list so the measured position and the captured frame agree. browseHit is also measured immediately before grabTree to eliminate any async-reorder gap.",
+            "markdown": "Wait for analysis to settle before measuring the browse cursor target, so the composited cursor lands on the file the click actually opens.\n\nIn risk sort mode the sidebar re-sorts as mock scores stream in, and the `.analysis-loading-inline` banner appears/disappears — both shift row positions. Measuring `browseHit` (the `redis.ts` row center) mid-stream froze a coordinate that, once the frame was composited against the *settled* list, pointed at a different row (`auth.ts`). Waiting for `.analysis-loading-inline` to detach gives a stable list so the measured position and the captured frame agree. `browseHit` is also measured immediately before `grabTree` to eliminate any async-reorder gap."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/demo/capture-demo.ts"
+                },
+                "region": {
+                  "startLine": 362,
+                  "endLine": 362,
+                  "snippet": {
+                    "text": "    await page.waitForSelector('.analysis-loading-inline', { state: 'detached', timeout: 20000 });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1188"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "d297d73c0f10fead9f7184b3e06052b0"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "466adbe4af2c38fdfb3cefd633d0785690461edb",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

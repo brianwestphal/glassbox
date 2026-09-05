@@ -94,6 +94,19 @@ describe('demo storyboard transition contract (capture-demo.ts, exit-semantics)'
     expect(crossfades.length).toBeLessThanOrEqual(2);
   });
 
+  it('measures the browse cursor target only after risk analysis has settled', () => {
+    // The risk-sorted sidebar keeps reordering (and the "Analyzing…" banner
+    // shifts rows) while scores stream in. Measuring `browseHit` mid-stream left
+    // the cursor pointing at the wrong row once the frame was composited — it
+    // appeared to click `auth.ts` while the click actually opened `redis.ts`
+    // (GB-1188). The capture must wait for a stable list (no
+    // `.analysis-loading-inline`) BEFORE it measures `browseHit`.
+    const settleIdx = CAPTURE_SRC.indexOf("'.analysis-loading-inline', { state: 'detached'");
+    const browseHitIdx = CAPTURE_SRC.indexOf('const browseHit =');
+    expect(settleIdx).toBeGreaterThanOrEqual(0);
+    expect(browseHitIdx).toBeGreaterThan(settleIdx);
+  });
+
   it('layers the pop-in over the previous terminal beat (both pop-ins carry a bg)', () => {
     // Each `withPopIn(...)` call must pass a terminal background SVG (its 3rd arg)
     // so the app pops in OVER a fading terminal, not onto nothing.
