@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hot Sheet",
+          "rules": [
+            {
+              "id": "review-note",
+              "name": "ReviewNote",
+              "shortDescription": {
+                "text": "AI-authored, line-anchored review note."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "review-note",
+          "ruleIndex": 0,
+          "kind": "informational",
+          "level": "none",
+          "guid": "mtnxksvrtrvzdrxj",
+          "message": {
+            "text": "Wait for .settings-tabs, not .settings-dialog, so the settings still isn't captured mid-spinner.\n\nThe settings dialog now renders in two stages (doc 33 native overlay / GB-1132): a .settings-dialog shell containing a .settings-loading spinner while its async build() loads data, then it swaps in the real shell with .settings-tabs. The old .settings-dialog wait matched the spinner stage, so the regenerated demo-settings.png caught a centered loading spinner instead of the dialog. .settings-tabs only exists post-load, so it's the reliable readiness gate.",
+            "markdown": "Wait for `.settings-tabs`, not `.settings-dialog`, so the settings still isn't captured mid-spinner.\n\nThe settings dialog now renders in two stages (doc 33 native overlay / GB-1132): a `.settings-dialog` shell containing a `.settings-loading` spinner while its async `build()` loads data, then it swaps in the real shell with `.settings-tabs`. The old `.settings-dialog` wait matched the spinner stage, so the regenerated `demo-settings.png` caught a centered loading spinner instead of the dialog. `.settings-tabs` only exists post-load, so it's the reliable readiness gate."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/demo/capture-stills.ts"
+                },
+                "region": {
+                  "startLine": 178,
+                  "endLine": 178,
+                  "snippet": {
+                    "text": "      await page.waitForSelector('.settings-tabs', { timeout: 5000 });"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "tags": [
+              "rationale"
+            ]
+          },
+          "workItemUris": [
+            "GB-1186"
+          ],
+          "partialFingerprints": {
+            "prNoteAnchor/v1": "010383ccd2dd3650e65706455710d276"
+          }
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "git@github.com:brianwestphal/glassbox.git",
+          "revisionId": "59ef9def6ab93e221f82d8c57529fad505a63f4f",
+          "branch": "main"
+        }
+      ]
+    }
+  ]
+}

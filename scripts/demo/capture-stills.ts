@@ -171,7 +171,11 @@ const SCENARIOS: Scenario[] = [
     label: 'Settings dialog with guided review',
     async setup(page) {
       await page.click('.settings-gear');
-      await page.waitForSelector('.settings-dialog', { timeout: 5000 });
+      // The dialog renders a loading spinner (`.settings-loading`) while its
+      // async data load runs, then swaps in the real shell. Wait for the tabs,
+      // not the outer `.settings-dialog` (which is present during loading too),
+      // or the capture can fire mid-spinner.
+      await page.waitForSelector('.settings-tabs', { timeout: 5000 });
       // Guided review lives under the Experimental tab; click it if present.
       const tab = page.locator('[data-tab="experimental"]');
       if (await tab.count() > 0) await tab.first().click();
