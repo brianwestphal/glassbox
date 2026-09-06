@@ -333,7 +333,7 @@ jobs:
       - run: npm ci
       - run: bash scripts/build-sidecar.sh ${{ matrix.target }}
       - name: Build Tauri app (unsigned validation gate)
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -606,7 +606,7 @@ jobs:
       # by release-desktop.yml on `v[0-9]*` tags) still produce both NSIS
       # and MSI because the version has no pre-release identifier.
       - name: Build Tauri app and upload to release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
