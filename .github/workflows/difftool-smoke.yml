@@ -171,6 +171,18 @@ jobs:
           }
           Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           if ($fail) { Write-Host "FAIL"; exit 1 } else { Write-Host "PASS: Windows difftool paths + server verified"; exit 0 }
+      # Keep the NSIS installer so a real Windows machine (e.g. the maintainer's
+      # Parallels VM) can install and exercise the desktop launch flows that the
+      # runner can't observe — the double-click welcome screen in particular
+      # (the 1.1.2 blank-window bug, GitHub #57, only showed up in an installed
+      # build). The updater signing may have failed above, so the .sig is
+      # optional; only the .exe matters here.
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
       - name: Best-effort full GUI launch (non-fatal; Windows runners have a desktop)
         continue-on-error: true
         shell: pwsh
