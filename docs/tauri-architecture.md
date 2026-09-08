@@ -53,6 +53,8 @@ User double-clicks Glassbox.app
   → Checks for updates in background
 ```
 
+The navigation target is built by `app_asset_url("welcome.html")` in `lib.rs`, **not** a literal URL: Tauri serves the bundled `loading/` assets from `tauri://localhost` on macOS/Linux but from `http://tauri.localhost` on Windows (WebView2 can't register a real custom scheme). A hard-coded `tauri://localhost/welcome.html` never resolves on Windows and leaves the webview on `about:blank` — the 1.1.2 Windows installers opened an empty window with only an Edit menu because of exactly this (GitHub #57). Any future `window.navigate` to a bundled page must go through the same helper.
+
 The welcome screen uses `window.__TAURI__.core.invoke()` to call `check_cli_installed` and `install_cli` Rust commands. Both commands act on the **entire CLI set** — `glassbox` and (since GB-853) `glassbox-difftool` — not just the launcher. `check_cli_installed` reports `installed: true` only when every entry is on PATH; `install_cli` symlinks all of them in a single elevated shell on macOS (one admin prompt, two symlinks) so a partial install is impossible.
 
 **Adding a custom command** (e.g. the doc-29 `pick_plugin_folder` folder picker, GB-1048) requires **three** in-sync edits, because the frontend is a *remote* localhost origin (Tauri 2.11+ no longer auto-allows app commands there): (1) `#[tauri::command]` + `generate_handler!` in `lib.rs`; (2) `build.rs`'s `AppManifest.commands([...])`, which generates the `allow-<command>` ACL permission; (3) the matching `allow-<command>` grant in `capabilities/remote-localhost.json`. Miss (2)/(3) and `cargo build` fails with "Permission allow-… not found"; miss the grant at runtime and the webview call is rejected.

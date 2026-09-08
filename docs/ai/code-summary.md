@@ -822,7 +822,10 @@ rules ("every feature has both unit and E2E coverage").
 Three launch flows (full detail in `docs/tauri-architecture.md`):
 
 1. **Double-click app** (no `--project-dir`) → `welcome.html` CLI
-   install wizard.
+   install wizard. The URL comes from `app_asset_url()` in `lib.rs`
+   (`tauri://localhost` on macOS/Linux, `http://tauri.localhost` on
+   Windows) — a literal `tauri://` URL left the Windows webview blank
+   (the 1.1.2 empty-window report, GitHub #57).
 2. **macOS CLI** (`glassbox`) → CLI script starts the Node server in the
    terminal context (JIT + filesystem OK), creates a stub `.app` for
    Dock identity, passes the URL via `/tmp/glassbox-server-{hash}.info`

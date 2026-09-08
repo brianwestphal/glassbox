@@ -22,7 +22,7 @@ Requirements for the Tauri desktop application and platform distribution.
 
 The desktop app shall support these launch flows:
 
-- **Direct app launch** (no `--project-dir`) — show welcome/setup screen with CLI installation wizard.
+- **Direct app launch** (no `--project-dir`) — show welcome/setup screen with CLI installation wizard. The screen shall load on every supported platform; the bundled-asset URL must use the platform's Tauri asset scheme (`tauri://localhost` on macOS/Linux, `http://tauri.localhost` on Windows), since a hard-coded `tauri://` URL leaves the Windows webview blank (the 1.1.2 empty-window report, GitHub #57).
 - **CLI launch** (macOS) — the CLI wrapper starts the Node server in the terminal context (for JIT/filesystem access), creates a stub `.app`, and passes the server URL via temp file to the Tauri binary.
 - **Direct binary launch** with `--project-dir` — spawn the sidecar directly and navigate to it when ready.
 
