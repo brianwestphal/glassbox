@@ -870,6 +870,14 @@ CI workflows:
   link never 404s against a mismatched asset name). `publish-release` flips the
   draft → published only after `rename-assets`, guarded by
   `tests/unit/scripts/release-assets.test.ts`.
+- The release-candidate **smoke** jobs (fresh install + upgrade-from-latest)
+  install the just-published version through
+  `scripts/release/install-published.sh`: polls the registry until the version
+  is listed (15-min budget — a publish once took six minutes to show up),
+  retries the install, and asserts the installed version so a propagation miss
+  can't pass silently (the old bare retry loop let the upgrade smoke run green
+  against the previous stable). Driven against a fake `npm` in
+  `tests/unit/scripts/install-published.test.ts`.
 
 ## 17. Maintenance rules
 

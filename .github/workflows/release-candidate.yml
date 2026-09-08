@@ -647,13 +647,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: Install beta globally (with registry-propagation retry)
-        run: |
-          for i in 1 2 3 4 5; do
-            npm install -g glassbox@${{ needs.publish-beta.outputs.version }} && break
-            echo "Attempt $i failed, waiting 15s for npm registry propagation..."
-            sleep 15
-          done
+      # Waits out npm registry propagation (a new version can take minutes to
+      # list) and asserts the installed version — see the script header.
+      - name: Install beta globally (waits for registry, asserts version)
+        run: bash scripts/release/install-published.sh ${{ needs.publish-beta.outputs.version }}
       - name: Run smoke tests
         run: bash tests/smoke/smoke-test.sh glassbox
 
@@ -673,13 +670,11 @@ jobs:
           if command -v glassbox &>/dev/null; then
             bash tests/smoke/smoke-test.sh glassbox
           fi
-      - name: Upgrade to beta (with registry-propagation retry)
-        run: |
-          for i in 1 2 3 4 5; do
-            npm install -g glassbox@${{ needs.publish-beta.outputs.version }} && break
-            echo "Attempt $i failed, waiting 15s for npm registry propagation..."
-            sleep 15
-          done
+      # Same script as the fresh install. The version assertion matters most
+      # here: the old loop had no failure exit, so when propagation lagged the
+      # "beta" smoke below ran against the still-installed stable and passed.
+      - name: Upgrade to beta (waits for registry, asserts version)
+        run: bash scripts/release/install-published.sh ${{ needs.publish-beta.outputs.version }}
       - name: Smoke test beta version
         run: bash tests/smoke/smoke-test.sh glassbox
 
