@@ -2,6 +2,41 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.1] - 2026-09-08
+
+
+
+- Review notes now reveal their origin commit: each note shows a clickable commit label that expands to the full message, plus an **Open commit** button that opens that commit as its own review and jumps to the note's file and line (reusing an existing review of the same commit, in-progress or completed). Review pages honor `?file=&line=` deep links.
+- Review notes anchored inside a collapsed context region now appear when you expand that region, in both split and unified views.
+- The sidebar surfaces committed AI review notes: files with notes belonging to the current review get a note icon, a file whose notes changed but whose source didn't is shown as an unchanged file with full content for context, and the `.pr-notes/` folder is collapsed by default.
+- Built-in themes that meet WCAG AA contrast are marked "(AA)" in the theme picker, so accessibility-minded users can choose one without guessing.
+- Modal dialogs (settings, theme manager/editor, completion modal, confirmations) are now hosted in native `<dialog>` elements with a real focus trap, focus restore, and Escape/backdrop dismissal. Review-history delete confirmations and the difftool session-ended overlay use the same system.
+
+
+- Windows desktop app: launching with no project (double-click after install) no longer opens a blank window; the welcome screen now loads from the correct bundled-asset origin.
+- Review notes are no longer all flagged stale on Windows checkouts with CRLF line endings; anchoring now ignores a trailing carriage return.
+- Pressing Escape with stacked dialogs (settings → theme manager → editor) now closes only the topmost one instead of two levels at once.
+- The reclassify picker and sidebar risk popover now follow their anchor as you scroll or resize instead of drifting; the language picker closes after you pick a language.
+- Launching via `git difftool` now prints the same notice as a normal launch when Glassbox updates your `.gitignore`.
+- The theme editor dialog no longer collapses narrower than intended.
+
+
+- Outdated AI review notes are hidden entirely instead of being shown with an "outdated" badge; the Keep/Discard controls on stale notes are gone. Reviewing an older commit still shows the notes that were current for it.
+
+
+- A consistent keyboard focus ring now appears on buttons, segmented controls, settings tabs, and the filter/find/annotation inputs; mouse focus stays clean.
+- The default Dark theme's dim text and the line-number gutter across all built-in themes were raised to WCAG AA contrast.
+- Annotation create form: shows a "Line N" anchor label, uses a guiding placeholder, and keeps Save disabled until you type something.
+- Risk dimension "Aggregate" is now labeled "Overall".
+- Review History rows show a persistent "Open" affordance on past reviews.
+
+
+- Updated `hono`, `@hono/node-server`, `fast-uri`, and `qs` to clear high/moderate npm audit advisories.
+
+
+- README gains a badge row (npm, desktop release, Node version, license) and a Features list grouped into scannable sections; the theme list now covers all sixteen built-in themes.
+- New requirements docs for review-note reveal, native overlay hosting, and open-commit-as-review; demo screenshots and the animated hero were regenerated.
+
 ## [1.2.0] - 2026-09-08
 
 
