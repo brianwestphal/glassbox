@@ -2,6 +2,41 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.2] - 2026-09-08
+
+
+
+- Review notes now show the commit they were written against as a clickable label that expands to the full commit message, with an **Open commit** button that opens that commit as its own review and jumps straight to the note's file and line. Reopening the same commit reuses the existing review (in-progress or completed) instead of creating duplicates.
+- Review pages accept `?file=<path>&line=<n>` deep links, landing on the given file and line instead of auto-selecting the first file.
+- Expanding a collapsed diff region now reveals the review notes anchored inside it, in both split and unified views.
+- Files carrying AI review notes get a note icon in the sidebar; files whose notes are part of the review but whose source didn't change are shown as unchanged with full content so their notes render; the `.pr-notes/` folder starts collapsed.
+- Theme picker marks built-in themes that meet WCAG AA contrast with an "(AA)" suffix, and the Light theme was adjusted to fully pass.
+
+
+- Consistent keyboard focus ring across buttons, segmented controls, settings tabs, and the filter/find/annotation inputs; mouse focus stays clean.
+- Line-number gutter contrast raised to WCAG AA in every built-in theme; the default Dark theme's dim text color now clears AA on both background and surface colors.
+- Dialog close (X) buttons in settings, theme manager, and theme editor now have accessible labels; plugin enable checkboxes are labeled.
+
+
+- All modals (settings, theme manager, theme editor, completion modal, confirmations) are now native dialogs with focus trapping, focus restore, and Escape/backdrop dismissal. Escape closes only the topmost dialog when several are stacked, and the stray focus ring and wrong text color on native dialogs are gone.
+- Reclassify picker, risk popover, theme context menu, and language picker stay glued to their anchor when the page scrolls or the window resizes; the language picker now closes after a selection.
+- Annotation create form shows a "Line N" anchor label, uses a guiding placeholder, and keeps Save disabled until there is text.
+- Review History shows a human-readable created time, hides the internal review ID, and displays an "Open" hint on past-review rows.
+- Completion modal's copyable fields show a copy icon (turning into "Copied!"), and long paths scroll on one line instead of wrapping mid-word.
+- Plainer wording: image comparison modes have clarifying tooltips, the risk dimension "Aggregate" is now "Overall", the git difftool button reads "Set Glassbox as git difftool" with a note that it can be undone, and settings section headings use Title Case.
+- Outdated review notes are hidden instead of shown with an "outdated" badge and Keep/Discard controls.
+
+
+- Windows desktop app no longer opens a blank window when launched with no project (double-click after install); the welcome screen now loads correctly.
+- Review notes re-anchor correctly on Windows checkouts with CRLF line endings, so they are no longer all treated as stale and hidden.
+- Launching via `git difftool` now prints the notice when Glassbox modifies `.gitignore`, matching the regular launch path.
+
+
+- Updated dependencies flagged by `npm audit` (fast-uri, hono, @hono/node-server, qs).
+
+
+- README gains a badge row, a Features list grouped into scannable sections, and an up-to-date list of built-in themes; demo screenshots and the animated hero were regenerated.
+
 ## [1.2.1] - 2026-09-08
 
 
