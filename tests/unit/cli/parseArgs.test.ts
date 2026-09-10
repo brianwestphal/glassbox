@@ -190,6 +190,15 @@ describe('parseArgs', () => {
       expect(result!.aiServiceTest).toBe(true);
     });
 
+    // GitHub #59: the Windows launcher shim forwards its untouched %* in
+    // browser mode, so `--browser` itself reaches the parser. It is a
+    // launcher-level flag and must be a no-op here, not "Unknown option".
+    it('accepts --browser as a no-op (desktop launcher flag)', () => {
+      const result = parseArgs(argv('--browser', '--commit', 'abc123'));
+      expect(result.mode).toEqual({ type: 'commit', sha: 'abc123' });
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
     it('parses --no-open', () => {
       const result = parseArgs(argv('--no-open'));
       expect(result!.noOpen).toBe(true);

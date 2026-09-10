@@ -34,7 +34,7 @@ Beyond opening a review window, the CLI wrapper also **forwards other CLI invoca
 - CLI installation locations:
   - macOS: `/usr/local/bin/glassbox` (symlink, requires admin prompt)
   - Linux: `~/.local/bin/glassbox` (symlink)
-  - Windows: `%LOCALAPPDATA%\Programs\glassbox\glassbox.cmd` (copy, adds to user PATH)
+  - Windows: `%LOCALAPPDATA%\Programs\glassbox\glassbox.cmd` (copy with the app's install directory baked in, adds to user PATH)
 - Installation shall also install the `glassbox-difftool` companion binary alongside `glassbox` (doc 19).
 - The welcome screen shall display the manual installation command if automatic installation fails.
 
@@ -72,3 +72,6 @@ Beyond opening a review window, the CLI wrapper also **forwards other CLI invoca
 
 - On **macOS and Linux**, the CLI install creates a **symlink** pointing into the installed app bundle, so app updates automatically update the CLI without re-installation.
 - On **Windows**, symlinks require elevated privileges, so the CLI is installed as a **copy** (`glassbox.cmd`) rather than a symlink (see `src-tauri/src/lib.rs`). A copy does not auto-track app updates the way a symlink does; reinstalling the CLI from a newer app refreshes it.
+- The Windows shims locate the app in three steps: relative to their own location (`%~dp0..`, correct inside the bundle's `resources\` folder and the CI build layout), then an absolute `set` that `install_cli` bakes in by replacing the `REM @@GLASSBOX_APP_DIR@@` marker line with the directory of the running `glassbox.exe`, then the standard per-user (`%LOCALAPPDATA%\Glassbox`) and per-machine (`%ProgramFiles%\Glassbox`) install directories for a hand-copied shim. A verbatim copy used to keep only the relative lookup and failed with "`…\Programs\glassbox\..\glassbox.exe` cannot be found" (GitHub #59).
+- On **Linux and Windows** the launcher shim execs the Tauri binary, which spawns the sidecar itself and must forward **every** CLI argument to it (`build_sidecar_args` in `src-tauri/src/lib.rs`). An earlier allowlist (`--project-dir`, `--diff`, `--difftool-serve`) dropped the review-mode flags, so `glassbox --commit <sha>` opened the default uncommitted review (GitHub #59). macOS is unaffected: its launcher pre-starts the server with the full argument list.
+- `--browser` is a launcher-level flag; the CLI parser accepts it as a no-op because the Windows shim forwards its untouched `%*` and cmd can't drop one token without re-quoting every argument.

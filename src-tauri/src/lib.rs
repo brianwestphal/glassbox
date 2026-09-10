@@ -301,9 +301,17 @@ fn install_cli(app: tauri::AppHandle) -> Result<InstallResult, String> {
     {
         std::fs::create_dir_all(&parent)
             .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+        // The directory holding glassbox.exe (= the NSIS/MSI install dir; the
+        // bundled shims resolve glassbox-node.exe and server\ beneath it).
+        let app_dir = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+            .ok_or_else(|| "Failed to locate the running glassbox.exe".to_string())?;
         for entry in &entries {
-            std::fs::copy(&entry.source, &entry.dest)
-                .map_err(|e| format!("Failed to copy {}: {e}", entry.source.display()))?;
+            let script = std::fs::read_to_string(&entry.source)
+                .map_err(|e| format!("Failed to read {}: {e}", entry.source.display()))?;
+            std::fs::write(&entry.dest, bake_windows_app_dir(&script, &app_dir))
+                .map_err(|e| format!("Failed to write {}: {e}", entry.dest.display()))?;
         }
 
         // Add to user PATH via registry
@@ -422,6 +430,49 @@ fn build_dev_server_args(app_args: &[String]) -> Vec<String> {
         server_args.push(arg.clone());
     }
     server_args
+}
+
+/// Arguments for the release-build sidecar spawn (the Linux/Windows launch
+/// path, where the launcher shim execs this binary with `--project-dir <dir>`
+/// plus the user's CLI flags and the app spawns `glassbox-node cli.js` itself).
+///
+/// Every launcher argument after argv[0] is forwarded verbatim. This used to be
+/// an allowlist (`--project-dir`, `--diff`, `--difftool-serve`), which silently
+/// dropped every review-mode flag: `glassbox --commit <sha>` (or `--staged`,
+/// `--branch`, …) opened the window on the default uncommitted review instead
+/// of the requested one, on Windows and Linux alike (GitHub #59). macOS never
+/// hit it — its launcher pre-starts the server with the full argument list and
+/// the app only connects via `GLASSBOX_SERVER_URL`. The dev build forwards the
+/// same way (`build_dev_server_args`); the shims pass nothing the CLI doesn't
+/// accept (`--browser` is accepted there as a no-op for exactly this reason).
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn build_sidecar_args(cli_js: &str, app_args: &[String]) -> Vec<String> {
+    let mut sidecar_args = vec![cli_js.to_string(), "--no-open".to_string()];
+    sidecar_args.extend(app_args.iter().skip(1).cloned());
+    sidecar_args
+}
+
+/// Marker line in the Windows launcher shims (`resources/glassbox.cmd`,
+/// `resources/glassbox-difftool.cmd`) that `install_cli` replaces with the
+/// app's absolute install directory. KEEP IN SYNC with the shims
+/// (`tests/unit/conventions.test.ts` pins that both carry it).
+const WINDOWS_APP_DIR_MARKER: &str = "REM @@GLASSBOX_APP_DIR@@";
+
+/// Bake the desktop app's install directory into a Windows launcher shim.
+///
+/// Windows installs the CLI as a *copy* of the bundled `.cmd` (symlinks need
+/// elevation), and the bundled shim locates the app relative to its own
+/// location (`%~dp0..`). That is right inside `<install>\resources\` and wrong
+/// the moment the copy lands in `%LOCALAPPDATA%\Programs\glassbox\` — the
+/// installed CLI then failed with "…\Programs\glassbox\..\glassbox.exe cannot
+/// be found" (GitHub #59). The shim keeps its relative default (the CI build
+/// layout and a manual copy still work — the shim also falls back to the
+/// standard install dirs) and carries a marker line; the installer swaps that
+/// line for an absolute `set`. A script without the marker is returned as-is.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn bake_windows_app_dir(script: &str, app_dir: &std::path::Path) -> String {
+    let baked = format!("set \"GLASSBOX_APP_DIR={}\"", app_dir.display());
+    script.replace(WINDOWS_APP_DIR_MARKER, &baked)
 }
 
 /// Open a native folder picker so a desktop user can browse to a content-plugin
@@ -667,42 +718,10 @@ pub fn run() {
                         .map_err(|e| format!("Failed to get resource dir: {e}"))?;
                     let cli_js = resource_dir.join("server").join("cli.js");
 
-                    let mut sidecar_args = vec![
-                        cli_js.to_string_lossy().to_string(),
-                        "--no-open".to_string(),
-                    ];
-                    if let Some(i) = app_args.iter().position(|a| a == "--project-dir") {
-                        if let Some(dir) = app_args.get(i + 1) {
-                            sidecar_args.push("--project-dir".to_string());
-                            sidecar_args.push(dir.clone());
-                        }
-                    }
-                    // GB-856 — forward `--diff <a> <b>` so the Linux/Windows
-                    // `git difftool` path (where the launcher execs this binary,
-                    // and the app spawns its own sidecar) actually renders the
-                    // diff. Without this the window would open on the project's
-                    // default mode instead of the requested comparison. macOS
-                    // doesn't hit this branch (its launcher pre-starts the
-                    // server and we connect via GLASSBOX_SERVER_URL).
-                    if let Some(i) = app_args.iter().position(|a| a == "--diff") {
-                        if let (Some(a), Some(b)) = (app_args.get(i + 1), app_args.get(i + 2)) {
-                            sidecar_args.push("--diff".to_string());
-                            sidecar_args.push(a.clone());
-                            sidecar_args.push(b.clone());
-                        }
-                    }
-                    // doc 19 / GB-861 — accumulating per-file DESKTOP mode. The
-                    // `glassbox-difftool` wrapper launches the app with
-                    // `--difftool-serve`; the app then spawns ONE long-lived
-                    // accumulating server and shows a single window, and later
-                    // per-file invocations append to that running session instead
-                    // of opening another window. Closing the window kills the
-                    // sidecar (RunEvent::Exit below), ending the session. macOS
-                    // doesn't reach this branch — its launcher pre-starts the
-                    // serve-mode server and we connect via GLASSBOX_SERVER_URL.
-                    if app_args.iter().any(|a| a == "--difftool-serve") {
-                        sidecar_args.push("--difftool-serve".to_string());
-                    }
+                    // Forward EVERY launcher argument (review-mode flags
+                    // included) — see `build_sidecar_args` for why an allowlist
+                    // here was a bug.
+                    let sidecar_args = build_sidecar_args(&cli_js.to_string_lossy(), &app_args);
 
                     let sidecar = app
                         .shell()
@@ -809,7 +828,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{app_asset_url, app_asset_url_for, manual_install_command, CliEntry};
+    use super::{
+        app_asset_url, app_asset_url_for, bake_windows_app_dir, build_sidecar_args,
+        manual_install_command, CliEntry, WINDOWS_APP_DIR_MARKER,
+    };
     use std::path::PathBuf;
 
     // The welcome screen is reached by navigating to a bundled asset, and the
@@ -870,6 +892,122 @@ mod tests {
                 dest: PathBuf::from("/dest/bin/glassbox-difftool"),
             },
         ]
+    }
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    // GitHub #59: `glassbox --commit <sha>` through the Linux/Windows launcher
+    // opened the default review because the sidecar spawn only forwarded an
+    // allowlist of flags. Every launcher argument must reach cli.js.
+    #[test]
+    fn sidecar_args_forward_review_mode_flags() {
+        let a = build_sidecar_args(
+            "C:\\app\\server\\cli.js",
+            &args(&[
+                "glassbox.exe",
+                "--project-dir",
+                "C:\\repo",
+                "--commit",
+                "abc123",
+            ]),
+        );
+        assert_eq!(
+            a,
+            args(&[
+                "C:\\app\\server\\cli.js",
+                "--no-open",
+                "--project-dir",
+                "C:\\repo",
+                "--commit",
+                "abc123"
+            ])
+        );
+    }
+
+    #[test]
+    fn sidecar_args_keep_the_previously_allowlisted_flags_working() {
+        let a = build_sidecar_args(
+            "/app/server/cli.js",
+            &args(&[
+                "glassbox",
+                "--project-dir",
+                "/tmp/x",
+                "--diff",
+                "/a",
+                "/b",
+                "--difftool-serve",
+            ]),
+        );
+        assert_eq!(
+            &a[2..],
+            &args(&[
+                "--project-dir",
+                "/tmp/x",
+                "--diff",
+                "/a",
+                "/b",
+                "--difftool-serve"
+            ])[..]
+        );
+    }
+
+    #[test]
+    fn sidecar_args_skip_argv0_and_always_suppress_browser_open() {
+        let a = build_sidecar_args("/app/server/cli.js", &args(&["glassbox"]));
+        assert_eq!(a, args(&["/app/server/cli.js", "--no-open"]));
+    }
+
+    // GitHub #59: the copied Windows shim resolved the app relative to its own
+    // location. The installer must bake the absolute app dir into the copy.
+    #[test]
+    fn bake_windows_app_dir_replaces_the_marker_line() {
+        let script = format!("@echo off\r\nset \"GLASSBOX_APP_DIR=%~dp0..\"\r\n{WINDOWS_APP_DIR_MARKER}\r\nrem rest\r\n");
+        let baked = bake_windows_app_dir(
+            &script,
+            std::path::Path::new("C:\\Users\\abc\\AppData\\Local\\Glassbox"),
+        );
+        assert!(
+            baked.contains("set \"GLASSBOX_APP_DIR=C:\\Users\\abc\\AppData\\Local\\Glassbox\""),
+            "{baked}"
+        );
+        assert!(!baked.contains(WINDOWS_APP_DIR_MARKER), "{baked}");
+        // The relative default stays above the baked line, so the baked `set`
+        // wins by running later.
+        let rel = baked.find("%~dp0..").unwrap();
+        let abs = baked.find("Local\\Glassbox").unwrap();
+        assert!(rel < abs);
+        assert!(baked.ends_with("rem rest\r\n"), "{baked}");
+    }
+
+    #[test]
+    fn bake_windows_app_dir_leaves_a_markerless_script_untouched() {
+        let script = "@echo off\necho hi\n";
+        assert_eq!(
+            bake_windows_app_dir(script, std::path::Path::new("C:\\x")),
+            script
+        );
+    }
+
+    // Both bundled Windows shims must carry the marker the installer swaps,
+    // or the installed copy silently keeps the relative lookup that broke.
+    #[test]
+    fn both_windows_shims_carry_the_app_dir_marker() {
+        for shim in ["glassbox.cmd", "glassbox-difftool.cmd"] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("resources")
+                .join(shim);
+            let text = std::fs::read_to_string(&path).unwrap();
+            assert!(
+                text.contains(WINDOWS_APP_DIR_MARKER),
+                "{shim} lacks the marker"
+            );
+            assert!(
+                !text.contains("SCRIPT_DIR%.."),
+                "{shim} still resolves the app via SCRIPT_DIR"
+            );
+        }
     }
 
     // The command must install BOTH CLIs in one pasteable line (one elevation

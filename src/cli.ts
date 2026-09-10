@@ -206,6 +206,13 @@ export function parseArgs(
       case "--no-open":
         noOpen = true;
         break;
+      case "--browser":
+        // A desktop-launcher flag ("run in the browser instead of the app
+        // window"), meaningful only to the launcher shims. The Windows shim
+        // forwards its untouched %* and cmd can't drop one token without
+        // re-quoting every argument, so the flag reaches us here; accept it as
+        // a no-op rather than dying with "Unknown option" (GitHub #59).
+        break;
       case "--strict-port":
         strictPort = true;
         break;

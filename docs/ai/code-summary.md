@@ -830,7 +830,10 @@ Three launch flows (full detail in `docs/tauri-architecture.md`):
    terminal context (JIT + filesystem OK), creates a stub `.app` for
    Dock identity, passes the URL via `/tmp/glassbox-server-{hash}.info`
    to the Tauri binary.
-3. **Direct binary with `--project-dir`** → Rust spawns the sidecar,
+3. **Direct binary with `--project-dir`** (the Linux/Windows CLI path) → Rust spawns the sidecar,
+   forwarding every launcher arg via `build_sidecar_args` (an allowlist once
+   dropped `--commit` etc., GitHub #59); the Windows CLI install bakes the app
+   dir into the copied `.cmd` (`bake_windows_app_dir`) —
    reads "running at" from stdout, navigates the webview.
 
 CLI install locations: `/usr/local/bin/glassbox` (macOS symlink),

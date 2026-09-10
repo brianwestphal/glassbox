@@ -187,6 +187,27 @@ state isn't available in the demo e2e server:
   deleted", Cancel/Escape dismiss. *(Requires a retained pre-upgrade backup on
   disk, which the e2e environment never has.)*
 
+## Windows desktop CLI (doc 10 §10.3 / §10.4 / §10.9)
+
+Verified on a real Windows machine (the maintainer's Parallels Windows 11 VM)
+against an installed build — the CI runner can't observe the desktop window.
+Both items came from GitHub #59.
+
+- **Install CLI from the welcome screen, then run it from PowerShell.** Launch
+  the installed app with no arguments, click **Install CLI**, open a new
+  PowerShell in a git repo and run `glassbox`. Expected: a review window opens.
+  Before the fix the installed `glassbox.cmd` failed with "`…\Programs\glassbox\..\glassbox.exe` cannot be found" because the copied shim
+  resolved the app relative to its own location; the installer now bakes the
+  app directory into the copy, and a hand-copied shim falls back to
+  `%LOCALAPPDATA%\Glassbox` / `%ProgramFiles%\Glassbox`.
+- **Review-mode flags reach the sidecar.** In a git repo run
+  `glassbox --commit <sha>` (and `glassbox --browser --commit <sha>`).
+  Expected: the window (or browser tab) shows that commit's review, not the
+  uncommitted changes. Before the fix the Tauri binary forwarded only an
+  allowlist of flags to the sidecar it spawns, so every review-mode flag was
+  dropped on Windows and Linux; `--browser` also died with "Unknown option"
+  because the shim forwards its untouched `%*`.
+
 ## Automated Coverage Summary
 
 - **Content-plugin render paths (doc 29 FR-29.2 / FR-29.13, GB-1043)** — the

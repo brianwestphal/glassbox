@@ -1131,13 +1131,13 @@
     },
     "10.3": {
       "waived": "Three production launch flows are Tauri shell orchestration; only the dev-mode launch path is unit-tested (build_dev_server_args).",
-      "note": "desktop."
+      "note": "desktop. The release-build sidecar spawn's argument forwarding is unit-tested (build_sidecar_args: every launcher flag, incl. --commit, reaches cli.js \u2014 an allowlist once dropped them, GitHub #59); the window/webview orchestration itself stays manual (docs/manual-test-plan.md, Windows desktop CLI)."
     },
     "10.4": {
       "tests": [
         "src-tauri/src/lib.rs"
       ],
-      "note": "Rust unit tests assert the manual-install command shape per platform (ln -sf on macOS/Linux, copy on Windows)."
+      "note": "Rust unit tests assert the manual-install command shape per platform (ln -sf on macOS/Linux, copy on Windows) and, for Windows, that install_cli bakes the app dir into the copied shim (bake_windows_app_dir) and that both bundled .cmd shims carry the marker it replaces (GitHub #59)."
     },
     "10.5": {
       "waived": "Tauri updater plugin (check-on-launch, no auto-install, banner, signature verify, GitHub Releases) — desktop-shell/updater behavior, not unit-testable.",
@@ -1163,7 +1163,7 @@
       "tests": [
         "src-tauri/src/lib.rs"
       ],
-      "note": "macOS/Linux shapes assert ln -sf (symlink); Windows asserts copy — the platform behavior this NFR specifies."
+      "note": "macOS/Linux shapes assert ln -sf (symlink); Windows asserts copy \u2014 the platform behavior this NFR specifies \u2014 plus the baked-app-dir substitution the copy needs to find glassbox.exe (GitHub #59). The end-to-end Windows install + `glassbox --commit` launch is in docs/manual-test-plan.md."
     },
     "11.1": {
       "waived": "npm installability + single-file dist/cli.js shebang + Node20/git prerequisites — packaging concerns verified by npm pack in CI.",
