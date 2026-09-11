@@ -2,6 +2,15 @@
 
 All notable changes to Glassbox are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.3] - 2026-09-11
+
+
+
+- The Windows `glassbox` and `glassbox-difftool` commands installed from the app's welcome screen now find the desktop app. The installer bakes the app's install directory into the copied shims, which previously looked for `glassbox.exe` relative to their own location and failed with "cannot be found" (GitHub #59).
+- A hand-copied Windows shim now falls back to the standard per-user and per-machine install directories, and prints a clear "reinstall the CLI from the welcome screen" error instead of a cryptic path failure when the app is missing.
+- Review-mode flags such as `--commit`, `--staged`, and `--branch` now work through the desktop launcher on Windows and Linux. The app previously forwarded only a short allowlist of flags to its server, so these commands silently opened the default uncommitted review (GitHub #59).
+- `glassbox --browser` on Windows no longer fails with "Unknown option"; the CLI now accepts the launcher-level `--browser` flag as a no-op.
+
 ## [1.2.2] - 2026-09-08
 
 
