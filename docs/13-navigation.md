@@ -7,6 +7,7 @@ Requirements for code navigation features — go-to-definition and navigation hi
 ### 13.1 Go-to-Definition
 
 - **Cmd+Click / Ctrl+Click** — Cmd+Click (macOS) or Ctrl+Click (Windows/Linux) on a symbol name in the diff view shall navigate to its definition.
+- **Highlighted symbols** — Search highlights and syntax spans shall not split a symbol for go-to-definition; clicking any part shall resolve the complete identifier within that code line.
 - **Symbol resolution** — The system shall search for symbol definitions using the regex-based outline parser across all files. Search order: current file first, then other files in the review, then all tracked files in the repository.
 - **Same-file navigation** — If the definition is in the current file, the view shall scroll to the definition line with a brief highlight animation.
 - **Cross-file navigation (review files)** — If the definition is in another file in the review, the system shall switch to that file and scroll to the definition line.

@@ -550,7 +550,8 @@ animation; other review files switch + scroll; repo files outside the
 review open as read-only (`/file-raw`) and don't appear in the sidebar.
 Common keywords (if/for/return/function/class/etc.) don't trigger.
 Unknown symbols get a toast. Cursor turns to pointer when Cmd/Ctrl is
-held over code spans.
+held over code spans. Search and syntax highlighting do not split the clicked
+identifier: lookup uses the complete word within the code line.
 
 **Navigation stack**: tracks file visits and scroll positions; scroll
 updates the current entry (debounced) instead of pushing new ones; any

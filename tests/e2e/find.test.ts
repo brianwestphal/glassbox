@@ -93,4 +93,32 @@ test.describe('GB-797: find-in-diff across text-node boundaries', () => {
     await page.locator('.find-bar .find-input').fill('');
     await expect(page.locator('.find-highlight')).toHaveCount(0, { timeout: 3000 });
   });
+
+  for (const part of ['highlighted prefix', 'unhighlighted suffix'] as const) {
+    test(`go-to-definition reads the complete symbol from its ${part}`, async ({ page }) => {
+      await openFile(page, 'session.ts');
+      await search(page, 'createS');
+      const symbol = page.locator('.diff-line[data-side="new"] .hljs-title')
+        .filter({ hasText: /^createSession$/ }).first();
+      const mark = symbol.locator('.find-highlight');
+      await expect(mark).toHaveText('createS');
+      await symbol.scrollIntoViewIfNeeded();
+
+      const lookup = page.waitForRequest(request =>
+        new URL(request.url()).pathname === '/api/symbol-definition');
+      if (part === 'highlighted prefix') {
+        await mark.click({ modifiers: ['Control'] });
+      } else {
+        const bounds = await symbol.boundingBox();
+        const prefix = await mark.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(prefix).not.toBeNull();
+        await symbol.click({
+          modifiers: ['Control'],
+          position: { x: (prefix!.width + bounds!.width) / 2, y: bounds!.height / 2 },
+        });
+      }
+      expect(new URL((await lookup).url()).searchParams.get('name')).toBe('createSession');
+    });
+  }
 });

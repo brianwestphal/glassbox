@@ -849,9 +849,11 @@
     "13.1": {
       "tests": [
         "tests/integration/api/routes.test.ts",
-        "tests/unit/client/diff-container-mount.test.ts"
+        "tests/unit/client/diff-container-mount.test.ts",
+        "tests/unit/client/wordAtPoint.test.ts",
+        "tests/e2e/find.test.ts"
       ],
-      "note": "symbol-definition endpoint; cross-file raw-file open via setRawDiffContent. (Cmd+Click gesture, toast, keyword filter are sub-gaps)."
+      "note": "symbol-definition endpoint; cross-file raw-file open via setRawDiffContent; full identifiers across search/syntax highlights, keyword filtering, and Cmd+Click lookup requests. (toast is a sub-gap)."
     },
     "13.2": {
       "tests": [
