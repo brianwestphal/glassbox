@@ -938,3 +938,5 @@ two documents intentionally overlap.
 - `docs/tauri-setup.md` — certificates, signing keys, GitHub secrets.
 - `docs/1-review-workflow.md` … `docs/31-plugin-lifecycle-hooks.md` — numbered
   functional / non-functional requirements.
+
+Diff line styling keeps +/- markers outside the text flow and animates navigation outlines without replacing diff backgrounds.

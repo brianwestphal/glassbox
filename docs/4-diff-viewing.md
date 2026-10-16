@@ -97,3 +97,5 @@ The user's Code/Rendered choice is remembered across file selections.
 ### 4.9 Binary Detection
 
 - **Detection method** — For tracked files, binary status comes from git's own indicator (the `Binary files … differ` diff header). The first-8KB null-byte scan is **only** applied to **untracked/new** files (which have no git diff header to read); it is not a universal second check on tracked diffs. See doc 3 §3.4.
+
+Diff markers occupy the code padding without shifting code indentation or tab stops. Navigation flashes animate an inset outline, preserving addition and deletion backgrounds throughout the jump.
