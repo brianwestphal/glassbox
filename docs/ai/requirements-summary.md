@@ -1285,3 +1285,5 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets
 - `docs/ai/code-summary.md` — the companion code map
 - `CLAUDE.md` — project rules and conventions
+
+AI prompt context labels each diff row with its original and new source line numbers. Supplemental full-file context also includes explicit new-side line numbers, so deletion rows and summarized gaps do not shift generated note anchors.

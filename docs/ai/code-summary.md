@@ -938,3 +938,5 @@ two documents intentionally overlap.
 - `docs/tauri-setup.md` — certificates, signing keys, GitHub secrets.
 - `docs/1-review-workflow.md` … `docs/31-plugin-lifecycle-hooks.md` — numbered
   functional / non-functional requirements.
+
+AI prompt context labels each diff row with its original and new source line numbers. Supplemental full-file context also includes explicit new-side line numbers, so deletion rows and summarized gaps do not shift generated note anchors.

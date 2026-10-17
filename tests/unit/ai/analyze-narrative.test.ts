@@ -5,6 +5,7 @@ vi.mock('../../../src/git/diff.js', () => ({
   getFileContent: vi.fn().mockReturnValue('file content'),
 }));
 
+import { getFileContent } from '../../../src/git/diff.js';
 import { sendAIRequest } from '../../../src/ai/client.js';
 import { runNarrativeAnalysisBatch, mergeNarrativeOrders } from '../../../src/ai/analyze-narrative.js';
 import type { NarrativeFileResult } from '../../../src/ai/analyze-narrative.js';
@@ -25,7 +26,10 @@ const validResult = [
 ];
 
 describe('runNarrativeAnalysisBatch', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFileContent).mockReturnValue('file content');
+  });
 
   it('returns narrative results on success', async () => {
     vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult) });

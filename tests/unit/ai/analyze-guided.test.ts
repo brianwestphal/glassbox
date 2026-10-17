@@ -5,6 +5,7 @@ vi.mock('../../../src/git/diff.js', () => ({
   getFileContent: vi.fn().mockReturnValue('file content'),
 }));
 
+import { getFileContent } from '../../../src/git/diff.js';
 import { sendAIRequest } from '../../../src/ai/client.js';
 import { runGuidedAnalysisBatch } from '../../../src/ai/analyze-guided.js';
 import type { ReviewFile } from '../../../src/db/queries.js';
@@ -24,7 +25,10 @@ const validResult = [
 ];
 
 describe('runGuidedAnalysisBatch', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFileContent).mockReturnValue('file content');
+  });
 
   it('returns guided results on success', async () => {
     vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult) });

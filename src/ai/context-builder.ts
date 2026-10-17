@@ -7,6 +7,11 @@ function linePrefix(type: DiffLine['type']): string {
   return type === 'add' ? '+' : type === 'remove' ? '-' : ' ';
 }
 
+/** Keep source coordinates explicit, including after omitted lines and deletions. */
+function numberedLine(line: DiffLine): string {
+  return `[old:${line.oldNum ?? '-'} new:${line.newNum ?? '-'}] ${linePrefix(line.type)}${line.content}`;
+}
+
 export interface FileContext {
   fileId: string;
   filePath: string;
@@ -23,22 +28,19 @@ function summarizeHunk(hunk: DiffHunk, maxLines: number): string {
   const hunkLines = hunk.lines;
   if (hunkLines.length <= maxLines) {
     for (const line of hunkLines) {
-      const prefix = linePrefix(line.type);
-      lines.push(prefix + line.content);
+      lines.push(numberedLine(line));
     }
   } else {
     // Show first and last portions
     const half = Math.floor(maxLines / 2);
     for (let i = 0; i < half; i++) {
       const line = hunkLines[i];
-      const prefix = linePrefix(line.type);
-      lines.push(prefix + line.content);
+      lines.push(numberedLine(line));
     }
-    lines.push(`... (${String(hunkLines.length - maxLines)} lines omitted) ...`);
+    lines.push(`... (${String(hunkLines.length - half * 2)} lines omitted) ...`);
     for (let i = hunkLines.length - half; i < hunkLines.length; i++) {
       const line = hunkLines[i];
-      const prefix = linePrefix(line.type);
-      lines.push(prefix + line.content);
+      lines.push(numberedLine(line));
     }
   }
 
@@ -54,8 +56,7 @@ function buildDiffText(diff: FileDiff, charBudget: number): string {
   for (const hunk of diff.hunks) {
     fullLines.push(`@@ -${String(hunk.oldStart)},${String(hunk.oldCount)} +${String(hunk.newStart)},${String(hunk.newCount)} @@`);
     for (const line of hunk.lines) {
-      const prefix = linePrefix(line.type);
-      fullLines.push(prefix + line.content);
+      fullLines.push(numberedLine(line));
     }
   }
   const fullText = fullLines.join('\n');
@@ -103,11 +104,12 @@ export function formatContextsForPrompt(contexts: FileContext[]): string {
     ].join('\n');
   });
 
-  return sections.join('\n\n');
+  return 'Coordinates [old:N new:N] are source line numbers, not diff row numbers. Use new:N for NEW-side notes; new:- has no new-side line. Never count omitted lines.\n\n' + sections.join('\n\n');
 }
 
 export function formatAdditionalContext(files: Array<{ path: string; content: string }>): string {
   return files.map(f => {
-    return `=== Full content: ${f.path} ===\n${f.content}`;
+    const numbered = f.content.split('\n').map((line, index) => `[new:${String(index + 1)}] ${line}`).join('\n');
+    return `=== Full content: ${f.path} ===\n${numbered}`;
   }).join('\n\n');
 }

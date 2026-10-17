@@ -5,6 +5,7 @@ vi.mock('../../../src/git/diff.js', () => ({
   getFileContent: vi.fn().mockReturnValue('file content'),
 }));
 
+import { getFileContent } from '../../../src/git/diff.js';
 import { sendAIRequest } from '../../../src/ai/client.js';
 import { runRiskAnalysisBatch, RISK_DIMENSIONS } from '../../../src/ai/analyze-risk.js';
 import type { ReviewFile } from '../../../src/db/queries.js';
@@ -23,7 +24,10 @@ const validResult = [
 ];
 
 describe('runRiskAnalysisBatch', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFileContent).mockReturnValue('file content');
+  });
 
   it('returns risk results on successful AI response', async () => {
     vi.mocked(sendAIRequest).mockResolvedValue({ content: JSON.stringify(validResult) });
@@ -76,7 +80,10 @@ describe('runRiskAnalysisBatch', () => {
 });
 
 describe('runRiskAnalysisBatch — Apple FM fallback', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFileContent).mockReturnValue('file content');
+  });
 
   const appleWithFallback = {
     platform: 'apple', model: 'apple-on-device', apiKey: null, keySource: null,

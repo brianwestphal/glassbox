@@ -80,3 +80,5 @@ Requirements for optional AI-powered code analysis features.
 - AI analysis failures shall not affect core review functionality.
 - Failed analyses shall be reported to the user with an error message.
 - The system shall handle AI response parsing errors gracefully (malformed JSON, unexpected schema).
+
+AI prompt context labels each diff row with its original and new source line numbers. Supplemental full-file context also includes explicit new-side line numbers, so deletion rows and summarized gaps do not shift generated note anchors.

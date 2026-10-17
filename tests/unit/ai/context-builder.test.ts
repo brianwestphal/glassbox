@@ -41,6 +41,9 @@ describe('buildFileContexts', () => {
     const contexts = buildFileContexts(files, 10000);
     expect(contexts[0].linesAdded).toBe(2);
     expect(contexts[0].linesRemoved).toBe(1);
+    expect(contexts[0].diffText).toContain('[old:2 new:-] -old line');
+    expect(contexts[0].diffText).toContain('[old:- new:2] +new line 1');
+    expect(contexts[0].diffText).toContain('[old:- new:3] +new line 2');
   });
 
   it('handles binary files', () => {
@@ -78,6 +81,7 @@ describe('buildFileContexts', () => {
     // Small budget forces summarization
     const contexts = buildFileContexts(files, 500);
     expect(contexts[0].diffText).toContain('lines omitted');
+    expect(contexts[0].diffText).toContain('[old:- new:200] +line 199');
   });
 });
 
@@ -103,10 +107,10 @@ describe('formatContextsForPrompt', () => {
 describe('formatAdditionalContext', () => {
   it('formats file contents with headers', () => {
     const result = formatAdditionalContext([
-      { path: 'src/utils.ts', content: 'export function foo() {}' },
+      { path: 'src/utils.ts', content: 'export function foo() {}\n// second line' },
     ]);
     expect(result).toContain('=== Full content: src/utils.ts ===');
-    expect(result).toContain('export function foo() {}');
+    expect(result).toContain('[new:1] export function foo() {}\n[new:2] // second line');
   });
 
   it('joins multiple files', () => {
