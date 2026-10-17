@@ -76,11 +76,8 @@ export function readConfigFile(): ConfigFile {
  * sets `.fallback` — that's layered on by `loadAIConfig`.
  */
 function resolvePlatformConfig(platform: AIPlatform, rawModelOrUndefined: string | undefined): AIConfig {
-  // Resolve a saved preference that may point at a retired/older model id
-  // (e.g. a `claude-sonnet-4-*` snapshot) to a currently-offered model so
-  // analysis doesn't 404 on a stale config (GB-893). Skip for keyless
-  // platforms (local), whose model id is whatever the user's server offers —
-  // never a cloud alias to remap.
+  // Keep provider-discovered selections intact; only explicit legacy IDs migrate.
+  // Keyless platforms use the exact model offered by their local server.
   const rawModel = rawModelOrUndefined ?? getDefaultModel(platform);
   const model = KEYLESS_PLATFORMS.has(platform) ? rawModel : resolveModelId(platform, rawModel);
   const { key, source } = _resolveAPIKey(platform);

@@ -84,7 +84,7 @@ describe('getDefaultModel', () => {
   });
 });
 
-describe('resolveModelId (GB-893 — best-effort version matching)', () => {
+describe('resolveModelId (legacy migrations and provider selections)', () => {
   it('returns a currently-offered id unchanged', () => {
     expect(resolveModelId('anthropic', 'claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
   });
@@ -108,8 +108,16 @@ describe('resolveModelId (GB-893 — best-effort version matching)', () => {
     expect(resolveModelId('google', 'gemini-1.5-flash')).toBe('gemini-2.5-flash');
   });
 
-  it('falls back to the platform default when no family matches', () => {
-    expect(resolveModelId('anthropic', 'some-unknown-model')).toBe(getDefaultModel('anthropic'));
+  it.each([
+    ['openai', 'gpt-5.5-pro'], ['openai', 'gpt-future-mini'],
+    ['anthropic', 'claude-sonnet-future'], ['google', 'gemini-future-pro'],
+    ['local', 'custom/local-model'], ['openai', 'toString'],
+  ] as const)('preserves a provider selection absent from the fallback catalog: %s / %s', (platform, id) => {
+    expect(resolveModelId(platform, id)).toBe(id);
+  });
+
+  it.each(['', '   '])('defaults only an empty selection: %j', id => {
+    expect(resolveModelId('openai', id)).toBe(getDefaultModel('openai'));
   });
 });
 

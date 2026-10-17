@@ -306,10 +306,7 @@ filtered to chat models, Google `/v1beta/models` filtered to
 `generateContent`), zod-validated and mapped to `{id,name,contextWindow}`;
 the static `src/ai/models.ts` list is the fallback (no key / failure /
 demo / `--ai-service-test`). Because providers return only
-currently-available models, retired ids never appear. A stale/older saved
-model id is best-effort resolved to the current same-tier model
-(`resolveModelId` — e.g. `claude-sonnet-4-5` → `claude-sonnet-4-6`) so it
-never 404s (GB-893).
+currently-available models, retired ids never appear. Saved IDs are preserved even when missing from the bundled catalog or when discovery is unavailable. `resolveModelId` migrates only explicitly listed legacy IDs (e.g. `claude-sonnet-4-5` → `claude-sonnet-4-6`); an empty selection uses the default.
 
 **Risk** — six dimensions scored 0.0–1.0 (security, correctness,
 error-handling, maintainability, architecture, performance). Files

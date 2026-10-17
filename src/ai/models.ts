@@ -106,40 +106,24 @@ export function getModelContextWindow(platform: AIPlatform, modelId: string): nu
   return 128000;
 }
 
-/**
- * Coarse "family/tier" key for a model id, used for best-effort matching when a
- * stored id is no longer offered. The family is intentionally version-agnostic
- * (`claude-sonnet-4-5` and `claude-sonnet-4-20250514` both map to the sonnet
- * family) so an upgrade like sonnet 4.5 → 4.6 matches automatically.
- */
-function modelFamily(id: string): string {
-  const lower = id.toLowerCase();
-  for (const tier of ['opus', 'sonnet', 'haiku']) {
-    if (lower.includes(tier)) return `anthropic:${tier}`;
-  }
-  if (lower.includes('gemini')) {
-    if (lower.includes('flash')) return 'google:flash';
-    if (lower.includes('pro')) return 'google:pro';
-    return 'google:gemini';
-  }
-  if (lower.includes('gpt') || lower.startsWith('o1') || lower.startsWith('o3')) {
-    return lower.includes('mini') ? 'openai:mini' : 'openai:gpt';
-  }
-  return lower;
-}
+// Only migrate specific legacy selections. The fallback catalog cannot tell us
+// whether an unfamiliar provider-discovered model is unavailable or simply new.
+const LEGACY_MODEL_IDS: Partial<Record<AIPlatform, Record<string, string>>> = {
+  anthropic: {
+    'claude-sonnet-4-20250514': 'claude-sonnet-4-6',
+    'claude-sonnet-4-5': 'claude-sonnet-4-6',
+    'claude-opus-4-1': 'claude-opus-4-8',
+    'claude-haiku-4-20250514': 'claude-haiku-4-5',
+  },
+  google: {
+    'gemini-1.5-pro': 'gemini-2.5-pro',
+    'gemini-1.5-flash': 'gemini-2.5-flash',
+  },
+};
 
-/**
- * Resolve a (possibly stale or older) model id to one currently offered for the
- * platform. Exact match wins; otherwise best-effort match by family — e.g. a
- * retired `claude-sonnet-4-20250514` or an older `claude-sonnet-4-5` resolves to
- * the current `claude-sonnet-4-6` — and as a last resort the platform default.
- * This keeps a saved preference pointing at a now-retired snapshot from 404ing
- * (GB-893); the model lists themselves still need to be kept current.
- */
+/** Preserve provider model IDs; default only when no model was selected. */
 export function resolveModelId(platform: AIPlatform, modelId: string): string {
-  const models = MODELS[platform];
-  if (models.some(m => m.id === modelId)) return modelId;
-  const family = modelFamily(modelId);
-  const familyMatch = models.find(m => modelFamily(m.id) === family);
-  return familyMatch ? familyMatch.id : getDefaultModel(platform);
+  if (modelId.trim() === '') return getDefaultModel(platform);
+  const migrations = LEGACY_MODEL_IDS[platform];
+  return migrations && Object.hasOwn(migrations, modelId) ? migrations[modelId] : modelId;
 }
