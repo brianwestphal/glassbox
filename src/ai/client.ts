@@ -47,6 +47,17 @@ const OpenAIResponseSchema = z.object({
   usage: z.object({ prompt_tokens: z.number(), completion_tokens: z.number() }).loose(),
 }).loose();
 
+const OpenAIResponsesSchema = z.object({
+  status: z.string(),
+  output: z.array(z.object({
+    type: z.string(),
+    content: z.array(z.object({ type: z.string(), text: z.string().optional(), refusal: z.string().optional() }).loose()).optional(),
+  }).loose()),
+  usage: z.object({ input_tokens: z.number(), output_tokens: z.number() }).loose().nullish(),
+  incomplete_details: z.object({ reason: z.string() }).loose().nullish(),
+  error: z.object({ message: z.string() }).loose().nullish(),
+}).loose();
+
 // Local OpenAI-compatible servers (Ollama, LM Studio, …) follow the OpenAI
 // shape but don't always return `usage` — keep it optional so a missing token
 // count degrades to 0 rather than failing the parse.
@@ -162,6 +173,10 @@ async function sendOpenAIRequest(
   systemPrompt: string,
   messages: AIMessage[],
 ): Promise<AIResponse> {
+  // GPT-5.5 Pro and its snapshots require Responses rather than Chat Completions.
+  if (/^gpt-5\.5-pro(?:-\d{4}-\d{2}-\d{2})?$/.test(model)) {
+    return sendOpenAIResponsesRequest(apiKey, model, systemPrompt, messages);
+  }
   const oaiMessages = [
     { role: 'system' as const, content: systemPrompt },
     ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -190,6 +205,33 @@ async function sendOpenAIRequest(
     inputTokens: data.usage.prompt_tokens,
     outputTokens: data.usage.completion_tokens,
   };
+}
+
+async function sendOpenAIResponsesRequest(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  messages: AIMessage[],
+): Promise<AIResponse> {
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, instructions: systemPrompt, input: messages,
+      max_output_tokens: MAX_OUTPUT_TOKENS, store: false }),
+  });
+  await throwIfNotOk(response, 'OpenAI API error');
+  const raw: unknown = await response.json();
+  const data = OpenAIResponsesSchema.parse(raw);
+  if (data.status !== 'completed') {
+    throw new Error(`OpenAI response ${data.status}: ${data.error?.message ?? data.incomplete_details?.reason ?? 'no completed output'}`);
+  }
+  // Reasoning items can precede messages; only message output_text is analysis.
+  const parts = data.output.filter(item => item.type === 'message').flatMap(item => item.content ?? []);
+  const refusal = parts.find(part => part.type === 'refusal');
+  if (refusal) throw new Error(`OpenAI response refused: ${refusal.refusal ?? 'no analysis returned'}`);
+  const content = parts.filter(part => part.type === 'output_text').map(part => part.text ?? '').join('');
+  if (content.trim() === '') throw new Error('OpenAI response contained no text output');
+  return { content, inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 };
 }
 
 /**

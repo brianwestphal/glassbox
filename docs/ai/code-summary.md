@@ -938,3 +938,5 @@ two documents intentionally overlap.
 - `docs/tauri-setup.md` — certificates, signing keys, GitHub secrets.
 - `docs/1-review-workflow.md` … `docs/31-plugin-lifecycle-hooks.md` — numbered
   functional / non-functional requirements.
+
+`src/ai/client.ts` routes GPT-5.5 Pro (including dated snapshots) through `/v1/responses` with response storage disabled. It extracts completed message text, ignores reasoning items, preserves token usage, and rejects incomplete/empty/refused output. Other OpenAI models retain Chat Completions.

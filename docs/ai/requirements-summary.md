@@ -1285,3 +1285,5 @@ Also keep `CLAUDE.md`'s requirements index in sync with `docs/`.
 - `docs/tauri-setup.md` — signing / certificates / GitHub secrets
 - `docs/ai/code-summary.md` — the companion code map
 - `CLAUDE.md` — project rules and conventions
+
+**GPT-5.5 Pro analysis — Shipped:** the model and dated snapshots use Responses with storage disabled; unfinished, refused, or empty responses fail clearly instead of becoming analysis results.
